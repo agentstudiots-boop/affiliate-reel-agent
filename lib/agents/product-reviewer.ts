@@ -9,6 +9,8 @@ export async function reviewProduct(candidate: Candidate) {
   const now = new Date();
   const recentStart = new Date(now);
   recentStart.setMonth(recentStart.getMonth() - 6);
+  const toWholeSecondIso = (date: Date) =>
+    date.toISOString().replace(/\.\d{3}Z$/, "Z");
 
   return generateText({
     model: google("gemini-3.5-flash-lite"),
@@ -16,8 +18,8 @@ export async function reviewProduct(candidate: Candidate) {
       google_search: google.tools.googleSearch({
         searchTypes: { webSearch: {} },
         timeRangeFilter: {
-          startTime: recentStart.toISOString(),
-          endTime: now.toISOString(),
+          startTime: toWholeSecondIso(recentStart),
+          endTime: toWholeSecondIso(now),
         },
       }),
     },
