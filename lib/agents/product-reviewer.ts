@@ -14,6 +14,7 @@ export async function reviewProduct(candidate: Candidate) {
 
   return generateText({
     model: google("gemini-3.5-flash-lite"),
+    maxRetries: 0,
     tools: {
       google_search: google.tools.googleSearch({
         searchTypes: { webSearch: {} },

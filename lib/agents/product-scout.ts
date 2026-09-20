@@ -11,6 +11,7 @@ export async function scoutProducts() {
 
   return generateText({
     model: google("gemini-3.5-flash-lite"),
+    maxRetries: 0,
     tools: {
       google_search: google.tools.googleSearch({
         searchTypes: { webSearch: {} },
