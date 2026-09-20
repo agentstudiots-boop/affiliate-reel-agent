@@ -1,32 +1,27 @@
 import { google } from "@ai-sdk/google";
 import { generateText, Output } from "ai";
 import { productReviewSchema, trendCandidateSchema } from "@/lib/schema";
+import { tavilyContext, tavilySearch, tavilySources } from "@/lib/tavily";
 import type { z } from "zod";
 
 type Candidate = z.infer<typeof trendCandidateSchema>;
 
 export async function reviewProduct(candidate: Candidate) {
-  const now = new Date();
-  const recentStart = new Date(now);
-  recentStart.setMonth(recentStart.getMonth() - 6);
-  const toWholeSecondIso = (date: Date) =>
-    date.toISOString().replace(/\.\d{3}Z$/, "Z");
+  const searchResults = await tavilySearch({
+    query: `${candidate.name} Deutschland Eigenschaften Erfahrungen Nachteile Hersteller`,
+    timeRange: "year",
+    maxResults: 8,
+  });
 
-  return generateText({
+  const result = await generateText({
     model: google("gemini-3.5-flash-lite"),
     maxRetries: 0,
-    tools: {
-      google_search: google.tools.googleSearch({
-        searchTypes: { webSearch: {} },
-        timeRangeFilter: {
-          startTime: toWholeSecondIso(recentStart),
-          endTime: toWholeSecondIso(now),
-        },
-      }),
-    },
     output: Output.object({ schema: productReviewSchema }),
     prompt: `Du bist die unabhängige Produkt-Prüfabteilung. Prüfe diesen Kandidaten anhand aktueller, seriöser Webquellen:
 ${JSON.stringify(candidate, null, 2)}
+
+Nutze ausschließlich diese Tavily-Suchergebnisse als Webgrundlage:
+${tavilyContext(searchResults)}
 
 Regeln:
 - Trenne belegbare Eigenschaften von Werbeaussagen.
@@ -37,4 +32,6 @@ Regeln:
 - approvalRecommendation ist nur true, wenn mindestens zwei sinnvolle, belegbare Nutzenargumente vorliegen.
 - Gib keine medizinische, rechtliche oder finanzielle Empfehlung.`,
   });
+
+  return { output: result.output, sources: tavilySources(searchResults) };
 }
