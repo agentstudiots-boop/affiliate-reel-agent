@@ -1,7 +1,7 @@
 import { amazonSearchUrls, createAmazonAffiliateUrl } from "@/lib/amazon";
 import { reviewProduct } from "@/lib/agents/product-reviewer";
 import { scoutProducts } from "@/lib/agents/product-scout";
-import { scriptWriterAgent } from "@/lib/agents/script-writer";
+import { writeReelConcept } from "@/lib/agents/script-writer";
 import type { Product } from "@/lib/types";
 
 function webSources(sources: Awaited<ReturnType<typeof scoutProducts>>["sources"]) {
@@ -32,8 +32,6 @@ export async function runScriptWriter(product: Product) {
     ...product,
     affiliateUrl: createAmazonAffiliateUrl(product.affiliateUrl || product.sourceUrl),
   };
-  const { output } = await scriptWriterAgent.generate({
-    prompt: `Erstelle das Reel-Konzept für dieses vom Menschen freigegebene Produkt:\n${JSON.stringify(reviewedProduct, null, 2)}`,
-  });
-  return { concept: output, affiliateUrl: reviewedProduct.affiliateUrl };
+  const concept = writeReelConcept(reviewedProduct);
+  return { concept, affiliateUrl: reviewedProduct.affiliateUrl };
 }

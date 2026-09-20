@@ -10,10 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ai-sdk/google": "^4.0.76",
     "@runwayml/sdk": "^4.20.0",
     "@vercel/blob": "^2.8.0",
-    "ai": "latest",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest",

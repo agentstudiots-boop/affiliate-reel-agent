@@ -12,7 +12,7 @@ Die kleinste messbare Version des Agenten-Projekts:
 
 - Next.js App Router + TypeScript
 - Vercel AI SDK mit `ToolLoopAgent`
-- Google Gemini API (`gemini-3.5-flash-lite`)
+- Tavily-Suche mit regelbasierten, stabilen Entwurfsvorlagen
 - Tavily-Suche für aktuelle und saisonale Produktsignale
 - Automatische Amazon-Partnerlinks mit `AMAZON_ASSOCIATE_TAG`
 - Runway `gen4_turbo` für kontrollierte 10-Sekunden-Clips
@@ -28,7 +28,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Für lokale KI-Ausgaben `GOOGLE_GENERATIVE_AI_API_KEY`, für aktuelle Webrecherche `TAVILY_API_KEY` und für Amazon-Links `AMAZON_ASSOCIATE_TAG` in `.env.local` setzen. Für Videos werden zusätzlich `RUNWAYML_API_SECRET` und `BLOB_READ_WRITE_TOKEN` benötigt. Die Datei wird von Git ignoriert.
+Für aktuelle Webrecherche `TAVILY_API_KEY` und für Amazon-Links `AMAZON_ASSOCIATE_TAG` in `.env.local` setzen. Für Videos werden zusätzlich `RUNWAYML_API_SECRET` und `BLOB_READ_WRITE_TOKEN` benötigt. Die Datei wird von Git ignoriert.
 
 ## Runway-Videos mit Schutzlimit
 
@@ -57,8 +57,7 @@ git push -u origin main
 
 1. Repository in Vercel importieren.
 2. Framework-Preset `Next.js` verwenden.
-3. `GOOGLE_GENERATIVE_AI_API_KEY` in den Vercel-Umgebungsvariablen hinterlegen.
-4. `TAVILY_API_KEY` für die aktuelle Webrecherche hinterlegen.
+3. `TAVILY_API_KEY` für die aktuelle Webrecherche hinterlegen.
 5. `AMAZON_ASSOCIATE_TAG` mit der Tracking-ID, z. B. `alltaeglichle-21`, hinterlegen.
 6. Einen Vercel-Blob-Store verbinden; dadurch wird `BLOB_READ_WRITE_TOKEN` gesetzt.
 7. `RUNWAYML_API_SECRET` und `RUNWAY_MONTHLY_BUDGET_CREDITS=1800` hinterlegen.
