@@ -3,10 +3,8 @@ import { currentMonthRange, getRunwayClient, monthlyBudgetCredits, RUNWAY_DURATI
 
 export const runtime = "nodejs";
 const requestSchema = z.object({
-  imageUrl: z.string().url().startsWith("https://"),
   productName: z.string().min(2).max(160),
   prompt: z.string().min(10).max(900),
-  rightsConfirmed: z.literal(true),
 });
 
 export async function POST(request: Request) {
@@ -19,10 +17,9 @@ export async function POST(request: Request) {
     if (usedCredits + RUNWAY_ESTIMATED_CREDITS > budgetCredits) {
       return Response.json({ error: `Monatslimit erreicht: ${usedCredits} von ${budgetCredits} Credits verbraucht. Kein Video gestartet.` }, { status: 402 });
     }
-    const task = await client.imageToVideo.create({
+    const task = await client.textToVideo.create({
       model: RUNWAY_MODEL,
-      promptImage: input.imageUrl,
-      promptText: `Vertical product advertisement for ${input.productName}. ${input.prompt} Keep the product recognizable and unchanged. Natural realistic motion, clean lighting, no text, no logos added, no people, no unsupported claims.`,
+      promptText: `Vertical generic lifestyle advertisement for the product category ${input.productName}. ${input.prompt} Create an original unbranded visualization, not a copy of an Amazon listing or a specific manufacturer's product. Natural realistic motion, clean lighting, no text, no logos, no packaging, no people, no prices, no medical or unsupported claims.`,
       ratio: RUNWAY_RATIO,
       duration: RUNWAY_DURATION_SECONDS,
     });

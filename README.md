@@ -28,7 +28,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Für aktuelle Webrecherche `TAVILY_API_KEY` und für Amazon-Links `AMAZON_ASSOCIATE_TAG` in `.env.local` setzen. Für Videos werden zusätzlich `RUNWAYML_API_SECRET` und `BLOB_READ_WRITE_TOKEN` benötigt. Die Datei wird von Git ignoriert.
+Für aktuelle Webrecherche `TAVILY_API_KEY` und für Amazon-Links `AMAZON_ASSOCIATE_TAG` in `.env.local` setzen. Für automatisch erzeugte Videos wird zusätzlich `RUNWAYML_API_SECRET` benötigt. Die Datei wird von Git ignoriert.
 
 ## Runway-Videos mit Schutzlimit
 

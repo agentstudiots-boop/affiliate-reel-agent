@@ -1,9 +1,10 @@
 import RunwayML from "@runwayml/sdk";
 
-export const RUNWAY_MODEL = "gen4_turbo" as const;
+export const RUNWAY_MODEL = "gen4.5" as const;
 export const RUNWAY_DURATION_SECONDS = 10;
 export const RUNWAY_RATIO = "720:1280" as const;
-export const RUNWAY_ESTIMATED_CREDITS = 50;
+// Konservative Vorab-Reserve; die API liefert nach dem Start die echten Maximal-Credits.
+export const RUNWAY_ESTIMATED_CREDITS = 150;
 
 export function getRunwayClient() {
   if (!process.env.RUNWAYML_API_SECRET) throw new Error("RUNWAYML_API_SECRET fehlt in Vercel.");

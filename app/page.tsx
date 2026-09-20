@@ -276,8 +276,6 @@ function Concept({ concept }: { concept: ReelConcept }) {
 }
 
 function VideoStudio({ product, concept }: { product: Product; concept: ReelConcept }) {
-  const [file, setFile] = useState<File | null>(null);
-  const [rightsConfirmed, setRightsConfirmed] = useState(false);
   const [taskId, setTaskId] = useState("");
   const [jobStatus, setJobStatus] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
@@ -309,22 +307,15 @@ function VideoStudio({ product, concept }: { product: Product; concept: ReelConc
   }, [jobStatus, taskId, videoUrl]);
 
   async function createVideo() {
-    if (!file || !rightsConfirmed) return;
-    if (!window.confirm("Jetzt einen 10-Sekunden-Clip für maximal ca. 50 Runway-Credits (ca. 0,50 US-Dollar) starten?")) return;
+    if (!window.confirm("Der Agent erzeugt jetzt selbst einen neutralen 10-Sekunden-Clip. Dabei werden Runway-Credits verbraucht. Fortfahren?")) return;
     setBusy(true);
     setVideoError("");
     try {
-      const form = new FormData();
-      form.set("file", file);
-      const uploadResponse = await fetch("/api/assets/upload", { method: "POST", body: form });
-      const upload = await uploadResponse.json();
-      if (!uploadResponse.ok) throw new Error(upload.error || "Produktfoto konnte nicht gespeichert werden.");
-
       const visual = concept.scenes.map((scene) => scene.visual).join(" ").slice(0, 700);
       const response = await fetch("/api/video/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageUrl: upload.url, productName: product.name, prompt: visual, rightsConfirmed: true }),
+        body: JSON.stringify({ productName: product.name, prompt: visual }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Video konnte nicht gestartet werden.");
@@ -339,11 +330,9 @@ function VideoStudio({ product, concept }: { product: Product; concept: ReelConc
 
   return <section className="videoStudio">
     <h3>Runway-Videostudio</h3>
-    <p className="videoNote">Ein kontrollierter Testclip: 10 Sekunden, Hochformat, keine automatischen Wiederholungen. Das Monatslimit liegt standardmäßig bei 1.800 Credits.</p>
+    <p className="videoNote">Der Agent erzeugt selbst einen neutralen 10-Sekunden-Clip im Hochformat. Er kopiert kein Amazon-Bild und bildet nicht zwingend das exakte Produktmodell ab. Keine automatischen Wiederholungen.</p>
     {!videoUrl && <>
-      <label>Eigenes Produktfoto (JPG, PNG oder WebP; max. 4 MB)<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label>
-      <label className="checkLabel"><input type="checkbox" checked={rightsConfirmed} onChange={(event) => setRightsConfirmed(event.target.checked)} /><span>Ich darf dieses Foto für Werbung verwenden. Es wurde nicht unerlaubt von Amazon kopiert.</span></label>
-      <button className="primary" type="button" disabled={busy || !file || !rightsConfirmed} onClick={createVideo}>{busy ? `Runway: ${jobStatus || "Upload"} …` : "10-Sekunden-Clip erzeugen"}</button>
+      <button className="primary" type="button" disabled={busy} onClick={createVideo}>{busy ? `Runway: ${jobStatus || "Start"} …` : "Agent erstellt 10-Sekunden-Clip"}</button>
     </>}
     {costCredits !== null && <small className="cost">Runway-Kosten: {costCredits} Credits ≈ {(costCredits / 100).toFixed(2)} US-Dollar</small>}
     {videoError && <p className="error">{videoError}</p>}
