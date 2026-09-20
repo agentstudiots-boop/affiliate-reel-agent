@@ -12,7 +12,7 @@ Die kleinste messbare Version des Agenten-Projekts:
 
 - Next.js App Router + TypeScript
 - Vercel AI SDK mit `ToolLoopAgent`
-- Vercel AI Gateway (`openai/gpt-5.6-luna`)
+- Google Gemini API (`gemini-3.8-flash`)
 - Browser-Speicher für einen v0.1-Testlauf
 - Keine automatische Veröffentlichung und keine ungeprüften Werbeversprechen
 
@@ -24,7 +24,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Für lokale KI-Ausgaben `AI_GATEWAY_API_KEY` in `.env.local` setzen. Die Datei wird von Git ignoriert.
+Für lokale KI-Ausgaben `GOOGLE_GENERATIVE_AI_API_KEY` in `.env.local` setzen. Den Schlüssel gibt es unter [Google AI Studio](https://aistudio.google.com/api-keys). Die Datei wird von Git ignoriert.
 
 ## Auf GitHub bereitstellen
 
@@ -41,7 +41,7 @@ git push -u origin main
 
 1. Repository in Vercel importieren.
 2. Framework-Preset `Next.js` verwenden.
-3. AI Gateway im Projekt aktivieren bzw. `AI_GATEWAY_API_KEY` hinterlegen.
+3. `GOOGLE_GENERATIVE_AI_API_KEY` in den Vercel-Umgebungsvariablen hinterlegen.
 4. Deploy ausführen.
 
 Alternativ nach Anmeldung über die CLI:
@@ -61,4 +61,3 @@ npx vercel deploy
 - Vor jeder Veröffentlichung ist eine menschliche Freigabe erforderlich.
 
 Diese Grenzen halten den ersten Test klein. Erst nach einem vollständigen Durchlauf werden Datenbank, Produktquellen, Videogenerierung, Partnerprogramme und Social-APIs ergänzt.
-
