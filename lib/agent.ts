@@ -3,7 +3,7 @@ import { Output, ToolLoopAgent } from "ai";
 import { reelConceptSchema } from "@/lib/schema";
 
 export const reelAgent = new ToolLoopAgent({
-  model: google("gemini-3.8-flash"),
+  model: google("gemini-2.5-flash-lite"),
   instructions: `Du bist ein deutschsprachiger Affiliate-Reel-Redakteur.
 Erstelle ein ehrliches, konkretes Reel-Konzept für genau ein Produkt.
 Keine erfundenen Tests, Bewertungen, Rabatte, Lieferzeiten oder Eigenschaften.
