@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import type { Product, ProjectState, ReelConcept, WorkflowStatus } from "@/lib/types";
+import type { Product, ProductReview, ProjectState, ReelConcept, TrendCandidate, TrendReport, WorkflowStatus } from "@/lib/types";
 
 const emptyProduct: Product = {
   name: "",
@@ -35,6 +35,10 @@ export default function Home() {
   const [state, setState] = useState<ProjectState>(initialState);
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [scouting, setScouting] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [trendReport, setTrendReport] = useState<TrendReport | null>(null);
+  const [productReview, setProductReview] = useState<ProductReview | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -57,6 +61,7 @@ export default function Home() {
   }
 
   function updateProduct(field: keyof Product, value: string) {
+    setProductReview(null);
     setState((current) => ({
       ...current,
       product: { ...current.product, [field]: value },
@@ -67,6 +72,10 @@ export default function Home() {
 
   async function generate(event: FormEvent) {
     event.preventDefault();
+    if (!productReview) {
+      setError("Der Orchestrator benötigt zuerst die Freigabe der Produkt-Prüfung.");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
@@ -77,7 +86,11 @@ export default function Home() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Der Agent konnte keinen Entwurf erstellen.");
-      patch({ concept: data as ReelConcept, status: "generated" });
+      patch({
+        concept: data.concept,
+        product: { ...state.product, affiliateUrl: data.affiliateUrl },
+        status: "generated",
+      });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unbekannter Fehler");
     } finally {
@@ -85,8 +98,83 @@ export default function Home() {
     }
   }
 
+  async function scoutTrends() {
+    setScouting(true);
+    setError("");
+    try {
+      const response = await fetch("/api/trends", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Der Trend-Scout konnte nicht recherchieren.");
+      setTrendReport(data as TrendReport);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unbekannter Fehler");
+    } finally {
+      setScouting(false);
+    }
+  }
+
+  async function chooseTrend(candidate: TrendCandidate) {
+    setVerifying(true);
+    setError("");
+    try {
+      const response = await fetch("/api/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(candidate),
+      });
+      const review = await response.json();
+      if (!response.ok) throw new Error(review.error || "Die Produkt-Prüfung ist fehlgeschlagen.");
+      const typedReview = review as ProductReview;
+      if (!typedReview.approvalRecommendation) throw new Error("Die Prüfabteilung empfiehlt diesen Kandidaten derzeit nicht. Bitte einen anderen wählen.");
+
+      setProductReview(typedReview);
+    setState((current) => ({
+      ...current,
+      product: {
+        ...emptyProduct,
+        name: typedReview.normalizedName,
+        sourceUrl: candidate.amazonUrl,
+        affiliateUrl: candidate.affiliateUrl,
+        price: "Aktueller Preis siehe Amazon",
+        targetGroup: typedReview.targetGroup,
+        benefits: typedReview.verifiedBenefits.join("; "),
+        notes: `${typedReview.cautions.join("; ")} Keine erfundenen Tests, Preise, Rabatte oder Garantien behaupten.`,
+      },
+      concept: null,
+      status: "draft",
+      updatedAt: new Date().toISOString(),
+    }));
+      document.querySelector(".grid")?.scrollIntoView({ behavior: "smooth" });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unbekannter Fehler");
+    } finally {
+      setVerifying(false);
+    }
+  }
+
+  async function verifyManualProduct() {
+    const candidate: TrendCandidate = {
+      name: state.product.name,
+      category: "Manuell eingetragen",
+      kind: "Dauerläufer",
+      season: "Vom Nutzer ausgewählt",
+      whyNow: "Manuelle Produktauswahl zur unabhängigen Prüfung",
+      reelIdea: "Praktischen Nutzen demonstrieren",
+      targetGroup: state.product.targetGroup || "Noch zu prüfen",
+      benefitsToVerify: state.product.benefits ? [state.product.benefits, "Eignung für ein kurzes Demonstrationsvideo"] : ["Produkteigenschaften", "Eignung für ein kurzes Demonstrationsvideo"],
+      searchQuery: state.product.name,
+      confidence: 50,
+      amazonUrl: state.product.sourceUrl,
+      affiliateUrl: state.product.affiliateUrl,
+    };
+    await chooseTrend(candidate);
+  }
+
   function reset() {
-    if (window.confirm("Aktuellen Test wirklich zurücksetzen?")) setState({ ...initialState, updatedAt: new Date().toISOString() });
+    if (window.confirm("Aktuellen Test wirklich zurücksetzen?")) {
+      setProductReview(null);
+      setState({ ...initialState, updatedAt: new Date().toISOString() });
+    }
   }
 
   return (
@@ -107,13 +195,36 @@ export default function Home() {
         })}
       </nav>
 
+      <section className="scout panel">
+        <div className="scoutHead">
+          <div className="panelTitle"><span>00</span><div><h2>Trend-Scout</h2><p>Aktuelle Signale + Saisonkalender + Dauerläufer.</p></div></div>
+          <button className="primary scoutButton" type="button" disabled={scouting} onClick={scoutTrends}>
+            {scouting ? "Trends werden recherchiert …" : "Produkte finden"}
+          </button>
+        </div>
+        {!trendReport ? <p className="scoutIntro">Der Scout sucht fünf Kandidaten für Deutschland und trennt aktuelle Trends, Saisonprodukte und ganzjährige Dauerläufer.</p> : <>
+          <p className="scoutSummary">{trendReport.summary}</p>
+          <div className="trendGrid">{trendReport.candidates.map((candidate) => <article className="trendCard" key={`${candidate.kind}-${candidate.name}`}>
+            <div className="trendMeta"><span>{candidate.kind}</span><small>{candidate.confidence}% Signalstärke</small></div>
+            <h3>{candidate.name}</h3>
+            <p>{candidate.whyNow}</p>
+            <small>{candidate.season} · {candidate.category}</small>
+            <div className="trendActions">
+              <a href={candidate.amazonUrl} target="_blank" rel="noopener">Bei Amazon prüfen ↗</a>
+              <button type="button" disabled={verifying} onClick={() => chooseTrend(candidate)}>{verifying ? "Prüfung läuft …" : "Prüfen & übernehmen"}</button>
+            </div>
+          </article>)}</div>
+          {trendReport.sources.length > 0 && <details className="sources"><summary>Recherchequellen anzeigen</summary>{trendReport.sources.map((source) => <a key={source.url} href={source.url} target="_blank" rel="noopener">{source.title || source.url}</a>)}</details>}
+        </>}
+      </section>
+
       <section className="grid">
         <form className="panel" onSubmit={generate}>
           <div className="panelTitle"><span>01</span><div><h2>Produkt erfassen</h2><p>Nur belegbare Angaben eintragen.</p></div></div>
           <label>Produktname<input required value={state.product.name} onChange={(e) => updateProduct("name", e.target.value)} placeholder="z. B. Microplane Premium Classic" /></label>
           <div className="two">
-            <label>Produktseite<input required type="url" value={state.product.sourceUrl} onChange={(e) => updateProduct("sourceUrl", e.target.value)} placeholder="https://…" /></label>
-            <label>Affiliate-Link<input required type="url" value={state.product.affiliateUrl} onChange={(e) => updateProduct("affiliateUrl", e.target.value)} placeholder="https://…" /></label>
+            <label>Amazon-Produktseite<input required type="url" value={state.product.sourceUrl} onChange={(e) => updateProduct("sourceUrl", e.target.value)} placeholder="https://www.amazon.de/…" /></label>
+            <label>Affiliate-Link (automatisch)<input type="url" value={state.product.affiliateUrl} onChange={(e) => updateProduct("affiliateUrl", e.target.value)} placeholder="Wird aus der Produktseite erzeugt" /></label>
           </div>
           <div className="two">
             <label>Preis<input value={state.product.price} onChange={(e) => updateProduct("price", e.target.value)} placeholder="z. B. 24,90 €" /></label>
@@ -121,14 +232,17 @@ export default function Home() {
           </div>
           <label>Belegbare Vorteile<textarea required value={state.product.benefits} onChange={(e) => updateProduct("benefits", e.target.value)} placeholder="Eigenschaften, eigener Eindruck, Nutzen …" /></label>
           <label>Hinweise / Einschränkungen<textarea value={state.product.notes} onChange={(e) => updateProduct("notes", e.target.value)} placeholder="Was darf der Agent nicht behaupten?" /></label>
+          {productReview && <div className="reviewBox"><strong>✓ Produkt-Prüfung bestanden · {productReview.confidence}% Sicherheit</strong><p>{productReview.evidenceSummary}</p><small>Der Drehbuch-Agent verwendet nur die geprüften Nutzenargumente.</small></div>}
           {error && <p className="error">{error}</p>}
-          <button className="primary" disabled={loading}>{loading ? "Agent arbeitet …" : "Reel-Entwurf erstellen"}</button>
+          {!productReview && <button className="secondary" type="button" disabled={verifying || !state.product.name || !state.product.sourceUrl} onClick={verifyManualProduct}>{verifying ? "Prüfabteilung arbeitet …" : "Produktangaben prüfen"}</button>}
+          <button className="primary" disabled={loading || !productReview}>{loading ? "Drehbuch-Agent arbeitet …" : productReview ? "Reel-Entwurf erstellen" : "Erst Produkt prüfen"}</button>
         </form>
 
         <section className="panel result">
           <div className="panelTitle"><span>02</span><div><h2>Reel & Freigabe</h2><p>Menschen behalten die letzte Entscheidung.</p></div></div>
           {!state.concept ? <div className="empty"><b>Noch kein Entwurf</b><p>Links ein Produkt eintragen und den Agenten starten.</p></div> : <Concept concept={state.concept} />}
           {state.concept && state.status === "generated" && <button className="primary approve" onClick={() => patch({ status: "approved" })}>Entwurf freigeben</button>}
+          {state.concept && (state.status === "approved" || state.status === "published") && <VideoStudio product={state.product} concept={state.concept} />}
           {state.status === "approved" && <div className="publish"><label>URL des veröffentlichten Reels<input value={state.publishedUrl} onChange={(e) => patch({ publishedUrl: e.target.value })} placeholder="https://instagram.com/…" /></label><button className="primary" onClick={() => patch({ status: "published" })}>Als veröffentlicht markieren</button></div>}
           {state.status === "published" && <div className="success">✓ Reel als veröffentlicht erfasst</div>}
         </section>
@@ -159,4 +273,80 @@ function Concept({ concept }: { concept: ReelConcept }) {
     <h3>CTA & Kennzeichnung</h3><p>{concept.cta}</p><p className="disclosure">{concept.disclosure}</p>
     <h3>Vor Veröffentlichung prüfen</h3><ul>{concept.checks.map((check) => <li key={check}>{check}</li>)}</ul>
   </div>;
+}
+
+function VideoStudio({ product, concept }: { product: Product; concept: ReelConcept }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [rightsConfirmed, setRightsConfirmed] = useState(false);
+  const [taskId, setTaskId] = useState("");
+  const [jobStatus, setJobStatus] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
+  const [costCredits, setCostCredits] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [videoError, setVideoError] = useState("");
+
+  useEffect(() => {
+    if (!taskId || videoUrl || jobStatus === "FAILED" || jobStatus === "CANCELLED") return;
+    const poll = window.setInterval(async () => {
+      try {
+        const response = await fetch(`/api/video/status?taskId=${encodeURIComponent(taskId)}`);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Video-Status nicht verfügbar.");
+        setJobStatus(data.status);
+        if (typeof data.costCredits === "number") setCostCredits(data.costCredits);
+        if (data.error) setVideoError(data.error);
+        if (data.videoUrl) {
+          setVideoUrl(data.videoUrl);
+          setBusy(false);
+        }
+        if (data.status === "FAILED" || data.status === "CANCELLED") setBusy(false);
+      } catch (caught) {
+        setVideoError(caught instanceof Error ? caught.message : "Video-Status nicht verfügbar.");
+        setBusy(false);
+      }
+    }, 6000);
+    return () => window.clearInterval(poll);
+  }, [jobStatus, taskId, videoUrl]);
+
+  async function createVideo() {
+    if (!file || !rightsConfirmed) return;
+    if (!window.confirm("Jetzt einen 10-Sekunden-Clip für maximal ca. 50 Runway-Credits (ca. 0,50 US-Dollar) starten?")) return;
+    setBusy(true);
+    setVideoError("");
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      const uploadResponse = await fetch("/api/assets/upload", { method: "POST", body: form });
+      const upload = await uploadResponse.json();
+      if (!uploadResponse.ok) throw new Error(upload.error || "Produktfoto konnte nicht gespeichert werden.");
+
+      const visual = concept.scenes.map((scene) => scene.visual).join(" ").slice(0, 700);
+      const response = await fetch("/api/video/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: upload.url, productName: product.name, prompt: visual, rightsConfirmed: true }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Video konnte nicht gestartet werden.");
+      setTaskId(data.taskId);
+      setJobStatus("PENDING");
+      setCostCredits(data.estimatedCredits);
+    } catch (caught) {
+      setVideoError(caught instanceof Error ? caught.message : "Video konnte nicht gestartet werden.");
+      setBusy(false);
+    }
+  }
+
+  return <section className="videoStudio">
+    <h3>Runway-Videostudio</h3>
+    <p className="videoNote">Ein kontrollierter Testclip: 10 Sekunden, Hochformat, keine automatischen Wiederholungen. Das Monatslimit liegt standardmäßig bei 1.800 Credits.</p>
+    {!videoUrl && <>
+      <label>Eigenes Produktfoto (JPG, PNG oder WebP; max. 4 MB)<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label>
+      <label className="checkLabel"><input type="checkbox" checked={rightsConfirmed} onChange={(event) => setRightsConfirmed(event.target.checked)} /><span>Ich darf dieses Foto für Werbung verwenden. Es wurde nicht unerlaubt von Amazon kopiert.</span></label>
+      <button className="primary" type="button" disabled={busy || !file || !rightsConfirmed} onClick={createVideo}>{busy ? `Runway: ${jobStatus || "Upload"} …` : "10-Sekunden-Clip erzeugen"}</button>
+    </>}
+    {costCredits !== null && <small className="cost">Runway-Kosten: {costCredits} Credits ≈ {(costCredits / 100).toFixed(2)} US-Dollar</small>}
+    {videoError && <p className="error">{videoError}</p>}
+    {videoUrl && <div className="videoReady"><video controls playsInline src={videoUrl} /><a className="track" href={videoUrl} target="_blank" rel="noopener">MP4 öffnen / herunterladen ↗</a><p>Erst prüfen. Danach kann der Clip über Windsor veröffentlicht und in Google Drive archiviert werden.</p></div>}
+  </section>;
 }

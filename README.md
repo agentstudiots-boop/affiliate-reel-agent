@@ -1,4 +1,4 @@
-# Affiliate Reel Agent v0.1
+# Affiliate Reel Agent v0.2
 
 Die kleinste messbare Version des Agenten-Projekts:
 
@@ -12,7 +12,11 @@ Die kleinste messbare Version des Agenten-Projekts:
 
 - Next.js App Router + TypeScript
 - Vercel AI SDK mit `ToolLoopAgent`
-- Google Gemini API (`gemini-3.8-flash`)
+- Google Gemini API (`gemini-3.5-flash-lite`)
+- Google-Suche für aktuelle und saisonale Produktsignale
+- Automatische Amazon-Partnerlinks mit `AMAZON_ASSOCIATE_TAG`
+- Runway `gen4_turbo` für kontrollierte 10-Sekunden-Clips
+- Vercel Blob für Produktbilder und dauerhafte MP4-Dateien
 - Browser-Speicher für einen v0.1-Testlauf
 - Keine automatische Veröffentlichung und keine ungeprüften Werbeversprechen
 
@@ -24,7 +28,19 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Für lokale KI-Ausgaben `GOOGLE_GENERATIVE_AI_API_KEY` in `.env.local` setzen. Den Schlüssel gibt es unter [Google AI Studio](https://aistudio.google.com/api-keys). Die Datei wird von Git ignoriert.
+Für lokale KI-Ausgaben `GOOGLE_GENERATIVE_AI_API_KEY` und für Amazon-Links `AMAZON_ASSOCIATE_TAG` in `.env.local` setzen. Für Videos werden zusätzlich `RUNWAYML_API_SECRET` und `BLOB_READ_WRITE_TOKEN` benötigt. Die Datei wird von Git ignoriert.
+
+## Runway-Videos mit Schutzlimit
+
+Nach der menschlichen Freigabe erzeugt der MVP genau einen 10-Sekunden-Clip. Vor jedem
+Start liest der Server den echten Runway-Verbrauch des laufenden Monats. Bei standardmäßig
+1.800 Credits wird kein weiterer Auftrag gestartet. Fehlgeschlagene Aufträge werden nicht
+automatisch wiederholt. Das entspricht bei 0,01 US-Dollar pro Credit einem Schutzlimit von
+18 US-Dollar. Der Puffer hält das Monatsziel trotz Wechselkursschwankungen ungefähr unter 20 Euro.
+
+Das Produktfoto muss selbst erstellt oder zur werblichen Nutzung freigegeben sein. Die App
+kopiert das fertige Video als dauerhafte MP4 in Vercel Blob. Anschließend kann es nach einer
+Sichtprüfung über Windsor.ai veröffentlicht und in Google Drive archiviert werden.
 
 ## Auf GitHub bereitstellen
 
@@ -42,7 +58,10 @@ git push -u origin main
 1. Repository in Vercel importieren.
 2. Framework-Preset `Next.js` verwenden.
 3. `GOOGLE_GENERATIVE_AI_API_KEY` in den Vercel-Umgebungsvariablen hinterlegen.
-4. Deploy ausführen.
+4. `AMAZON_ASSOCIATE_TAG` mit der Tracking-ID, z. B. `alltaeglichle-21`, hinterlegen.
+5. Einen Vercel-Blob-Store verbinden; dadurch wird `BLOB_READ_WRITE_TOKEN` gesetzt.
+6. `RUNWAYML_API_SECRET` und `RUNWAY_MONTHLY_BUDGET_CREDITS=1800` hinterlegen.
+7. Deploy ausführen.
 
 Alternativ nach Anmeldung über die CLI:
 
@@ -56,8 +75,9 @@ npx vercel deploy
 
 - Daten liegen nur im jeweiligen Browser.
 - Klickzählung erfasst nur Klicks über den Button in dieser Anwendung.
-- Produktdaten werden noch nicht automatisch aus Shops eingelesen.
-- Das Reel wird nicht automatisch gerendert oder veröffentlicht.
+- Produktideen basieren auf Such- und Saisonsignalen, nicht auf garantierten Verkaufszahlen.
+- Exakte Amazon-Produktdaten werden ohne Freischaltung der Amazon Product Advertising API nicht automatisch eingelesen.
+- Das Reel wird gerendert, aber nicht automatisch veröffentlicht.
 - Vor jeder Veröffentlichung ist eine menschliche Freigabe erforderlich.
 
-Diese Grenzen halten den ersten Test klein. Erst nach einem vollständigen Durchlauf werden Datenbank, Produktquellen, Videogenerierung, Partnerprogramme und Social-APIs ergänzt.
+Diese Grenzen halten den ersten Test klein. Erst nach einem vollständigen Durchlauf werden Datenbank und automatische Social- oder Drive-Aktionen ergänzt.

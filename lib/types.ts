@@ -20,6 +20,40 @@ export type ReelConcept = {
   checks: string[];
 };
 
+export type TrendCandidate = {
+  name: string;
+  category: string;
+  kind: "Dauerläufer" | "Saisontrend" | "Aktueller Trend";
+  season: string;
+  whyNow: string;
+  reelIdea: string;
+  targetGroup: string;
+  benefitsToVerify: string[];
+  searchQuery: string;
+  confidence: number;
+  amazonUrl: string;
+  affiliateUrl: string;
+};
+
+export type TrendReport = {
+  summary: string;
+  researchedAt: string;
+  candidates: TrendCandidate[];
+  sources: Array<{ title?: string; url: string }>;
+};
+
+export type ProductReview = {
+  normalizedName: string;
+  evidenceSummary: string;
+  verifiedBenefits: string[];
+  cautions: string[];
+  targetGroup: string;
+  reelAngle: string;
+  confidence: number;
+  approvalRecommendation: boolean;
+  sources: Array<{ title?: string; url: string }>;
+};
+
 export type ProjectState = {
   product: Product;
   concept: ReelConcept | null;
@@ -30,4 +64,3 @@ export type ProjectState = {
   revenue: string;
   updatedAt: string;
 };
-
