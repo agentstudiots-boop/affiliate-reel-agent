@@ -1,5 +1,13 @@
 # Architektur v0.2
 
+## Redaktionelle Vorgabe
+
+Für Verkaufsargumente und Drehbücher gilt [das Drehbuch-Manifest](SCRIPT_WRITER_MANIFEST.md):
+Alltagssituation → Anwendung → konkreter Nutzen → visuelle Demonstration.
+Der derzeitige Drehbuch-Code ist vorlagenbasiert; das Vakuumierer-Beispiel setzt
+die Vorgabe exemplarisch um. Eine freie Nutzenanalyse für beliebige Produkte
+ist noch nicht implementiert.
+
 ## Ablauf
 
 `Trend-Scout → Produkt-Prüfer → menschliche Auswahl → Amazon-Linkdienst → Drehbuch-Agent → menschliche Freigabe → Runway-Clip → Sichtprüfung → Veröffentlichung → Messwerte`
