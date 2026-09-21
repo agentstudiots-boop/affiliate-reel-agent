@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { VideoStudio } from "@/app/video-studio";
 import type { Product, ProductReview, ProjectState, ReelConcept, TrendCandidate, TrendReport, WorkflowStatus } from "@/lib/types";
 
 const emptyProduct: Product = {
@@ -242,7 +243,7 @@ export default function Home() {
           <div className="panelTitle"><span>02</span><div><h2>Reel & Freigabe</h2><p>Menschen behalten die letzte Entscheidung.</p></div></div>
           {!state.concept ? <div className="empty"><b>Noch kein Entwurf</b><p>Links ein Produkt eintragen und den Agenten starten.</p></div> : <Concept concept={state.concept} />}
           {state.concept && state.status === "generated" && <button className="primary approve" onClick={() => patch({ status: "approved" })}>Entwurf freigeben</button>}
-          {state.concept && (state.status === "approved" || state.status === "published") && <VideoStudio product={state.product} concept={state.concept} />}
+          {state.concept && (state.status === "approved" || state.status === "published") && <VideoStudio key={JSON.stringify([state.product, state.concept])} product={state.product} concept={state.concept} />}
           {state.status === "approved" && <div className="publish"><label>URL des veröffentlichten Reels<input value={state.publishedUrl} onChange={(e) => patch({ publishedUrl: e.target.value })} placeholder="https://instagram.com/…" /></label><button className="primary" onClick={() => patch({ status: "published" })}>Als veröffentlicht markieren</button></div>}
           {state.status === "published" && <div className="success">✓ Reel als veröffentlicht erfasst</div>}
         </section>
@@ -273,69 +274,4 @@ function Concept({ concept }: { concept: ReelConcept }) {
     <h3>CTA & Kennzeichnung</h3><p>{concept.cta}</p><p className="disclosure">{concept.disclosure}</p>
     <h3>Vor Veröffentlichung prüfen</h3><ul>{concept.checks.map((check) => <li key={check}>{check}</li>)}</ul>
   </div>;
-}
-
-function VideoStudio({ product, concept }: { product: Product; concept: ReelConcept }) {
-  const [taskId, setTaskId] = useState("");
-  const [jobStatus, setJobStatus] = useState("");
-  const [videoUrl, setVideoUrl] = useState("");
-  const [costCredits, setCostCredits] = useState<number | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [videoError, setVideoError] = useState("");
-
-  useEffect(() => {
-    if (!taskId || videoUrl || jobStatus === "FAILED" || jobStatus === "CANCELLED") return;
-    const poll = window.setInterval(async () => {
-      try {
-        const response = await fetch(`/api/video/status?taskId=${encodeURIComponent(taskId)}`);
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "Video-Status nicht verfügbar.");
-        setJobStatus(data.status);
-        if (typeof data.costCredits === "number") setCostCredits(data.costCredits);
-        if (data.error) setVideoError(data.error);
-        if (data.videoUrl) {
-          setVideoUrl(data.videoUrl);
-          setBusy(false);
-        }
-        if (data.status === "FAILED" || data.status === "CANCELLED") setBusy(false);
-      } catch (caught) {
-        setVideoError(caught instanceof Error ? caught.message : "Video-Status nicht verfügbar.");
-        setBusy(false);
-      }
-    }, 6000);
-    return () => window.clearInterval(poll);
-  }, [jobStatus, taskId, videoUrl]);
-
-  async function createVideo() {
-    if (!window.confirm("Der Agent erzeugt jetzt selbst einen neutralen 10-Sekunden-Clip. Dabei werden Runway-Credits verbraucht. Fortfahren?")) return;
-    setBusy(true);
-    setVideoError("");
-    try {
-      const visual = concept.scenes.map((scene) => scene.visual).join(" ").slice(0, 700);
-      const response = await fetch("/api/video/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productName: product.name, prompt: visual }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Video konnte nicht gestartet werden.");
-      setTaskId(data.taskId);
-      setJobStatus("PENDING");
-      setCostCredits(data.estimatedCredits);
-    } catch (caught) {
-      setVideoError(caught instanceof Error ? caught.message : "Video konnte nicht gestartet werden.");
-      setBusy(false);
-    }
-  }
-
-  return <section className="videoStudio">
-    <h3>Runway-Videostudio</h3>
-    <p className="videoNote">Der Agent erzeugt selbst einen neutralen 10-Sekunden-Clip im Hochformat. Er kopiert kein Amazon-Bild und bildet nicht zwingend das exakte Produktmodell ab. Keine automatischen Wiederholungen.</p>
-    {!videoUrl && <>
-      <button className="primary" type="button" disabled={busy} onClick={createVideo}>{busy ? `Runway: ${jobStatus || "Start"} …` : "Agent erstellt 10-Sekunden-Clip"}</button>
-    </>}
-    {costCredits !== null && <small className="cost">Runway-Kosten: {costCredits} Credits ≈ {(costCredits / 100).toFixed(2)} US-Dollar</small>}
-    {videoError && <p className="error">{videoError}</p>}
-    {videoUrl && <div className="videoReady"><video controls playsInline src={videoUrl} /><a className="track" href={videoUrl} target="_blank" rel="noopener">MP4 öffnen / herunterladen ↗</a><p>Erst prüfen. Danach kann der Clip über Windsor veröffentlicht und in Google Drive archiviert werden.</p></div>}
-  </section>;
 }
