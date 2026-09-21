@@ -81,7 +81,7 @@ export function VideoStudio({ product, concept }: { product: Product; concept: R
   }, [ready, taskId, finished, paused, save]);
 
   async function createVideo() {
-    if (!ready || job || startingRef.current) return;
+    if (!ready || (job && job.status !== "NOT_STARTED") || startingRef.current) return;
     if (!window.confirm("Der Agent erzeugt jetzt einen neutralen 10-Sekunden-Clip. Dabei werden Runway-Credits verbraucht. Fortfahren?")) return;
     startingRef.current = true;
     setStarting(true);
@@ -90,8 +90,11 @@ export function VideoStudio({ product, concept }: { product: Product; concept: R
       // Also catch an intent saved by another tab before this click.
       const existing = localStorage.getItem(storageKey);
       if (existing) {
-        setJob(jobSchema.parse(JSON.parse(existing)));
-        return;
+        const previous = jobSchema.parse(JSON.parse(existing));
+        if (previous.status !== "NOT_STARTED") {
+          setJob(previous);
+          return;
+        }
       }
       save({ status: "STARTING" });
       const visual = concept.scenes.map((scene) => scene.visual).join(" ").slice(0, 700);
@@ -101,7 +104,10 @@ export function VideoStudio({ product, concept }: { product: Product; concept: R
         body: JSON.stringify({ productName: product.name, prompt: visual }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Der Start konnte nicht bestätigt werden.");
+      if (!response.ok) {
+        if (data.notStarted === true) save({ status: "NOT_STARTED" });
+        throw new Error(data.error || "Der Start konnte nicht bestätigt werden.");
+      }
       const id = z.string().regex(/^[a-zA-Z0-9_-]{8,100}$/).parse(data.taskId);
       const next = jobSchema.parse({ taskId: id, status: "PENDING", costCredits: data.estimatedCredits });
       // Keep a received ID in memory even if browser storage becomes unavailable.
@@ -118,8 +124,13 @@ export function VideoStudio({ product, concept }: { product: Product; concept: R
   return <section className="videoStudio">
     <h3>Runway-Videostudio</h3>
     <p className="videoNote">Der Agent erzeugt einen neutralen 10-Sekunden-Clip im Hochformat. Er bildet nicht zwingend das exakte Produktmodell ab. Auftrag und Download bleiben in diesem Browser gespeichert.</p>
-    {!job && <button className="primary" type="button" disabled={!ready || starting} onClick={createVideo}>{ready ? "Agent erstellt 10-Sekunden-Clip" : "Gespeicherten Auftrag laden …"}</button>}
-    {job && !job.videoUrl && <p role="status">{starting ? "Video-Auftrag wird gestartet …" : job.taskId ? `Runway: ${job.status}` : "Start nicht bestätigt. Bitte in Runway prüfen, ob ein Auftrag angelegt wurde. Es wird kein zweiter Clip gestartet."}</p>}
+    {(!job || job.status === "NOT_STARTED") && <button className="primary" type="button" disabled={!ready || starting} onClick={createVideo}>{ready ? "Agent erstellt 10-Sekunden-Clip" : "Gespeicherten Auftrag laden …"}</button>}
+    {job && !job.videoUrl && <p role="status">{starting ? "Video-Auftrag wird gestartet …" : job.taskId ? `Runway: ${job.status}` : job.status === "NOT_STARTED" ? "Kein Video gestartet. Nach Behebung der Ursache kannst du erneut starten." : "Start nicht bestätigt. Bitte in Runway prüfen, ob ein Auftrag angelegt wurde. Es wird kein zweiter Clip gestartet."}</p>}
+    {job?.status === "STARTING" && !job.taskId && !starting && <button className="secondary" type="button" onClick={() => {
+      if (!window.confirm("Nur zurücksetzen, wenn Runway den Start ausdrücklich mit einem Validierungsfehler abgelehnt hat oder du dort geprüft hast, dass kein Auftrag angelegt wurde. Ist das bestätigt?")) return;
+      try { save({ status: "NOT_STARTED" }); setError(""); }
+      catch { setError("Die Startsperre konnte nicht zurückgesetzt werden."); }
+    }}>Abgelehnten Start zurücksetzen</button>}
     {job?.taskId && <small>Auftrag: {job.taskId}</small>}
     {paused && taskId && !finished && <button className="secondary" type="button" onClick={() => { setError(""); setPaused(false); }}>Status erneut abrufen – kein neuer Clip</button>}
     {job?.costCredits !== undefined && <small className="cost">Runway-Kosten: {job.costCredits} Credits ≈ {(job.costCredits / 100).toFixed(2)} US-Dollar</small>}
