@@ -73,6 +73,23 @@ npx vercel deploy
 
 ## Bewusste Grenzen der v0.1
 
+### Video-Aufträge wieder aufnehmen
+
+Auftrag-ID, Status und MP4-Link werden pro Produkt und Entwurf im selben Browser
+gespeichert. Nach dem Neuladen wird der vorhandene Auftrag weiter abgefragt.
+Ein Fehler beim Statusabruf pausiert die Abfrage; „Status erneut abrufen“ fragt
+nur den bestehenden Auftrag ab und erzeugt keinen neuen Clip. Auch das Runway-SDK
+wiederholt fehlgeschlagene API-Anfragen nicht automatisch.
+
+Bereits vor dem Start wird eine lokale Startsperre gespeichert. Geht die Antwort
+auf den Start verloren, bleibt ein weiterer Start für diesen Entwurf gesperrt;
+der Auftrag muss dann in Runway geprüft werden. Diese lokale Sicherung ersetzt
+keine serverseitige Auftragsverwaltung: andere Browser/Geräte, gelöschter
+Browser-Speicher oder gleichzeitig gestartete Tabs werden nicht zuverlässig
+abgedeckt. Frühere, noch nicht gespeicherte Aufträge werden nicht nachträglich erkannt.
+
+### Weitere Grenzen
+
 - Daten liegen nur im jeweiligen Browser.
 - Klickzählung erfasst nur Klicks über den Button in dieser Anwendung.
 - Produktideen basieren auf Such- und Saisonsignalen, nicht auf garantierten Verkaufszahlen.

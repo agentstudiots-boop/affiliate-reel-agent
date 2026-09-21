@@ -8,7 +8,8 @@ export const RUNWAY_ESTIMATED_CREDITS = 150;
 
 export function getRunwayClient() {
   if (!process.env.RUNWAYML_API_SECRET) throw new Error("RUNWAYML_API_SECRET fehlt in Vercel.");
-  return new RunwayML({ apiKey: process.env.RUNWAYML_API_SECRET });
+  // A retried creation request can charge for a second clip if its response was lost.
+  return new RunwayML({ apiKey: process.env.RUNWAYML_API_SECRET, maxRetries: 0 });
 }
 
 export function monthlyBudgetCredits() {
