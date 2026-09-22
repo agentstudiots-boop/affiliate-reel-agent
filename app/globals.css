@@ -78,3 +78,30 @@ footer { color:#687069; font-size:12px; text-align:center; padding:30px 0 0; }
 @media (max-width:800px) { main{padding-top:28px}.hero{display:block}.hero .ghost{margin-top:12px}.grid{grid-template-columns:1fr}.two,.metricGrid{grid-template-columns:1fr 1fr}.steps span{font-size:11px}.steps span{white-space:nowrap;overflow:hidden}.panel{padding:18px}.scoutHead{display:block}.scoutButton{width:100%;margin-top:18px} }
 @media (max-width:480px) { .two,.metricGrid{grid-template-columns:1fr}.steps{overflow:auto;gap:20px}.steps span{min-width:82px} }
 @media (max-width:560px) { .trendGrid{grid-template-columns:1fr} }
+
+/* Content orchestration extends the existing studio without replacing legacy jobs. */
+select { width: 100%; min-height: 44px; padding: 12px; border: 1px solid #4c5549; border-radius: 10px; background: #222820; color: #f1f2e9; font: inherit; }
+.contentStudio { min-width: 0; scroll-margin-top: 24px; }
+.agentHierarchy { font-size: .85rem; line-height: 1.7; color: #d3ec99; }
+.contentStudio .muted, .contentStudio > small { color: #b6beb0; font-size: .85rem; line-height: 1.6; }
+.contentActions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 18px 0; }
+.contentActions .primary { flex: 1; }
+.contentJob { margin: 28px 0; border-top: 1px solid #4c5549; padding-top: 24px; }
+.jobHeader { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.jobHeader strong { color: #d3ec99; }
+.jobHeader span, .contentJob > small { font-size: .8rem; color: #b6beb0; overflow-wrap: anywhere; }
+.ideaGrid { display: grid; gap: 12px; margin: 24px 0; }
+.ideaCard, .slidePlan, .marketingPlan { padding: 18px; border: 1px solid #4c5549; border-radius: 12px; margin-bottom: 14px; }
+.ideaCard h3 { margin-top: 8px; }
+.selectedIdea { border-color: #c9ed8a; background: #c9ed8a0a; }
+.ideaCard small { color: #bfcbaf; }
+.contentPreview { margin: 24px 0; }
+.contentPreview blockquote { margin: 16px 0; padding: 16px; border-left: 3px solid #c9ed8a; font-size: 1.15rem; }
+.postCopy { white-space: pre-wrap; line-height: 1.8; padding: 16px; background: #ffffff06; border-radius: 12px; }
+.jobTrace { margin: 20px 0; }
+.jobTrace article { padding: 14px 0; border-bottom: 1px solid #4c5549; }
+.jobTrace pre { max-height: 380px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .75rem; background: #111; padding: 12px; }
+.contentStudio details summary, .legacyContent > summary { cursor: pointer; padding: 10px 0; }
+.legacyContent { margin: 24px 0; }
+.contentStudio p, .contentStudio li { overflow-wrap: anywhere; }
+@media (max-width: 720px) { .contentActions { align-items: stretch; flex-direction: column; } }

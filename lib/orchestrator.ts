@@ -35,3 +35,6 @@ export async function runScriptWriter(product: Product) {
   const concept = writeReelConcept(reviewedProduct);
   return { concept, affiliateUrl: reviewedProduct.affiliateUrl };
 }
+
+// Central public entry point; specialists remain isolated behind the content coordinator.
+export { runContentJob } from "@/lib/content/orchestrator";

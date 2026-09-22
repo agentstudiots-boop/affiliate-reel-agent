@@ -57,12 +57,26 @@ Keine Haltbarkeitsfristen aus der Produktart ableiten.
 Fachliche Grundlage für die bedingte Haltbarkeitsaussage:
 https://www.gov.uk/government/publications/vacuum-packaging/vacuum-packaging
 
-## Umsetzung und Grenzen
+## Neue Umsetzung und Grenzen
 
-Dieses Manifest ist die dauerhafte Vorgabe für Weiterentwicklung und Prüfung.
-Der derzeitige Code verwendet weiterhin deterministische Vorlagen. Für
-Vakuumierer enthält er ein ausgearbeitetes Referenzdrehbuch. Für beliebige
-Produkte fehlt noch die freie, quellenbasierte Nutzenanalyse durch ein
-Sprachmodell; die übrige allgemeine Vorlage erfüllt dieses Ziel noch nicht.
-Der Runway-Clip ist weiterhin eine stumme 10-Sekunden-Visualisierung, kein
-automatisch fertig geschnittener Reel mit Sprechertext und Einblendungen.
+Die Content-Planung läuft über einen zentralen Orchestrator mit getrennten
+Creative-, Video-, Bild-, Text- und Marketing-Agenten. Es gilt nicht mehr
+„jedes Produkt wird ein Reel“. Mehrere Ideen und eine begründete Formatwahl
+stehen vor der Produktion. Höchstens zwei Überarbeitungen sind erlaubt.
+
+Der Referenzmodus bleibt regelbasiert und wird so bezeichnet. Im optional
+freigeschalteten KI-Modus liefert ein Sprachmodell strukturierte Ideen und
+Entwürfe; der Orchestrator prüft die Ergebnisse. Keine Modellantwort ersetzt
+menschliche Faktenprüfung oder Veröffentlichungsfreigabe.
+
+Die Vakuumierer-Video-Referenz ist jetzt eine inszenierte 37-Sekunden-
+Familiengeschichte: Omas Überraschung → Rückblende mit Vakuumierer → separates
+Sous-vide-Wasserbad → auspacken und anbraten → appetitlicher Anschnitt → CTA.
+Rosa Fleisch, Kruste, Geräusche und Reaktionen dienen dem Storytelling, dürfen
+aber nicht als garantierter Produkterfolg oder echter Kundenbericht erscheinen.
+Vorratshaltung bleibt als eigener Carousel-/Text-Anwendungsfall erhalten.
+
+Der bisherige Runway-Renderer erstellt weiterhin nur einzelne stumme
+10-Sekunden-Clips. Die neuen Drehbücher werden nicht in diesen Renderer
+gepresst. Schnitt, Sprecher und Einblendungen benötigen einen weiteren
+Produktionsschritt. Details stehen in ARCHITECTURE.md.

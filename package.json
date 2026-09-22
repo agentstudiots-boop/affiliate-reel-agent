@@ -7,18 +7,23 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsc -p tsconfig.test.json && node --test tests/*.test.cjs",
+    "db:migrate": "node scripts/migrate.cjs"
   },
   "dependencies": {
     "@runwayml/sdk": "^4.20.0",
     "@vercel/blob": "^2.8.0",
     "next": "latest",
+    "pg": "^8.23.0",
     "react": "latest",
     "react-dom": "latest",
     "zod": "latest"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@types/node": "latest",
+    "@types/pg": "^8.23.1",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "eslint": "latest",

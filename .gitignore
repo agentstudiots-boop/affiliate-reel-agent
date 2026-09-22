@@ -7,3 +7,10 @@ node_modules/
 npm-debug.log*
 *.tsbuildinfo
 .DS_Store
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*.json
+service-account*.json
+.test-build/

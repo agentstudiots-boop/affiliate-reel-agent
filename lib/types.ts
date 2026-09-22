@@ -57,6 +57,7 @@ export type ProductReview = {
 export type ProjectState = {
   product: Product;
   concept: ReelConcept | null;
+  conceptProduct?: Product;
   status: WorkflowStatus;
   publishedUrl: string;
   clicks: number;

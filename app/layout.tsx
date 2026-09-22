@@ -6,8 +6,8 @@ const geist = Geist({ variable: "--font-geist", subsets: ["latin"] });
 const mono = Geist_Mono({ variable: "--font-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Affiliate Reel Agent",
-  description: "Ein Produkt. Ein Reel. Ein messbarer Test.",
+  title: "Affiliate Content Studio",
+  description: "Kreative Ideen, das passende Format und bewusste Content-Freigabe.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

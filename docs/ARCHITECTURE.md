@@ -1,59 +1,109 @@
-# Architektur v0.2
+# Content-Architektur v0.4
 
-## Redaktionelle Vorgabe
+Aktuelle Speicherarchitektur: [POSTGRES_MEMORY.md](POSTGRES_MEMORY.md).
+Die nachstehende Browser-Speicherung beschreibt die vorherige v0.3; neue Jobs
+verwenden ausschließlich Postgres. Historische Performance wird jetzt vor der
+Formatwahl regelbasiert abgefragt. Betrieb benötigt DATABASE_URL und Migration.
 
-Für Verkaufsargumente und Drehbücher gilt [das Drehbuch-Manifest](SCRIPT_WRITER_MANIFEST.md):
-Alltagssituation → Anwendung → konkreter Nutzen → visuelle Demonstration.
-Der derzeitige Drehbuch-Code ist vorlagenbasiert; das Vakuumierer-Beispiel setzt
-die Vorgabe exemplarisch um. Eine freie Nutzenanalyse für beliebige Produkte
-ist noch nicht implementiert.
+## Zentrale Steuerung
 
-## Ablauf
+`lib/orchestrator.ts` bleibt der öffentliche Einstieg. Der Content-Workflow liegt
+in `lib/content/orchestrator.ts`. Nur dort werden Spezialagenten importiert und
+beauftragt. Spezialisten bekommen ein strukturiertes Briefing und einen isolierten
+JSON-Generator. Sie haben weder Tools noch Zugriff auf andere Agenten oder den
+Orchestrator. Agentenantworten können keine weiteren Aufträge auslösen.
 
-`Trend-Scout → Produkt-Prüfer → menschliche Auswahl → Amazon-Linkdienst → Drehbuch-Agent → menschliche Freigabe → Runway-Clip → Sichtprüfung → Veröffentlichung → Messwerte`
+1. Opportunity validieren; Suchauswahl und unbestätigte Modellangaben einordnen.
+2. Creative liefert drei unterschiedliche Ideen für Video, Bild und Text,
+   einschließlich Alltagssituation, Story, Nutzen, Voraussetzungen und Cross-Sell.
+3. Der Orchestrator gewichtet Zielgruppenpassung, Glaubwürdigkeit, Demonstration,
+   Kaufinteresse und Aufwand gemäß Kommunikationsziel und Budget.
+4. Nur der ausgewählte Video-, Bild- oder Text-Agent erstellt einen Entwurf.
+5. Der Orchestrator prüft Format, Anwendung, Zeitbudget, kritische Aussagen und
+   bei KI-Modus zusätzlich die redaktionelle Qualität durch einen Modellaufruf.
+6. Höchstens zwei Überarbeitungen, jeweils mit konkretem Feedback und Vorversion.
+   Bleibt die Qualität schwach, endet der Job mit `needs_input`, ohne Marketing.
+7. Marketing schlägt Plattform, Anpassungen, Linkplatzierung und Messgrößen vor.
+   Der Orchestrator prüft die Formatkompatibilität und übergibt zur Nutzerfreigabe.
 
-Der Orchestrator steuert nur die Reihenfolge. Inhaltliche Aufgaben bleiben in getrennten Modulen. Der Amazon-Link wird deterministisch erzeugt und nicht von einem Sprachmodell erfunden.
+Die Rangfolge ist eine redaktionelle Heuristik, keine Performance-Prognose.
+Budget bedeutet relativen Produktionsaufwand, keine garantierte Euro-Kalkulation.
+Cross-Sell-Empfehlungen sind Rechercheaufträge, keine automatisch ausgewählten
+oder verifizierten Zusatzprodukte.
 
-## Verantwortlichkeiten
+## Modi und Kostengrenzen
 
-- **Produkt-Scout:** recherchiert aktuelle Signale, Saisonprodukte und Dauerläufer mit Google-Suche.
-- **Produkt-Prüfer:** prüft Nutzenargumente und markiert offene Behauptungen.
-- **Amazon-Linkdienst:** ergänzt die Partner-ID reproduzierbar.
-- **Drehbuch-Agent:** verarbeitet nur geprüfte und freigegebene Angaben.
-- **Orchestrator:** verbindet die Schritte und vereinheitlicht die Ausgaben.
-- **Video-Agent:** startet genau einen asynchronen Runway-Auftrag und prüft vorher das Monatsbudget.
-- **Medienspeicher:** legt Bilder und fertige MP4s dauerhaft in Vercel Blob ab.
-- **Menschliche Freigabe:** bleibt vor Drehbuch und Veröffentlichung erforderlich.
+- **Referenzmodus:** keine externen Modellaufrufe. Drei regelbasierte Ideen und
+  formatbezogene Vorlagen, mit ausgearbeitetem Vakuumierer-Beispiel. Für beliebige
+  Produkte nur ein Ausgangsentwurf; keine freie kreative Produktanalyse.
+- **KI-Modus:** Gemini REST `generateContent`, strukturierte JSON-Schemata und
+  zusätzliche Zod-Prüfung auf jeder Grenze. Erfordert bewusst gesetzte
+  `CONTENT_AI_ENABLED=true`, `CONTENT_MODEL`, `GOOGLE_GENERATIVE_AI_API_KEY` und
+  `CONTENT_STUDIO_PASSWORD` auf dem Server. Ohne vollständige Konfiguration bleibt
+  die Option gesperrt. Keine automatische kostenpflichtige Ersatzroute.
+- Maximal acht Modellaufrufe: Creative + drei Entwürfe + drei Reviews + Marketing.
+  Pro Aufruf maximal 5.000 Output-Tokens und 25 Sekunden Timeout; kein API-Retry.
+  Provider-Ausfälle, ungültiges JSON und unvollständige Ausgaben stoppen den Job.
+- Der Zugangscode wird nur als Request-Header übermittelt und nicht gespeichert.
+  Das ist ein Zugangsschutz für die neue KI-Route, kein vollständiges Mehrbenutzer-
+  oder serverweites Budget-/Rate-Limit-System. Pro Browser verhindert Web Locks
+  überlappende Planungen, soweit vom Browser unterstützt. Für öffentliche KI-
+  Freischaltung sind später Nutzerkonten, serverseitige Quoten und Idempotenz nötig.
+- Gemini-Verbrauch wird als gemeldete Tokenzahl protokolliert. Keine erfundenen
+  Euro-Kosten oder garantierten Conversion-Werte.
 
-## Verzeichnisstruktur
+API-Vertrag geprüft anhand https://ai.google.dev/api/generate-content.
+Live-Modellaufrufe sind für Tests nicht erforderlich und wurden nicht ausgelöst.
 
-```text
-app/api/trends/route.ts        Produktsuche
-app/api/verify/route.ts        Produktprüfung
-app/api/generate/route.ts      Drehbucherstellung
-app/api/assets/upload/route.ts Produktfoto in Vercel Blob
-app/api/video/start/route.ts   Kostenprüfung und Runway-Start
-app/api/video/status/route.ts  Status und dauerhafte MP4-Ablage
-lib/agents/product-scout.ts    Scout-Abteilung
-lib/agents/product-reviewer.ts Prüfabteilung
-lib/agents/script-writer.ts    Drehbuch-Abteilung
-lib/amazon.ts                  deterministische Partnerlinks
-lib/orchestrator.ts            Ablaufsteuerung
-lib/runway.ts                  Runway-Konfiguration und Budget
-lib/schema.ts                  Ein- und Ausgabeverträge
-lib/types.ts                   gemeinsame Datentypen
-```
+## Jobs, Protokolle und Wiederherstellung
 
-## Noch bewusst nicht automatisiert
+`POST /api/content` streamt validierte Job-Snapshots als NDJSON. Der Server steuert
+den gesamten Ablauf; der Client bestimmt keine Agentenfolge. Ein Job enthält ID,
+Version, Opportunity-Snapshot, Modus, Status, Ideen, Entscheidung, Content, Review,
+Marketing, Revisions-/Aufrufzähler und ein sequenziertes Ereignisprotokoll.
 
-- Exakte Amazon-Produktdaten und Preise benötigen später die Freischaltung der Amazon Product Advertising API.
-- Social-Media-Veröffentlichung bleibt bis zu einer gesonderten Freigabe manuell.
-- Google-Drive-Archivierung bleibt bis zur Einrichtung eines eigenen Google-OAuth-Zugangs manuell.
+Status: `queued`, `checking`, `ideating`, `selecting`, `producing`, `reviewing`,
+`revising`, `marketing`, `awaiting_approval`, `needs_input`, `failed`,
+`interrupted`, `approved`.
 
-## Kostenschutz
+Vollständige strukturierte Antworten und Entscheidungen bleiben im Job-Verlauf
+im Browser (`affiliate-content-jobs-v1`, letzte zehn Jobs) und sind als JSON
+exportierbar. Serverlogs enthalten ausschließlich Job-ID, Phase, Ereignisnummer,
+Agent und Ereignisart; keine Secrets oder vollständigen Produktbriefings.
 
-- Zehn Sekunden `gen4_turbo` im Hochformat pro Auftrag.
-- Keine automatische kostenpflichtige Wiederholung.
-- Echte Runway-Monatsnutzung wird vor jedem Start geprüft.
-- Standardlimit: 1.800 Credits bzw. 18 US-Dollar als Puffer für ein Monatsziel von etwa 20 Euro.
-- Runway-Ausgabe wird wegen ihrer kurzen URL-Laufzeit sofort in Vercel Blob kopiert.
+Das ist bewusst noch keine dauerhafte serverseitige Job-Datenbank. Beim Schließen
+kann ein bereits gestarteter Provideraufruf noch Kosten verursachen; Folgeaufrufe
+werden bei Abbruch nicht gestartet. Ein unvollständiger Browser-Job wird nach
+Neuladen als unterbrochen markiert, niemals automatisch wiederholt. Ein Neustart
+ist ein neuer expliziter Auftrag. Browser-Speicherfehler werden angezeigt; ein
+Download bleibt möglich. Geräteübergreifende Wiederaufnahme erfordert später
+einen authentifizierten persistenten Job-Store und eine langlebige Queue.
+
+## Vorhandene Funktionen bleiben erhalten
+
+Trend-Scout und Quellenrecherche bleiben über die bestehenden Routen erreichbar.
+Gefundene Quellen gelten nicht als Nachweis einzelner Produkteigenschaften. Die
+Oberfläche bezeichnet sie deshalb nicht mehr als bestandene Faktenprüfung.
+
+Alte Reel-Entwürfe und zugehörige Runway-Jobs bleiben in einem separaten aufklappbaren
+Bereich erhalten. Änderungen am neuen Produktbriefing verändern deren gespeicherten
+Produktsnapshot nicht. `/api/generate` bleibt als alte Vorlagen-API kompatibel,
+ist aber nicht mehr der normale Einstieg der Oberfläche.
+
+Die neue Content-Freigabe startet weder Runway noch Bildgenerierung noch Posts.
+Der Video-Agent schreibt 10–40-Sekunden-Drehbücher; der vorhandene Runway-Renderer
+produziert weiterhin einzelne stumme 10-Sekunden-Clips (`gen4.5`, Hochformat).
+Ein vollständiger Filmschnitt mit Szenenkonsistenz, Ton und Untertiteln ist ein
+separater nächster Produktionsschritt. Bild-Agent liefert Layouts/Prompts,
+Text-Agent liefert einen Textentwurf. Marketing veröffentlicht nicht selbst.
+
+## Erweiterung und Tests
+
+Neue Spezialisten (Trendscout, Produktfinder, Finanz-, KDP- oder Qualitätsagent)
+werden mit eigenen Verträgen hinter der zentralen Steuerung ergänzt. Kein Import
+zwischen Spezialisten. Spätere Kosten-/Performancewerte können `selectIdea`
+beeinflussen; derzeit gibt es dafür keine vorgetäuschten Messdaten.
+
+`npm test` prüft Format-Routing, Revisions-/Aufrufgrenzen, Qualitätsstopps,
+Abbruch, Wiederherstellung, Schemakonformität und Importisolation ohne echte
+API-Aufrufe. CI führt Tests, Typecheck, Lint und Build aus.

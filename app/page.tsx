@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { ContentStudio } from "@/app/content-studio";
 import { VideoStudio } from "@/app/video-studio";
-import type { Product, ProductReview, ProjectState, ReelConcept, TrendCandidate, TrendReport, WorkflowStatus } from "@/lib/types";
+import type { Product, ProductReview, ProjectState, ReelConcept, TrendCandidate, TrendReport } from "@/lib/types";
 
 const emptyProduct: Product = {
   name: "",
@@ -25,17 +26,9 @@ const initialState: ProjectState = {
   updatedAt: new Date(0).toISOString(),
 };
 
-const statusLabels: Record<WorkflowStatus, string> = {
-  draft: "Produkt",
-  generated: "Entwurf",
-  approved: "Freigegeben",
-  published: "Veröffentlicht",
-};
-
 export default function Home() {
   const [state, setState] = useState<ProjectState>(initialState);
   const [ready, setReady] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [scouting, setScouting] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [trendReport, setTrendReport] = useState<TrendReport | null>(null);
@@ -66,37 +59,10 @@ export default function Home() {
     setState((current) => ({
       ...current,
       product: { ...current.product, [field]: value },
-      status: "draft",
+      conceptProduct: current.concept ? current.conceptProduct || current.product : undefined,
+      status: current.concept ? current.status : "draft",
       updatedAt: new Date().toISOString(),
     }));
-  }
-
-  async function generate(event: FormEvent) {
-    event.preventDefault();
-    if (!productReview) {
-      setError("Der Orchestrator benötigt zuerst die Freigabe der Produkt-Prüfung.");
-      return;
-    }
-    setLoading(true);
-    setError("");
-    try {
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(state.product),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Der Agent konnte keinen Entwurf erstellen.");
-      patch({
-        concept: data.concept,
-        product: { ...state.product, affiliateUrl: data.affiliateUrl },
-        status: "generated",
-      });
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unbekannter Fehler");
-    } finally {
-      setLoading(false);
-    }
   }
 
   async function scoutTrends() {
@@ -141,8 +107,9 @@ export default function Home() {
         benefits: typedReview.verifiedBenefits.join("; "),
         notes: `${typedReview.cautions.join("; ")} Keine erfundenen Tests, Preise, Rabatte oder Garantien behaupten.`,
       },
-      concept: null,
-      status: "draft",
+      concept: current.concept,
+      conceptProduct: current.concept ? current.conceptProduct || current.product : undefined,
+      status: current.concept ? current.status : "draft",
       updatedAt: new Date().toISOString(),
     }));
       document.querySelector(".grid")?.scrollIntoView({ behavior: "smooth" });
@@ -182,18 +149,15 @@ export default function Home() {
     <main>
       <header className="hero">
         <div>
-          <span className="eyebrow">AFFILIATE-AGENT · V0.1</span>
-          <h1>Ein Produkt. Ein Reel.<br />Ein messbarer Test.</h1>
+          <span className="eyebrow">AFFILIATE CONTENT STUDIO · V0.2</span>
+          <h1>Eine gute Idee.<br />Das passende Format.</h1>
           <p>Vom Produktfund bis zur Auswertung – mit einer bewussten Freigabe vor der Veröffentlichung.</p>
         </div>
         <button className="ghost" onClick={reset}>Neuer Test</button>
       </header>
 
       <nav className="steps" aria-label="Workflow">
-        {(Object.keys(statusLabels) as WorkflowStatus[]).map((item, index) => {
-          const current = (Object.keys(statusLabels) as WorkflowStatus[]).indexOf(state.status);
-          return <span className={index <= current ? "active" : ""} key={item}>{index + 1} {statusLabels[item]}</span>;
-        })}
+        {["Produkt", "Ideen & Format", "Entwurf & Prüfung", "Marketing & Freigabe"].map((label, i) => <span key={label}>{i + 1} {label}</span>)}
       </nav>
 
       <section className="scout panel">
@@ -220,37 +184,41 @@ export default function Home() {
       </section>
 
       <section className="grid">
-        <form className="panel" onSubmit={generate}>
+        <section className="panel">
           <div className="panelTitle"><span>01</span><div><h2>Produkt erfassen</h2><p>Nur belegbare Angaben eintragen.</p></div></div>
           <label>Produktname<input required value={state.product.name} onChange={(e) => updateProduct("name", e.target.value)} placeholder="z. B. Microplane Premium Classic" /></label>
           <div className="two">
-            <label>Amazon-Produktseite<input required type="url" value={state.product.sourceUrl} onChange={(e) => updateProduct("sourceUrl", e.target.value)} placeholder="https://www.amazon.de/…" /></label>
+            <label>Amazon-Produkt oder Suchauswahl<input required type="url" value={state.product.sourceUrl} onChange={(e) => updateProduct("sourceUrl", e.target.value)} placeholder="https://www.amazon.de/…" /></label>
             <label>Affiliate-Link (automatisch)<input type="url" value={state.product.affiliateUrl} onChange={(e) => updateProduct("affiliateUrl", e.target.value)} placeholder="Wird aus der Produktseite erzeugt" /></label>
           </div>
           <div className="two">
             <label>Preis<input value={state.product.price} onChange={(e) => updateProduct("price", e.target.value)} placeholder="z. B. 24,90 €" /></label>
             <label>Zielgruppe<input required value={state.product.targetGroup} onChange={(e) => updateProduct("targetGroup", e.target.value)} placeholder="Für wen ist es relevant?" /></label>
           </div>
-          <label>Belegbare Vorteile<textarea required value={state.product.benefits} onChange={(e) => updateProduct("benefits", e.target.value)} placeholder="Eigenschaften, eigener Eindruck, Nutzen …" /></label>
+          <label>Produktangaben / mögliche Vorteile<textarea required value={state.product.benefits} onChange={(e) => updateProduct("benefits", e.target.value)} placeholder="Eigenschaften, eigener Eindruck, Nutzen …" /></label>
           <label>Hinweise / Einschränkungen<textarea value={state.product.notes} onChange={(e) => updateProduct("notes", e.target.value)} placeholder="Was darf der Agent nicht behaupten?" /></label>
-          {productReview && <div className="reviewBox"><strong>✓ Produkt-Prüfung bestanden · {productReview.confidence}% Sicherheit</strong><p>{productReview.evidenceSummary}</p><small>Der Drehbuch-Agent verwendet nur die geprüften Nutzenargumente.</small></div>}
+          {productReview && <div className="reviewBox"><strong>Recherche vorhanden · Modellprüfung offen</strong><p>{productReview.evidenceSummary}</p><small>Gefundene Quellen sind keine Bestätigung der einzelnen Produktangaben.</small></div>}
           {error && <p className="error">{error}</p>}
           {!productReview && <button className="secondary" type="button" disabled={verifying || !state.product.name || !state.product.sourceUrl} onClick={verifyManualProduct}>{verifying ? "Prüfabteilung arbeitet …" : "Produktangaben prüfen"}</button>}
-          <button className="primary" disabled={loading || !productReview}>{loading ? "Drehbuch-Agent arbeitet …" : productReview ? "Reel-Entwurf erstellen" : "Erst Produkt prüfen"}</button>
-        </form>
+          <button type="button" className="primary" onClick={() => document.getElementById("content-studio")?.scrollIntoView({ behavior: "smooth" })}>Weiter zur Content-Planung</button>
+        </section>
 
+        <ContentStudio product={state.product} />
+      </section>
+
+      {state.concept && <details className="legacyContent"><summary>Bisherigen Reel-Entwurf und Videoauftrag öffnen</summary>
         <section className="panel result">
-          <div className="panelTitle"><span>02</span><div><h2>Reel & Freigabe</h2><p>Menschen behalten die letzte Entscheidung.</p></div></div>
+          <div className="panelTitle"><span>02</span><div><h2>Bisheriger Reel-Entwurf</h2><p>Menschen behalten die letzte Entscheidung.</p></div></div>
           {!state.concept ? <div className="empty"><b>Noch kein Entwurf</b><p>Links ein Produkt eintragen und den Agenten starten.</p></div> : <Concept concept={state.concept} />}
           {state.concept && state.status === "generated" && <button className="primary approve" onClick={() => patch({ status: "approved" })}>Entwurf freigeben</button>}
-          {state.concept && (state.status === "approved" || state.status === "published") && <VideoStudio key={JSON.stringify([state.product, state.concept])} product={state.product} concept={state.concept} />}
+          {state.concept && (state.status === "approved" || state.status === "published") && <VideoStudio key={JSON.stringify([state.conceptProduct || state.product, state.concept])} product={state.conceptProduct || state.product} concept={state.concept} />}
           {state.status === "approved" && <div className="publish"><label>URL des veröffentlichten Reels<input value={state.publishedUrl} onChange={(e) => patch({ publishedUrl: e.target.value })} placeholder="https://instagram.com/…" /></label><button className="primary" onClick={() => patch({ status: "published" })}>Als veröffentlicht markieren</button></div>}
           {state.status === "published" && <div className="success">✓ Reel als veröffentlicht erfasst</div>}
         </section>
-      </section>
+      </details>}
 
       <section className="metrics panel">
-        <div className="panelTitle"><span>03</span><div><h2>Ergebnis messen</h2><p>Ein kleiner Test braucht klare Zahlen.</p></div></div>
+        <div className="panelTitle"><span>03</span><div><h2>Bisherige lokale Testzahlen</h2><p>Altbestand ohne Zuordnung zum Lernspeicher. Neue Ergebnisse direkt am freigegebenen Content-Job erfassen.</p></div></div>
         <div className="metricGrid">
           <label>Klicks<input type="number" min="0" value={state.clicks} onChange={(e) => patch({ clicks: Number(e.target.value) })} /></label>
           <label>Verkäufe<input type="number" min="0" value={state.sales} onChange={(e) => patch({ sales: Number(e.target.value) })} /></label>
@@ -260,7 +228,7 @@ export default function Home() {
         {state.product.affiliateUrl && <a className="track" href={state.product.affiliateUrl} target="_blank" rel="sponsored noopener" onClick={() => patch({ clicks: state.clicks + 1 })}>Affiliate-Link testen ↗</a>}
       </section>
 
-      <footer>Daten bleiben in diesem Browser · KI-Ausgabe vor Veröffentlichung prüfen · Werbung klar kennzeichnen</footer>
+      <footer>Postgres als zentraler Lernspeicher · Content vor Veröffentlichung prüfen · Werbung klar kennzeichnen</footer>
     </main>
   );
 }
