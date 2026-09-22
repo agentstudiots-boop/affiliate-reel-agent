@@ -8,4 +8,3 @@ export default defineConfig([
   { files: ["tests/**/*.cjs", "scripts/**/*.cjs"], rules: { "@typescript-eslint/no-require-imports": "off" } },
   globalIgnores([".next/**", ".test-build/**", "node_modules/**", "next-env.d.ts"]),
 ]);
-

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ContentStudio } from "@/app/content-studio";
+import { MetaConnection } from "@/app/meta-connection";
 import { VideoStudio } from "@/app/video-studio";
 import type { Product, ProductReview, ProjectState, ReelConcept, TrendCandidate, TrendReport } from "@/lib/types";
 
@@ -159,6 +160,8 @@ export default function Home() {
       <nav className="steps" aria-label="Workflow">
         {["Produkt", "Ideen & Format", "Entwurf & Prüfung", "Marketing & Freigabe"].map((label, i) => <span key={label}>{i + 1} {label}</span>)}
       </nav>
+
+      <MetaConnection />
 
       <section className="scout panel">
         <div className="scoutHead">

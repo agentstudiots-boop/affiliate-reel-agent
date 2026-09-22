@@ -14,6 +14,8 @@
   },
   "include": [
     "lib/content/**/*.ts",
-    "lib/memory/**/*.ts"
+    "lib/memory/**/*.ts",
+    "lib/meta/**/*.ts",
+    "lib/diagnostics/**/*.ts"
   ]
 }
