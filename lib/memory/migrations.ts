@@ -1,0 +1,41 @@
+import fs from "node:fs";
+import path from "node:path";
+import { getDatabase, type Database } from "./db";
+
+const migrationNames = ["001_memory.sql"] as const;
+
+export type MigrationResult = {
+  applied: string[];
+  alreadyApplied: string[];
+};
+
+function loadMigration(name: string) {
+  if (!migrationNames.includes(name as (typeof migrationNames)[number])) {
+    throw new Error("Unbekannte Migration.");
+  }
+  return fs.readFileSync(path.join(process.cwd(), "db", "migrations", name), "utf8");
+}
+
+export async function applyMigrations(
+  database: Database = getDatabase(),
+  loader: (name: string) => string = loadMigration,
+): Promise<MigrationResult> {
+  return database.transaction(async (sql) => {
+    await sql.query("SELECT pg_advisory_xact_lock($1)", [83624001]);
+    await sql.query(
+      "CREATE TABLE IF NOT EXISTS schema_migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())",
+    );
+    const result: MigrationResult = { applied: [], alreadyApplied: [] };
+    for (const name of migrationNames) {
+      const existing = await sql.query("SELECT name FROM schema_migrations WHERE name=$1", [name]);
+      if (existing.rows.length) {
+        result.alreadyApplied.push(name);
+        continue;
+      }
+      await sql.exec(loader(name));
+      await sql.query("INSERT INTO schema_migrations(name) VALUES($1)", [name]);
+      result.applied.push(name);
+    }
+    return result;
+  });
+}

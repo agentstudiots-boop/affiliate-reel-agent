@@ -13,6 +13,13 @@ führt jede Migration in einer Transaktion aus. Es läuft niemals automatisch be
 Build oder Seitenaufruf. Der Runtime-Nutzer benötigt Zugriff auf die Tabellen;
 ein separater Migrationsnutzer kann für Schemaänderungen verwendet werden.
 
+Für Vercel kann dieselbe explizite Migration über `/api/admin/migrate` ausgelöst
+werden. Die Route verlangt den Content-Studio-Zugangscode, akzeptiert nur die fest
+im Repository hinterlegten Migrationen und ist idempotent. Das Passwort wird nur
+im verschlüsselten POST-Body oder Schutz-Header übertragen, nicht gespeichert oder
+zurückgegeben. Auch dieser Weg migriert niemals automatisch beim Build oder normalen
+Seitenaufruf.
+
 Tabellen: products, content_jobs, job_events, publications,
 performance_observations. Produkt-IDs verwenden Amazon-ASINs oder normalisierte
 URL-Hashes; eine Suchauswahl wird nicht als konkretes Modell ausgegeben.
