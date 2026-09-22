@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { MetaConnection } from "@/app/meta-connection";
 import { VideoStudio } from "@/app/video-studio";
 import type { Product, ProductReview, ProjectState, ReelConcept, TrendCandidate, TrendReport, WorkflowStatus } from "@/lib/types";
 
@@ -195,6 +196,8 @@ export default function Home() {
           return <span className={index <= current ? "active" : ""} key={item}>{index + 1} {statusLabels[item]}</span>;
         })}
       </nav>
+
+      <MetaConnection />
 
       <section className="scout panel">
         <div className="scoutHead">

@@ -5,6 +5,7 @@ import nextTs from "eslint-config-next/typescript";
 export default defineConfig([
   ...nextVitals,
   ...nextTs,
-  globalIgnores([".next/**", "node_modules/**", "next-env.d.ts"]),
+  { files: ["tests/**/*.cjs"], rules: { "@typescript-eslint/no-require-imports": "off" } },
+  globalIgnores([".next/**", ".test-build/**", "node_modules/**", "next-env.d.ts"]),
 ]);
 
