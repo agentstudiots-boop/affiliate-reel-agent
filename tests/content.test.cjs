@@ -116,40 +116,22 @@ test('specialists cannot import each other or an orchestrator', () => {
   }
 });
 
-test('JSON provider schema is serializable and reference generator rejects malformed output', async () => {
+test('JSON contract is serializable and reference generator rejects malformed output', async () => {
   assert.ok(z.toJSONSchema(creativeSchema).properties.ideas);
-  const generate = createGenerator({ mode: 'reference', onUsage: () => {} });
+  const generate = createGenerator({ mode: 'reference' });
   await assert.rejects(generate('creative', '', {}, creativeSchema, () => ({ ideas: [] })));
 });
 
-test('AI transport sends JSON schema, records usage and never retries rejected requests', async () => {
-  const names = ['GOOGLE_GENERATIVE_AI_API_KEY', 'CONTENT_AI_ENABLED', 'CONTENT_MODEL'];
-  const previous = Object.fromEntries(names.map(name => [name, process.env[name]]));
+test('removed generative transport fails closed without a network request', async () => {
   const originalFetch = global.fetch;
-  let calls = 0, tokens = 0;
-  process.env.GOOGLE_GENERATIVE_AI_API_KEY = 'test-key';
-  process.env.CONTENT_AI_ENABLED = 'true';
-  process.env.CONTENT_MODEL = 'test-model';
+  let calls = 0;
   try {
-    global.fetch = async (url, request) => {
-      calls++;
-      assert.equal(new URL(url).origin, 'https://generativelanguage.googleapis.com');
-      assert.ok(!url.includes('test-key'));
-      const body = JSON.parse(request.body);
-      assert.equal(body.generationConfig.responseMimeType, 'application/json');
-      assert.ok(body.generationConfig.responseJsonSchema);
-      assert.equal(body.tools, undefined);
-      return { ok: true, json: async () => ({ usageMetadata: { totalTokenCount: 42 }, candidates: [{ finishReason: 'STOP', content: { parts: [{ text: '{"ok":true}' }] } }] }) };
-    };
-    const generate = createGenerator({ mode: 'ai', onUsage: n => tokens += n });
-    assert.deepEqual(await generate('creative', 'Test', {}, z.object({ ok: z.boolean() }), () => ({ ok: false })), { ok: true });
-    assert.equal(tokens, 42);
-    global.fetch = async () => { calls++; return { ok: false, status: 429 }; };
-    await assert.rejects(generate('creative', 'Test', {}, z.object({ ok: z.boolean() }), () => ({ ok: false })), /HTTP 429/);
-    assert.equal(calls, 2);
+    global.fetch = async () => { calls++; throw new Error('unexpected'); };
+    const generate = createGenerator({ mode: 'ai' });
+    await assert.rejects(generate('creative', 'Test', {}, z.object({ ok: z.boolean() }), () => ({ ok: false })), /Tavily bleibt auf Recherche begrenzt/);
+    assert.equal(calls, 0);
   } finally {
     global.fetch = originalFetch;
-    for (const name of names) { if (previous[name] === undefined) delete process.env[name]; else process.env[name] = previous[name]; }
   }
 });
 

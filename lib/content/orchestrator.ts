@@ -61,7 +61,7 @@ export async function runContentJob(raw: Opportunity, options: {
     await options.onUpdate?.(structuredClone(job));
   };
   const status = async (next: JobStatus, message: string) => { job.status = next; await emit("orchestrator", "status", message); };
-  const baseGenerate = options.generate || createGenerator({ mode: job.mode, signal: options.signal, onUsage: tokens => { job.totalTokens += tokens; } });
+  const baseGenerate = options.generate || createGenerator({ mode: job.mode, signal: options.signal });
   const generate: Generator = async (agent, instruction, input, schema, reference) => {
     options.signal?.throwIfAborted();
     if (job.mode === "ai" && ++job.modelCalls > 8) throw new Error("Modellbudget erreicht.");

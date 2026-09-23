@@ -31,29 +31,22 @@ Budget bedeutet relativen Produktionsaufwand, keine garantierte Euro-Kalkulation
 Cross-Sell-Empfehlungen sind Rechercheaufträge, keine automatisch ausgewählten
 oder verifizierten Zusatzprodukte.
 
-## Modi und Kostengrenzen
+## Recherche, Planung und Kostengrenzen
 
-- **Referenzmodus:** keine externen Modellaufrufe. Drei regelbasierte Ideen und
+- **Content-Planung:** keine externen generativen Modellaufrufe. Drei regelbasierte Ideen und
   formatbezogene Vorlagen, mit ausgearbeitetem Vakuumierer-Beispiel. Für beliebige
   Produkte nur ein Ausgangsentwurf; keine freie kreative Produktanalyse.
-- **KI-Modus:** Gemini REST `generateContent`, strukturierte JSON-Schemata und
-  zusätzliche Zod-Prüfung auf jeder Grenze. Erfordert bewusst gesetzte
-  `CONTENT_AI_ENABLED=true`, `CONTENT_MODEL`, `GOOGLE_GENERATIVE_AI_API_KEY` und
-  `CONTENT_STUDIO_PASSWORD` auf dem Server. Ohne vollständige Konfiguration bleibt
-  die Option gesperrt. Keine automatische kostenpflichtige Ersatzroute.
-- Maximal acht Modellaufrufe: Creative + drei Entwürfe + drei Reviews + Marketing.
-  Pro Aufruf maximal 5.000 Output-Tokens und 25 Sekunden Timeout; kein API-Retry.
-  Provider-Ausfälle, ungültiges JSON und unvollständige Ausgaben stoppen den Job.
+- **Tavily:** aktuelle Trend-, Produkt- und Quellenrecherche über die bestehende
+  Basic Search API. Tavily wird nicht als allgemeiner Creative-/Drehbuch-Generator
+  ausgegeben. `TAVILY_API_KEY` bleibt ausschließlich serverseitig.
+- Ein späterer generativer Provider muss separat mit Kostenlimit, strukturierten
+  Verträgen und ausdrücklicher Freischaltung ergänzt werden. Es gibt keine
+  automatische kostenpflichtige Ersatzroute.
 - Der Zugangscode wird nur als Request-Header übermittelt und nicht gespeichert.
-  Das ist ein Zugangsschutz für die neue KI-Route, kein vollständiges Mehrbenutzer-
-  oder serverweites Budget-/Rate-Limit-System. Pro Browser verhindert Web Locks
-  überlappende Planungen, soweit vom Browser unterstützt. Für öffentliche KI-
-  Freischaltung sind später Nutzerkonten, serverseitige Quoten und Idempotenz nötig.
-- Gemini-Verbrauch wird als gemeldete Tokenzahl protokolliert. Keine erfundenen
-  Euro-Kosten oder garantierten Conversion-Werte.
-
-API-Vertrag geprüft anhand https://ai.google.dev/api/generate-content.
-Live-Modellaufrufe sind für Tests nicht erforderlich und wurden nicht ausgelöst.
+  Das ist ein Zugangsschutz für das private Content Studio, kein vollständiges
+  Mehrbenutzer- oder serverweites Rate-Limit-System. Pro Browser verhindert Web
+  Locks überlappende Planungen, soweit vom Browser unterstützt.
+- Keine erfundenen Euro-Kosten oder garantierten Conversion-Werte.
 
 ## Jobs, Protokolle und Wiederherstellung
 

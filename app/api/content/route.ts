@@ -6,10 +6,9 @@ import { authorized } from "@/lib/memory/auth";
 import { ConflictError, memoryRepository } from "@/lib/memory/repository";
 export const runtime = "nodejs";
 export const maxDuration = 300;
-const requestSchema = z.object({ requestId: z.string().uuid(), opportunity: opportunitySchema, mode: z.enum(["reference", "ai"]).default("reference") });
-function aiConfigured() { return process.env.CONTENT_AI_ENABLED === "true" && !!process.env.GOOGLE_GENERATIVE_AI_API_KEY && !!process.env.CONTENT_MODEL; }
+const requestSchema = z.object({ requestId: z.string().uuid(), opportunity: opportunitySchema, mode: z.literal("reference").default("reference") });
 export function GET() {
-  return Response.json({ aiAvailable: aiConfigured() && databaseConfigured(), databaseConfigured: databaseConfigured(), maxRevisions: 2, maxModelCalls: 8 }, { headers: { "Cache-Control": "no-store" } });
+  return Response.json({ databaseConfigured: databaseConfigured(), planningMode: "reference", researchProvider: "tavily", maxRevisions: 2, maxModelCalls: 0 }, { headers: { "Cache-Control": "no-store" } });
 }
 export async function POST(request: Request) {
   if (!authorized(request)) return Response.json({ error: "Zugangscode für den zentralen Speicher erforderlich." }, { status: 401 });
@@ -21,7 +20,6 @@ export async function POST(request: Request) {
     if (raw.length > 24000) return Response.json({ error: "Briefing zu groß." }, { status: 413 });
     input = requestSchema.parse(JSON.parse(raw));
   } catch { return Response.json({ error: "Bitte Produkt, Link, Zielgruppe und konkreten Use Case vollständig eintragen." }, { status: 400 }); }
-  if (input.mode === "ai" && !aiConfigured()) return Response.json({ error: "KI-Planung nicht freigeschaltet." }, { status: 503 });
   const repo = memoryRepository();
   try { await repo.claim(input.requestId,input.opportunity,input.mode); }
   catch (error) { return Response.json({ error: error instanceof ConflictError ? error.message : "Postgres ist nicht erreichbar oder die Migration fehlt. Kein Modellaufruf gestartet." }, { status: error instanceof ConflictError ? 409 : 503 }); }

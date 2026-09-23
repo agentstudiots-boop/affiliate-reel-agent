@@ -16,12 +16,6 @@ Page- und Instagram-ID werden über zugewiesene Seiten, ersatzweise `me/accounts
 
 Ein erfolgreicher lesender Test bestätigt die erreichbaren Konten und den Publishing-Vorabtest, ersetzt aber keinen separat freigegebenen tatsächlichen Veröffentlichungstest.
 
-## Einmaliger Gemini-Test
-
-`GET /api/gemini/check` liefert nur, ob API-Key und Schutzschlüssel konfiguriert sind; er prüft keine Quota.
-
-`POST /api/gemini/check` benötigt `x-diagnostics-secret`, passend zu `DIAGNOSTICS_SECRET` oder ersatzweise `CONTENT_STUDIO_PASSWORD`. Schlüssel ausschließlich serverseitig setzen, niemals committen oder in öffentliche Frontend-Konfiguration übernehmen. Der Test führt einen minimalen Gemini-Aufruf aus, ohne Wiederholungen, mit 15-Minuten-Cache pro Instanz. Modell über `GEMINI_DIAGNOSTICS_MODEL`, Standard `gemini-2.5-flash`. Er unterscheidet fehlenden Key, Credits, Quota, Zugriff, Konfiguration und Verfügbarkeit. Ohne Schutzschlüssel erfolgt kein Gemini-Aufruf.
-
 ## Prüfung
 
-`npm test`, `npm run lint`, `npm run build`. Tests nutzen simulierte Graph-/Gemini-Antworten, keine Tokens, öffentlichen Posts oder kostenpflichtigen Generierungen. Production muss zusätzlich mit ihrem eigenen Environment praktisch geprüft werden.
+`npm test`, `npm run lint`, `npm run build`. Tests nutzen simulierte Graph-Antworten, keine Tokens, öffentlichen Posts oder kostenpflichtigen Generierungen. Production muss zusätzlich mit ihrem eigenen Environment praktisch geprüft werden.

@@ -18,9 +18,7 @@ export function ContentStudio({ product }: { product: Product }) {
   const [trend, setTrend] = useState("");
   const [goal, setGoal] = useState<Opportunity["goal"]>("conversion");
   const [budget, setBudget] = useState<Opportunity["budget"]>("balanced");
-  const [mode, setMode] = useState<"reference" | "ai">("reference");
   const [password, setPassword] = useState("");
-  const [aiAvailable, setAiAvailable] = useState(false);
   const [jobs, setJobs] = useState<ContentJob[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [ready, setReady] = useState(false);
@@ -36,7 +34,7 @@ export function ContentStudio({ product }: { product: Product }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch("/api/content", { signal: controller.signal }).then(r => r.json()).then(data => { setAiAvailable(data.aiAvailable === true); setDatabaseReady(data.databaseConfigured === true); setReady(true); }).catch(() => {});
+    fetch("/api/content", { signal: controller.signal }).then(r => r.json()).then(data => { setDatabaseReady(data.databaseConfigured === true); setReady(true); }).catch(() => {});
     return () => { controller.abort(); abortRef.current?.abort(); };
   }, []);
 
@@ -72,7 +70,7 @@ export function ContentStudio({ product }: { product: Product }) {
     const execute = async () => {
       const response = await fetch("/api/content", { method: "POST", signal: controller.signal,
         headers: { "Content-Type": "application/json", "x-content-password": password },
-        body: JSON.stringify({ requestId: crypto.randomUUID(), opportunity: parsed.data, mode }) });
+        body: JSON.stringify({ requestId: crypto.randomUUID(), opportunity: parsed.data, mode: "reference" }) });
       if (!response.ok) { const data = await response.json(); throw new Error(data.error || "Planung konnte nicht starten."); }
       if (!response.body) throw new Error("Keine Antwort vom Orchestrator erhalten.");
       const reader = response.body.getReader();
@@ -132,8 +130,7 @@ export function ContentStudio({ product }: { product: Product }) {
     <div className="two"><label>Produktkategorie<select value={category} onChange={e=>setCategory(e.target.value as Opportunity["category"])}><option value="general">Noch nicht eingeordnet</option><option value="kitchen">Küche</option><option value="household">Haushalt</option><option value="technology">Technik</option><option value="leisure">Freizeit</option></select></label>
     <label>Zielplattform<select value={targetPlatform} onChange={e=>setTargetPlatform(e.target.value as Opportunity["targetPlatform"])}><option value="any">Noch offen</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option></select></label></div>
     <label>Anwendungsgruppe für ähnliche Fälle<input value={useCaseKey} onChange={e=>setUseCaseKey(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,"-"))} maxLength={80} placeholder="z. B. sous-vide oder vorratshaltung" /><small>Für vergleichbare Anwendungen denselben Begriff verwenden. „general“ aktiviert noch keinen historischen Vergleich.</small></label>
-    <label>Planungsmodus<select value={mode} onChange={e => setMode(e.target.value as "reference" | "ai")}><option value="reference">Referenzmodus · ohne Modellkosten</option><option value="ai" disabled={!aiAvailable}>KI-Planung{!aiAvailable ? " · noch nicht freigeschaltet" : " · bis zu 8 Modellaufrufe"}</option></select></label>
-    {mode === "reference" && <p className="muted">Regelbasierte Referenzentwürfe ohne Modellkosten. Freie kreative Analyse erfordert KI-Planung.</p>}
+    <p className="muted">Tavily recherchiert aktuelle Trends und Produktquellen. Die Content-Planung arbeitet regelbasiert ohne generative Modellkosten.</p>
     <label>Zugangscode für Planung & Datenbank<input type="password" autoComplete="off" value={password} onChange={e => setPassword(e.target.value)} /><small>Der Code wird nicht im Browser gespeichert.</small></label>
     <p className={databaseReady ? "muted" : "error"}>{databaseReady ? "Postgres konfiguriert. Verlauf laden prüft die Verbindung." : "Postgres muss noch eingerichtet werden. Neue Jobs werden erst mit zentralem Speicher gestartet."}</p>
     <div className="contentActions"><button type="button" className="ghost" disabled={busy || !password || !databaseReady} onClick={()=>loadHistory()}>Gespeicherten Verlauf laden</button>{jobs.length >= 50 && <button type="button" className="ghost" disabled={busy} onClick={()=>loadHistory(true)}>Ältere Jobs laden</button>}</div>
@@ -142,8 +139,8 @@ export function ContentStudio({ product }: { product: Product }) {
     <p className="muted">Dieser Auftrag erstellt einen Content-Plan. Medienproduktion und Veröffentlichung werden dadurch nicht gestartet.</p>
     {jobs.length > 0 && <label>Job-Verlauf<select disabled={busy} value={job?.id || ""} onChange={e => setSelectedId(e.target.value)}>{jobs.map(item => <option key={item.id} value={item.id}>{item.opportunity.product.name} · {labels[item.status]} · {new Date(item.createdAt).toLocaleString("de-DE")}</option>)}</select></label>}
     {job && <div className="contentJob">
-      <div className="jobHeader"><strong aria-live="polite">{labels[job.status]}</strong><span>{job.mode === "ai" ? "KI-Planung" : "Referenzentwurf"} · {job.revisions}/2 Überarbeitungen</span></div>
-      <small>Job {job.id} · {job.modelCalls} Modellaufrufe · {job.totalTokens} gemeldete Tokens</small>
+      <div className="jobHeader"><strong aria-live="polite">{labels[job.status]}</strong><span>{job.mode === "ai" ? "Historische KI-Planung" : "Regelbasierter Entwurf"} · {job.revisions}/2 Überarbeitungen</span></div>
+      <small>Job {job.id} · {job.modelCalls} externe Modellaufrufe</small>
       <p><a href={job.opportunity.product.affiliateUrl} target="_blank" rel="sponsored noopener">Geplantes Affiliate-Linkziel prüfen ↗</a></p>
       <p><b>Produkt:</b> {job.opportunity.product.name}<br /><b>Use Case:</b> {job.opportunity.useCase}</p>
       {JSON.stringify({ ...job.opportunity.product, affiliateUrl: "" }) !== JSON.stringify({ ...product, affiliateUrl: "" }) && <p className="error">Dieser Job gehört zu einem früheren Produktstand. Änderungen oben sind noch nicht eingearbeitet.</p>}
