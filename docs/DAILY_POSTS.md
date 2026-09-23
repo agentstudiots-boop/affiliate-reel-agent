@@ -36,11 +36,13 @@ in `publications` gespeichert. Bei unklarem Meta-Ergebnis bleibt der Lauf
 gesperrt. Instagram ist noch nicht integriert. Der tägliche Entwurf ist darum
 noch keine Zusage für einen täglichen sichtbaren Post.
 
-Vor Preview-E2E: Migration 005 anwenden, Blob-Token und Facebook-
-Schreibberechtigung lesend verifizieren, echte WhatsApp-Template-Kategorie samt
-Gebühren klären und einen vollständigen WhatsApp-/Meta-Durchlauf kontrolliert
-testen. Der Scout wählt saisonale Suchauswahlen, noch keine verifizierten
-Einzelprodukte. Natürliche Änderungswünsche für Bild-/Textbeiträge werden
+Die Migration 005 ist im Preview angewendet; der Blob-Token ist vorhanden und
+die Meta-Verbindung wurde lesend geprüft. Die Facebook-Schreibberechtigung
+und der vollständige WhatsApp-/Meta-Durchlauf sind damit noch nicht bewiesen.
+Vor autonomen täglichen Benachrichtigungen die genehmigte WhatsApp-Vorlage,
+Kategorie samt Gebühren klären. Der Scout wählt saisonale Suchauswahlen, noch
+keine verifizierten Einzelprodukte. Natürliche Änderungswünsche für
+Bild-/Textbeiträge werden
 gespeichert und sperren den Post; eine neue Revision durch die Spezialagenten
 ist noch nicht implementiert. Instagram erfordert einen separaten
 Container-/Publish-Ablauf und eigene Prüfung der externen Bild-URL.

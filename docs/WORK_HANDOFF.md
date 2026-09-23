@@ -1,72 +1,68 @@
 # Work handoff
 
-Stand: 23. September 2026.
-Branch: `feat/production-gates-whatsapp`
-PR: #6
+Stand: 23. September 2026. Offener Draft-PR #6 auf
+`feat/production-gates-whatsapp`. Weder nach `main` gemergt noch für Production
+freigegeben.
 
-## Bereits erledigt
+## Tatsächlich nachgewiesen
 
-- Content-Orchestrator und Postgres-Lernspeicher bleiben unverändert die Basis.
-- Gemini ist entfernt; Tavily bleibt Rechercheprovider.
-- Persistente Produktionsläufe, Freigaben und WhatsApp-Ereignisse sind implementiert.
-- Erste 15 erfolgreiche Videos erzwingen Faceless Storyboard.
-- Spend-Lock verhindert Renderstart ohne gespeicherte Freigabe.
-- Signierter WhatsApp-Webhook, Absenderbindung und Freitext-Änderungswünsche sind implementiert.
-- Production-Gate ist in der Weboberfläche nach Content-Plan-Freigabe eingebunden.
-- Alter 10-Sekunden-Runway-Weg ist als Legacy markiert.
-- GitHub Quality und Vercel Preview waren vor dieser Dokumentationsänderung erfolgreich.
+- Der bestehende Content-Orchestrator mit Postgres, separaten Freigaben und
+  Faceless.so-Storyboard-Gate bleibt die Basis. Die ersten 15 Videos zählen nur
+  bei `production_runs.status='ready'` und müssen `FACELESS_STORYBOARD` nutzen.
+- Der Betreiber hat die Preview-Migrationen `001_memory.sql` bis
+  `005_publication_gate.sql` angewendet. Zwei weitere geschützte Aufrufe von
+  `/api/admin/migrate` meldeten alle fünf als `alreadyApplied`.
+- `BLOB_READ_WRITE_TOKEN` ist in Preview vorhanden. Nach Redeploy des richtigen
+  PR-Previews zeigte die lesende Meta-Diagnose `connected`: Systemnutzer,
+  Facebook-Seite und verknüpftes Instagram-Konto waren erreichbar. Ein
+  Meta-Schreibaufruf wurde dadurch noch nicht bewiesen.
+- Der Preview-Build zu `2bed3c2` und GitHub Quality waren erfolgreich.
+  Browserprüfung: Seite lädt, Postgres wird als konfiguriert angezeigt. Die
+  Veröffentlichungssperre erklärt inzwischen vor dem Klick, warum ein
+  gespeicherter Job keinen Facebook-Seitenpost ergeben kann.
+- Eine nachfolgende Änderung bindet eingehende signierte WhatsApp-Nachrichten
+  zusätzlich an `WHATSAPP_PHONE_NUMBER_ID` (oder die bestehende Schreibweise
+  `WHATTSAPP_PHONE_NUMBER_ID`). Die lokalen Prüfungen bestehen: TypeScript,
+  ESLint, 38 Tests und Next.js-Build. Den neuen Preview-Build separat abwarten.
+- Bisher wurde kein kostenpflichtiger Faceless-Auftrag und kein echter
+  Facebook-Post durch das System ausgelöst. Keine Secrets in GitHub schreiben.
 
-## Aufgaben, die einen authentifizierten Browser / Provider-Zugang brauchen
+## Nächster kontrollierter Preview-Durchlauf
 
-Nachtrag: Der Betreiber hat Preview-Migration `002_production_gates.sql` in Firefox
-zweimal ausgeführt; die Oberfläche meldete „Schema bereits aktuell“. Der
-tatsächliche Anbieter ist **faceless.so**. Seine offizielle Dokumentation liegt
-unter https://faceless.so/developers/docs/reference. Der Adapter samt neuer
-Migration `003_faceless_so.sql` wird auf diesem Branch ergänzt; diese neue
-Migration ist in Preview noch offen. Die alte Liste unten ist historischer
-Handoff und mit dieser Korrektur zu lesen.
+1. Im aktuellen Preview einen neuen, zur **Facebook-Seite** passenden Bild-
+   oder Textplan mit dem tatsächlich gewünschten Produkt speichern und inhaltlich
+   freigeben. Alte Jobs enthalten unveränderliche Produkt-/Plattform-Snapshots;
+   ein anderes Produkt im Formular ändert den gespeicherten Job nicht.
+2. `Beitrag vorbereiten & WhatsApp-Freigabe anfragen` genau einmal auslösen.
+   Textgrafik, Bild-URL, Affiliate-Link und den gespeicherten Status prüfen.
+3. Ausschließlich vom festgelegten Approver auf **diese** WhatsApp antworten:
+   `Freigeben` oder einen natürlichen Änderungswunsch. Eine separate erste
+   Content-Freigabe darf niemals schon publizieren. Danach genau einen
+   Facebook-POST, Permalink und Postgres-Eintrag prüfen; Runtime-Logs ansehen.
+4. Einen Faceless.so-Videoablauf nur mit echter Quote, überprüften Credits und
+   ausdrücklicher WhatsApp-Freigabe einmalig durchführen. Unklare Ergebnisse
+   bleiben gesperrt; keine automatische Wiederholung oder neuer Render auf
+   Verdacht.
+5. Browser-E2E und Preview-Runtime-Fehler dokumentieren. Erst nach stabilem
+   Ergebnis PR #6 finalisieren, mergen, Production deployen, dort Migration
+   ausführen und Smoke-Test durchführen.
 
-1. Vercel-Projekt `agentstudiots-boop/affiliate-reel-agent` öffnen.
-2. Preview-Environment prüfen:
-   - `FACELESS_API_KEY`
-   - `WHATSAPP_ACCESS_TOKEN`
-   - `WHATSAPP_PHONE_NUMBER_ID`
-   - `WHATSAPP_BUSINESS_ACCOUNT_ID`
-   - `WHATSAPP_VERIFY_TOKEN`
-   - `WHATSAPP_APPROVER_WA_ID`
-   - `META_APP_SECRET`
-   - bestehende `DATABASE_URL` und `CONTENT_STUDIO_PASSWORD`
-3. Migration `002_production_gates.sql` über die geschützte Migrationsroute im
-   Preview ausführen und danach erneut ausführen, um Idempotenz praktisch zu bestätigen.
-4. Den **echten Faceless.so-Key** im Preview lesend mit `GET /me`,
-   `GET /options?kind=models` und `GET /voices` prüfen. Keine Provider-Credits
-   ausgeben. Die offizielle API hat keine kostenlose Draft-/Revision-Route;
-   Credits werden bei `POST /videos` belastet, nicht beim MP4-Render.
-5. Den integrierten Adapter erst nach Anwendung von Migration 003 im Preview
-   prüfen. Vor `POST /videos` muss WhatsApp-Freigabe und einmaliger Claim
-   persistiert sein. Idempotency-Key verwenden, aber bei unklarem Ergebnis
-   niemals automatisch wiederholen.
-6. Meta WhatsApp Webhook auf `/api/whatsapp/webhook` konfigurieren und signierten
-   Inbound-Test durchführen:
-   - Freigeben
-   - Ablehnen
-   - natürlicher Änderungswunsch
-   - Duplicate Message
-   - Nachricht einer nicht freigegebenen WA-ID
-7. Die integrierte Outbound-Nachricht nach echter Live-Katalogquote in Preview
-   testen. Sie nennt Produkt, Content-Typ, Provider, Provider-Credits sowie
-   unbekannte EUR-Kosten/Provision explizit als unbekannt.
-8. Browser-E2E auf Preview:
-   Content planen → Content freigeben → Produktionsweg vorbereiten →
-   Kostenquote → WhatsApp → Änderung oder Freigabe → genau ein Render.
-9. Danach separaten Publish-Gate für Instagram/Facebook implementieren:
-   niemals direkt nach Render veröffentlichen; zweite WhatsApp-Freigabe.
-10. Erst nach bestandenem Preview-E2E PR #6 mergen, Migration in Production
-    ausführen und Production erneut smoke-testen.
+## Noch offen / externe Entscheidung
 
-## Danach
+- Tägliche Entwürfe werden im Production-Cron vorbereitet. Freier WhatsApp-Text
+  ist außerhalb des 24-Stunden-Fensters nicht möglich: Eine genehmigte Vorlage,
+  deren Kategorie und mögliche Gebühren müssen vor autonomem täglichen Versand
+  geklärt werden. Der aktuelle Cron versendet nur bei offenem Servicefenster;
+  sonst wartet der Entwurf im Content Studio.
+- Das tatsächliche Faceless.so-Video-E2E und die Meta-Schreibberechtigung sind
+  noch nicht praktisch bestätigt. Es fehlt ein echter, bewusst freigegebener
+  Publishing-Durchlauf.
+- Natürliche Änderungen am Video laufen bereits über den Orchestrator. Bei
+  Bild-/Textpublikationen wird Änderungswunsch gespeichert und der alte Post
+  gesperrt; eine neue Bild-/Textrevision steht noch aus.
+- Instagram-Veröffentlichung und Wochenbericht erst nach stabilem
+  Produktions-/Publishing-Workflow ergänzen. Fehlende Klick-, Follower-,
+  Umsatz- oder Kostenwerte nicht erfinden.
 
-- Wöchentlicher Bericht: Klicks, Follower, Verkäufe, Provision, Produktionskosten,
-  Nettoergebnis und Reinvestitionsvorschlag.
-- Performance-Daten in die Renderer-/Formatentscheidung einbeziehen.
-- Legacy-Runway-Teststudio entfernen, sobald der neue Pfad vollständig bewiesen ist.
+Technische Einzelheiten: [PRODUCTION_GATES.md](PRODUCTION_GATES.md),
+[DAILY_POSTS.md](DAILY_POSTS.md) und [VERIFICATION.md](VERIFICATION.md).

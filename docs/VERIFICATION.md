@@ -1,50 +1,43 @@
-# Prüfung des stabilisierten Arbeitsstands
+# Verifikation des offenen PR #6
 
-Stand: 23. September 2026. Branch: `feat/content-orchestrator-memory`.
+Stand: 23. September 2026. Branch `feat/production-gates-whatsapp`.
 
-## Automatische Prüfung
+## Lokal und CI
 
-- 29 Tests bestanden. Geprüft werden Formatwahl, Orchestrator-Grenzen, höchstens
-  zwei Revisionen, Qualitätsstopp, Wiederherstellung, Spezialisten-Isolation,
-  Postgres-Transaktionen, idempotente Migrationen, Versionskonflikte,
-  Performance-Lernen und Meta-Diagnose ohne echte Provider-Schreibzugriffe.
-- `npm run typecheck`, `npm run lint` und `npm run build` erfolgreich.
-- Der Production-Build enthält `/api/admin/migrate`, `/api/content`,
-  `/api/content/jobs`, `/api/meta/connection` und die bestehenden Runway-/Blob-
-  Routen. Es gibt keinen generativen Google-Endpunkt mehr.
-- Der entfernte generative Transport scheitert geschlossen und führt keinen
-  Netzwerkaufruf aus. Tavily bleibt auf Basic Search für Trend-, Produkt- und
-  Quellenrecherche begrenzt.
-- Kein kostenpflichtiger Modell-, Bild-, Runway-, Faceless- oder
-  Veröffentlichungsauftrag wurde durch Tests ausgelöst.
+- Nach der letzten Änderung: `npm run typecheck`, `npm run lint`, `npm test`
+  (38 bestanden) und `npm run build` erfolgreich. Tests verwendeten keine
+  kostenpflichtigen oder externen Schreibaufrufe.
+- GitHub Quality und Vercel Preview zu `2bed3c2` waren erfolgreich. Die
+  unmittelbar folgende WhatsApp-Empfängernummer-Prüfung wurde lokal ebenfalls
+  erfolgreich geprüft; ihr Preview-Build folgt mit dem nächsten PR-Commit.
+- Die Tests decken getrennte Content-, Render- und Publikationsfreigaben,
+  ungültige Sender, „ja“, Nachrichten-Deduplikation, genau einen Publish-Claim,
+  Sperre inkompatibler Facebook-Jobs und Abgleich der im Meta-Webhook
+  enthaltenen Empfängernummer ab.
 
-## Externe Preview-Prüfung
+## Preview wirklich beobachtet
 
-- Vercel Preview-Build erfolgreich.
-- `DATABASE_URL` und `CONTENT_STUDIO_PASSWORD` werden in Preview erkannt.
-- Der Betreiber hat über die geschützte Route bestätigt:
-  `Schema bereits aktuell: 001_memory.sql`.
-- Damit sind reale Neon-Verbindung, Authentifizierung und der persistierte
-  Migrationsstand bestätigt. Ein realer Content-Job muss noch einmal über die
-  Oberfläche geschrieben und nach Neuladen wieder gelesen werden.
-- Die bestehende Meta-Verbindung wurde zuvor in Production lesend als verbunden
-  geprüft. Ein echter Publish wurde bewusst nicht ausgelöst.
+- Alle Migrationen 001–005 sind angewendet; zwei weitere geschützte
+  Migrationsaufrufe meldeten keine offene Änderung.
+- Das korrekte PR-Preview zeigte `Postgres konfiguriert` und eine erfolgreiche
+  lesende Meta-Diagnose mit Facebook-Seite und verknüpftem Instagram-Konto.
+- Der Browser lud die Seite zum Preview-Deploy `2bed3c2`. Im Browserprotokoll
+  war lediglich ein Fehler der Browsererweiterung, kein App-Runtime-Fehler zu
+  sehen. Das beweist noch keinen echten Browser-E2E für Freigabe oder Posting.
 
-## Repository und Secrets
+## Für den Merge weiterhin zwingend
 
-Das Repository `agentstudiots-boop/affiliate-reel-agent` ist derzeit öffentlich.
-Environment-Dateien und Zugangsdaten bleiben ausgeschlossen. Eine Mustersuche im
-Arbeitsstand fand keine wörtlich eingetragenen Provider- oder Datenbank-Secrets;
-ein Musterscan kann unbekannte oder verschleierte Geheimnisse nicht vollständig
-ausschließen.
+1. Authentifizierten Browser-E2E mit einem neuen, passenden Facebook-Bild-
+   oder Textjob im **aktuellen** Preview durchführen.
+2. Erste Content-Freigabe und getrennte finale WhatsApp-Freigabe verifizieren;
+   danach genau einen echten Facebook-Post, Permalink und Postgres-Persistenz
+   sowie Runtime-Logs prüfen. Bei unklaren Ergebnissen kein zweiter POST.
+3. Faceless.so-Quote und ein einziges bewusst freigegebenes Video mit
+   Statusabfrage, fertiger URL und Persistenz prüfen. Kostenpflichtigen
+   Provideraufruf nicht als allgemeinen Regressionstest wiederholen.
+4. Erst dann PR finalisieren, `main` mergen, Production deployen, Migration
+   in Production ausführen und Smoke-Test durchführen. Fehlende genehmigte
+   WhatsApp-Vorlage für initiierte Tagesnachrichten gesondert klären.
 
-## Noch offen vor Abschluss von Priorität 1
-
-1. Kostenlosen Referenz-Content-Job in Neon schreiben und nach Neuladen lesen.
-2. Feature-Branch nach `main` übernehmen und Production deployen.
-3. Production: Postgres, Meta, bestehende Runway-/Blob-Funktionen und Oberfläche
-   erneut ohne kostenpflichtigen Render prüfen.
-4. Publishing erst mit persistenter Inhaltsfreigabe und Idempotenz aktivieren.
-
-Faceless, WhatsApp-Freigaben, Capability Proposals und Wochenbericht gehören zu
-Priorität 2 und beginnen erst nach diesem stabilen Production-Stand.
+Keine Secrets, WhatsApp-Tokens oder Rohantworten mit Zugangsdaten in Tests,
+Dokumentation, Logs oder Pull Request schreiben.

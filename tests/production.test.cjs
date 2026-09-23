@@ -66,14 +66,18 @@ test('WhatsApp webhook verification and signature fail closed',()=>{
   }
 });
 
-test('WhatsApp webhook extracts only inbound text and reply context',()=>{
-  const payload={object:'whatsapp_business_account',entry:[{changes:[{value:{messages:[
+test('WhatsApp webhook extracts only inbound text to the configured phone number',()=>{
+  const payload={object:'whatsapp_business_account',entry:[{changes:[{value:{metadata:{phone_number_id:'123456123'},messages:[
     {from:'491234',id:'wamid.1',timestamp:'1',type:'text',text:{body:'Freigeben'},context:{id:'wamid.out'}},
     {from:'491234',id:'wamid.2',timestamp:'2',type:'image',image:{id:'x'}}
   ]}}]}]};
-  assert.deepEqual(extractIncomingWhatsAppMessages(payload),[
+  assert.deepEqual(extractIncomingWhatsAppMessages(payload,'123456123'),[
     {id:'wamid.1',from:'491234',body:'Freigeben',replyToMessageId:'wamid.out'}
   ]);
+  assert.deepEqual(extractIncomingWhatsAppMessages(payload,'999999999'),[],'a valid app signature for another number must not authorize a reply');
+  assert.deepEqual(extractIncomingWhatsAppMessages(payload,''),[],'missing phone configuration must fail closed');
+  delete payload.entry[0].changes[0].value.metadata;
+  assert.deepEqual(extractIncomingWhatsAppMessages(payload,'123456123'),[],'webhook without recipient identity must fail closed');
 });
 
 test('existing misspelled Vercel WhatsApp secrets remain usable without exposing values',()=>{

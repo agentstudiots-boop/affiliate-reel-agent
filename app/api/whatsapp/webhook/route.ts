@@ -28,7 +28,8 @@ export async function POST(request: Request) {
   try { payload = JSON.parse(raw); }
   catch { return new Response("Invalid JSON", { status: 400 }); }
 
-  const messages = extractIncomingWhatsAppMessages(payload);
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || process.env.WHATTSAPP_PHONE_NUMBER_ID || "";
+  const messages = extractIncomingWhatsAppMessages(payload, phoneNumberId);
   if (!messages.length) return new Response("EVENT_RECEIVED", { status: 200, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
   let repo;
   try { repo = productionRepository(); }

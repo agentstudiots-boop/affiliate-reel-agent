@@ -25,7 +25,8 @@ export type IncomingWhatsAppMessage = {
   replyToMessageId: string | null;
 };
 
-export function extractIncomingWhatsAppMessages(payload: unknown): IncomingWhatsAppMessage[] {
+export function extractIncomingWhatsAppMessages(payload: unknown, expectedPhoneNumberId: string): IncomingWhatsAppMessage[] {
+  if (!/^\d+$/.test(expectedPhoneNumberId)) return [];
   if (!payload || typeof payload !== "object") return [];
   const root = payload as Record<string, unknown>;
   if (root.object !== "whatsapp_business_account" || !Array.isArray(root.entry)) return [];
@@ -38,6 +39,8 @@ export function extractIncomingWhatsAppMessages(payload: unknown): IncomingWhats
       if (!change || typeof change !== "object") continue;
       const value = (change as Record<string, unknown>).value;
       if (!value || typeof value !== "object") continue;
+      const metadata = (value as Record<string, unknown>).metadata;
+      if (!metadata || typeof metadata !== "object" || (metadata as Record<string, unknown>).phone_number_id !== expectedPhoneNumberId) continue;
       const messages = (value as Record<string, unknown>).messages;
       if (!Array.isArray(messages)) continue;
       for (const item of messages) {

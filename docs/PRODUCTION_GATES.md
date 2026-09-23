@@ -45,6 +45,9 @@ Webhook: `/api/whatsapp/webhook`
 
 - GET: Meta Challenge mit `WHATSAPP_VERIFY_TOKEN`.
 - POST: Signaturprüfung von `x-hub-signature-256` mit `META_APP_SECRET`.
+- Eingehende `messages` werden zusätzlich nur für die konfigurierte
+  `WHATSAPP_PHONE_NUMBER_ID` verarbeitet; signierte Ereignisse für andere
+  Telefonnummern derselben Meta-App lösen keine Freigabe aus.
 - Nur Textnachrichten werden als Entscheidungen ausgewertet.
 - Nur `WHATSAPP_APPROVER_WA_ID` darf eine Freigabe verändern.
 - Provider-Message-IDs werden dedupliziert.
@@ -82,20 +85,23 @@ Offizieller Vertrag: https://faceless.so/developers/docs/reference
   unbekannte Ergebnisse starten weder einen zweiten Videokauf noch einen
   zweiten Render.
 
-Migration `003_faceless_so.sql` ergänzt die persistenten Start- und Render-Claims;
-sie muss nach dem Preview-Deploy über `/api/admin/migrate` ausgeführt werden.
+Migration `003_faceless_so.sql` ergänzt die persistenten Start- und Render-Claims.
+Sie wurde zusammen mit 001, 002, 004 und 005 bereits im Preview ausgeführt;
+zwei weitere Preview-Aufrufe bestätigten den idempotenten Stand.
 
 Die bereits existierenden Vercel-Secrets mit Präfix `WHATTSAPP_` werden aus
 Kompatibilitätsgründen für Access-Token, Phone-Number-ID und Business-Account-ID
 akzeptiert. Kanonische `WHATSAPP_`-Namen haben Vorrang. Verify-Token,
 Meta-App-Secret und Approver-ID müssen gesondert konfiguriert werden.
 
-## Noch nicht aktiviert
+## Betrieb noch nicht praktisch bewiesen
 
 - Kein Faceless.so-Render, bis Preview-Konfiguration, Migration und echte
   WhatsApp-Freigabe geprüft wurden.
 - Kein Runway-Render über den neuen Produktionsweg.
-- Keine automatische Facebook-/Instagram-Veröffentlichung.
+- Der separate Facebook-Publikationsweg ist im Preview verfügbar, wurde aber
+  noch nicht mit einem echten WhatsApp-Freigabe- und Facebook-Post-Durchlauf
+  nachgewiesen. Instagram-Publishing ist noch nicht implementiert.
 - Keine automatische Wochenbilanz.
 
 Der alte Runway-10-Sekunden-Pfad bleibt nur als Legacy-Teststudio sichtbar und
