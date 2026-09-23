@@ -1,0 +1,39 @@
+import { productionRepository } from "@/lib/production/repository";
+import { extractIncomingWhatsAppMessages, verifyMetaWebhookSignature, verifyWhatsAppChallenge } from "@/lib/whatsapp/security";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+export function GET(request: Request) {
+  const params = new URL(request.url).searchParams;
+  const mode = params.get("hub.mode") || "";
+  const token = params.get("hub.verify_token") || "";
+  const challenge = params.get("hub.challenge") || "";
+  if (mode === "subscribe" && challenge && verifyWhatsAppChallenge(token)) {
+    return new Response(challenge, { status: 200, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
+  }
+  return new Response("Forbidden", { status: 403, headers: { "Cache-Control": "no-store" } });
+}
+
+export async function POST(request: Request) {
+  const raw = await request.text();
+  if (raw.length > 256_000) return new Response("Payload too large", { status: 413 });
+  if (!verifyMetaWebhookSignature(raw, request.headers.get("x-hub-signature-256"))) {
+    return new Response("Invalid signature", { status: 401 });
+  }
+  let payload: unknown;
+  try { payload = JSON.parse(raw); }
+  catch { return new Response("Invalid JSON", { status: 400 }); }
+
+  const messages = extractIncomingWhatsAppMessages(payload);
+  const repo = productionRepository();
+  for (const message of messages) {
+    try {
+      const result = await repo.applyIncomingWhatsApp({ ...message, payload });
+      console.info(JSON.stringify({ event: "whatsapp_approval_message", messageId: message.id, handled: result.handled, reason: "reason" in result ? result.reason : undefined, intent: "intent" in result ? result.intent : undefined }));
+    } catch {
+      console.error(JSON.stringify({ event: "whatsapp_approval_message_failed", messageId: message.id }));
+    }
+  }
+  return new Response("EVENT_RECEIVED", { status: 200, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
+}
