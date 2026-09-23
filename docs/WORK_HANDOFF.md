@@ -18,6 +18,14 @@ PR: #6
 
 ## Aufgaben, die einen authentifizierten Browser / Provider-Zugang brauchen
 
+Nachtrag: Der Betreiber hat Preview-Migration `002_production_gates.sql` in Firefox
+zweimal ausgeführt; die Oberfläche meldete „Schema bereits aktuell“. Der
+tatsächliche Anbieter ist **faceless.so**. Seine offizielle Dokumentation liegt
+unter https://faceless.so/developers/docs/reference. Der Adapter samt neuer
+Migration `003_faceless_so.sql` wird auf diesem Branch ergänzt; diese neue
+Migration ist in Preview noch offen. Die alte Liste unten ist historischer
+Handoff und mit dieser Korrektur zu lesen.
+
 1. Vercel-Projekt `agentstudiots-boop/affiliate-reel-agent` öffnen.
 2. Preview-Environment prüfen:
    - `FACELESS_API_KEY`
@@ -30,12 +38,14 @@ PR: #6
    - bestehende `DATABASE_URL` und `CONTENT_STUDIO_PASSWORD`
 3. Migration `002_production_gates.sql` über die geschützte Migrationsroute im
    Preview ausführen und danach erneut ausführen, um Idempotenz praktisch zu bestätigen.
-4. Faceless.video Developer Portal mit dem echten Konto öffnen und den offiziellen
-   API-Vertrag für Quote → Storyboard Draft → Revision → bestätigten Render →
-   Status → Output dokumentieren. Keine Endpoints eines anderen Faceless-Anbieters übernehmen.
-5. Erst danach den Faceless.video-Adapter implementieren. Vor Render muss die
-   gespeicherte WhatsApp-Freigabe geprüft werden; Provider-Confirmation und
-   Idempotenz ebenfalls nutzen.
+4. Den **echten Faceless.so-Key** im Preview lesend mit `GET /me`,
+   `GET /options?kind=models` und `GET /voices` prüfen. Keine Provider-Credits
+   ausgeben. Die offizielle API hat keine kostenlose Draft-/Revision-Route;
+   Credits werden bei `POST /videos` belastet, nicht beim MP4-Render.
+5. Den integrierten Adapter erst nach Anwendung von Migration 003 im Preview
+   prüfen. Vor `POST /videos` muss WhatsApp-Freigabe und einmaliger Claim
+   persistiert sein. Idempotency-Key verwenden, aber bei unklarem Ergebnis
+   niemals automatisch wiederholen.
 6. Meta WhatsApp Webhook auf `/api/whatsapp/webhook` konfigurieren und signierten
    Inbound-Test durchführen:
    - Freigeben
@@ -43,9 +53,9 @@ PR: #6
    - natürlicher Änderungswunsch
    - Duplicate Message
    - Nachricht einer nicht freigegebenen WA-ID
-7. Outbound-Freigabenachricht erst nach echter Provider-Kostenquote verdrahten.
-   Sie muss Produkt, Content-Typ, Provider, erwartete Kosten und – sofern belegbar –
-   die erwartete Affiliate-Provision zeigen.
+7. Die integrierte Outbound-Nachricht nach echter Live-Katalogquote in Preview
+   testen. Sie nennt Produkt, Content-Typ, Provider, Provider-Credits sowie
+   unbekannte EUR-Kosten/Provision explizit als unbekannt.
 8. Browser-E2E auf Preview:
    Content planen → Content freigeben → Produktionsweg vorbereiten →
    Kostenquote → WhatsApp → Änderung oder Freigabe → genau ein Render.

@@ -31,15 +31,19 @@ export async function POST(request: Request) {
   try { repo = productionRepository(); }
   catch {
     console.error(JSON.stringify({ event: "whatsapp_database_unavailable" }));
-    return new Response("EVENT_RECEIVED", { status: 200, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
+    return new Response("Storage unavailable", { status: 503, headers: { "Cache-Control": "no-store" } });
   }
+  let failed = false;
   for (const message of messages) {
     try {
       const result = await repo.applyIncomingWhatsApp({ ...message, payload });
       console.info(JSON.stringify({ event: "whatsapp_approval_message", messageId: message.id, handled: result.handled, reason: "reason" in result ? result.reason : undefined, intent: "intent" in result ? result.intent : undefined }));
     } catch {
+      failed = true;
       console.error(JSON.stringify({ event: "whatsapp_approval_message_failed", messageId: message.id }));
     }
   }
+  // Successful message IDs deduplicate when Meta redelivers the batch.
+  if (failed) return new Response("Storage unavailable", { status: 503, headers: { "Cache-Control": "no-store" } });
   return new Response("EVENT_RECEIVED", { status: 200, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
 }

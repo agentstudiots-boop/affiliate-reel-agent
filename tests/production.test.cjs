@@ -7,8 +7,10 @@ const {chooseVideoProvider,FACELESS_LEARNING_TARGET}=require('../.test-build/lib
 const {classifyWhatsAppReply}=require('../.test-build/lib/whatsapp/intent');
 const {extractIncomingWhatsAppMessages,verifyMetaWebhookSignature,verifyWhatsAppChallenge}=require('../.test-build/lib/whatsapp/security');
 const {productionRepository}=require('../.test-build/lib/production/repository');
+const {facelessClient,narration}=require('../.test-build/lib/production/faceless-so');
 const {memoryRepository}=require('../.test-build/lib/memory/repository');
 const {runContentJob}=require('../.test-build/lib/content/orchestrator');
+const {reviseApprovedVideo}=require('../.test-build/lib/content/orchestrator');
 const {opportunitySchema}=require('../.test-build/lib/content/schema');
 
 const opportunity=opportunitySchema.parse({
@@ -83,6 +85,7 @@ test('production repository is idempotent and cannot start spend before WhatsApp
   try{
     await pg.exec(fs.readFileSync('db/migrations/001_memory.sql','utf8'));
     await pg.exec(fs.readFileSync('db/migrations/002_production_gates.sql','utf8'));
+    await pg.exec(fs.readFileSync('db/migrations/003_faceless_so.sql','utf8'));
     const memory=memoryRepository(db);
     const id=crypto.randomUUID();
     await memory.claim(id,opportunity,'reference');
@@ -98,6 +101,82 @@ test('production repository is idempotent and cannot start spend before WhatsApp
     assert.equal(first.run.providerMode,'FACELESS_STORYBOARD');
     assert.equal(first.run.status,'needs_provider_quote');
     assert.equal(await production.successfulVideoCount(),0);
-    await assert.rejects(production.markRendering(first.run.id,'provider-job-1'),/WhatsApp-Freigabe/);
+    await assert.rejects(production.claimPaidCreation(id,20),/WhatsApp-Freigabe/);
+
+    const script=narration({...job,status:'approved'});
+    const approval=await production.createRenderApproval({jobId:id,estimatedCostCents:null,estimatedProviderCredits:20,estimatedCommissionCents:null,summary:'Vakuumierer, 20 Credits',approverWaId:'491234',script,voiceId:'de-voice'});
+    await production.claimWhatsAppSend(approval.id);
+    await assert.rejects(production.claimWhatsAppSend(approval.id),/bereits versucht/);
+    await production.bindApprovalMessage(approval.id,'wamid.out');
+    const old=process.env.WHATSAPP_APPROVER_WA_ID;process.env.WHATSAPP_APPROVER_WA_ID='491234';
+    try{
+      const incoming={id:'wamid.in',from:'491234',body:'Freigeben',replyToMessageId:'wamid.out',payload:{}};
+      assert.equal((await production.applyIncomingWhatsApp({...incoming,from:'491235'})).reason,'untrusted_sender');
+      assert.equal((await production.applyIncomingWhatsApp(incoming)).intent,'approve');
+      assert.equal((await production.applyIncomingWhatsApp(incoming)).reason,'duplicate');
+      const claimed=await production.claimPaidCreation(id,20);
+      assert.equal(claimed.script,script);
+      await assert.rejects(production.claimPaidCreation(id,20),/WhatsApp-Freigabe/);
+      await production.bindProviderJob(first.run.id,'provider-job-1');
+      const render=await production.claimFreeRender(first.run.id);
+      assert.ok(render.key);
+      await assert.rejects(production.claimFreeRender(first.run.id),/bereits versucht/);
+      await production.bindRender(first.run.id,'render-job-1');
+      await production.markReady(first.run.id,'https://exports.faceless.so/video.mp4');
+      assert.equal(await production.successfulVideoCount(),1);
+    }finally{if(old===undefined)delete process.env.WHATSAPP_APPROVER_WA_ID;else process.env.WHATSAPP_APPROVER_WA_ID=old;}
   }finally{await pg.close();}
+});
+
+test('Faceless.so reads catalog without writing, and paid creation uses one idempotency key',async()=>{
+  const old=process.env.FACELESS_API_KEY;process.env.FACELESS_API_KEY='test-only';
+  const calls=[];
+  const mock=async(url,options)=>{
+    calls.push({url,method:options.method,key:options.headers['Idempotency-Key']});
+    const path=new URL(url).pathname;
+    const data=path.endsWith('/me')?{team:{credits:40},auth:{scopes:['videos:read','videos:write','catalog:read']}}
+      :path.endsWith('/options')?{kind:'models',items:[{value:'storyboard',credits:20}]}
+      :path.endsWith('/voices')?[{id:'de-voice',name:'Deutsch',targetLanguages:['de']}]
+      :{id:'video-1',model:'storyboard',creditsUsed:20};
+    return {ok:true,json:async()=>({success:true,data})};
+  };
+  try{
+    const client=facelessClient(mock);
+    assert.deepEqual(await client.quote(),{credits:20,balance:40,voices:[{id:'de-voice',name:'Deutsch'}]});
+    assert.ok(calls.every(c=>c.method==='GET' && c.url.startsWith('https://faceless.so/api/v1/')));
+    await client.create('Testtext','de-voice','Test','uuid-key');
+    assert.equal(calls.filter(c=>c.method==='POST').length,1);
+    assert.equal(calls.at(-1).key,'uuid-key');
+  }finally{if(old===undefined)delete process.env.FACELESS_API_KEY;else process.env.FACELESS_API_KEY=old;}
+});
+
+test('WhatsApp change request is revised by orchestrator and needs fresh editorial approval',async()=>{
+  const pg=new PGlite();
+  const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
+  const old=process.env.WHATSAPP_APPROVER_WA_ID;process.env.WHATSAPP_APPROVER_WA_ID='491234';
+  try{
+    for(const file of ['001_memory.sql','002_production_gates.sql','003_faceless_so.sql'])await pg.exec(fs.readFileSync(`db/migrations/${file}`,'utf8'));
+    const memory=memoryRepository(db),production=productionRepository(db),id=crypto.randomUUID();
+    await memory.claim(id,opportunity,'reference');
+    await runContentJob(opportunity,{id,onUpdate:memory.save,loadLearning:memory.learn});
+    const approved=await memory.approve(id);
+    const run=(await production.prepareVideo(id)).run;
+    const approval=await production.createRenderApproval({jobId:id,estimatedCostCents:null,estimatedProviderCredits:20,estimatedCommissionCents:null,summary:'Test',approverWaId:'491234',script:narration(approved),voiceId:'de-voice'});
+    await production.claimWhatsAppSend(approval.id);await production.bindApprovalMessage(approval.id,'wamid.out');
+    const change=await production.applyIncomingWhatsApp({id:'wamid.change',from:'491234',body:'Mach die erste Szene kürzer. CTA weniger werblich. Nimm Szene 3 raus.',replyToMessageId:'wamid.out',payload:{}});
+    assert.equal(change.intent,'changes_requested');
+    const revised=await production.reviseRequestedVideo(id);
+    assert.equal(revised.status,'awaiting_approval');
+    assert.equal(revised.revisions,1);
+    assert.equal(revised.content.scenes.length,approved.content.scenes.length-1);
+    assert.equal(revised.content.scenes[0].durationSeconds,approved.content.scenes[0].durationSeconds-2);
+    assert.notEqual(narration({...revised,status:'approved'}),narration(approved));
+    assert.equal((await production.getByJobId(id)).status,'needs_provider_quote');
+    await assert.rejects(production.claimPaidCreation(id,20),/WhatsApp-Freigabe/);
+    await memory.approve(id);
+    await assert.rejects(production.reviseRequestedVideo(id),/Kein offener/);
+    const raw=await pg.query('SELECT count(*) AS n FROM job_events WHERE job_id=$1',[id]);
+    assert.equal(Number(raw.rows[0].n),revised.events.length+1);
+    await assert.rejects(reviseApprovedVideo({...revised,status:'approved',revisions:2},'Mach die erste Szene kürzer.'),/Maximal zwei/);
+  }finally{if(old===undefined)delete process.env.WHATSAPP_APPROVER_WA_ID;else process.env.WHATSAPP_APPROVER_WA_ID=old;await pg.close();}
 });

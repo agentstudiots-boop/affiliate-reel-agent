@@ -10,6 +10,27 @@ import { contentSchema, opportunitySchema, reviewSchema, type AgentName, type Co
 import type { Generator } from "./agent";
 
 export const MAX_REVISIONS = 2;
+
+export async function reviseApprovedVideo(job: ContentJob, feedback: string): Promise<ContentJob> {
+  if (job.status !== "approved" || job.content?.format !== "video" || !job.decision || !job.ideas) throw new Error("Freigegebener Video-Plan fehlt.");
+  if (job.revisions >= MAX_REVISIONS) throw new Error("Maximal zwei Überarbeitungen erreicht.");
+  if (job.mode !== "reference") throw new Error("Für diesen Modus ist kein geprüfter Änderungs-Generator aktiv.");
+  const idea = job.ideas.find(item => item.id === job.decision!.ideaId);
+  if (!idea) throw new Error("Gewählte Idee fehlt.");
+  const draft = contentSchema.parse(await videoAgent({ opportunity: job.opportunity, idea, previous: job.content, changeRequest: feedback }, createGenerator({ mode: job.mode })));
+  const review = inspectContent(draft, job.decision);
+  if (!review.passed) throw new Error(`Überarbeitung verletzt redaktionelle Prüfung: ${review.issues.join(" ")}`);
+  const next = structuredClone(job);
+  next.revisions++;
+  next.content = draft;
+  next.review = review;
+  next.status = "awaiting_approval";
+  next.updatedAt = new Date().toISOString();
+  next.events.push({ sequence: next.events.length + 1, at: next.updatedAt, agent: "orchestrator", kind: "decision", message: `Änderungsauftrag an Video-Agent: ${feedback}` });
+  next.events.push({ sequence: next.events.length + 1, at: next.updatedAt, agent: "video", kind: "response", message: `Revision ${next.revisions} erstellt`, data: draft });
+  next.events.push({ sequence: next.events.length + 1, at: next.updatedAt, agent: "orchestrator", kind: "decision", message: "Überarbeiteter Plan benötigt erneut redaktionelle Freigabe." });
+  return next;
+}
 // Only this registry/orchestrator imports specialists. New agents can be registered here.
 const producers = { video: videoAgent, image: imageAgent, text: textAgent };
 

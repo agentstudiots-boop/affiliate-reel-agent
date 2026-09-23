@@ -4,6 +4,7 @@ import { getDatabase, type Database } from "../memory/db";
 import { chooseVideoProvider } from "./policy";
 import { approvalRequestSchema, productionRunSchema, type ApprovalRequest, type ProductionRun } from "./schema";
 import { classifyWhatsAppReply } from "../whatsapp/intent";
+import { reviseApprovedVideo } from "../content/orchestrator";
 
 export class ProductionConflictError extends Error {}
 
@@ -65,6 +66,14 @@ export function productionRepository(db: Database = getDatabase()) {
       return result.rows[0] ? mapRun(result.rows[0]) : null;
     },
 
+    async approvedJob(jobId: string) {
+      const result = await db.query("SELECT snapshot FROM content_jobs WHERE id=$1", [jobId]);
+      if (!result.rows[0]) throw new ProductionConflictError("Content-Job nicht gefunden.");
+      const job = parseJob(result.rows[0].snapshot);
+      if (job.status !== "approved" || job.content?.format !== "video") throw new ProductionConflictError("Freigegebener Video-Plan fehlt.");
+      return job;
+    },
+
     async latestApproval(jobId: string) {
       const result = await db.query("SELECT * FROM approval_requests WHERE job_id=$1 ORDER BY created_at DESC LIMIT 1", [jobId]);
       return result.rows[0] ? mapApproval(result.rows[0]) : null;
@@ -96,11 +105,13 @@ export function productionRepository(db: Database = getDatabase()) {
 
     async createRenderApproval(input: {
       jobId: string;
-      estimatedCostCents: number;
+      estimatedCostCents: number | null;
       estimatedProviderCredits: number | null;
       estimatedCommissionCents: number | null;
       summary: string;
       approverWaId: string;
+      script?: string;
+      voiceId?: string;
     }) {
       return db.transaction(async sql => {
         const runResult = await sql.query("SELECT * FROM production_runs WHERE job_id=$1 FOR UPDATE", [input.jobId]);
@@ -108,6 +119,19 @@ export function productionRepository(db: Database = getDatabase()) {
         const run = mapRun(runResult.rows[0]);
         if (!["needs_provider_quote", "changes_requested"].includes(run.status)) {
           throw new ProductionConflictError("Für diesen Produktionsauftrag kann derzeit keine neue Render-Freigabe angefordert werden.");
+        }
+        if (run.providerMode !== "FACELESS_STORYBOARD" || !input.script || !input.voiceId || !input.estimatedProviderCredits) {
+          throw new ProductionConflictError("Faceless.so-Quote, Sprecher und freigegebener Entwurf fehlen.");
+        }
+        const jobResult = await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE", [input.jobId]);
+        if (!jobResult.rows[0]) throw new ProductionConflictError("Content-Job nicht gefunden.");
+        const job = parseJob(jobResult.rows[0].snapshot);
+        if (job.status !== "approved" || job.content?.format !== "video") throw new ProductionConflictError("Freigegebener Video-Plan fehlt.");
+        if (job.content.scenes.map(scene => scene.audio.trim()).join("\n\n") !== input.script) {
+          throw new ProductionConflictError("Der Entwurf wurde seit der Quote geändert.");
+        }
+        if (run.status === "changes_requested" && input.script === runResult.rows[0].provider_script) {
+          throw new ProductionConflictError("Änderungswunsch erst im Content-Plan überarbeiten und erneut freigeben.");
         }
         const pending = await sql.query("SELECT * FROM approval_requests WHERE production_run_id=$1 AND kind='render' AND status='pending'", [run.id]);
         if (pending.rows[0]) return mapApproval(pending.rows[0]);
@@ -120,11 +144,19 @@ export function productionRepository(db: Database = getDatabase()) {
           [id, run.id, input.jobId, token, input.estimatedCostCents, input.estimatedCommissionCents, input.summary, input.approverWaId],
         );
         await sql.query(
-          "UPDATE production_runs SET status='awaiting_whatsapp_approval',estimated_cost_cents=$2,estimated_provider_credits=$3,revision_request='',updated_at=now() WHERE id=$1",
-          [run.id, input.estimatedCostCents, input.estimatedProviderCredits],
+          "UPDATE production_runs SET status='awaiting_whatsapp_approval',estimated_cost_cents=$2,estimated_provider_credits=$3,provider_script=$4,provider_voice_id=$5,revision_request='',updated_at=now() WHERE id=$1",
+          [run.id, input.estimatedCostCents, input.estimatedProviderCredits, input.script, input.voiceId],
         );
         return mapApproval(result.rows[0]);
       });
+    },
+
+    async claimWhatsAppSend(approvalId: string) {
+      const result = await db.query(
+        "UPDATE approval_requests SET whatsapp_send_attempted_at=now() WHERE id=$1 AND status='pending' AND whatsapp_message_id IS NULL AND whatsapp_send_attempted_at IS NULL RETURNING id",
+        [approvalId],
+      );
+      if (!result.rows.length) throw new ProductionConflictError("WhatsApp-Versand bereits versucht. Bei unklarem Ergebnis nicht erneut senden.");
     },
 
     async bindApprovalMessage(approvalId: string, messageId: string) {
@@ -134,6 +166,27 @@ export function productionRepository(db: Database = getDatabase()) {
       );
       if (!result.rows[0]) throw new ProductionConflictError("WhatsApp-Nachricht konnte keiner offenen Freigabe zugeordnet werden.");
       return mapApproval(result.rows[0]);
+    },
+
+    async reviseRequestedVideo(jobId: string) {
+      return db.transaction(async sql => {
+        const run = await sql.query("SELECT * FROM production_runs WHERE job_id=$1 AND status='changes_requested' FOR UPDATE", [jobId]);
+        if (!run.rows[0]) throw new ProductionConflictError("Kein offener Änderungsauftrag für diesen Produktionsjob.");
+        const stored = await sql.query("SELECT snapshot,event_sequence FROM content_jobs WHERE id=$1 FOR UPDATE", [jobId]);
+        if (!stored.rows[0]) throw new ProductionConflictError("Content-Job fehlt.");
+        const original = parseJob(stored.rows[0].snapshot);
+        let revised;
+        try { revised = await reviseApprovedVideo(original, String(run.rows[0].revision_request)); }
+        catch (error) { throw new ProductionConflictError(error instanceof Error ? error.message : "Änderung nicht umsetzbar."); }
+        const previousSequence = Number(stored.rows[0].event_sequence);
+        if (previousSequence !== original.events.length) throw new ProductionConflictError("Content-Protokoll wurde zwischenzeitlich geändert.");
+        await sql.query("UPDATE content_jobs SET status='awaiting_approval',snapshot=$2,event_sequence=$3,updated_at=$4 WHERE id=$1", [jobId, JSON.stringify(revised), revised.events.length, revised.updatedAt]);
+        for (const event of revised.events.filter(item => item.sequence > previousSequence)) {
+          await sql.query("INSERT INTO job_events(job_id,sequence,agent,kind,occurred_at,payload) VALUES($1,$2,$3,$4,$5,$6)", [jobId, event.sequence, event.agent, event.kind, event.at, JSON.stringify(event)]);
+        }
+        await sql.query("UPDATE production_runs SET status='needs_provider_quote',revision_request='',updated_at=now() WHERE job_id=$1", [jobId]);
+        return revised;
+      });
     },
 
     async applyIncomingWhatsApp(input: { id: string; from: string; body: string; replyToMessageId: string | null; payload: unknown }) {
@@ -148,13 +201,15 @@ export function productionRepository(db: Database = getDatabase()) {
 
         const approvalResult = input.replyToMessageId
           ? await sql.query("SELECT * FROM approval_requests WHERE whatsapp_message_id=$1 AND status='pending' FOR UPDATE", [input.replyToMessageId])
-          : await sql.query("SELECT * FROM approval_requests WHERE approver_wa_id=$1 AND status='pending' ORDER BY created_at DESC LIMIT 1 FOR UPDATE", [input.from]);
+          : await sql.query("SELECT * FROM approval_requests WHERE approver_wa_id=$1 AND status='pending' AND whatsapp_message_id IS NOT NULL ORDER BY created_at DESC LIMIT 2 FOR UPDATE", [input.from]);
+        if (!input.replyToMessageId && approvalResult.rows.length !== 1) return { handled: false as const, reason: "ambiguous_approval" as const };
         if (!approvalResult.rows[0]) return { handled: false as const, reason: "no_pending_approval" as const };
 
         const approval = mapApproval(approvalResult.rows[0]);
         const decision = classifyWhatsAppReply(input.body);
         const approvalStatus = decision.intent === "approve" ? "approved" : decision.intent === "reject" ? "rejected" : "changes_requested";
         const runStatus = decision.intent === "approve" ? "approved_for_spend" : decision.intent === "reject" ? "cancelled" : "changes_requested";
+        if (approval.kind !== "render") return { handled: false as const, reason: "unsupported_approval_kind" as const };
         await sql.query(
           "UPDATE approval_requests SET status=$2,feedback=$3,decided_at=now() WHERE id=$1",
           [approval.id, approvalStatus, decision.feedback],
@@ -171,13 +226,53 @@ export function productionRepository(db: Database = getDatabase()) {
       });
     },
 
-    async markRendering(runId: string, providerJobId: string) {
-      const result = await db.query(
-        "UPDATE production_runs SET status='rendering',provider_job_id=$2,updated_at=now() WHERE id=$1 AND status='approved_for_spend' RETURNING *",
-        [runId, providerJobId],
-      );
-      if (!result.rows[0]) throw new ProductionConflictError("Render darf ohne gespeicherte WhatsApp-Freigabe nicht gestartet werden.");
+    async claimPaidCreation(jobId: string, maxCredits: number) {
+      return db.transaction(async sql => {
+        const result = await sql.query(
+          `SELECT r.* FROM production_runs r JOIN approval_requests a ON a.production_run_id=r.id
+           WHERE r.job_id=$1 AND r.status='approved_for_spend' AND r.provider_mode='FACELESS_STORYBOARD'
+             AND r.provider_request_attempted_at IS NULL AND r.estimated_provider_credits >= $2
+             AND r.provider_script IS NOT NULL AND r.provider_voice_id IS NOT NULL
+             AND a.kind='render' AND a.status='approved' AND a.whatsapp_message_id IS NOT NULL
+           FOR UPDATE OF r`, [jobId, maxCredits],
+        );
+        if (!result.rows[0]) throw new ProductionConflictError("Bezahlten Videostart ohne eindeutige WhatsApp-Freigabe oder bei geänderter Quote verweigert.");
+        const key = crypto.randomUUID();
+        const claimed = await sql.query(
+          "UPDATE production_runs SET status='rendering',provider_request_key=$2,provider_request_attempted_at=now(),updated_at=now() WHERE id=$1 AND status='approved_for_spend' RETURNING *",
+          [result.rows[0].id, key],
+        );
+        await sql.query("UPDATE approval_requests SET status='consumed' WHERE production_run_id=$1 AND kind='render' AND status='approved'", [result.rows[0].id]);
+        return { run: mapRun(claimed.rows[0]), script: String(result.rows[0].provider_script), voiceId: String(result.rows[0].provider_voice_id), key };
+      });
+    },
+
+    async bindProviderJob(runId: string, providerJobId: string) {
+      const result = await db.query("UPDATE production_runs SET provider_job_id=$2,updated_at=now() WHERE id=$1 AND status='rendering' AND provider_request_attempted_at IS NOT NULL AND provider_job_id IS NULL RETURNING *", [runId, providerJobId]);
+      if (!result.rows[0]) throw new ProductionConflictError("Provider-Auftrag konnte nicht eindeutig zugeordnet werden.");
       return mapRun(result.rows[0]);
+    },
+
+    async claimFreeRender(runId: string) {
+      const result = await db.query("UPDATE production_runs SET render_request_key=$2,render_request_attempted_at=now(),updated_at=now() WHERE id=$1 AND status='rendering' AND provider_job_id IS NOT NULL AND render_request_attempted_at IS NULL RETURNING *", [runId, crypto.randomUUID()]);
+      if (!result.rows[0]) throw new ProductionConflictError("MP4-Render bereits versucht; bei unklarem Ergebnis manuell prüfen.");
+      const key = await db.query("SELECT render_request_key FROM production_runs WHERE id=$1", [runId]);
+      return { run: mapRun(result.rows[0]), key: String(key.rows[0].render_request_key) };
+    },
+
+    async bindRender(runId: string, renderId: string) {
+      const result = await db.query("UPDATE production_runs SET render_id=$2,updated_at=now() WHERE id=$1 AND status='rendering' AND render_request_attempted_at IS NOT NULL AND render_id IS NULL RETURNING *", [runId, renderId]);
+      if (!result.rows[0]) throw new ProductionConflictError("MP4-Render konnte nicht zugeordnet werden.");
+      return mapRun(result.rows[0]);
+    },
+
+    async providerProgress(jobId: string) {
+      const result = await db.query("SELECT render_id,render_request_attempted_at FROM production_runs WHERE job_id=$1", [jobId]);
+      return result.rows[0] ? { renderId: result.rows[0].render_id as string | null, renderAttempted: !!result.rows[0].render_request_attempted_at } : null;
+    },
+
+    async markFailed(runId: string) {
+      await db.query("UPDATE production_runs SET status='failed',updated_at=now() WHERE id=$1 AND status='rendering'", [runId]);
     },
 
     async markReady(runId: string, outputUrl: string) {

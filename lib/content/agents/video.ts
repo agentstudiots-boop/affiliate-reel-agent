@@ -1,11 +1,45 @@
 import { videoSchema } from "../schema";
 import type { Brief, Generator } from "../agent";
 
+function reviseReferenceVideo(brief: Brief) {
+  if (brief.previous?.format !== "video" || !brief.changeRequest) throw new Error("Vorheriger Video-Plan und Änderungsauftrag fehlen.");
+  const request = brief.changeRequest.toLocaleLowerCase("de-DE");
+  const next = structuredClone(brief.previous);
+  let applied = false;
+  if (/erste szene kürzer|szene 1 kürzer/.test(request)) {
+    next.scenes[0].durationSeconds = Math.max(2, next.scenes[0].durationSeconds - 2);
+    applied = true;
+  }
+  if (/cta.{0,25}weniger werblich|weniger werblich.{0,25}cta/.test(request)) {
+    next.cta = new URL(brief.opportunity.product.sourceUrl).pathname === "/s"
+      ? "Bei Interesse kannst du die verlinkte Auswahl vergleichen."
+      : "Bei Interesse kannst du die Angaben zum verlinkten Produkt prüfen.";
+    next.scenes.at(-1)!.audio = next.cta;
+    applied = true;
+  }
+  if (/szene\s*3\s*(raus|entfernen|streichen)|nimm\s+szene\s*3\s+raus/.test(request)) {
+    if (next.scenes.length <= 3) throw new Error("Szene 3 kann nicht entfernt werden: mindestens drei Szenen erforderlich.");
+    next.scenes.splice(2, 1);
+    applied = true;
+  }
+  if (/video ruhiger|ruhigeres video|mach.{0,20}ruhiger/.test(request)) {
+    // A single narrator cannot recreate the original multi-speaker dialogue.
+    if (!/vakuumier/i.test(brief.opportunity.product.name)) throw new Error("Ruhigere Fassung für dieses Produkt im Referenzmodus nicht sicher ableitbar.");
+    next.scenes[0].audio = "Ein Familienessen. Oma entdeckt eine Idee für die Zubereitung des Steaks.";
+    next.scenes.at(-2)!.audio = "Beim gemeinsamen Essen steht der praktische Ablauf im Mittelpunkt.";
+    applied = true;
+  }
+  if (!applied) throw new Error("Änderungswunsch im Referenzmodus nicht eindeutig umsetzbar. Bitte konkret eine Szene, den CTA oder das Erzähltempo nennen.");
+  next.durationSeconds = next.scenes.reduce((sum, scene) => sum + scene.durationSeconds, 0);
+  return videoSchema.parse(next);
+}
+
 export function videoAgent(brief: Brief, generate: Generator) {
   return generate("video", `Setze ausschließlich das vom Orchestrator ausgewählte Konzept in ein vollständiges Drehbuch um.
 Die Geschichte bestimmt die Dauer: 10–40 Sekunden, bei Erklärung meist 20–40. Summe aller Szenendauern muss durationSeconds entsprechen.
 Pro Szene konkrete visuelle Handlung, sprechbarer Dialog/Voiceover und Einblendung. Maximal ca. 2,5 gesprochene Wörter pro Sekunde.
-Produktintegration, Voraussetzungen, CTA und Caption ausarbeiten. Feedback bei Revision gezielt beheben. Keine Videogenerierung auslösen.`, brief, videoSchema, () => {
+  Produktintegration, Voraussetzungen, CTA und Caption ausarbeiten. Feedback bei Revision gezielt beheben. Keine Videogenerierung auslösen.`, brief, videoSchema, () => {
+    if (brief.changeRequest) return reviseReferenceVideo(brief);
     const { idea, opportunity } = brief;
     const vacuum = /vakuumier|vakuum.?versiegl/i.test(opportunity.product.name);
     const cta = new URL(opportunity.product.sourceUrl).pathname === "/s" ? "Passende Geräte in der verlinkten Auswahl ansehen." : "Eignung und Details beim verlinkten Produkt prüfen.";

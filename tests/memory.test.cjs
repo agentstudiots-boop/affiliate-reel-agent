@@ -20,8 +20,8 @@ test('explicit migrations are transactional and idempotent',async()=>{
     const loader=name=>fs.readFileSync(`db/migrations/${name}`,'utf8');
     const first=await applyMigrations(db,loader);
     const second=await applyMigrations(db,loader);
-    assert.deepEqual(first,{applied:['001_memory.sql','002_production_gates.sql'],alreadyApplied:[]});
-    assert.deepEqual(second,{applied:[],alreadyApplied:['001_memory.sql','002_production_gates.sql']});
+    assert.deepEqual(first,{applied:['001_memory.sql','002_production_gates.sql','003_faceless_so.sql'],alreadyApplied:[]});
+    assert.deepEqual(second,{applied:[],alreadyApplied:['001_memory.sql','002_production_gates.sql','003_faceless_so.sql']});
     const tables=await pg.query("SELECT tablename FROM pg_tables WHERE schemaname='public'");
     assert.ok(tables.rows.some(row=>row.tablename==='content_jobs'));
     assert.ok(tables.rows.some(row=>row.tablename==='production_runs'));
