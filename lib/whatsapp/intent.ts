@@ -25,7 +25,8 @@ function normalize(value: string) {
     .trim()
     .toLocaleLowerCase("de-DE")
     .replace(/[.!?;,]+/g, " ")
-    .replace(/\s+/g, " ");
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export function classifyWhatsAppReply(body: string): { intent: WhatsAppIntent; feedback: string } {
