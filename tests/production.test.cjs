@@ -7,6 +7,7 @@ const {chooseVideoProvider,FACELESS_LEARNING_TARGET}=require('../.test-build/lib
 const {classifyWhatsAppReply}=require('../.test-build/lib/whatsapp/intent');
 const {extractIncomingWhatsAppMessages,verifyMetaWebhookSignature,verifyWhatsAppChallenge}=require('../.test-build/lib/whatsapp/security');
 const {productionRepository}=require('../.test-build/lib/production/repository');
+const {whatsappConfig}=require('../.test-build/lib/whatsapp/client');
 const {facelessClient,narration}=require('../.test-build/lib/production/faceless-so');
 const {memoryRepository}=require('../.test-build/lib/memory/repository');
 const {runContentJob}=require('../.test-build/lib/content/orchestrator');
@@ -73,6 +74,20 @@ test('WhatsApp webhook extracts only inbound text and reply context',()=>{
   assert.deepEqual(extractIncomingWhatsAppMessages(payload),[
     {id:'wamid.1',from:'491234',body:'Freigeben',replyToMessageId:'wamid.out'}
   ]);
+});
+
+test('existing misspelled Vercel WhatsApp secrets remain usable without exposing values',()=>{
+  const keys=['WHATSAPP_ACCESS_TOKEN','WHATTSAPP_ACCESS_TOKEN','WHATSAPP_PHONE_NUMBER_ID','WHATTSAPP_PHONE_NUMBER_ID','WHATSAPP_BUSINESS_ACCOUNT_ID','WHATTSAPP_BUSINESS_ACCOUNT_ID'];
+  const old=Object.fromEntries(keys.map(key=>[key,process.env[key]]));
+  try{
+    for(const key of keys)delete process.env[key];
+    process.env.WHATTSAPP_ACCESS_TOKEN='test-token';
+    process.env.WHATTSAPP_PHONE_NUMBER_ID='test-phone';
+    process.env.WHATTSAPP_BUSINESS_ACCOUNT_ID='test-account';
+    assert.equal(whatsappConfig().accessToken,true);
+    assert.equal(whatsappConfig().phoneNumberId,true);
+    assert.equal(whatsappConfig().businessAccountId,true);
+  }finally{for(const key of keys){if(old[key]===undefined)delete process.env[key];else process.env[key]=old[key];}}
 });
 
 test('production repository is idempotent and cannot start spend before WhatsApp approval',async()=>{
@@ -160,7 +175,7 @@ test('WhatsApp change request is revised by orchestrator and needs fresh editori
     await memory.claim(id,opportunity,'reference');
     await runContentJob(opportunity,{id,onUpdate:memory.save,loadLearning:memory.learn});
     const approved=await memory.approve(id);
-    const run=(await production.prepareVideo(id)).run;
+    await production.prepareVideo(id);
     const approval=await production.createRenderApproval({jobId:id,estimatedCostCents:null,estimatedProviderCredits:20,estimatedCommissionCents:null,summary:'Test',approverWaId:'491234',script:narration(approved),voiceId:'de-voice'});
     await production.claimWhatsAppSend(approval.id);await production.bindApprovalMessage(approval.id,'wamid.out');
     const change=await production.applyIncomingWhatsApp({id:'wamid.change',from:'491234',body:'Mach die erste Szene kürzer. CTA weniger werblich. Nimm Szene 3 raus.',replyToMessageId:'wamid.out',payload:{}});

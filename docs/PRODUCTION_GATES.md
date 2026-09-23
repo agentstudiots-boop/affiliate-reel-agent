@@ -85,6 +85,11 @@ Offizieller Vertrag: https://faceless.so/developers/docs/reference
 Migration `003_faceless_so.sql` ergänzt die persistenten Start- und Render-Claims;
 sie muss nach dem Preview-Deploy über `/api/admin/migrate` ausgeführt werden.
 
+Die bereits existierenden Vercel-Secrets mit Präfix `WHATTSAPP_` werden aus
+Kompatibilitätsgründen für Access-Token, Phone-Number-ID und Business-Account-ID
+akzeptiert. Kanonische `WHATSAPP_`-Namen haben Vorrang. Verify-Token,
+Meta-App-Secret und Approver-ID müssen gesondert konfiguriert werden.
+
 ## Noch nicht aktiviert
 
 - Kein Faceless.so-Render, bis Preview-Konfiguration, Migration und echte
