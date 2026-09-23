@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { ContentJob } from "@/lib/content/schema";
 import type { ProductionRun } from "@/lib/production/schema";
 import type { VideoProviderDecision } from "@/lib/production/policy";
@@ -26,23 +26,6 @@ export function ProductionGate({ job, password }: { job: ContentJob; password: s
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-
-  async function load() {
-    if (!password) return;
-    try {
-      const response = await fetch(`/api/production?jobId=${encodeURIComponent(job.id)}`, {
-        headers: { "x-content-password": password },
-        cache: "no-store",
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Produktionsstatus nicht verfügbar.");
-      setStatus(data);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Produktionsstatus nicht verfügbar.");
-    }
-  }
-
-  useEffect(() => { void load(); }, [job.id, password]);
 
   async function prepare() {
     setBusy(true); setError("");
