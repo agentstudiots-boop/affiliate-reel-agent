@@ -1,4 +1,10 @@
-# Content-Architektur v0.4
+# Content-Architektur v0.5
+
+Der aktuelle Produktions-, Freigabe-, WhatsApp- und Publishing-Kreislauf ist in
+[PRODUCTION_CONTROL.md](PRODUCTION_CONTROL.md) beschrieben. Die früheren
+Hinweise weiter unten zur rein lokalen Speicherung und zu deaktiviertem
+Publishing beschreiben den historischen v0.4-Zustand und gelten nicht für die
+neuen, Postgres-gebundenen Produktionsrouten.
 
 Aktuelle Speicherarchitektur: [POSTGRES_MEMORY.md](POSTGRES_MEMORY.md).
 Die nachstehende Browser-Speicherung beschreibt die vorherige v0.3; neue Jobs

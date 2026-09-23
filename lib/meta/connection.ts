@@ -65,7 +65,7 @@ export async function checkMetaConnection(config:MetaConfig, transport: typeof f
       report.steps.push({stage,result:permissions?"ok":"unknown"});
     }catch(error){if(fatal(error))throw error;report.steps.push({stage,result:"unknown"});}
     // Do not infer missing scopes from an unsupported permission-list edge.
-    if(permissions)report.missingPermissions=["instagram_basic","pages_read_engagement","instagram_content_publish"].filter(p=>!permissions!.has(p));
+    if(permissions)report.missingPermissions=["instagram_basic","pages_read_engagement","instagram_content_publish","pages_manage_posts"].filter(p=>!permissions!.has(p));
     stage="page_discovery";
     let pageId=config.pageId;
     if(!pageId){

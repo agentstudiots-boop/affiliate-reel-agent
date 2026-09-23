@@ -1,50 +1,54 @@
-# Prüfung des stabilisierten Arbeitsstands
+# Verifikation
 
-Stand: 23. September 2026. Branch: `feat/content-orchestrator-memory`.
+Stand: 23. September 2026.
 
-## Automatische Prüfung
+## Automatisch bestätigt
 
-- 29 Tests bestanden. Geprüft werden Formatwahl, Orchestrator-Grenzen, höchstens
-  zwei Revisionen, Qualitätsstopp, Wiederherstellung, Spezialisten-Isolation,
-  Postgres-Transaktionen, idempotente Migrationen, Versionskonflikte,
-  Performance-Lernen und Meta-Diagnose ohne echte Provider-Schreibzugriffe.
-- `npm run typecheck`, `npm run lint` und `npm run build` erfolgreich.
-- Der Production-Build enthält `/api/admin/migrate`, `/api/content`,
-  `/api/content/jobs`, `/api/meta/connection` und die bestehenden Runway-/Blob-
-  Routen. Es gibt keinen generativen Google-Endpunkt mehr.
-- Der entfernte generative Transport scheitert geschlossen und führt keinen
-  Netzwerkaufruf aus. Tavily bleibt auf Basic Search für Trend-, Produkt- und
-  Quellenrecherche begrenzt.
-- Kein kostenpflichtiger Modell-, Bild-, Runway-, Faceless- oder
-  Veröffentlichungsauftrag wurde durch Tests ausgelöst.
+- 34 Tests bestanden.
+- TypeScript, ESLint und Next.js-Production-Build erfolgreich.
+- Postgres-Migrationen sind transaktional und idempotent.
+- Der Faceless-Bootstrap erzwingt für Zähler 0 bis 14 Storyboard.
+- Nur `completed` plus vorhandene Blob-URL erhöht den Erfolgszähler.
+- Deutsche WhatsApp-Beispiele werden in eine feste Intent-Menge übersetzt.
+- Nicht autorisierte Absender und falsche Webhook-Signaturen scheitern
+  geschlossen.
+- Runway kann nicht mehr über den historischen freien Payload gestartet werden.
+- Ohne persistente Kostenfreigabe startet kein kostenpflichtiger Provider.
+- Ohne persistente Content-Freigabe startet kein Publishing.
+- Doppelte WhatsApp Message-IDs werden nicht erneut verarbeitet.
+- Kein Test hat Faceless-/Runway-Credits verbraucht oder Content veröffentlicht.
 
-## Externe Preview-Prüfung
+Der Build enthält unter anderem:
 
-- Vercel Preview-Build erfolgreich.
-- `DATABASE_URL` und `CONTENT_STUDIO_PASSWORD` werden in Preview erkannt.
-- Der Betreiber hat über die geschützte Route bestätigt:
-  `Schema bereits aktuell: 001_memory.sql`.
-- Damit sind reale Neon-Verbindung, Authentifizierung und der persistierte
-  Migrationsstand bestätigt. Ein realer Content-Job muss noch einmal über die
-  Oberfläche geschrieben und nach Neuladen wieder gelesen werden.
-- Die bestehende Meta-Verbindung wurde zuvor in Production lesend als verbunden
-  geprüft. Ein echter Publish wurde bewusst nicht ausgelöst.
+- `/api/faceless/connection`
+- `/api/production/requests`
+- `/api/production/status`
+- `/api/whatsapp/webhook`
+- `/api/content/approval`
+- `/api/capability-proposals`
+- `/api/publishing`
+- `/api/reports/weekly`
 
-## Repository und Secrets
+## Bereits extern bestätigt
 
-Das Repository `agentstudiots-boop/affiliate-reel-agent` ist derzeit öffentlich.
-Environment-Dateien und Zugangsdaten bleiben ausgeschlossen. Eine Mustersuche im
-Arbeitsstand fand keine wörtlich eingetragenen Provider- oder Datenbank-Secrets;
-ein Musterscan kann unbekannte oder verschleierte Geheimnisse nicht vollständig
-ausschließen.
+- `main` wurde vor Beginn dieser Erweiterung stabil auf Vercel Production
+  deployed.
+- Neon-Verbindung, geschützte Migration `001_memory.sql` und bestehender Blob
+  Store `affiliate-reel-media` wurden real bestätigt.
+- Die bestehende Meta-Verbindung war lesend verbunden; ein echter Post wurde
+  bewusst nicht als Test ausgelöst.
 
-## Noch offen vor Abschluss von Priorität 1
+## Nach dem nächsten Deployment extern auszuführen
 
-1. Kostenlosen Referenz-Content-Job in Neon schreiben und nach Neuladen lesen.
-2. Feature-Branch nach `main` übernehmen und Production deployen.
-3. Production: Postgres, Meta, bestehende Runway-/Blob-Funktionen und Oberfläche
-   erneut ohne kostenpflichtigen Render prüfen.
-4. Publishing erst mit persistenter Inhaltsfreigabe und Idempotenz aktivieren.
+1. Migration `002_production_control.sql` über `/api/admin/migrate` ausführen.
+2. `/api/faceless/connection` lesen: Key, Scopes, Stimmen, Modelle und Credits.
+3. Fehlende WhatsApp-Variablen setzen und Webhook bei Meta konfigurieren.
+4. Betreiber sendet zuerst eine Nachricht an die Business-Nummer oder richtet
+   eine freigegebene Utility-Vorlage ein.
+5. Einen kostenlosen Content-Plan schreiben/laden und eine Produktionsanfrage
+   erzeugen. Noch nicht freigeben, solange kein bezahlter Storyboard-Test gewollt
+   ist.
+6. Runway nur regressiv bis vor den kostenpflichtigen Aufruf prüfen.
 
-Faceless, WhatsApp-Freigaben, Capability Proposals und Wochenbericht gehören zu
-Priorität 2 und beginnen erst nach diesem stabilen Production-Stand.
+Diese externen Punkte dürfen erst nach tatsächlicher Rückmeldung als erfolgreich
+gelten.

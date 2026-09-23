@@ -1,35 +1,24 @@
 import { z } from "zod";
-import { buildVideoPrompt } from "@/lib/video-prompt";
-import { currentMonthRange, getRunwayClient, monthlyBudgetCredits, RUNWAY_DURATION_SECONDS, RUNWAY_ESTIMATED_CREDITS, RUNWAY_MODEL, RUNWAY_RATIO } from "@/lib/runway";
+import { authorized } from "@/lib/memory/auth";
+import { startApprovedProduction } from "@/lib/production/service";
+import { completeProduction } from "@/lib/production/service";
+import { after } from "next/server";
 
 export const runtime = "nodejs";
-const requestSchema = z.object({
-  productName: z.string().min(2).max(160),
-  prompt: z.string().min(10).max(900),
-});
+export const maxDuration = 300;
+const requestSchema = z.object({ productionRequestId:z.string().uuid() });
 
 export async function POST(request: Request) {
-  let creationAttempted = false;
+  if(!authorized(request))return Response.json({error:"Zugangscode erforderlich. Kostenpflichtige Produktion bleibt gesperrt."},{status:401});
   try {
     const input = requestSchema.parse(await request.json());
-    const client = getRunwayClient();
-    const usage = await client.organization.retrieveUsage(currentMonthRange());
-    const usedCredits = usage.results.flatMap((day) => day.usedCredits).reduce((sum, item) => sum + item.amount, 0);
-    const budgetCredits = monthlyBudgetCredits();
-    if (usedCredits + RUNWAY_ESTIMATED_CREDITS > budgetCredits) {
-      return Response.json({ error: `Monatslimit erreicht: ${usedCredits} von ${budgetCredits} Credits verbraucht. Kein Video gestartet.`, notStarted: true }, { status: 402 });
-    }
-    creationAttempted = true;
-    const task = await client.textToVideo.create({
-      model: RUNWAY_MODEL,
-      promptText: buildVideoPrompt(input.productName, input.prompt),
-      ratio: RUNWAY_RATIO,
-      duration: RUNWAY_DURATION_SECONDS,
-    });
-    return Response.json({ taskId: task.id, estimatedCredits: task.estimatedCost.credits, usedCredits, budgetCredits });
+    const production=await startApprovedProduction(input.productionRequestId);
+    if(!production)return Response.json({error:"Produktionsanfrage nicht gefunden."},{status:404});
+    if(production.status==="awaiting_cost_approval")return Response.json({error:"Keine ausdrückliche WhatsApp-Kostenfreigabe gespeichert. Kein Render gestartet.",notStarted:true},{status:409});
+    if(["submitted","generating","rendering","transferring"].includes(production.status))after(()=>completeProduction(production.id));
+    return Response.json({productionRequestId:production.id,taskId:production.external_job_id,status:production.status,estimatedCredits:production.estimated_credits,actualCredits:production.actual_credits});
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Runway-Job konnte nicht gestartet werden.";
-    const validationRejected = error instanceof Error && "status" in error && error.status === 400 && message.includes("Validation of body failed");
-    return Response.json({ error: message, notStarted: !creationAttempted || validationRejected }, { status: 400 });
+    const message = error instanceof Error ? error.message : "Video-Job konnte nicht gestartet werden.";
+    return Response.json({ error: message, notStarted:true }, { status: 400 });
   }
 }

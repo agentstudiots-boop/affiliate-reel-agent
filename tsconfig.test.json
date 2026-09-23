@@ -15,6 +15,11 @@
   "include": [
     "lib/content/**/*.ts",
     "lib/memory/**/*.ts",
-    "lib/meta/**/*.ts"
+    "lib/meta/**/*.ts",
+    "lib/renderers/**/*.ts",
+    "lib/production/schema.ts",
+    "lib/production/repository.ts",
+    "lib/whatsapp/intent.ts",
+    "lib/whatsapp/client.ts"
   ]
 }

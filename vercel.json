@@ -1,5 +1,7 @@
 {
   "framework": "nextjs",
-  "regions": ["fra1"]
+  "regions": ["fra1"],
+  "crons": [
+    { "path": "/api/reports/weekly", "schedule": "0 18 * * 0" }
+  ]
 }
-
