@@ -17,13 +17,15 @@ test('explicit migrations are transactional and idempotent',async()=>{
   const pg=new PGlite();
   const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
   try{
-    const migration=fs.readFileSync('db/migrations/001_memory.sql','utf8');
-    const first=await applyMigrations(db,()=>migration);
-    const second=await applyMigrations(db,()=>migration);
-    assert.deepEqual(first,{applied:['001_memory.sql'],alreadyApplied:[]});
-    assert.deepEqual(second,{applied:[],alreadyApplied:['001_memory.sql']});
+    const loader=name=>fs.readFileSync(`db/migrations/${name}`,'utf8');
+    const first=await applyMigrations(db,loader);
+    const second=await applyMigrations(db,loader);
+    assert.deepEqual(first,{applied:['001_memory.sql','002_production_gates.sql'],alreadyApplied:[]});
+    assert.deepEqual(second,{applied:[],alreadyApplied:['001_memory.sql','002_production_gates.sql']});
     const tables=await pg.query("SELECT tablename FROM pg_tables WHERE schemaname='public'");
     assert.ok(tables.rows.some(row=>row.tablename==='content_jobs'));
+    assert.ok(tables.rows.some(row=>row.tablename==='production_runs'));
+    assert.ok(tables.rows.some(row=>row.tablename==='approval_requests'));
   }finally{await pg.close();}
 });
 
