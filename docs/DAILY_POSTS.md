@@ -17,24 +17,30 @@ aktuelle Websignale und Saisonkandidaten. Für den Content-Job wird eine
 saisonale **Amazon-Suchauswahl** verwendet, solange kein konkretes Produkt samt
 Eigenschaftsnachweisen vorliegt. Der vorhandene Content-Orchestrator entwickelt
 einen kostenlosen Referenzentwurf für Facebook mit Budget `low`; der Job und
-das Scout-Ergebnis werden in Postgres gespeichert. Eine freie WhatsApp-Nachricht
-mit Auszug und Job-ID wird ausschließlich dann einmalig gesendet, wenn die
+das Scout-Ergebnis werden in Postgres gespeichert. Eine Content-Freigabe per
+WhatsApp mit Auszug und Job-ID wird ausschließlich dann einmalig gesendet, wenn die
 Approver-ID innerhalb der letzten 24 Stunden eine Nachricht an die API gesendet
 hat. Für tägliche initiierte Nachrichten außerhalb dieses Fensters muss zunächst
 eine genehmigte WhatsApp-Vorlage einschließlich der möglichen Nachrichtengebühren
 eingerichtet werden. Ohne Vorlage wartet der Entwurf gespeichert im Content Studio.
+Eine ausdrückliche erste Antwort genehmigt nur den Content-Plan. Das System
+bereitet danach eine originale Textgrafik vor und schickt eine **zweite**
+WhatsApp-Nachricht zur finalen Freigabe des Facebook-Posts.
 
 ## Noch offen
 
-Es existiert noch kein fertiges Bild: Der Bild-Agent liefert lediglich Layout
-und Prompt. Es gibt noch keine schreibende Meta-Publishing-Integration. Weder
-die WhatsApp-Nachricht noch die Content-Freigabe veröffentlichen einen Beitrag.
-Der tägliche Entwurf ist darum keine Zusage für einen täglichen sichtbaren Post.
+Eine eigene typografische PNG-Grafik wird über Vercel Blob öffentlich gehostet;
+sie zeigt keine konkreten Produkteigenschaften. Der Facebook-Fotopost wird
+nach der zweiten eindeutigen WhatsApp-Freigabe genau einmal angefordert und
+in `publications` gespeichert. Bei unklarem Meta-Ergebnis bleibt der Lauf
+gesperrt. Instagram ist noch nicht integriert. Der tägliche Entwurf ist darum
+noch keine Zusage für einen täglichen sichtbaren Post.
 
-Vor automatischem Publishing: ein rechtmäßig nutzbares Bild erzeugen/hosten,
-den konkreten Produktlink und die Aussagen prüfen, einen getrennten persistenten
-WhatsApp-Publish-Gate mit eindeutiger Zuordnung zu Beitrag und Plattform bauen,
-Meta-Schreibberechtigungen prüfen und POST-Claims vor jedem externen Schreibaufruf
-persistieren. Instagram erfordert ein öffentlich erreichbares Bild und einen
-separaten Container-/Publish-Ablauf. Bei unklarem Meta-Ergebnis keine zweite
-Veröffentlichung auslösen.
+Vor Preview-E2E: Migration 005 anwenden, Blob-Token und Facebook-
+Schreibberechtigung lesend verifizieren, echte WhatsApp-Template-Kategorie samt
+Gebühren klären und einen vollständigen WhatsApp-/Meta-Durchlauf kontrolliert
+testen. Der Scout wählt saisonale Suchauswahlen, noch keine verifizierten
+Einzelprodukte. Natürliche Änderungswünsche für Bild-/Textbeiträge werden
+gespeichert und sperren den Post; eine neue Revision durch die Spezialagenten
+ist noch nicht implementiert. Instagram erfordert einen separaten
+Container-/Publish-Ablauf und eigene Prüfung der externen Bild-URL.

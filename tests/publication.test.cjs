@@ -1,0 +1,55 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const {PGlite}=require('@electric-sql/pglite');
+const {memoryRepository}=require('../.test-build/lib/memory/repository');
+const {productionRepository}=require('../.test-build/lib/production/repository');
+const {publicationRepository}=require('../.test-build/lib/meta/publication-gate');
+const {runContentJob}=require('../.test-build/lib/content/orchestrator');
+const {opportunitySchema}=require('../.test-build/lib/content/schema');
+
+test('Facebook publication needs a distinct signed WhatsApp decision and claims exactly one external POST',async()=>{
+  const pg=new PGlite();
+  const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
+  const old=process.env.WHATSAPP_APPROVER_WA_ID;process.env.WHATSAPP_APPROVER_WA_ID='491234';
+  try{
+    for(const file of ['001_memory.sql','002_production_gates.sql','003_faceless_so.sql','004_daily_drafts.sql','005_publication_gate.sql'])await pg.exec(fs.readFileSync(`db/migrations/${file}`,'utf8'));
+    const memory=memoryRepository(db),publication=publicationRepository(db),inbound=productionRepository(db);
+    const opportunity=opportunitySchema.parse({product:{name:'Kuscheldecke',sourceUrl:'https://www.amazon.de/s?k=Kuscheldecke',affiliateUrl:'https://www.amazon.de/s?k=Kuscheldecke',price:'',targetGroup:'Haushalte',benefits:'Größe und Material vergleichen',notes:''},useCase:'Ein kühler Herbstabend auf dem Sofa mit einer Decke.',targetPlatform:'facebook',budget:'low'});
+    const id=crypto.randomUUID();await memory.claim(id,opportunity,'reference');
+    const job=await runContentJob(opportunity,{id,onUpdate:memory.save,loadLearning:memory.learn});
+    assert.equal(job.content.format,'image');await memory.approve(id);
+    const pending=await publication.prepare(id,'491234');
+    assert.equal(pending.status,'preparing');assert.equal((await publication.prepare(id,'491234')).id,pending.id);
+    await assert.rejects(publication.claimPublish(pending.id),/nicht freigegeben/);
+    await publication.claimImage(pending.id);
+    await publication.bindImage(pending.id,'https://example.public.blob.vercel-storage.com/image.png');
+    await publication.claimWhatsAppSend(pending.id);
+    await publication.bindMessage(pending.id,'wamid.publish');
+    const stranger=await inbound.applyIncomingWhatsApp({id:'wamid.stranger',from:'499999',body:'Freigeben',replyToMessageId:'wamid.publish',payload:{}});
+    assert.equal(stranger.reason,'untrusted_sender');
+    const weak=await inbound.applyIncomingWhatsApp({id:'wamid.weak',from:'491234',body:'ja',replyToMessageId:'wamid.publish',payload:{}});
+    assert.notEqual(weak.intent,'approve');
+    assert.equal((await publication.get(id)).status,'changes_requested');
+    await assert.rejects(publication.claimPublish(pending.id),/nicht freigegeben/);
+    const id2=crypto.randomUUID();await memory.claim(id2,opportunity,'reference');
+    await runContentJob(opportunity,{id:id2,onUpdate:memory.save,loadLearning:memory.learn});await memory.approve(id2);
+    const next=await publication.prepare(id2,'491234');await publication.claimImage(next.id);
+    await publication.bindImage(next.id,'https://example.public.blob.vercel-storage.com/image.png');await publication.claimWhatsAppSend(next.id);await publication.bindMessage(next.id,'wamid.publish2');
+    const approved=await inbound.applyIncomingWhatsApp({id:'wamid.approve',from:'491234',body:'OK, freigeben',replyToMessageId:'wamid.publish2',payload:{}});
+    assert.equal(approved.publicationId,next.id);assert.equal(approved.intent,'approve');
+    assert.equal((await inbound.applyIncomingWhatsApp({id:'wamid.approve',from:'491234',body:'OK, freigeben',replyToMessageId:'wamid.publish2',payload:{}})).reason,'duplicate');
+    assert.equal((await publication.claimPublish(next.id)).status,'publishing');
+    await assert.rejects(publication.claimPublish(next.id),/bereits versucht/);
+    await publication.markUnknown(next.id);
+    assert.equal((await publication.get(id2)).status,'unknown');
+    const id3=crypto.randomUUID();await memory.claim(id3,opportunity,'reference');
+    await runContentJob(opportunity,{id:id3,onUpdate:memory.save,loadLearning:memory.learn});
+    await pg.query("INSERT INTO daily_drafts(day,job_id,status,whatsapp_send_attempted_at,whatsapp_message_id) VALUES('2026-09-24',$1,'awaiting_approval',now(),'wamid.daily')",[id3]);
+    const daily=await inbound.applyIncomingWhatsApp({id:'wamid.daily.approve',from:'491234',body:'Freigeben',replyToMessageId:'wamid.daily',payload:{}});
+    assert.equal(daily.dailyJobId,id3);assert.equal(daily.intent,'approve');
+    assert.equal((await memory.list()).find(row=>row.id===id3).status,'approved');
+    assert.equal((await pg.query("SELECT status FROM daily_drafts WHERE job_id=$1",[id3])).rows[0].status,'content_approved');
+    assert.equal((await publication.get(id3)),null,'content approval cannot post without a second WhatsApp decision');
+  }finally{if(old===undefined)delete process.env.WHATSAPP_APPROVER_WA_ID;else process.env.WHATSAPP_APPROVER_WA_ID=old;await pg.close();}
+});

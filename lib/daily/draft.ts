@@ -53,7 +53,7 @@ export async function createDailyDraft(day = new Date().toISOString().slice(0, 1
       );
       if (attempted.rows.length) {
         const summary = job.content?.format === "text" ? job.content.body : job.content?.format === "image" ? job.content.caption : "Videoentwurf";
-        const messageId = await sendWhatsAppText(`Tagesentwurf ${day}: ${candidate.name}\nFormat: ${job.content?.format || "unbekannt"} · Ziel: Facebook\n\n${(summary || "").slice(0, 600)}\n\nSuchauswahl, kein geprüftes Einzelprodukt. Öffne das Content Studio und prüfe Job ${jobId}. Es ist noch nichts veröffentlicht. Eine gesonderte WhatsApp-Freigabe für die Veröffentlichung ist erforderlich.`);
+        const messageId = await sendWhatsAppText(`Content-Freigabe · Tagesentwurf ${day}\nProdukt: ${candidate.name}\nFormat: ${job.content?.format || "unbekannt"} · Facebook\n\n${(summary || "").slice(0, 1100)}\n\nSuchauswahl, kein geprüftes Einzelprodukt. Antworte auf DIESE Nachricht mit „Freigeben“, um den Content-Plan freizugeben. Danach kommt eine ZWEITE WhatsApp für die Veröffentlichung. „Ablehnen“ stoppt den Auftrag, Änderungswünsche bitte als Text. Noch kein Post ist online.`);
         await db.query("UPDATE daily_drafts SET whatsapp_message_id=$2,updated_at=now() WHERE day=$1", [day, messageId]);
       }
     }

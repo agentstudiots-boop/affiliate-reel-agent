@@ -6,6 +6,8 @@
     "outDir": ".test-build",
     "rootDir": ".",
     "strict": true,
+    "jsx": "react-jsx",
+    "paths": { "@/*": ["./*"] },
     "esModuleInterop": true,
     "skipLibCheck": true,
     "types": [

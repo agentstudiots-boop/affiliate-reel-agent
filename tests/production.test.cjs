@@ -101,6 +101,8 @@ test('production repository is idempotent and cannot start spend before WhatsApp
     await pg.exec(fs.readFileSync('db/migrations/001_memory.sql','utf8'));
     await pg.exec(fs.readFileSync('db/migrations/002_production_gates.sql','utf8'));
     await pg.exec(fs.readFileSync('db/migrations/003_faceless_so.sql','utf8'));
+    await pg.exec(fs.readFileSync('db/migrations/004_daily_drafts.sql','utf8'));
+    await pg.exec(fs.readFileSync('db/migrations/005_publication_gate.sql','utf8'));
     const memory=memoryRepository(db);
     const id=crypto.randomUUID();
     await memory.claim(id,opportunity,'reference');
@@ -170,7 +172,7 @@ test('WhatsApp change request is revised by orchestrator and needs fresh editori
   const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
   const old=process.env.WHATSAPP_APPROVER_WA_ID;process.env.WHATSAPP_APPROVER_WA_ID='491234';
   try{
-    for(const file of ['001_memory.sql','002_production_gates.sql','003_faceless_so.sql'])await pg.exec(fs.readFileSync(`db/migrations/${file}`,'utf8'));
+    for(const file of ['001_memory.sql','002_production_gates.sql','003_faceless_so.sql','004_daily_drafts.sql','005_publication_gate.sql'])await pg.exec(fs.readFileSync(`db/migrations/${file}`,'utf8'));
     const memory=memoryRepository(db),production=productionRepository(db),id=crypto.randomUUID();
     await memory.claim(id,opportunity,'reference');
     await runContentJob(opportunity,{id,onUpdate:memory.save,loadLearning:memory.learn});

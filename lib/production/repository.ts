@@ -202,8 +202,45 @@ export function productionRepository(db: Database = getDatabase()) {
         const approvalResult = input.replyToMessageId
           ? await sql.query("SELECT * FROM approval_requests WHERE whatsapp_message_id=$1 AND status='pending' FOR UPDATE", [input.replyToMessageId])
           : await sql.query("SELECT * FROM approval_requests WHERE approver_wa_id=$1 AND status='pending' AND whatsapp_message_id IS NOT NULL ORDER BY created_at DESC LIMIT 2 FOR UPDATE", [input.from]);
-        if (!input.replyToMessageId && approvalResult.rows.length !== 1) return { handled: false as const, reason: "ambiguous_approval" as const };
-        if (!approvalResult.rows[0]) return { handled: false as const, reason: "no_pending_approval" as const };
+        const publicationResult = input.replyToMessageId
+          ? await sql.query("SELECT * FROM publication_requests WHERE whatsapp_message_id=$1 AND status='pending' FOR UPDATE", [input.replyToMessageId])
+          : await sql.query("SELECT * FROM publication_requests WHERE approver_wa_id=$1 AND status='pending' AND whatsapp_message_id IS NOT NULL ORDER BY created_at DESC LIMIT 2 FOR UPDATE", [input.from]);
+        const dailyResult = input.replyToMessageId
+          ? await sql.query("SELECT * FROM daily_drafts WHERE whatsapp_message_id=$1 AND status='awaiting_approval' FOR UPDATE", [input.replyToMessageId])
+          : await sql.query("SELECT * FROM daily_drafts WHERE status='awaiting_approval' AND whatsapp_message_id IS NOT NULL ORDER BY created_at DESC LIMIT 2 FOR UPDATE", []);
+        if (!input.replyToMessageId && approvalResult.rows.length + publicationResult.rows.length + dailyResult.rows.length !== 1) return { handled: false as const, reason: "ambiguous_approval" as const };
+        if (!approvalResult.rows[0] && !publicationResult.rows[0] && !dailyResult.rows[0]) return { handled: false as const, reason: "no_pending_approval" as const };
+
+        if (dailyResult.rows[0]) {
+          const daily = dailyResult.rows[0];
+          const decision = classifyWhatsAppReply(input.body);
+          const status = decision.intent === "approve" ? "content_approved" : decision.intent === "reject" ? "rejected" : "changes_requested";
+          if (decision.intent === "approve") {
+            const stored = await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE", [daily.job_id]);
+            if (!stored.rows[0]) throw new ProductionConflictError("Tages-Content-Job fehlt.");
+            const job = parseJob(stored.rows[0].snapshot);
+            if (job.status !== "awaiting_approval") throw new ProductionConflictError("Tagesentwurf wurde bereits verändert.");
+            job.status = "approved"; job.updatedAt = new Date().toISOString();
+            const event = { sequence: job.events.length+1, at: job.updatedAt, agent: "orchestrator" as const,
+              kind: "decision" as const, message: "Content-Plan nach eindeutiger WhatsApp-Freigabe genehmigt; separate Veröffentlichungsfreigabe folgt." };
+            job.events.push(event);
+            await sql.query("UPDATE content_jobs SET status='approved',snapshot=$2,event_sequence=$3,updated_at=$4 WHERE id=$1", [job.id,JSON.stringify(job),event.sequence,job.updatedAt]);
+            await sql.query("INSERT INTO job_events(job_id,sequence,agent,kind,occurred_at,payload) VALUES($1,$2,$3,$4,$5,$6)", [job.id,event.sequence,event.agent,event.kind,event.at,JSON.stringify(event)]);
+          }
+          await sql.query("UPDATE daily_drafts SET status=$2,feedback=$3,updated_at=now() WHERE day=$1", [daily.day,status,decision.feedback]);
+          await sql.query("UPDATE whatsapp_events SET intent=$2 WHERE message_id=$1", [input.id,decision.intent]);
+          return { handled: true as const, intent: decision.intent, feedback: decision.feedback, dailyJobId: String(daily.job_id) };
+        }
+
+        if (publicationResult.rows[0]) {
+          const publication = publicationResult.rows[0];
+          const decision = classifyWhatsAppReply(input.body);
+          const status = decision.intent === "approve" ? "approved" : decision.intent === "reject" ? "rejected" : "changes_requested";
+          await sql.query("UPDATE publication_requests SET status=$2,feedback=$3,decided_at=now(),updated_at=now() WHERE id=$1", [publication.id,status,decision.feedback]);
+          await sql.query("UPDATE whatsapp_events SET intent=$2,approval_request_id=NULL WHERE message_id=$1", [input.id,decision.intent]);
+          return { handled: true as const, intent: decision.intent, feedback: decision.feedback,
+            publicationId: String(publication.id), jobId: String(publication.job_id) };
+        }
 
         const approval = mapApproval(approvalResult.rows[0]);
         const decision = classifyWhatsAppReply(input.body);

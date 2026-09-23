@@ -1,4 +1,7 @@
 import { productionRepository } from "@/lib/production/repository";
+import { publicationRepository } from "@/lib/meta/publication-gate";
+import { publishFacebookPhoto } from "@/lib/meta/publisher";
+import { requestFacebookApproval } from "@/lib/meta/request-publication";
 import { extractIncomingWhatsAppMessages, verifyMetaWebhookSignature, verifyWhatsAppChallenge } from "@/lib/whatsapp/security";
 
 export const runtime = "nodejs";
@@ -38,6 +41,24 @@ export async function POST(request: Request) {
     try {
       const result = await repo.applyIncomingWhatsApp({ ...message, payload });
       console.info(JSON.stringify({ event: "whatsapp_approval_message", messageId: message.id, handled: result.handled, reason: "reason" in result ? result.reason : undefined, intent: "intent" in result ? result.intent : undefined }));
+      if(result.handled && "dailyJobId" in result && typeof result.dailyJobId === "string" && result.intent === "approve"){
+        // The incoming reply opens a 24-hour customer-service window. The
+        // separate publication request is sent once and has its own decision.
+        try { await requestFacebookApproval(result.dailyJobId); }
+        catch { console.error(JSON.stringify({event:"daily_publication_preparation_unknown",jobId:result.dailyJobId})); }
+      }
+      if (result.handled && "publicationId" in result && typeof result.publicationId === "string" && result.intent === "approve") {
+        const publicationRepo = publicationRepository();
+        const claimed = await publicationRepo.claimPublish(result.publicationId);
+        try {
+          const posted = await publishFacebookPhoto(claimed.imageUrl!, claimed.caption);
+          await publicationRepo.published(claimed.id, posted.id, posted.permalink);
+          console.info(JSON.stringify({ event: "facebook_publication", publicationId: claimed.id, status: "published" }));
+        } catch {
+          await publicationRepo.markUnknown(claimed.id);
+          console.error(JSON.stringify({ event: "facebook_publication", publicationId: claimed.id, status: "unknown" }));
+        }
+      }
     } catch {
       failed = true;
       console.error(JSON.stringify({ event: "whatsapp_approval_message_failed", messageId: message.id }));
