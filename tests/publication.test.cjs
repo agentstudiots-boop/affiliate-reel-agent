@@ -21,6 +21,16 @@ test('Facebook publication needs a distinct signed WhatsApp decision and claims 
     assert.equal(job.content.format,'image');await memory.approve(id);
     const pending=await publication.prepare(id,'491234');
     assert.equal(pending.status,'preparing');assert.equal((await publication.prepare(id,'491234')).id,pending.id);
+    const groupOpportunity={...opportunity,goal:'community'};
+    const groupId=crypto.randomUUID();await memory.claim(groupId,groupOpportunity,'reference');
+    const groupJob=await runContentJob(groupOpportunity,{id:groupId,onUpdate:memory.save,loadLearning:memory.learn});
+    assert.equal(groupJob.marketing.primary,'Gruppenbeitrag');await memory.approve(groupId);
+    await assert.rejects(publication.prepare(groupId,'491234'),/Gruppenbeitrag.*Facebook-Seite/);
+    const instagramOpportunity={...opportunity,targetPlatform:'instagram'};
+    const instagramId=crypto.randomUUID();await memory.claim(instagramId,instagramOpportunity,'reference');
+    await runContentJob(instagramOpportunity,{id:instagramId,onUpdate:memory.save,loadLearning:memory.learn});await memory.approve(instagramId);
+    await assert.rejects(publication.prepare(instagramId,'491234'),/nicht für Facebook geplant/);
+    assert.equal((await pg.query('SELECT count(*)::int AS count FROM publication_requests')).rows[0].count,1,'ineligible jobs must not create publication requests');
     await assert.rejects(publication.claimPublish(pending.id),/nicht freigegeben/);
     await publication.claimImage(pending.id);
     await publication.bindImage(pending.id,'https://example.public.blob.vercel-storage.com/image.png');

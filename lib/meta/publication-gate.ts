@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { parseJob } from "../content/history";
 import { getDatabase, type Database } from "../memory/db";
+import { facebookPagePublicationError } from "./publication-eligibility";
 
 export class PublicationConflictError extends Error {}
 
@@ -26,8 +27,9 @@ export function publicationRepository(db: Database = getDatabase()) {
         const stored = await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE", [jobId]);
         if (!stored.rows[0]) throw new PublicationConflictError("Content-Job fehlt.");
         const job = parseJob(stored.rows[0].snapshot);
-        if (job.status !== "approved" || !job.content || !["image", "text"].includes(job.content.format)
-          || job.marketing?.primary !== "Facebook Post") throw new PublicationConflictError("Ein freigegebener Bild-/Textentwurf für eine Facebook-Seite fehlt.");
+        const eligibilityError = facebookPagePublicationError(job);
+        if (eligibilityError) throw new PublicationConflictError(eligibilityError);
+        if (!job.content || job.content.format === "video") throw new PublicationConflictError("Bild- oder Textentwurf fehlt.");
         const source = new URL(job.opportunity.product.affiliateUrl);
         if (source.protocol !== "https:" || source.username || source.password) throw new PublicationConflictError("Affiliate-Link ist nicht sicher.");
         const base = job.content.format === "text" ? job.content.body : job.content.caption;
