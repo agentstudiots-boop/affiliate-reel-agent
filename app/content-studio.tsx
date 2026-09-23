@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { LearningEvidence } from "@/lib/memory/schema";
 import { PerformanceEditor } from "@/app/performance-editor";
+import { ProductionGate } from "@/app/production-gate";
 import type { Product } from "@/lib/types";
 import { parseJob } from "@/lib/content/history";
 import { opportunitySchema, terminalStatuses, type Content, type ContentJob, type JobStatus, type Opportunity } from "@/lib/content/schema";
@@ -155,7 +156,7 @@ export function ContentStudio({ product }: { product: Product }) {
       {job.review && <p className={job.review.passed ? "muted" : "error"}>{job.review.passed ? "Redaktionelle Vorprüfung bestanden – keine unabhängige Faktenprüfung." : `Überarbeiten: ${job.review.issues.join(" ")}`}</p>}
       {job.marketing && <div className="marketingPlan"><h3>Marketing: {job.marketing.primary}</h3><p>{job.marketing.rationale}</p><p><b>Zielgruppe:</b> {job.marketing.audience}</p><p>{job.marketing.adaptation}</p><p><b>Linkplatzierung:</b> {job.marketing.linkPlacement}</p><p>{job.marketing.conversionHypothesis}</p><p><b>Messen:</b> {job.marketing.metrics.join(" · ")}</p><ul>{job.marketing.publishingChecks.map(c => <li key={c}>{c}</li>)}</ul></div>}
       <div className="contentActions">{job.status === "awaiting_approval" && <button type="button" className="primary" onClick={approve}>Content-Plan nach Prüfung freigeben</button>}<button type="button" className="ghost" onClick={download}>Job & Protokoll herunterladen</button></div>
-      {job.status === "approved" && <p className="success">Content-Plan freigegeben. Veröffentlichungsstatus und Messwerte separat erfassen.</p>}
+      {job.status === "approved" && <><p className="success">Content-Plan freigegeben. Kostenpflichtige Produktion bleibt bis zur separaten Freigabe gesperrt.</p><ProductionGate job={job} password={password} /></>}
       {terminalStatuses.includes(job.status) && <PerformanceEditor key={job.id} jobId={job.id} password={password} />}
       <details className="jobTrace"><summary>Entscheidungen & Agentenantworten ({job.events.length})</summary>{job.events.map(event => <article key={event.sequence}><small>{event.sequence} · {event.agent} · {new Date(event.at).toLocaleTimeString("de-DE")}</small><p>{event.message}</p>{event.data !== undefined && <details><summary>Strukturierte Antwort</summary><pre>{JSON.stringify(event.data, null, 2)}</pre></details>}</article>)}</details>
     </div>}
