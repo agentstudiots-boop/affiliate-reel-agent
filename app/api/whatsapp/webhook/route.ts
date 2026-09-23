@@ -26,7 +26,13 @@ export async function POST(request: Request) {
   catch { return new Response("Invalid JSON", { status: 400 }); }
 
   const messages = extractIncomingWhatsAppMessages(payload);
-  const repo = productionRepository();
+  if (!messages.length) return new Response("EVENT_RECEIVED", { status: 200, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
+  let repo;
+  try { repo = productionRepository(); }
+  catch {
+    console.error(JSON.stringify({ event: "whatsapp_database_unavailable" }));
+    return new Response("EVENT_RECEIVED", { status: 200, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
+  }
   for (const message of messages) {
     try {
       const result = await repo.applyIncomingWhatsApp({ ...message, payload });
