@@ -3,6 +3,7 @@ import { authorized } from "@/lib/memory/auth";
 import { databaseConfigured } from "@/lib/memory/db";
 import { PublicationConflictError, publicationRepository } from "@/lib/meta/publication-gate";
 import { requestFacebookApproval } from "@/lib/meta/request-publication";
+import { imageProviderStatus } from "@/lib/content/image-provider";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ export async function GET(request: Request) {
   const denied=guard(request);if(denied)return denied;
   try {
     const jobId=idSchema.parse(new URL(request.url).searchParams.get("jobId"));
-    return Response.json({publication:await publicationRepository().get(jobId)},{headers:{"Cache-Control":"no-store"}});
+    return Response.json({publication:await publicationRepository().get(jobId),imageProvider:imageProviderStatus()},{headers:{"Cache-Control":"no-store"}});
   } catch { return Response.json({error:"Publikationsstatus nicht abrufbar."},{status:400}); }
 }
 export async function POST(request: Request) {

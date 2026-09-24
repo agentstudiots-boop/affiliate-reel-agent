@@ -83,8 +83,9 @@ test('single product page does not turn unverified benefits into model claims',a
 test('missing image provider cannot silently fall back to the typographic card',()=>{
   const status=imageProviderStatus();
   assert.equal(status.configured,false);
+  assert.equal(status.provider,'openai');
   assert.equal(getOriginalVisualProvider(),null);
-  assert.match(status.reason,/Textkarte.*Debug|Fallback/i);
+  assert.match(status.reason,/OPENAI_API_KEY fehlt/i);
 });
 
 test('publication eligibility rejects a legacy weak image before a publication request can be created',()=>{

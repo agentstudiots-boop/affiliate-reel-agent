@@ -1,9 +1,14 @@
 import type { ContentJob } from "./schema";
+import { createOpenAIImageProvider, DEFAULT_OPENAI_IMAGE_MODEL, SUPPORTED_OPENAI_IMAGE_MODELS } from "./providers/openai-image";
 
 export type OriginalVisualAsset = {
   url: string;
   provider: string;
   mediaType: "image";
+  model?: string;
+  sha256?: string;
+  generatedAt?: string;
+  usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number };
 };
 
 export type OriginalVisualProvider = {
@@ -14,17 +19,21 @@ export type OriginalVisualProvider = {
 export class ImageProviderUnavailableError extends Error {}
 
 export function imageProviderStatus() {
+  const hasKey = !!process.env.OPENAI_API_KEY?.trim();
+  const model = process.env.OPENAI_IMAGE_MODEL?.trim() || DEFAULT_OPENAI_IMAGE_MODEL;
+  const supported = SUPPORTED_OPENAI_IMAGE_MODELS.includes(model as (typeof SUPPORTED_OPENAI_IMAGE_MODELS)[number]);
+  const configured = hasKey && supported;
   return {
-    configured: false,
-    provider: null as string | null,
-    reason: "Kein produktiver Bildgenerator ist angeschlossen. Die vorhandene Textkarte bleibt ausschließlich Debug-/Fallback-Preview.",
+    configured,
+    provider: "openai",
+    model,
+    reason: configured ? "Bildprovider: OpenAI" : !hasKey ? "OpenAI-Bildgenerator noch nicht konfiguriert. OPENAI_API_KEY fehlt. Die Textkarte bleibt Debug-Preview." : "OPENAI_IMAGE_MODEL wird für das Bildformat nicht unterstützt.",
   };
 }
 
 export function getOriginalVisualProvider(): OriginalVisualProvider | null {
-  // Absichtlich fail-closed: erst einen real ausgewählten und verifizierten Provider
-  // implementieren. Keine unbekannte API und keinen erfundenen Environment-Key annehmen.
-  return null;
+  const key = process.env.OPENAI_API_KEY?.trim();
+  return key && imageProviderStatus().configured ? createOpenAIImageProvider(key, imageProviderStatus().model) : null;
 }
 
 export async function renderOriginalVisual(job: ContentJob): Promise<OriginalVisualAsset> {

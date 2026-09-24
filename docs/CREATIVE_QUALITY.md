@@ -34,25 +34,26 @@ Die bestehende Tavily-Integration bleibt Recherchewerkzeug. Dieser Quality-Patch
 
 Der Orchestrator führt diese Prüfung zusätzlich zur bestehenden redaktionellen Prüfung aus. `publicationRepository.prepare()` ruft weiterhin `facebookPagePublicationError()` **vor** dem INSERT in `publication_requests` auf; ein schwaches Bild-Creative erzeugt deshalb keine Publication Request.
 
-## Original-Visual-Provider
+## Original-Visual-Provider: OpenAI
 
-Aktuell ist **kein produktiver Bildgenerator** im Repository angeschlossen. Es gibt nur Runway/Faceless für Video, Tavily für Recherche und Vercel Blob für kontrollierte Medienablage.
+`lib/content/image-provider.ts` aktiviert OpenAI nur mit serverseitigem `OPENAI_API_KEY` und einem unterstützten Modell. Ohne Key meldet der Status `OPENAI_API_KEY fehlt`, liefert keinen Provider und bleibt fail-closed. Optional kann `OPENAI_IMAGE_MODEL` auf `gpt-image-2.5-flare` (Default) oder `gpt-image-2.5-sunburst` gesetzt werden. Ein unbekannter Modellname blockiert die Konfiguration.
 
-`lib/content/image-provider.ts` definiert deshalb nur eine fail-closed `OriginalVisualProvider`-Schnittstelle. `getOriginalVisualProvider()` liefert aktuell bewusst `null`.
+Die Implementation verwendet `POST https://api.openai.com/v1/images/generations`, `n: 1`, `1024x1280` (4:5), `quality: medium`, `output_format: png` und prüft genau ein Base64-Ergebnis. Der Prompt übernimmt Visual-Konzept, redaktionelles Briefing und belegte Fakten aus dem ContentJob. Such- und Kategorieseiten bleiben kategorisch. Verboten sind Logos, Amazon-/Händlerbranding, Shop-UI, Preis-/Bewertungsfelder, fiktive Produktmerkmale, reine Textkarten und generische Symbole. Ein Modell wird nicht aus einem Suchlink abgeleitet. Die erzeugte Datei muss PNG-Signatur, plausible Dimensionen und Dateigröße erfüllen; danach wird SHA-256 berechnet.
 
-Damit gilt:
+Der Server speichert das Original als öffentlichen Vercel Blob unter `generated/facebook/{jobId}/{sha256}.png` mit `image/png` und `addRandomSuffix: false`. Er verwendet das bestehende serverseitige `BLOB_READ_WRITE_TOKEN`. Nur eine passende Blob-URL und ein OpenAI-Asset können gebunden werden; `lib/meta/card.tsx` bleibt **Preview-only** und ist als Veröffentlichungsasset gesperrt.
 
-1. `lib/meta/card.tsx` bleibt ausschließlich Debug-/Fallback-Preview.
-2. `requestFacebookApproval()` stoppt **vor** `publicationRepository.prepare()`, solange kein echter Original-Visual-Provider vorhanden ist.
-3. Es wird in diesem Zustand keine Publication Request angelegt.
-4. Es wird keine WhatsApp-Publishing-Freigabe versendet.
-5. Es wird kein Facebook-Post ausgelöst.
+Ablauf: Job laden → Creative-Quality-Gate → Providerstatus → dauerhaften Bildversuch in `original_visual_attempts` reservieren → genau ein OpenAI-Aufruf → PNG validieren → Blob-Upload → Publication Request samt Bild-URL atomar anlegen → WhatsApp-Freigabe → Facebook-Veröffentlichung nur nach explizitem „Freigeben“. Bei Provider-/Blob-/Bildfehler entsteht **keine** Publication Request und **keine** WhatsApp-Publishing-Freigabe. Ein unklarer Versuch wird nicht automatisch wiederholt; der Datensatz verhindert auch parallele Doppelaufrufe. Ein erneuter Versuch für dasselbe Creative erfordert bewusste Klärung und einen neuen geprüften Entwurf. `009_original_visual_attempts.sql` muss vor dem ersten Live-Versuch in der jeweiligen Umgebung angewendet sein.
 
-### Noch benötigte externe Integration
+Modell, Zeitpunkt, Job-ID und Anzahl der Versuche stehen im Versuchsdatensatz. Soweit OpenAI Tokens in `usage` liefert, werden diese nach erfolgreichem Medienerfolg gespeichert. Ohne API-Kostenwert werden **keine** Ist-Kosten erfunden. Es erfolgen keine automatischen Retries.
 
-Ein konkreter Bildgenerator wurde bewusst noch **nicht** erfunden oder festgelegt. Der verbleibende Integrationsschritt ist daher eine Betreiberentscheidung für einen real verfügbaren Bildprovider plus dessen serverseitigen API-Schlüssel. Erst danach wird eine konkrete Implementierung von `OriginalVisualProvider.render()` ergänzt und das erzeugte Asset kontrolliert in Vercel Blob persistiert.
+### Kontrollierter Live-Test nach Betreiberkonfiguration
 
-Es wurde deshalb auch **kein neuer Secret-Name** in `.env.example` vorgetäuscht.
+1. `009_original_visual_attempts.sql` in Preview über die bestehende Migration anwenden und Schema prüfen.
+2. `OPENAI_API_KEY` als Vercel-Preview-Secret setzen; optional `OPENAI_IMAGE_MODEL`. `BLOB_READ_WRITE_TOKEN`, Datenbank und WhatsApp-Konfiguration müssen bestehen.
+3. Preview neu deployen und den Providerstatus in der UI prüfen.
+4. Einen freigegebenen Bildjob wählen und **genau einen** bewussten Testversuch auslösen. Kosten entstehen erst dann.
+5. Originalbild visuell prüfen und öffentliche Blob-URL kontrollieren. Bei unklarem Ergebnis keinen zweiten Bildversuch auslösen.
+6. Den getrennten WhatsApp-Publishing-Flow kontrolliert testen und erst danach eine Facebook-Veröffentlichung ausdrücklich freigeben.
 
 ## Carousel
 

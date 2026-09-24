@@ -1,28 +1,31 @@
 import {getDatabase} from "../memory/db";
 import {parseJob} from "../content/history";
 import {getOriginalVisualProvider,imageProviderStatus} from "../content/image-provider";
+import {facebookPagePublicationError} from "./publication-eligibility";
 import {publicationRepository,PublicationConflictError} from "./publication-gate";
 import {sendWhatsAppText,whatsappApprovalReady,WhatsAppRejectedError} from "../whatsapp/client";
 
 export async function requestFacebookApproval(jobId:string){
   if(!whatsappApprovalReady())throw new PublicationConflictError("WhatsApp-Freigabe ist noch nicht vollständig konfiguriert.");
+  const stored=await getDatabase().query("SELECT snapshot FROM content_jobs WHERE id=$1",[jobId]);
+  if(!stored.rows[0])throw new PublicationConflictError("Content-Job fehlt.");
+  const job=parseJob(stored.rows[0].snapshot);
+  const eligibilityError=facebookPagePublicationError(job);
+  if(eligibilityError)throw new PublicationConflictError(eligibilityError);
+  if(job.content?.format!=="image")throw new PublicationConflictError("Ein eigenständiger Bildentwurf ist für das Original-Visual erforderlich.");
 
   const provider=getOriginalVisualProvider();
   if(!provider){
     throw new PublicationConflictError(`Kein veröffentlichungsfähiges Original-Visual verfügbar. ${imageProviderStatus().reason} Es wurde keine Publication Request angelegt und keine WhatsApp-Veröffentlichungsfreigabe versendet.`);
   }
 
-  const stored=await getDatabase().query("SELECT snapshot FROM content_jobs WHERE id=$1",[jobId]);
-  if(!stored.rows[0])throw new PublicationConflictError("Content-Job fehlt.");
-  const job=parseJob(stored.rows[0].snapshot);
-
   const approver=(process.env.WHATSAPP_APPROVER_WA_ID||"").replace(/\D/g,"");
   const repo=publicationRepository();
-  let publication=await repo.prepare(jobId,approver);
-  if(publication.status==="preparing"){
-    await repo.claimImage(publication.id);
-    const asset=await provider.render(job);
-    publication=await repo.bindImage(publication.id,asset.url);
+  const claim=await repo.claimVisual(jobId,imageProviderStatus().model);
+  let publication=claim.existing;
+  if(!publication){
+    const asset=await provider.render(claim.job);
+    publication=await repo.prepareWithVisual(jobId,approver,asset);
   }
   if(publication.status!=="pending"||publication.whatsappMessageId)return {publication};
   const recent=await getDatabase().query("SELECT 1 FROM whatsapp_events WHERE wa_id=$1 AND received_at>now()-interval '24 hours' LIMIT 1",[approver]);
