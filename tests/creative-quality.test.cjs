@@ -1,10 +1,14 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const {PGlite}=require('@electric-sql/pglite');
 const {evaluateImageCreativeQuality}=require('../.test-build/lib/content/creative-quality');
 const {imageProviderStatus,getOriginalVisualProvider}=require('../.test-build/lib/content/image-provider');
 const {runContentJob}=require('../.test-build/lib/content/orchestrator');
 const {imageSchema,opportunitySchema}=require('../.test-build/lib/content/schema');
 const {facebookPagePublicationError}=require('../.test-build/lib/meta/publication-eligibility');
+const {publicationRepository}=require('../.test-build/lib/meta/publication-gate');
+const {memoryRepository}=require('../.test-build/lib/memory/repository');
 
 function baseImage(changes={}){
   return imageSchema.parse({
@@ -100,4 +104,38 @@ test('publication eligibility rejects a legacy weak image before a publication r
     content:weak,marketing:{primary:'Facebook Post',rationale:'test',audience:'Haushalte',adaptation:'test',linkPlacement:'test',conversionHypothesis:'test',metrics:['a','b'],publishingChecks:['a','b']}
   };
   assert.match(facebookPagePublicationError(job),/nicht veröffentlichungsreif|visuelles Konzept|Symbol/i);
+});
+
+
+test('creative quality gate prevents creation of a publication request in the database',async()=>{
+  const pg=new PGlite();
+  const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
+  try{
+    for(const file of ['001_memory.sql','002_production_gates.sql','003_faceless_so.sql','004_daily_drafts.sql','005_publication_gate.sql','006_daily_notification.sql','007_publication_revisions.sql','008_weekly_reports.sql']){
+      await pg.exec(fs.readFileSync(`db/migrations/${file}`,'utf8'));
+    }
+    const opportunity=opportunitySchema.parse({
+      product:{name:'Kuscheldecke',sourceUrl:'https://www.amazon.de/s?k=Kuscheldecke',affiliateUrl:'https://www.amazon.de/s?k=Kuscheldecke',price:'',targetGroup:'Haushalte',benefits:'Größe und Material vergleichen',notes:''},
+      useCase:'Ein kühler Herbstabend auf dem Sofa mit einer Decke.',targetPlatform:'facebook',budget:'low'
+    });
+    const id=crypto.randomUUID();
+    await memoryRepository(db).claim(id,opportunity,'reference');
+    const now=new Date().toISOString();
+    const weakJob={
+      version:1,id,createdAt:now,updatedAt:now,status:'approved',mode:'reference',opportunity,events:[],revisions:0,modelCalls:0,totalTokens:0,
+      content:baseImage({
+        visualConcept:undefined,
+        slides:[{headline:'Kuscheldecke',copy:'Vergleichen',visual:'Symbolgrafik mit grünem Hintergrund und Produktname.',
+          prompt:'Reine Textkarte mit Typografie und Platzhalter.',alt:'Symbolgrafik'}]
+      }),
+      marketing:{primary:'Facebook Post',rationale:'test',audience:'Haushalte',adaptation:'test',linkPlacement:'test',conversionHypothesis:'test',metrics:['a','b'],publishingChecks:['a','b']}
+    };
+    await pg.query("UPDATE content_jobs SET status='approved',snapshot=$2 WHERE id=$1",[id,JSON.stringify(weakJob)]);
+    const publication=publicationRepository(db);
+    await assert.rejects(publication.prepare(id,'491234'),/nicht veröffentlichungsreif|visuelles Konzept|Symbol/i);
+    const count=await pg.query("SELECT count(*)::int AS n FROM publication_requests WHERE job_id=$1",[id]);
+    assert.equal(count.rows[0].n,0);
+  }finally{
+    await pg.close();
+  }
 });
