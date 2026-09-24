@@ -2,6 +2,35 @@
 
 Stand: 24. September 2026. Branch `feat/production-gates-whatsapp`.
 
+## Lokale Fortsetzung nach `0e8484d`
+
+Sieben zusätzliche Integrationstests führen die tatsächlichen Produktions- und
+WhatsApp-Handler aus. Die Repositories arbeiten gegen isoliertes PGlite;
+externe Provider und ausgehende Nachrichten sind simuliert. Die vollständige
+Suite umfasst 47 erfolgreiche Tests. Diese Prüfungen beweisen keine echte
+WhatsApp-Zustellung, Meta-Schreibberechtigung oder Faceless-Produktion.
+TypeScript, ESLint und Next.js-Build sind ebenfalls erfolgreich. Die
+Dateiliste des erzeugten Migrations-Handlers enthält 001–006; alle sechs
+Dateien sind vorhanden. Das bestätigt die lokale Verpackung für das Deployment,
+keine ausgeführte Datenbankmigration.
+
+| Lokaler Fall | Nachgewiesenes Verhalten |
+| --- | --- |
+| Zwei gleichzeitige Videostarts | Ein kostenpflichtiger simulierter Aufruf, zweite Anfrage abgewiesen |
+| Verlorene Antwort auf Videostart | Dauerhafter Claim, keine Provider-ID behauptet, kein zweiter Kauf |
+| Unklarer MP4-Render | Ein Render, anschließender Abgleich nur lesend, fertige URL später übernommen |
+| Guthaben fehlt / Quote steigt | Kein Kauf, Freigabe nicht verbraucht |
+| Provider meldet nach Start höhere Kosten | Zuerst mit fehlender Provider-ID reproduziert; nach Fix bleibt die bestätigte ID gespeichert und lesbar, erneuter Kauf gesperrt |
+| Zwei getrennte signierte Facebook-Freigaben | Erster Schritt genehmigt nur Content, zweiter erzeugt genau einen simulierten Post mit persistierter ID/URL |
+| Gleiche und neue Message-IDs zur bereits entschiedenen Freigabe | Kein doppelter Post oder Freigabeversand, auch bei paralleler Zustellung |
+| Unklare Facebook-Antwort | Status `unknown`, kein erfundener Erfolgseintrag, keine zweite Veröffentlichung |
+| Falsche Signatur, Telefonnummer oder Approver | Keine Entscheidung und kein externer Schreibaufruf |
+
+Die PGlite-Prüfung ist kein Last-/Parallelitätstest des entfernten Postgres-
+Servers. Die echte Preview-Prüfung von Claims, Tabellen und Runtime-Logs bleibt
+zwingend. Der konkrete Morgenablauf steht in
+[PREVIEW_E2E_RUNBOOK.md](PREVIEW_E2E_RUNBOOK.md).
+
 ## Neue Prüfung ab `37c8a406` am 24.09.2026
 
 | Prüfung | Beobachtetes Ergebnis |

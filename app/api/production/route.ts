@@ -98,8 +98,14 @@ export async function POST(request: Request) {
       const claimed = await repo.claimPaidCreation(input.jobId, quote.credits);
       // This POST charges credits. Never retry automatically, even with the same idempotency key.
       const created = await provider.create(claimed.script, claimed.voiceId, `Affiliate Reel ${input.jobId}`, claimed.key);
-      if (created.creditsUsed !== undefined && created.creditsUsed > quote.credits) throw new FacelessError("Provider meldet höhere Kosten. Auftrag manuell prüfen.");
-      return Response.json({ run: await repo.bindProviderJob(claimed.run.id, created.id) }, { headers: { "Cache-Control": "no-store" } });
+      // Preserve a confirmed paid job before reporting a cost discrepancy so
+      // it remains observable without ever buying a replacement.
+      const boundRun = await repo.bindProviderJob(claimed.run.id, created.id);
+      if (created.creditsUsed !== undefined && created.creditsUsed > quote.credits) {
+        console.warn(JSON.stringify({ event: "faceless_credit_mismatch", jobId: input.jobId, quotedCredits: quote.credits, reportedCredits: created.creditsUsed }));
+        throw new FacelessError("Provider meldet höhere Kosten. Provider-Auftrag gespeichert; Status neu laden und Kosten manuell prüfen. Kein neuer Videostart.");
+      }
+      return Response.json({ run: boundRun }, { headers: { "Cache-Control": "no-store" } });
     }
     if (run.status !== "rendering" || !run.providerJobId) throw new ProductionConflictError("Provider-ID fehlt oder kein aktiver Videolauf. Bei unklarem Start manuell abgleichen.");
     const progress = await repo.providerProgress(input.jobId);

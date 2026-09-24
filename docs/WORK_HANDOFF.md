@@ -4,6 +4,29 @@ Stand: 24. September 2026. Offener Draft-PR #6 auf
 `feat/production-gates-whatsapp`. Weder nach `main` gemergt noch für Production
 freigegeben.
 
+## Fortsetzung ohne Betreiber (nach `0e8484d`)
+
+Der Betreiber ist heute nicht verfügbar; keine neue Zugangseingabe oder echte
+WhatsApp-Freigabe anfordern. Morgen nach [PREVIEW_E2E_RUNBOOK.md](PREVIEW_E2E_RUNBOOK.md)
+fortsetzen. Die bestehenden Live-Blocker bleiben bestehen.
+
+- In `/api/production` einen reproduzierten Fehler behoben: Bei einer höheren
+  gemeldeten Credit-Belastung wurde bisher die bereits bestätigte Provider-ID
+  nicht gespeichert. Sie wird nun vor der Kostenwarnung gebunden. Der Claim
+  bleibt verbraucht, ein zweiter Kauf gesperrt; der Auftrag bleibt lesbar.
+  `faceless_credit_mismatch` protokolliert ausschließlich Job-ID und Creditwerte.
+- Sieben neue lokale Handler-Integrationstests nutzen den echten Route-Code,
+  echte Signaturprüfung/Repository-Logik und isoliertes PGlite. Provider,
+  Bild-/Nachrichtenversand sind simuliert; kein echter Meta-/Faceless-Zugriff.
+  Sie prüfen die zwei Publikationsfreigaben, parallele/erneute Zustellungen,
+  genau einen Kauf/Render/Post, unbekannte Ergebnisse, zu wenig Guthaben,
+  gestiegene Quote und Erhalt der bekannten Provider-ID bei Kostenabweichung.
+- TypeScript, ESLint, die vollständige Testsuite mit 47 Tests und Next.js-Build
+  sind erfolgreich. Der Build enthält alle sechs SQL-Migrationsdateien für die
+  geschützte Route. CI/Preview zum neuen Commit separat prüfen.
+  Keine Architekturänderung, kein Schemaeingriff und keine
+  Änderungen am Wochenbericht oder an der Bild-/Textrevision.
+
 ## Verifikationsfortsetzung am 24.09.2026 (Ausgangscommit `37c8a406`)
 
 - Branch sauber und aktuell geladen; die vier Übergabedokumente gelesen.
