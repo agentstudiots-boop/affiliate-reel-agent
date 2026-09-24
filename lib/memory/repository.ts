@@ -39,7 +39,9 @@ export function memoryRepository(db: Database = getDatabase()) {
         await sql.query(`UPDATE content_jobs SET status=$2, content_type=$3, platform_plan=$4, creative=$5,
           decision=$6,decision_reason=$7,agents=$8,snapshot=$9,event_sequence=$10,updated_at=$11 WHERE id=$1`,
           [job.id,job.status,job.content?.format || job.decision?.format || null,job.marketing?.primary || null,
-            JSON.stringify(job.ideas?.find(i => i.id===job.decision?.ideaId) || null),JSON.stringify(job.decision || null),job.decision?.reason || null,
+            JSON.stringify(job.content?.format === "image"
+              ? { idea: job.ideas?.find(i => i.id===job.decision?.ideaId) || null, visualConcept: job.content.visualConcept || null, layout: job.content.layout }
+              : job.ideas?.find(i => i.id===job.decision?.ideaId) || null),JSON.stringify(job.decision || null),job.decision?.reason || null,
             agents,JSON.stringify(job),sequence,job.updatedAt]);
         for (const event of job.events.filter(e => e.sequence > Number(locked.rows[0].event_sequence))) {
           await sql.query("INSERT INTO job_events(job_id,sequence,agent,kind,occurred_at,payload) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING",
