@@ -16,6 +16,7 @@ export async function checkWhatsAppConnection(transport: typeof fetch = fetch) {
   const token = canonicalToken || legacyToken;
   const tokenSource = canonicalToken ? "WHATSAPP_ACCESS_TOKEN" : legacyToken ? "WHATTSAPP_ACCESS_TOKEN" : "none";
   const sender = process.env.WHATSAPP_PHONE_NUMBER_ID || process.env.WHATTSAPP_PHONE_NUMBER_ID;
+  const waba = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || process.env.WHATTSAPP_BUSINESS_ACCOUNT_ID;
   const version = process.env.META_GRAPH_API_VERSION || "v25.0";
   const configured = {
     token: !!token,
@@ -30,8 +31,13 @@ export async function checkWhatsAppConnection(transport: typeof fetch = fetch) {
     tokenHasOuterWhitespace: !!token && token !== token.trim(),
     tokenLengthBand: !token ? "missing" : token.length < 100 ? "short" : token.length < 250 ? "normal" : "long",
   };
+  const diagnostics:{
+    wabaAccessible:null|boolean;
+    senderBelongsToConfiguredWaba:null|boolean;
+    permissions:null|Record<string,boolean>;
+  }={wabaAccessible:null,senderBelongsToConfiguredWaba:null,permissions:null};
   const finish=(status:WhatsAppStatus,message:string,code?:number,subcode?:number)=>({
-    status,message,checkedAt:new Date().toISOString(),connectionOk:status==="connected",configured,
+    status,message,checkedAt:new Date().toISOString(),connectionOk:status==="connected",configured,diagnostics,
     ...(code!==undefined?{code}:{code:undefined}),
     ...(subcode!==undefined?{subcode}:{subcode:undefined}),
   });
@@ -60,6 +66,49 @@ export async function checkWhatsAppConnection(transport: typeof fetch = fetch) {
       return finish("service_unavailable","WhatsApp-Verbindung konnte nicht zuverlässig geprüft werden.",failure.code,failure.subcode);
     }
     if(body.id!==sender)return finish("sender_unreachable","Meta antwortet, aber nicht mit der erwarteten WhatsApp Phone Number ID.");
+
+    try {
+      const permissionsUrl=new URL(`https://graph.facebook.com/${version}/me/permissions`);
+      const permissionsResponse=await transport(permissionsUrl,{
+        method:"GET",headers:{Authorization:`Bearer ${token.trim()}`},cache:"no-store",redirect:"error",signal:AbortSignal.timeout(8000),
+      });
+      const permissionsBody=await permissionsResponse.json() as {data?:Array<{permission?:string;status?:string}>};
+      if(permissionsResponse.ok && Array.isArray(permissionsBody.data)){
+        const granted=new Set(permissionsBody.data.filter(item=>item.status==="granted").map(item=>item.permission));
+        diagnostics.permissions={
+          whatsapp_business_messaging:granted.has("whatsapp_business_messaging"),
+          whatsapp_business_management:granted.has("whatsapp_business_management"),
+          business_management:granted.has("business_management"),
+        };
+      }
+    } catch {}
+
+    if(waba?.trim() && /^\d+$/.test(waba)){
+      try {
+        const wabaUrl=new URL(`https://graph.facebook.com/${version}/${waba}/phone_numbers`);
+        wabaUrl.searchParams.set("fields","id");
+        const wabaResponse=await transport(wabaUrl,{
+          method:"GET",headers:{Authorization:`Bearer ${token.trim()}`},cache:"no-store",redirect:"error",signal:AbortSignal.timeout(8000),
+        });
+        const wabaBody=await wabaResponse.json() as {data?:Array<{id?:string}>};
+        diagnostics.wabaAccessible=wabaResponse.ok;
+        if(wabaResponse.ok && Array.isArray(wabaBody.data)){
+          diagnostics.senderBelongsToConfiguredWaba=wabaBody.data.some(item=>item.id===sender);
+        }
+      } catch {
+        diagnostics.wabaAccessible=false;
+      }
+    }
+
+    if(diagnostics.permissions && diagnostics.permissions.whatsapp_business_messaging===false){
+      return finish("missing_permission","Token ist gültig, aber whatsapp_business_messaging ist nicht tatsächlich erteilt.");
+    }
+    if(diagnostics.wabaAccessible===false){
+      return finish("missing_permission","Token ist gültig, aber der konfigurierte WhatsApp Business Account ist für diesen Systemnutzer nicht lesbar.");
+    }
+    if(diagnostics.senderBelongsToConfiguredWaba===false){
+      return finish("sender_unreachable","Die Phone Number ID gehört nicht zum konfigurierten WhatsApp Business Account.");
+    }
     return finish("connected","WhatsApp-Token und Phone Number ID sind lesend erreichbar.");
   } catch {
     return finish("service_unavailable","WhatsApp-Verbindung konnte wegen Netzwerkfehler oder Timeout nicht zuverlässig geprüft werden.");
