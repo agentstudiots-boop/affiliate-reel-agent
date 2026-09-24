@@ -2,6 +2,58 @@
 
 Stand: 24. September 2026. Branch `feat/production-gates-whatsapp`.
 
+## Neue Prüfung ab `37c8a406` am 24.09.2026
+
+| Prüfung | Beobachtetes Ergebnis |
+| --- | --- |
+| GitHub-Quality-Check | Erfolgreich für `37c8a406`; Run `35943059322` |
+| Vercel-Commitstatus | Erfolgreich; Deployment `85KqHvGET7iSUuKvkTzqAVmS68kd` |
+| Lokale technische Prüfung | TypeScript, ESLint, 39 bestehende Tests und Next.js-Build erfolgreich |
+| Ergänzter Migrationstest | Alle 40 Tests und ESLint erfolgreich; 006 aktualisiert den befüllten Stand 001–005 genau einmal, Bestandsdaten und frühere Migrationseinträge bleiben unverändert |
+| Preview-Oberfläche | Lädt; `Postgres konfiguriert` ist ein Konfigurationshinweis, noch kein Verbindungsnachweis per Datenbankabfrage |
+| Preview-Meta-Lesetest | Erneut `connected`; Facebook-Seite und Instagram-Konto erreichbar; kein Schreibaufruf |
+| Browserprotokoll | Nur Meldungen der Browsererweiterung beobachtet; kein beobachteter App-Fehler; kein Ersatz für Vercel Runtime Logs |
+| Geschützte Migrationsseite | Erreichbar, Datenbank/Zugangscode konfiguriert; Zugangscode für POST fehlt in dieser Sitzung |
+| Preview-Migration 006 | **Nicht ausgeführt**, kein Live-Ergebnis `applied` oder `alreadyApplied` behauptet |
+| Vercel Runtime/Umgebungsvariablen | **Blockiert**: Connector-Team `thorsten1988la-1943`, Projekt-Team `agentstudiots-boop`; Zugriff auf das Projekt wird mit 403 abgewiesen |
+| Facebook- und Faceless-E2E | **Nicht gestartet**; keine echten Posts, Providerkäufe oder WhatsApp-Sends |
+| PR/Production | Draft unverändert; kein Merge, keine Production-Migration |
+
+Der neue Test `tests/migration-upgrade.test.cjs` arbeitet ausschließlich mit einer
+isolierten PGlite-Datenbank. Er ersetzt nicht die verlangten zwei geschützten
+Migrationsaufrufe im Preview. Direkte HTTP-Prüfungen aus der Arbeitsumgebung
+lieferten keine verwertbaren Ergebnisse; ein zusätzlicher Browser-Aufruf des
+Webhook-GET wurde vom Client blockiert. Daraus wird kein App-Fehler und keine
+erfolgreiche Webhook-Prüfung abgeleitet.
+
+### Tagesvorlage: Code geprüft, Live-Konfiguration offen
+
+`dailyNotificationTemplateConfigured()` verlangt weiterhin ausdrücklich
+`WHATSAPP_DAILY_TEMPLATE_ENABLED=true`, einen gültigen
+`WHATSAPP_DAILY_TEMPLATE_NAME` und einen gültigen
+`WHATSAPP_DAILY_TEMPLATE_LANGUAGE`. Genehmigung und Tarif werden nicht über
+eine Meta-Live-Abfrage bewiesen. Deren Nachweis und Kostenentscheidung bleiben
+externe Voraussetzungen. Es wurde keine Variable geändert und keine Vorlage
+gesendet. Die tatsächlichen Preview-/Production-Werte sind wegen des oben
+beschriebenen Vercel-Zugriffsfehlers nicht verifiziert.
+
+### Fortsetzung ohne doppelte externe Aktionen
+
+1. Zugangscode ausschließlich über sichere Eingabe bereitstellen; 006 über
+   `/api/admin/migrate` anwenden, danach erneut aufrufen und beide Ergebnisse
+   festhalten. Bei abweichendem ersten Ergebnis den tatsächlichen Zustand
+   dokumentieren, niemals Ledger oder Migrationen zurücksetzen.
+2. Vercel-Zugriff für `agentstudiots-boop` herstellen und Meta-Webhook-Ziel auf den
+   richtigen Preview prüfen. Für zwei WhatsApp-Freigaben einen neuen Job über
+   den bestehenden Tagesentwurf-Flow vorbereiten; eine manuelle Content-Freigabe
+   zählt nicht als WhatsApp-Nachweis. Servicefenster und eindeutigen Approver
+   vorher bestätigen.
+3. Danach je einen Facebook- und Faceless-Durchlauf samt Job-/Request-/Provider-IDs,
+   Permalink/Video-URL, Datenbankstatus und Runtime-Logs belegen. Bei unklarem
+   Ergebnis ausschließlich lesend abgleichen; keine zweite externe Aktion.
+4. Erst nach allen ursprünglichen Merge-Gates erneut vollständig testen und
+   Production ausrollen. Die Arbeiten des anderen Agenten separat integrieren.
+
 ## Lokal und CI
 
 - Nach der Benachrichtigungsvorlage: `npm run typecheck`, `npm run lint`, `npm test`

@@ -4,6 +4,45 @@ Stand: 24. September 2026. Offener Draft-PR #6 auf
 `feat/production-gates-whatsapp`. Weder nach `main` gemergt noch für Production
 freigegeben.
 
+## Verifikationsfortsetzung am 24.09.2026 (Ausgangscommit `37c8a406`)
+
+- Branch sauber und aktuell geladen; die vier Übergabedokumente gelesen.
+  GitHub Quality und Vercel-Commitstatus für `37c8a406` sind erfolgreich.
+  Zugehöriges Deployment: `85KqHvGET7iSUuKvkTzqAVmS68kd`.
+- TypeScript, ESLint, die damaligen 39 Tests und Next.js-Build erneut bestanden.
+  Ein ergänzender isolierter Upgrade-Test prüft nun einen bereits befüllten
+  Stand 001–005: ausschließlich 006 wird geladen, beim zweiten Aufruf nichts;
+  frühere Migrationseinträge, Tagesentwurf und WhatsApp-Ereignis bleiben erhalten.
+  Alle 40 Tests und ESLint sind mit dieser Ergänzung erfolgreich. Das ist ein
+  lokaler Nachweis, **kein** Nachweis einer Preview-Migration.
+- Aktueller PR-Preview im Browser geöffnet: Oberfläche lädt, Postgres wird als
+  konfiguriert angezeigt. Erneuter lesender Meta-Test meldet `connected`.
+  Die Migrationsseite meldet konfigurierte Datenbank und Zugangscode, verlangt
+  vor jedem POST aber den Content-Studio-Zugangscode. Dieser ist in der neuen
+  Sitzung nicht verfügbar; **kein Migrations-POST wurde ausgeführt**.
+- Vercel-Connector hat Zugriff auf `thorsten1988la-1943`, das Projekt liegt unter
+  `agentstudiots-boop`. Projekt-/Deploymentabfrage im richtigen Team wird mit
+  403 und der Aufforderung zur erneuten Autorisierung dieses Scopes abgewiesen.
+  Runtime-Logs, Live-Umgebungsvariablen und Production-Zustand sind deshalb
+  nicht bestätigt. Keine Zugangsdaten in Dokumentation aufnehmen.
+- Es wurden keine Jobs, WhatsApp-Nachrichten, Facebook-Posts oder Faceless-Käufe
+  ausgelöst. PR bleibt Draft; kein Merge und kein Production-Rollout.
+- Wochenbilanz und natürliche Bild-/Textrevision werden von einem anderen
+  Agenten separat bearbeitet. Hier wurden nur Verifikation und Übergabe ergänzt.
+
+Nächster notwendiger Betreiberschritt: Content-Studio-Zugangscode im sicheren
+Browser-Eingabedialog bereitstellen, nicht im Chat. Danach 006 über die bestehende
+geschützte Route anwenden und den zweiten POST separat bestätigen. Für spätere
+Runtime-Nachweise zusätzlich die Vercel-Verbindung für `agentstudiots-boop`
+autorisieren. Die erforderlichen echten WhatsApp-Freigaben bleiben beim Approver.
+
+Für den Facebook-Test mit **zwei** WhatsApp-Freigaben den bestehenden Tagesentwurf-
+Flow nutzen: Die manuelle Content-Studio-Freigabe ist keine erste
+WhatsApp-Freigabe. Der tägliche Flow benötigt einen ausdrücklich autorisierten
+Cron-Aufruf und ein offenes Servicefenster; keine kostenpflichtige Vorlage
+ersatzweise aktivieren. Meta-Webhook-Ziel zum aktuellen Preview vor dem Versand
+prüfen. Noch kein neuer Tagesauftrag wurde ausgelöst.
+
 ## Tatsächlich nachgewiesen
 
 - Der bestehende Content-Orchestrator mit Postgres, separaten Freigaben und
