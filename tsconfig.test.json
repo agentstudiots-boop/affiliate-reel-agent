@@ -7,7 +7,11 @@
     "rootDir": ".",
     "strict": true,
     "jsx": "react-jsx",
-    "paths": { "@/*": ["./*"] },
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    },
     "esModuleInterop": true,
     "skipLibCheck": true,
     "types": [
@@ -19,6 +23,7 @@
     "lib/memory/**/*.ts",
     "lib/meta/**/*.ts",
     "lib/production/**/*.ts",
-    "lib/whatsapp/**/*.ts"
+    "lib/whatsapp/**/*.ts",
+    "lib/reporting/**/*.ts"
   ]
 }

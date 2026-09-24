@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const { PGlite } = require('@electric-sql/pglite');
 const { applyMigrations } = require('../.test-build/lib/memory/migrations');
 
-test('006 upgrades populated 001–005 once without replaying or changing prior migrations', async () => {
+test('006–008 upgrade populated 001–005 once without replaying or changing prior migrations', async () => {
   const pg = new PGlite();
   const db = {
     query: (query, values) => pg.query(query, values),
@@ -32,18 +32,20 @@ test('006 upgrades populated 001–005 once without replaying or changing prior 
     const trackedLoader = name => { loaded.push(name); return load(name); };
 
     assert.deepEqual(await applyMigrations(db, trackedLoader), {
-      applied: ['006_daily_notification.sql'], alreadyApplied: previous,
+      applied: ['006_daily_notification.sql', '007_publication_revisions.sql', '008_weekly_reports.sql'], alreadyApplied: previous,
     });
     assert.deepEqual(await applyMigrations(db, trackedLoader), {
-      applied: [], alreadyApplied: [...previous, '006_daily_notification.sql'],
+      applied: [], alreadyApplied: [...previous, '006_daily_notification.sql', '007_publication_revisions.sql', '008_weekly_reports.sql'],
     });
-    assert.deepEqual(loaded, ['006_daily_notification.sql'], 'existing migration SQL must never be replayed');
+    assert.deepEqual(loaded, ['006_daily_notification.sql', '007_publication_revisions.sql', '008_weekly_reports.sql'], 'existing migration SQL must never be replayed');
     assert.deepEqual((await pg.query('SELECT * FROM schema_migrations ORDER BY name')).rows.slice(0, 5), before);
     assert.deepEqual((await pg.query('SELECT * FROM daily_drafts')).rows[0], {
       ...draft, notification_send_attempted_at: null, notification_message_id: null,
     });
     assert.deepEqual((await pg.query('SELECT * FROM whatsapp_events')).rows[0], event);
     await pg.exec("INSERT INTO whatsapp_events(message_id,wa_id,intent,payload) VALUES('test.notification','test-approver','notification_reply','{}')");
+    await pg.exec("INSERT INTO whatsapp_events(message_id,wa_id,intent,payload) VALUES('test.weekly','test-approver','weekly_report_reply','{}')");
+    assert.equal((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_name='weekly_reports'")).rows[0].n, 1);
     await assert.rejects(pg.exec("INSERT INTO whatsapp_events(message_id,wa_id,intent,payload) VALUES('test.invalid','test-approver','unsupported','{}')"));
   } finally {
     await pg.close();

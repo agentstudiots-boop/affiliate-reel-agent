@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { parseJob } from "../content/history";
 import { getDatabase, type Database } from "../memory/db";
 import { facebookPagePublicationError } from "./publication-eligibility";
+import { reviseApprovedStaticContent } from "../content/orchestrator";
 
 export class PublicationConflictError extends Error {}
 
@@ -12,14 +13,15 @@ function publication(row: Record<string, unknown>) {
     whatsappMessageId: row.whatsapp_message_id ? String(row.whatsapp_message_id) : null,
     metaPostId: row.meta_post_id ? String(row.meta_post_id) : null,
     permalink: row.permalink ? String(row.permalink) : null,
-    feedback: String(row.feedback || ""),
+    feedback: String(row.feedback || ""), revision: Number(row.revision || 1),
+    whatsappSendAttempted: !!row.whatsapp_send_attempted_at,
   };
 }
 
 export function publicationRepository(db: Database = getDatabase()) {
   return {
     async get(jobId: string) {
-      const result = await db.query("SELECT * FROM publication_requests WHERE job_id=$1 AND platform='facebook'", [jobId]);
+      const result = await db.query("SELECT * FROM publication_requests WHERE job_id=$1 AND platform='facebook' ORDER BY revision DESC LIMIT 1", [jobId]);
       return result.rows[0] ? publication(result.rows[0]) : null;
     },
     async prepare(jobId: string, approver: string) {
@@ -35,14 +37,17 @@ export function publicationRepository(db: Database = getDatabase()) {
         const base = job.content.format === "text" ? job.content.body : job.content.caption;
         const caption = `${base}\n\n${job.content.cta}\n${source}`;
         const contentHash = createHash("sha256").update(JSON.stringify({caption,content:job.content,jobId})).digest("hex");
-        const existing = await sql.query("SELECT * FROM publication_requests WHERE job_id=$1 AND platform='facebook'", [jobId]);
+        const existing = await sql.query("SELECT * FROM publication_requests WHERE job_id=$1 AND platform='facebook' ORDER BY revision DESC LIMIT 1", [jobId]);
         if (existing.rows[0]) {
-          if (existing.rows[0].content_hash !== contentHash) throw new PublicationConflictError("Der Entwurf wurde verändert. Alte Veröffentlichungsfreigabe ist gesperrt.");
-          return publication(existing.rows[0]);
+          if (existing.rows[0].content_hash === contentHash) return publication(existing.rows[0]);
+          if (!["changes_requested","rejected"].includes(String(existing.rows[0].status))) {
+            throw new PublicationConflictError("Der Entwurf wurde verändert. Alte Veröffentlichungsfreigabe ist gesperrt.");
+          }
         }
+        const revision = Number(existing.rows[0]?.revision || 0) + 1;
         const result = await sql.query(
-          "INSERT INTO publication_requests(id,job_id,platform,status,caption,content_hash,approver_wa_id) VALUES($1,$2,'facebook','preparing',$3,$4,$5) RETURNING *",
-          [crypto.randomUUID(), jobId, caption, contentHash, approver],
+          "INSERT INTO publication_requests(id,job_id,platform,status,caption,content_hash,approver_wa_id,revision) VALUES($1,$2,'facebook','preparing',$3,$4,$5,$6) RETURNING *",
+          [crypto.randomUUID(), jobId, caption, contentHash, approver, revision],
         );
         return publication(result.rows[0]);
       });
@@ -61,10 +66,59 @@ export function publicationRepository(db: Database = getDatabase()) {
       const result = await db.query("UPDATE publication_requests SET whatsapp_send_attempted_at=now() WHERE id=$1 AND status='pending' AND image_url IS NOT NULL AND whatsapp_send_attempted_at IS NULL RETURNING id", [id]);
       if (!result.rows[0]) throw new PublicationConflictError("WhatsApp bereits gesendet oder Ergebnis unklar.");
     },
+    async releaseRejectedWhatsAppSend(id: string) {
+      const result = await db.query(
+        "UPDATE publication_requests SET whatsapp_send_attempted_at=NULL,updated_at=now() WHERE id=$1 AND status='pending' AND whatsapp_message_id IS NULL AND whatsapp_send_attempted_at IS NOT NULL RETURNING id",
+        [id],
+      );
+      if (!result.rows[0]) throw new PublicationConflictError("WhatsApp-Versandversuch kann nicht sicher freigegeben werden.");
+    },
+    async resetWhatsAppSendAfterOperatorConfirmation(jobId: string) {
+      const result = await db.query(
+        "UPDATE publication_requests SET whatsapp_send_attempted_at=NULL,updated_at=now() WHERE job_id=$1 AND platform='facebook' AND status='pending' AND whatsapp_message_id IS NULL AND whatsapp_send_attempted_at IS NOT NULL RETURNING *",
+        [jobId],
+      );
+      if (!result.rows[0]) throw new PublicationConflictError("Kein bestätigbarer offener WhatsApp-Versandversuch gefunden.");
+      return publication(result.rows[0]);
+    },
     async bindMessage(id: string, messageId: string) {
       const result = await db.query("UPDATE publication_requests SET whatsapp_message_id=$2,updated_at=now() WHERE id=$1 AND status='pending' AND whatsapp_message_id IS NULL RETURNING *", [id,messageId]);
       if (!result.rows[0]) throw new PublicationConflictError("WhatsApp-Nachricht nicht zugeordnet.");
       return publication(result.rows[0]);
+    },
+    async reviseRequested(id: string) {
+      return db.transaction(async sql => {
+        const request = await sql.query("SELECT * FROM publication_requests WHERE id=$1 AND status='changes_requested' FOR UPDATE", [id]);
+        if (!request.rows[0] || !String(request.rows[0].feedback || "").trim()) {
+          throw new PublicationConflictError("Kein offener Änderungswunsch für diesen Beitrag.");
+        }
+        const jobId = String(request.rows[0].job_id);
+        const stored = await sql.query("SELECT snapshot,event_sequence FROM content_jobs WHERE id=$1 FOR UPDATE", [jobId]);
+        if (!stored.rows[0]) throw new PublicationConflictError("Content-Job fehlt.");
+        const original = parseJob(stored.rows[0].snapshot);
+        let revised;
+        try {
+          revised = await reviseApprovedStaticContent(original, String(request.rows[0].feedback));
+        } catch (error) {
+          throw new PublicationConflictError(error instanceof Error ? error.message : "Änderung nicht umsetzbar.");
+        }
+        const previousSequence = Number(stored.rows[0].event_sequence);
+        if (previousSequence !== original.events.length) throw new PublicationConflictError("Content-Protokoll wurde zwischenzeitlich geändert.");
+        await sql.query("UPDATE content_jobs SET status='awaiting_approval',snapshot=$2,event_sequence=$3,updated_at=$4 WHERE id=$1",
+          [jobId, JSON.stringify(revised), revised.events.length, revised.updatedAt]);
+        for (const event of revised.events.filter(item => item.sequence > previousSequence)) {
+          await sql.query("INSERT INTO job_events(job_id,sequence,agent,kind,occurred_at,payload) VALUES($1,$2,$3,$4,$5,$6)",
+            [jobId,event.sequence,event.agent,event.kind,event.at,JSON.stringify(event)]);
+        }
+        const daily = await sql.query("SELECT day FROM daily_drafts WHERE job_id=$1 FOR UPDATE", [jobId]);
+        if (daily.rows[0]) {
+          await sql.query(
+            "UPDATE daily_drafts SET status='awaiting_approval',feedback='',whatsapp_send_attempted_at=NULL,whatsapp_message_id=NULL,updated_at=now() WHERE job_id=$1",
+            [jobId],
+          );
+        }
+        return { job: revised, daily: !!daily.rows[0] };
+      });
     },
     async claimPublish(id: string) {
       const result = await db.query("UPDATE publication_requests SET status='publishing',publish_attempted_at=now(),updated_at=now() WHERE id=$1 AND status='approved' AND whatsapp_message_id IS NOT NULL AND publish_attempted_at IS NULL AND image_url IS NOT NULL RETURNING *", [id]);

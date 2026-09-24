@@ -34,6 +34,34 @@ export async function reviseApprovedVideo(job: ContentJob, feedback: string): Pr
 // Only this registry/orchestrator imports specialists. New agents can be registered here.
 const producers = { video: videoAgent, image: imageAgent, text: textAgent };
 
+export async function reviseApprovedStaticContent(job: ContentJob, feedback: string): Promise<ContentJob> {
+  if (job.status !== "approved" || !job.content || job.content.format === "video" || !job.decision || !job.ideas) {
+    throw new Error("Freigegebener Bild- oder Text-Plan fehlt.");
+  }
+  if (job.revisions >= MAX_REVISIONS) throw new Error("Maximal zwei Überarbeitungen erreicht.");
+  if (job.mode !== "reference") throw new Error("Für diesen Modus ist kein geprüfter Änderungs-Generator aktiv.");
+  const idea = job.ideas.find(item => item.id === job.decision!.ideaId);
+  if (!idea) throw new Error("Gewählte Idee fehlt.");
+  const agent = job.content.format;
+  const producer = agent === "image" ? imageAgent : textAgent;
+  const draft = contentSchema.parse(await producer(
+    { opportunity: job.opportunity, idea, previous: job.content, changeRequest: feedback },
+    createGenerator({ mode: job.mode }),
+  ));
+  const review = inspectContent(draft, job.decision);
+  if (!review.passed) throw new Error(`Überarbeitung verletzt redaktionelle Prüfung: ${review.issues.join(" ")}`);
+  const next = structuredClone(job);
+  next.revisions++;
+  next.content = draft;
+  next.review = review;
+  next.status = "awaiting_approval";
+  next.updatedAt = new Date().toISOString();
+  next.events.push({ sequence: next.events.length + 1, at: next.updatedAt, agent: "orchestrator", kind: "decision", message: `Änderungsauftrag an ${agent === "image" ? "Bild" : "Text"}-Agent: ${feedback}` });
+  next.events.push({ sequence: next.events.length + 1, at: next.updatedAt, agent, kind: "response", message: `Revision ${next.revisions} erstellt`, data: draft });
+  next.events.push({ sequence: next.events.length + 1, at: next.updatedAt, agent: "orchestrator", kind: "decision", message: "Überarbeiteter Plan benötigt erneut redaktionelle Freigabe; alte Veröffentlichungsfreigabe bleibt gesperrt." });
+  return next;
+}
+
 export function selectIdea(ideas: Idea[], opportunity: Opportunity, learning?: LearningEvidence): Decision {
   const eligible = opportunity.targetPlatform === "instagram" ? ideas.filter(i => i.format !== "text") : ideas;
   const ranking = eligible.map(idea => {

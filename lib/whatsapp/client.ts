@@ -1,3 +1,18 @@
+export class WhatsAppRejectedError extends Error {
+  constructor(
+    public readonly code: number,
+    public readonly subcode: number,
+    public readonly httpStatus: number,
+    public readonly providerMessage: string,
+  ) {
+    super("WhatsApp request was definitively rejected by Meta");
+  }
+}
+function safeProviderMessage(value: unknown) {
+  const raw=typeof value==="string"?value:"";
+  return raw.replace(/EAA[A-Za-z0-9_-]{20,}/g,"[redacted]").replace(/\b\d{8,15}\b/g,"[number]").slice(0,300);
+}
+
 const graphVersion = () => process.env.META_GRAPH_API_VERSION || "v25.0";
 // Legacy Vercel secrets have a doubled T in WHATTSAPP; Vercel secret keys cannot be renamed in place.
 const accessToken = () => process.env.WHATSAPP_ACCESS_TOKEN || process.env.WHATTSAPP_ACCESS_TOKEN;
@@ -43,6 +58,23 @@ export async function sendDailyNotificationTemplate(to = process.env.WHATSAPP_AP
   }, to);
 }
 
+export function weeklyNotificationTemplateConfigured() {
+  return process.env.WHATSAPP_WEEKLY_REPORT_TEMPLATE_ENABLED === "true"
+    && !!process.env.WHATSAPP_WEEKLY_REPORT_TEMPLATE_NAME?.match(/^[a-z0-9_]+$/)
+    && !!process.env.WHATSAPP_WEEKLY_REPORT_TEMPLATE_LANGUAGE?.match(/^[a-z]{2}(?:_[A-Z]{2})?$/);
+}
+
+export async function sendWeeklyNotificationTemplate(to = process.env.WHATSAPP_APPROVER_WA_ID) {
+  if (!weeklyNotificationTemplateConfigured()) throw new Error("Genehmigte WhatsApp-Wochenvorlage und Kostenfreigabe fehlen.");
+  return sendWhatsAppMessage({
+    type: "template",
+    template: {
+      name: process.env.WHATSAPP_WEEKLY_REPORT_TEMPLATE_NAME,
+      language: { code: process.env.WHATSAPP_WEEKLY_REPORT_TEMPLATE_LANGUAGE },
+    },
+  }, to);
+}
+
 async function sendWhatsAppMessage(message: Record<string, unknown>, to = process.env.WHATSAPP_APPROVER_WA_ID) {
   const token = accessToken();
   const sender = phoneNumberId();
@@ -59,8 +91,16 @@ async function sendWhatsAppMessage(message: Record<string, unknown>, to = proces
       },
       body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to, ...message }),
     });
-    const data = await response.json() as { messages?: Array<{ id?: string }>; error?: { message?: string } };
-    if (!response.ok) throw new Error(data.error?.message || `WhatsApp HTTP ${response.status}`);
+    const data = await response.json() as { messages?: Array<{ id?: string }>; error?: { message?: string; code?: number; error_subcode?: number } };
+    if (!response.ok) {
+      if (response.status >= 400 && response.status < 500) throw new WhatsAppRejectedError(
+        data.error?.code || 0,
+        data.error?.error_subcode || 0,
+        response.status,
+        safeProviderMessage(data.error?.message),
+      );
+      throw new Error(`WhatsApp HTTP ${response.status}`);
+    }
     const id = data.messages?.[0]?.id;
     if (!id) throw new Error("WhatsApp hat keine Message-ID bestätigt.");
     return id;
