@@ -3,7 +3,7 @@ import {useCallback,useEffect,useState} from "react";
 import type {ContentJob} from "@/lib/content/schema";
 import {facebookPagePublicationError} from "@/lib/meta/publication-eligibility";
 
-type Publication={id:string;status:string;caption:string;imageUrl:string|null;permalink:string|null;feedback:string};
+type Publication={id:string;status:string;caption:string;imageUrl:string|null;permalink:string|null;feedback:string;whatsappMessageId?:string|null;whatsappSendAttempted?:boolean};
 export function PublicationGate({job,password}:{job:ContentJob;password:string}){
   const eligibilityError=facebookPagePublicationError(job);
   const [record,setRecord]=useState<Publication|null>(null);
@@ -16,6 +16,11 @@ export function PublicationGate({job,password}:{job:ContentJob;password:string})
     if(response.ok)setRecord((await response.json()).publication);
   },[job.id,password]);
   useEffect(()=>{const initial=setTimeout(()=>{void refresh()},0);const timer=setInterval(()=>{void refresh()},15000);return()=>{clearTimeout(initial);clearInterval(timer)}},[refresh]);
+  async function resetWhatsApp(){setBusy(true);setError("");setNotice("");try{
+    const response=await fetch("/api/publication",{method:"POST",headers:{"Content-Type":"application/json","x-content-password":password},body:JSON.stringify({action:"reset_whatsapp",jobId:job.id,confirmedNoMessage:true})});
+    const data=await response.json();if(!response.ok)throw new Error(data.error||"Versandversuch konnte nicht zurückgesetzt werden.");
+    setRecord(data.publication);setNotice("Bestätigter fehlgeschlagener WhatsApp-Versand wurde freigegeben. Nach Token-Reparatur kann derselbe Entwurf erneut angefragt werden.");
+  }catch(caught){setError(caught instanceof Error?caught.message:"Reset fehlgeschlagen.")}finally{setBusy(false)}}
   async function request(){if(eligibilityError)return;setBusy(true);setError("");setNotice("");try{
     const response=await fetch("/api/publication",{method:"POST",headers:{"Content-Type":"application/json","x-content-password":password},body:JSON.stringify({jobId:job.id})});
     const data=await response.json();if(!response.ok)throw new Error(data.error||"Veröffentlichungsfreigabe fehlgeschlagen.");
@@ -28,7 +33,8 @@ export function PublicationGate({job,password}:{job:ContentJob;password:string})
     {!record&&!eligibilityError&&<button type="button" disabled={busy||!password} onClick={request}>{busy?"Vorbereitung läuft …":"Beitrag vorbereiten & WhatsApp-Freigabe anfragen"}</button>}
     {record&&<><p>Status: <strong>{record.status}</strong></p>{record.imageUrl&&<a href={record.imageUrl} target="_blank" rel="noopener noreferrer">Grafik prüfen ↗</a>}
       <div className="postCopy">{record.caption}</div>
-      {record.status==="pending"&&!eligibilityError&&<button type="button" disabled={busy} onClick={request}>{busy?"Bitte warten …":"WhatsApp-Freigabe senden / Status prüfen"}</button>}
+      {record.status==="pending"&&record.whatsappSendAttempted&&!record.whatsappMessageId&&<div className="reviewBox"><p>Der letzte WhatsApp-Versand wurde versucht, aber keine Message-ID gespeichert.</p><button type="button" className="ghost" disabled={busy} onClick={resetWhatsApp}>{busy?"Bitte warten …":"Ich bestätige: keine WhatsApp angekommen"}</button></div>}
+      {record.status==="pending"&&!record.whatsappSendAttempted&&!eligibilityError&&<button type="button" disabled={busy} onClick={request}>{busy?"Bitte warten …":"WhatsApp-Freigabe senden / Status prüfen"}</button>}
       {record.permalink&&<p><a href={record.permalink} target="_blank" rel="noopener noreferrer">Veröffentlichten Beitrag öffnen ↗</a></p>}
       {record.feedback&&<p>Änderungswunsch: {record.feedback}</p>}</>}
     {notice&&<p role="status">{notice}</p>}{error&&<p role="alert" className="error">{error}</p>}
