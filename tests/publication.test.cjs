@@ -13,7 +13,7 @@ test('Facebook publication needs a distinct signed WhatsApp decision and claims 
   const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
   const old=process.env.WHATSAPP_APPROVER_WA_ID;process.env.WHATSAPP_APPROVER_WA_ID='491234';
   try{
-    for(const file of ['001_memory.sql','002_production_gates.sql','003_faceless_so.sql','004_daily_drafts.sql','005_publication_gate.sql','006_daily_notification.sql'])await pg.exec(fs.readFileSync(`db/migrations/${file}`,'utf8'));
+    for(const file of ['001_memory.sql','002_production_gates.sql','003_faceless_so.sql','004_daily_drafts.sql','005_publication_gate.sql','006_daily_notification.sql','007_publication_revisions.sql','008_weekly_reports.sql'])await pg.exec(fs.readFileSync(`db/migrations/${file}`,'utf8'));
     const memory=memoryRepository(db),publication=publicationRepository(db),inbound=productionRepository(db);
     const opportunity=opportunitySchema.parse({product:{name:'Kuscheldecke',sourceUrl:'https://www.amazon.de/s?k=Kuscheldecke',affiliateUrl:'https://www.amazon.de/s?k=Kuscheldecke',price:'',targetGroup:'Haushalte',benefits:'Größe und Material vergleichen',notes:''},useCase:'Ein kühler Herbstabend auf dem Sofa mit einer Decke.',targetPlatform:'facebook',budget:'low'});
     const id=crypto.randomUUID();await memory.claim(id,opportunity,'reference');
