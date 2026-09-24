@@ -31,6 +31,13 @@ Beim ersten Aufruf erschien dieselbe Postgres-SSL-Moduswarnung wie zuvor auf
 Keine Secrets im Nachweis. Frühere Aussagen „006 nicht ausgeführt“ weiter unten
 sind historische Befunde und durch diesen Abschnitt überholt.
 
+Die anschließende Content-Studio-Browserprüfung erreichte die Oberfläche mit
+`Postgres konfiguriert`. Das sichere Zugangsfeld zum Laden des gespeicherten
+Verlaufs wurde vor Anzeige/Eintrag automatisch abgelehnt, weil der allgemeine
+Dialog diese geschützte Leseabfrage als Anmeldung bezeichnet. Kein Verlauf
+geladen und kein E2E-Job gestartet; konkrete Betreiberbestätigung für diesen
+Eingabeschritt erforderlich, kein alternativer Ausführungsweg versucht.
+
 ## Live-Nachprüfung nach Vercel-Neuverbindung
 
 Geprüft am 24.09.2026 gegen 08:28 UTC, Preview-Commit

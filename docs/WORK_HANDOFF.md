@@ -25,6 +25,16 @@ Facebook-/Faceless-E2E und Production bleiben offen. Für den Facebook-Test
 zuerst den geschützten Verlauf und offene Freigaben prüfen, dann den vorhandenen
 Tagesentwurf-Flow mit zwei getrennten WhatsApp-Freigaben verwenden.
 
+Die Browserprüfung des Content Studios lädt die Oberfläche und bestätigt
+`Postgres konfiguriert`. Der separate sichere Eingabedialog für den Button
+`Gespeicherten Verlauf laden` wurde anschließend automatisch abgelehnt, bevor
+eine Eingabeaufforderung oder Aktion erfolgte: Die allgemeine Beschriftung
+`Sign in to continue` stellt diese geschützte Leseabfrage als Anmeldung dar.
+Kein Code wurde eingegeben, kein Verlauf geladen. Diese neue Ablehnung betrifft
+keine Migration. Vor einem erneuten Versuch die konkrete sichere Code-Eingabe
+und ausschließlich lesende Verlaufsabfrage ausdrücklich bestätigen lassen;
+keinen Browser-/API-Ersatzweg verwenden. Facebook-/Faceless-Tests nicht gestartet.
+
 ## Vercel-Zugriff wiederhergestellt (24.09., ca. 08:28 UTC)
 
 Die erneute Verbindung ist erfolgreich: Team `agentstudiots-boop` und Projekt
