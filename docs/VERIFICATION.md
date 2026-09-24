@@ -2,6 +2,32 @@
 
 Stand: 24. September 2026. Branch `feat/production-gates-whatsapp`.
 
+## Live-Nachprüfung nach Vercel-Neuverbindung
+
+Geprüft am 24.09.2026 gegen 08:28 UTC, Preview-Commit
+`d7ee14133508513185e826174e1230d113a63dce`.
+
+| Prüfung | Beobachtetes Ergebnis |
+| --- | --- |
+| Vercel-Team/Projekt | `agentstudiots-boop` erreichbar; früherer Autorisierungsfehler behoben |
+| Preview-Zuordnung | `dpl_4fH4vN9fPXbhdYYERG1w5qpfQxF7`, Branch `feat/production-gates-whatsapp`, korrekter Commit, `READY` |
+| Runtime-Fehler aktuelles Preview, letzte 24 h | Keine Error-/Warning-/Fatal-Einträge gefunden; sehr geringe Nutzung, kein E2E-Nachweis |
+| Webhook ohne Verifizierung | HTTP 403 mit App-Pfad `/api/whatsapp/webhook`; zugehöriger Request in Runtime-Zählung sichtbar |
+| Projektweite Fehleraggregation | Eine ältere Postgres-SSL-Warngruppe auf früherem Deployment; keine Änderung an SSL-Einstellungen |
+| Migration-Logsuche in Preview, letzte 24 h | Keine passenden `database_migration`-Logs gefunden; kein Beleg für Ausführung oder Schema-Zustand |
+| Weitere Connector-HTTP-Lesetests | Teilweise Connector-Zugriffsfehler oder SSO-Redirect, kein verwertbarer neuer Meta-/DB-Nachweis |
+| Live-Umgebungsvariablen | Keine passende Funktion im angebotenen Connector; Werte weiterhin unbestätigt |
+| Build-Log-Werkzeug | Server meldet `Tool not found`; erfolgreicher Deploymentstatus separat bestätigt |
+| Bestehende Production | `READY`, `dpl_EdFS8ZgeznxLrofXCTaabn9S6hm7`, `main` bei `d956518a71cd3658efb8524311bf314444f98272`; kein neuer Rollout |
+
+Keine Migration, kein Content-Job, keine ausgehende Nachricht, kein Post und kein
+Faceless-Kauf ausgelöst. Die geschützte Migration benötigt weiterhin den
+Betreiber/Zugangscode. Ältere Aussagen zum Vercel-403 weiter unten beschreiben
+den damaligen Zustand und sind durch diesen Nachtrag überholt. Keine vollständige
+technische Testsuite wiederholt, da ausschließlich Nachweise ergänzt wurden.
+
+## Isolierte Integrationsprüfung
+
 Neu: Die isolierte Kombination mit dem inzwischen vorliegenden PR #8 besteht
 lokal TypeScript, ESLint, **50 Tests** und Next.js-Build. PR #6 allein bleibt bei
 47 Tests. Die Kombination wurde weder remote gemergt noch live ausgeführt.

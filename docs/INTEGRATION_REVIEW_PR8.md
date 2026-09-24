@@ -51,6 +51,10 @@ Facebook-Schreibberechtigung, Faceless-Videoerstellung oder Live-Wochenberichte.
 
 ## Unverändert offen
 
+Nachtrag 24.09., ca. 08:28 UTC: Der folgende Vercel-403 wurde durch erneute
+Autorisierung behoben. Aktuelle Nachweise und verbleibende Grenzen stehen in
+[VERIFICATION.md](VERIFICATION.md). Die Migration und echten E2E bleiben offen.
+
 Der Vercel-Connector wurde erneut geprüft und ist weiterhin nur für
 `thorsten1988la-1943` autorisiert. Das Projekt-Team `agentstudiots-boop` antwortet
 mit 403. Für Runtime-Logs und Live-Konfiguration muss diese Verbindung korrigiert

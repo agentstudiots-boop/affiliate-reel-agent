@@ -4,6 +4,38 @@ Stand: 24. September 2026. Offener Draft-PR #6 auf
 `feat/production-gates-whatsapp`. Weder nach `main` gemergt noch für Production
 freigegeben.
 
+## Vercel-Zugriff wiederhergestellt (24.09., ca. 08:28 UTC)
+
+Die erneute Verbindung ist erfolgreich: Team `agentstudiots-boop` und Projekt
+`affiliate-reel-agent` sind über den Connector erreichbar. Der vorherige
+Scope-/403-Blocker ist damit behoben; die älteren Abschnitte unten sind historisch.
+Preview `dpl_4fH4vN9fPXbhdYYERG1w5qpfQxF7` ist `READY` und gehört zu
+PR-#6-Commit `d7ee14133508513185e826174e1230d113a63dce`.
+
+- Keine Fehler-/Warn-/Fatal-Logs für dieses Deployment im abgefragten
+  24-Stunden-Fenster. Zunächst keine Requests, danach ein eigener Webhook-GET:
+  ohne Verifizierung erwartungsgemäß HTTP 403 vom App-Handler. Dies beweist
+  Erreichbarkeit und Ablehnung, keinen erfolgreichen Meta-Handshake oder Empfang.
+- Projektweit zeigt die Fehleraggregation eine ältere Postgres-SSL-Warnung zu
+  `sslmode=require` auf einem früheren Deployment. Keine Konfiguration geändert.
+- Production ist weiterhin `READY` auf `main`-Commit `d956518a71cd3658efb8524311bf314444f98272`,
+  Deployment `dpl_EdFS8ZgeznxLrofXCTaabn9S6hm7`. Kein eigener Rollout erfolgt.
+- Weitere HTTP-Lesediagnosen über den Connector scheiterten teilweise an dessen
+  Deployment-Zugriff bzw. endeten im Vercel-SSO-Redirect. Daraus keinen App-Fehler
+  ableiten. Kein Browser-Ersatzweg für diese Connector-Probleme genutzt.
+- Umgebungsvariablen sind mit den aktuell angebotenen Connector-Funktionen nicht
+  abrufbar; das angebotene Build-Log-Werkzeug meldet serverseitig `Tool not found`.
+  Runtime-Log-Zugriff funktioniert. Tagesvorlage, Webhook-Ziel und DB-Zustand
+  bleiben praktisch zu bestätigen.
+
+Nächster Betreiberschritt: die geschützte Migrationsseite des PR-#6-Previews im
+eigenen Browser öffnen, Zugangscode dort eingeben und die Migration ausführen;
+anschließend mit demselben Code ein zweites Mal ausführen. Erwartet zunächst
+006, danach `Schema bereits aktuell` mit 001–006. Kein Code im Chat. Die zuvor
+automatisch abgelehnte Browser-Eingabe wurde nicht erneut versucht; kein
+Migrations-POST durch den Agenten. Danach die beiden `database_migration`-Events
+im aktuellen Deployment abgleichen und den kontrollierten E2E fortsetzen.
+
 ## Neue Integrationsvorprüfung
 
 PR #8 des anderen Agenten ist inzwischen vorhanden. PR #6 (`324dc8c`) und
