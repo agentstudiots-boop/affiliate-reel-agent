@@ -19,6 +19,14 @@ Stand: 24. September 2026. Branch `feat/production-gates-whatsapp`.
 | Facebook- und Faceless-E2E | **Nicht gestartet**; keine echten Posts, Providerkäufe oder WhatsApp-Sends |
 | PR/Production | Draft unverändert; kein Merge, keine Production-Migration |
 
+Nachtrag: Auch GitHub Quality und Vercel-Build zu `fb9762f` sind erfolgreich
+(Deployment `NZYWAJTf5f4TMiP35XB2RrgWwPHA`). Der Versuch, den Zugangscode über die
+sichere Browser-Eingabe abzufragen und damit den Migrations-POST abzusenden,
+wurde vor Anzeige des Dialogs automatisch abgelehnt. Grund: Die Dialogbeschriftung
+stellte die Datenbankaktion als Anmeldung dar. Keine Eingabe, keine Migration.
+Eine ausdrückliche Bestätigung des Betreibers zur konkreten Datenbankaktion ist
+vor einem erneuten Versuch erforderlich; keine Umgehung des geschützten Wegs.
+
 Der neue Test `tests/migration-upgrade.test.cjs` arbeitet ausschließlich mit einer
 isolierten PGlite-Datenbank. Er ersetzt nicht die verlangten zwei geschützten
 Migrationsaufrufe im Preview. Direkte HTTP-Prüfungen aus der Arbeitsumgebung

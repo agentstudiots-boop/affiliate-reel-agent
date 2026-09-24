@@ -36,6 +36,15 @@ geschützte Route anwenden und den zweiten POST separat bestätigen. Für späte
 Runtime-Nachweise zusätzlich die Vercel-Verbindung für `agentstudiots-boop`
 autorisieren. Die erforderlichen echten WhatsApp-Freigaben bleiben beim Approver.
 
+Nachtrag: Die sichere Browser-Eingabe wurde vor Anzeige an den Betreiber durch
+die automatische Sicherheitsprüfung abgelehnt: Der als Anmeldung beschriftete
+Dialog hätte mit dem Zugangscode direkt eine Datenbankmigration abgesendet.
+Es wurde weder ein Code eingegeben noch ein POST ausgeführt. Vor einem neuen
+Versuch ist eine ausdrückliche Bestätigung dieser Datenbankaktion erforderlich;
+keinen alternativen oder ungeschützten Ausführungsweg verwenden.
+GitHub Quality und Vercel-Build des Verifikationscommits `fb9762f` sind ebenfalls
+erfolgreich (Deployment `NZYWAJTf5f4TMiP35XB2RrgWwPHA`).
+
 Für den Facebook-Test mit **zwei** WhatsApp-Freigaben den bestehenden Tagesentwurf-
 Flow nutzen: Die manuelle Content-Studio-Freigabe ist keine erste
 WhatsApp-Freigabe. Der tägliche Flow benötigt einen ausdrücklich autorisierten
