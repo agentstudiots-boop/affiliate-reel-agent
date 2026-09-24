@@ -4,6 +4,16 @@ Stand: 24. September 2026. Offener Draft-PR #6 auf
 `feat/production-gates-whatsapp`. Weder nach `main` gemergt noch für Production
 freigegeben.
 
+## Neue Integrationsvorprüfung
+
+PR #8 des anderen Agenten ist inzwischen vorhanden. PR #6 (`324dc8c`) und
+PR #8 (`cd7d35a`) wurden ausschließlich in einer isolierten lokalen Arbeitskopie
+kombiniert: keine Merge-Konflikte, TypeScript/ESLint/50 Tests/Next.js-Build grün.
+Kein Remote-Merge und keine Änderungen an den fremden Feature-Dateien.
+Details und genaue SHAs: [INTEGRATION_REVIEW_PR8.md](INTEGRATION_REVIEW_PR8.md).
+PR #6 bleibt für den Nachweis von Migration 006 getrennt; PR #8 enthält zusätzlich
+007/008. Vercel-Zugriff erneut geprüft und weiterhin mit 403 blockiert.
+
 ## Fortsetzung ohne Betreiber (nach `0e8484d`)
 
 Der Betreiber ist heute nicht verfügbar; keine neue Zugangseingabe oder echte

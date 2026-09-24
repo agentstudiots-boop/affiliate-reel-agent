@@ -2,6 +2,11 @@
 
 Stand: 24. September 2026. Branch `feat/production-gates-whatsapp`.
 
+Neu: Die isolierte Kombination mit dem inzwischen vorliegenden PR #8 besteht
+lokal TypeScript, ESLint, **50 Tests** und Next.js-Build. PR #6 allein bleibt bei
+47 Tests. Die Kombination wurde weder remote gemergt noch live ausgeführt.
+Nachweis und Grenzen: [INTEGRATION_REVIEW_PR8.md](INTEGRATION_REVIEW_PR8.md).
+
 ## Lokale Fortsetzung nach `0e8484d`
 
 Sieben zusätzliche Integrationstests führen die tatsächlichen Produktions- und
