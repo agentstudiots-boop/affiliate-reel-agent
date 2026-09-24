@@ -1,5 +1,4 @@
 import { imageSchema } from "../schema";
-import { analyzeProductInspiration } from "../product-inspiration";
 import type { Brief, Generator } from "../agent";
 
 function shorten(value: string, max: number) {
@@ -11,7 +10,7 @@ function shorten(value: string, max: number) {
 }
 
 function visualConcept(brief: Brief) {
-  const inspiration = brief.inspiration || analyzeProductInspiration(brief.opportunity);
+  const inspiration = brief.inspiration;
   return {
     kind: "carousel_guide" as const,
     mainIdea: inspiration.visualDirections[0] || `Eigenständige Alltagsszene für ${brief.idea.useCase}`,
@@ -37,7 +36,7 @@ function reviseReferenceImage(brief: Brief) {
     applied = true;
   }
   if (/weniger werblich|nicht so werblich|sachlicher|neutraler/.test(request)) {
-    const inspiration = brief.inspiration || analyzeProductInspiration(brief.opportunity);
+    const inspiration = brief.inspiration;
     next.caption = `Werbung | ${inspiration.categoryLabel} als redaktionelle Produktidee für ${brief.idea.useCase}. Eignung und Herstellerangaben am konkreten Produkt bzw. in der verlinkten Auswahl prüfen. Bei einem Kauf über den Affiliate-Link kann eine Provision anfallen.`;
     next.cta = inspiration.editorialMode === "category"
       ? "Bei Interesse kannst du die verlinkte Auswahl sachlich vergleichen."
@@ -56,7 +55,7 @@ function reviseReferenceImage(brief: Brief) {
     applied = true;
   }
   if (/cta.{0,30}(ändern|neutral|sachlich|weniger werblich)|(ändern|neutral|sachlich).{0,30}cta/.test(request)) {
-    const inspiration = brief.inspiration || analyzeProductInspiration(brief.opportunity);
+    const inspiration = brief.inspiration;
     next.cta = inspiration.editorialMode === "category"
       ? "Bei Interesse kannst du die verlinkte Auswahl vergleichen."
       : "Bei Interesse kannst du die Produktangaben im Link prüfen.";
@@ -67,7 +66,7 @@ function reviseReferenceImage(brief: Brief) {
 }
 
 export function imageAgent(brief: Brief, generate: Generator) {
-  const inspiration = brief.inspiration || analyzeProductInspiration(brief.opportunity);
+  const inspiration = brief.inspiration;
   return generate("image", `Erstelle ein Einzelbild oder 3–7 zusammenhängende Carousel-Slides passend zum freigegebenen Konzept.
 Je Slide: Überschrift, knapper Text, konkrete Bildgestaltung, origineller Bildprompt und Alt-Text.
 Ein echtes visuelles Konzept ist Pflicht: Lifestyle-/Anwendungsszene, redaktioneller Vergleich oder eigenständige Collage. Keine reine Textkarte oder Symbolgrafik als Endprodukt.
