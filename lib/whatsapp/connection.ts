@@ -11,7 +11,10 @@ type WhatsAppStatus =
 type GraphFailure = { code: number; subcode: number; httpStatus: number };
 
 export async function checkWhatsAppConnection(transport: typeof fetch = fetch) {
-  const token = process.env.WHATSAPP_ACCESS_TOKEN || process.env.WHATTSAPP_ACCESS_TOKEN;
+  const canonicalToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  const legacyToken = process.env.WHATTSAPP_ACCESS_TOKEN;
+  const token = canonicalToken || legacyToken;
+  const tokenSource = canonicalToken ? "WHATSAPP_ACCESS_TOKEN" : legacyToken ? "WHATTSAPP_ACCESS_TOKEN" : "none";
   const sender = process.env.WHATSAPP_PHONE_NUMBER_ID || process.env.WHATTSAPP_PHONE_NUMBER_ID;
   const version = process.env.META_GRAPH_API_VERSION || "v25.0";
   const configured = {
@@ -22,6 +25,10 @@ export async function checkWhatsAppConnection(transport: typeof fetch = fetch) {
     verifyToken: !!process.env.WHATSAPP_VERIFY_TOKEN,
     appSecret: !!process.env.META_APP_SECRET,
     graphVersion: version,
+    tokenSource,
+    tokenHasBearerPrefix: /^Bearer\s+/i.test(token || ""),
+    tokenHasOuterWhitespace: !!token && token !== token.trim(),
+    tokenLengthBand: !token ? "missing" : token.length < 100 ? "short" : token.length < 250 ? "normal" : "long",
   };
   const finish=(status:WhatsAppStatus,message:string,code?:number,subcode?:number)=>({
     status,message,checkedAt:new Date().toISOString(),connectionOk:status==="connected",configured,
