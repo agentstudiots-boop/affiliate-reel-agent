@@ -26,6 +26,9 @@ test('content identity survives production workflow, parallel claims, reload and
     const finished=await runContentJob(opportunity,{id:first.id,contentId:first.contentId,onUpdate:job=>repo.save(job)});
     assert.equal(finished.contentId,first.contentId);
     assert.equal((await repo.list()).find(j=>j.id===first.id).contentId,first.contentId);
+    await db.query("UPDATE content_jobs SET snapshot=snapshot-'contentId' WHERE id=$1",[first.id]);
+    assert.equal((await repo.list()).find(j=>j.id===first.id).contentId,first.contentId,'legacy snapshots read the database identity');
+    assert.equal((await repo.approve(first.id)).contentId,first.contentId);
     await assert.rejects(db.query('UPDATE content_jobs SET content_id=$2 WHERE id=$1',[first.id,newContentId()]),/immutable/);
     await assert.rejects(db.query('INSERT INTO content_jobs(id,content_id,product_id,category,use_case_key,goal,target_platform,trend,opportunity,status,snapshot,created_at,updated_at) SELECT $1,content_id,product_id,category,use_case_key,goal,target_platform,trend,opportunity,status,snapshot,created_at,updated_at FROM content_jobs WHERE id=$2',[crypto.randomUUID(),first.id]));
     await assert.rejects(repo.save({...finished,contentId:newContentId(),events:[...finished.events,{sequence:finished.events.length+1,at:new Date().toISOString(),agent:'orchestrator',kind:'decision',message:'tamper'}]}),/content_id/);

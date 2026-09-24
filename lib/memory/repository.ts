@@ -66,14 +66,15 @@ export function memoryRepository(db: Database = getDatabase()) {
           await sql.query("INSERT INTO job_events(job_id,sequence,agent,kind,occurred_at,payload) VALUES($1,$2,$3,$4,$5,$6)",[job.id,event.sequence,event.agent,event.kind,event.at,JSON.stringify(event)]);
         }
       });
-      const result = await db.query("SELECT snapshot FROM content_jobs WHERE ($1::timestamptz IS NULL OR created_at < $1) ORDER BY created_at DESC LIMIT 50",[before || null]);
-      return result.rows.map(row => parseJob(row.snapshot));
+      const result = await db.query("SELECT content_id,snapshot FROM content_jobs WHERE ($1::timestamptz IS NULL OR created_at < $1) ORDER BY created_at DESC LIMIT 50",[before || null]);
+      return result.rows.map(row => ({...parseJob(row.snapshot),contentId:String(row.content_id)}));
     },
     async approve(id: string) {
       return db.transaction(async sql => {
-        const result = await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE",[id]);
+        const result = await sql.query("SELECT content_id,snapshot FROM content_jobs WHERE id=$1 FOR UPDATE",[id]);
         if (!result.rows.length) throw new ConflictError("Job nicht gefunden.");
         const job = parseJob(result.rows[0].snapshot);
+        job.contentId = String(result.rows[0].content_id);
         if (job.status === "approved") return job;
         if (job.status !== "awaiting_approval") throw new ConflictError("Dieser Job ist noch nicht zur Freigabe bereit.");
         job.status = "approved"; job.updatedAt = new Date().toISOString();
