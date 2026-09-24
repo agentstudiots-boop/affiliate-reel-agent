@@ -63,8 +63,8 @@ export async function createDailyDraft(day = new Date().toISOString().slice(0, 1
       useCase: candidate.reelIdea, trend: candidate.whyNow, goal: "education", budget: "low", verifiedFacts: [],
     };
     const repo = memoryRepository(db);
-    await repo.claim(jobId, opportunity, "reference");
-    const job = await runContentJob(opportunity, { id: jobId, mode: "reference", allowedFormats: ["image"],
+    const claimed = await repo.claim(jobId, opportunity, "reference");
+    const job = await runContentJob(opportunity, { id: jobId, contentId: claimed.contentId, mode: "reference", allowedFormats: ["image"],
       loadLearning: value => repo.learn(value), onUpdate: value => repo.save(value) });
     // Do not seek an approval for a plan that the later Facebook gate rejects.
     const publishablePlan = job.status === "awaiting_approval" && job.content?.format === "image"

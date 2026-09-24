@@ -112,7 +112,7 @@ test('creative quality gate prevents creation of a publication request in the da
   const pg=new PGlite();
   const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
   try{
-    for(const file of ['001_memory.sql','002_production_gates.sql','003_faceless_so.sql','004_daily_drafts.sql','005_publication_gate.sql','006_daily_notification.sql','007_publication_revisions.sql','008_weekly_reports.sql']){
+    for(const file of ['001_memory.sql','002_production_gates.sql','003_faceless_so.sql','004_daily_drafts.sql','005_publication_gate.sql','006_daily_notification.sql','007_publication_revisions.sql','008_weekly_reports.sql','009_original_visual_attempts.sql','010_content_history.sql']){
       await pg.exec(fs.readFileSync(`db/migrations/${file}`,'utf8'));
     }
     const opportunity=opportunitySchema.parse({

@@ -12,9 +12,9 @@ test('operations distinguishes a saved morning draft, publication and missing Pa
     for(const name of fs.readdirSync('db/migrations').filter(n=>n.endsWith('.sql')).sort())await pg.exec(fs.readFileSync(`db/migrations/${name}`,'utf8'));
     const jobId=crypto.randomUUID(),publicationId=crypto.randomUUID();
     await pg.query("INSERT INTO products(id,name,source_url) VALUES('test','Kuscheldecke','https://example.org')");
-    await pg.query(`INSERT INTO content_jobs(id,product_id,category,use_case_key,goal,target_platform,trend,opportunity,status,content_type,snapshot,created_at,updated_at)
-      VALUES($1,'test','household','test','education','facebook','', '{}','approved','image',$2,now(),now())`,
-      [jobId,JSON.stringify({opportunity:{product:{name:'Kuscheldecke'}}})]);
+    await pg.query(`INSERT INTO content_jobs(id,content_id,product_id,category,use_case_key,goal,target_platform,trend,opportunity,status,content_type,snapshot,created_at,updated_at)
+      VALUES($1,$3,'test','household','test','education','facebook','', '{}','approved','image',$2,now(),now())`,
+      [jobId,JSON.stringify({opportunity:{product:{name:'Kuscheldecke'}}}),`cnt_legacy_${jobId.replaceAll('-','')}`]);
     await pg.query("INSERT INTO daily_drafts(day,job_id,status,whatsapp_message_id) VALUES('2026-09-24',$1,'content_approved','wamid.test')",[jobId]);
     await pg.query("INSERT INTO publications(id,job_id,platform,status,url,published_at) VALUES($1,$2,'facebook','published','https://facebook.com/test',now())",[publicationId,jobId]);
     const missing=await getOperationsSnapshot(db);

@@ -4,7 +4,7 @@ import { contentSchema, ideaSchema, marketingSchema, opportunitySchema, reviewSc
 export const HISTORY_KEY = "affiliate-content-jobs-v1";
 const statuses = ["queued", "checking", "ideating", "selecting", "producing", "reviewing", "revising", "marketing", "awaiting_approval", "needs_input", "failed", "interrupted", "approved"] as const;
 const storedJobSchema = z.object({
-  version: z.literal(1), id: z.string().uuid(), createdAt: z.string(), updatedAt: z.string(), status: z.enum(statuses),
+  version: z.literal(1), id: z.string().uuid(), contentId: z.string().regex(/^cnt_[a-zA-Z0-9_]+$/).optional(), createdAt: z.string(), updatedAt: z.string(), status: z.enum(statuses),
   mode: z.enum(["reference", "ai"]), opportunity: opportunitySchema,
   events: z.array(z.object({ sequence: z.number(), at: z.string(), agent: z.enum(["creative", "video", "image", "text", "marketing", "orchestrator"]), kind: z.enum(["status", "response", "decision", "error"]), message: z.string(), data: z.unknown().optional() })).max(100),
   ideas: z.array(ideaSchema).max(4).optional(),

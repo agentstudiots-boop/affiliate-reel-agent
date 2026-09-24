@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const { PGlite } = require('@electric-sql/pglite');
 const { applyMigrations } = require('../.test-build/lib/memory/migrations');
 
-test('006–009 upgrade populated 001–005 once without replaying or changing prior migrations', async () => {
+test('006–010 upgrade populated 001–005 once without replaying or changing prior migrations', async () => {
   const pg = new PGlite();
   const db = {
     query: (query, values) => pg.query(query, values),
@@ -23,6 +23,10 @@ test('006–009 upgrade populated 001–005 once without replaying or changing p
       await pg.exec(load(name));
       await pg.query("INSERT INTO schema_migrations(name,applied_at) VALUES($1,'2026-09-23T00:00:00Z')", [name]);
     }
+    const legacyJobId=crypto.randomUUID();
+    await pg.exec("INSERT INTO products(id,name,source_url) VALUES('existing','Bestehendes Produkt','https://example.com/product')");
+    await pg.query(`INSERT INTO content_jobs(id,product_id,category,use_case_key,goal,target_platform,trend,opportunity,status,snapshot,created_at,updated_at)
+      VALUES($1,'existing','kitchen','preparation','education','facebook','', '{}','approved','{}',now(),now())`,[legacyJobId]);
     await pg.query("INSERT INTO daily_drafts(day,job_id,status,whatsapp_message_id) VALUES('2026-09-23',$1,'content_approved','test.draft')", [crypto.randomUUID()]);
     await pg.exec("INSERT INTO whatsapp_events(message_id,wa_id,intent,payload) VALUES('test.approval','test-approver','approve','{}')");
     const before = (await pg.query('SELECT * FROM schema_migrations ORDER BY name')).rows;
@@ -32,17 +36,19 @@ test('006–009 upgrade populated 001–005 once without replaying or changing p
     const trackedLoader = name => { loaded.push(name); return load(name); };
 
     assert.deepEqual(await applyMigrations(db, trackedLoader), {
-      applied: ['006_daily_notification.sql', '007_publication_revisions.sql', '008_weekly_reports.sql', '009_original_visual_attempts.sql'], alreadyApplied: previous,
+      applied: ['006_daily_notification.sql', '007_publication_revisions.sql', '008_weekly_reports.sql', '009_original_visual_attempts.sql', '010_content_history.sql'], alreadyApplied: previous,
     });
     assert.deepEqual(await applyMigrations(db, trackedLoader), {
-      applied: [], alreadyApplied: [...previous, '006_daily_notification.sql', '007_publication_revisions.sql', '008_weekly_reports.sql', '009_original_visual_attempts.sql'],
+      applied: [], alreadyApplied: [...previous, '006_daily_notification.sql', '007_publication_revisions.sql', '008_weekly_reports.sql', '009_original_visual_attempts.sql', '010_content_history.sql'],
     });
-    assert.deepEqual(loaded, ['006_daily_notification.sql', '007_publication_revisions.sql', '008_weekly_reports.sql', '009_original_visual_attempts.sql'], 'existing migration SQL must never be replayed');
+    assert.deepEqual(loaded, ['006_daily_notification.sql', '007_publication_revisions.sql', '008_weekly_reports.sql', '009_original_visual_attempts.sql', '010_content_history.sql'], 'existing migration SQL must never be replayed');
     assert.deepEqual((await pg.query('SELECT * FROM schema_migrations ORDER BY name')).rows.slice(0, 5), before);
     assert.deepEqual((await pg.query('SELECT * FROM daily_drafts')).rows[0], {
       ...draft, notification_send_attempted_at: null, notification_message_id: null,
     });
     assert.deepEqual((await pg.query('SELECT * FROM whatsapp_events')).rows[0], event);
+    assert.equal((await pg.query('SELECT content_id FROM content_jobs WHERE id=$1',[legacyJobId])).rows[0].content_id,
+      `cnt_legacy_${legacyJobId.replaceAll('-','')}`);
     await pg.exec("INSERT INTO whatsapp_events(message_id,wa_id,intent,payload) VALUES('test.notification','test-approver','notification_reply','{}')");
     await pg.exec("INSERT INTO whatsapp_events(message_id,wa_id,intent,payload) VALUES('test.weekly','test-approver','weekly_report_reply','{}')");
     assert.equal((await pg.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_name='weekly_reports'")).rows[0].n, 1);

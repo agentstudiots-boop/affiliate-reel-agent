@@ -21,7 +21,8 @@ export async function POST(request: Request) {
     input = requestSchema.parse(JSON.parse(raw));
   } catch { return Response.json({ error: "Bitte Produkt, Link, Zielgruppe und konkreten Use Case vollständig eintragen." }, { status: 400 }); }
   const repo = memoryRepository();
-  try { await repo.claim(input.requestId,input.opportunity,input.mode); }
+  let claimed;
+  try { claimed = await repo.claim(input.requestId,input.opportunity,input.mode); }
   catch (error) { return Response.json({ error: error instanceof ConflictError ? error.message : "Postgres ist nicht erreichbar oder die Migration fehlt. Kein Modellaufruf gestartet." }, { status: error instanceof ConflictError ? 409 : 503 }); }
   const abort = new AbortController();
   const signal = AbortSignal.any([request.signal, abort.signal]);
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        await runContentJob(input.opportunity, { id: input.requestId, mode: input.mode, signal, async loadLearning(opportunity) {
+        await runContentJob(input.opportunity, { id: input.requestId, contentId: claimed.contentId, mode: input.mode, signal, async loadLearning(opportunity) {
           try { return await repo.learn(opportunity); } catch { throw new Error("Historischer Datenbankvergleich nicht verfügbar. Planung gestoppt."); }
         }, async onUpdate(job) {
           // Database commit precedes UI delivery. A lost browser connection cannot erase saved work.

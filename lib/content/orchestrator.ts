@@ -109,13 +109,14 @@ export function inspectContent(content: Content, decision: Decision): Review {
 export async function runContentJob(raw: Opportunity, options: {
   mode?: "reference" | "ai"; signal?: AbortSignal; onUpdate?: (job: ContentJob) => void | Promise<void>;
   id?: string; loadLearning?: (opportunity: Opportunity) => Promise<LearningEvidence>;
+  contentId?: string;
   allowedFormats?: ReadonlyArray<Content["format"]>;
   generate?: Generator; // Dependency injection for deterministic, cost-free contract tests.
 } = {}): Promise<ContentJob> {
   const opportunity = opportunitySchema.parse(raw);
   opportunity.product.affiliateUrl = createAmazonAffiliateUrl(opportunity.product.affiliateUrl || opportunity.product.sourceUrl);
   const now = new Date().toISOString();
-  const job: ContentJob = { version: 1, id: options.id || crypto.randomUUID(), createdAt: now, updatedAt: now,
+  const job: ContentJob = { version: 1, id: options.id || crypto.randomUUID(), ...(options.contentId ? { contentId: options.contentId } : {}), createdAt: now, updatedAt: now,
     status: "queued", mode: options.mode || "reference", opportunity, events: [], revisions: 0, modelCalls: 0, totalTokens: 0 };
   const emit = async (agent: AgentName, kind: JobEvent["kind"], message: string, data?: unknown) => {
     job.updatedAt = new Date().toISOString();

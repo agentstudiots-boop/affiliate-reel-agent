@@ -9,7 +9,7 @@ const {runContentJob}=require('../.test-build/lib/content/orchestrator');
 const {opportunitySchema}=require('../.test-build/lib/content/schema');
 const {buildWeeklyReportData,formatWeeklyReport,previousWeek}=require('../.test-build/lib/reporting/weekly');
 
-const migrations=['001_memory.sql','002_production_gates.sql','003_faceless_so.sql','004_daily_drafts.sql','005_publication_gate.sql','006_daily_notification.sql','007_publication_revisions.sql','008_weekly_reports.sql'];
+const migrations=['001_memory.sql','002_production_gates.sql','003_faceless_so.sql','004_daily_drafts.sql','005_publication_gate.sql','006_daily_notification.sql','007_publication_revisions.sql','008_weekly_reports.sql','009_original_visual_attempts.sql','010_content_history.sql'];
 const opportunity=opportunitySchema.parse({
   product:{name:'Kuscheldecke',sourceUrl:'https://www.amazon.de/s?k=Kuscheldecke',affiliateUrl:'https://www.amazon.de/s?k=Kuscheldecke',price:'',targetGroup:'Haushalte',benefits:'Größe und Material vergleichen',notes:''},
   useCase:'Ein kühler Herbstabend auf dem Sofa mit einer Decke.',

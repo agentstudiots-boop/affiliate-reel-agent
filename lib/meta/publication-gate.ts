@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { parseJob } from "../content/history";
-import { getDatabase, type Database } from "../memory/db";
+import { getDatabase, type Database, type Sql } from "../memory/db";
 import { facebookPagePublicationError } from "./publication-eligibility";
 import { reviseApprovedStaticContent } from "../content/orchestrator";
 import type { OriginalVisualAsset } from "../content/image-provider";
@@ -8,7 +8,12 @@ import type { ContentJob } from "../content/schema";
 
 export class PublicationConflictError extends Error {}
 
-function publicationContent(job: ContentJob) {
+async function verifiedTrackingId(sql: Sql, jobId: string) {
+  const result = await sql.query("SELECT a.tracking_id FROM affiliate_tracking a JOIN content_jobs j ON j.content_id=a.content_id WHERE j.id=$1 AND a.provider='amazon'",[jobId]);
+  return result.rows[0]?.tracking_id ? String(result.rows[0].tracking_id) : null;
+}
+
+function publicationContent(job: ContentJob, trackingId: string | null) {
   const eligibilityError = facebookPagePublicationError(job);
   if (eligibilityError) throw new PublicationConflictError(eligibilityError);
   if (!job.content || job.content.format === "video") throw new PublicationConflictError("Bild- oder Textentwurf fehlt.");
@@ -16,6 +21,12 @@ function publicationContent(job: ContentJob) {
   try { source = new URL(job.opportunity.product.affiliateUrl); }
   catch { throw new PublicationConflictError("Affiliate-Link fehlt."); }
   if (source.protocol !== "https:" || source.username || source.password) throw new PublicationConflictError("Affiliate-Link ist nicht sicher.");
+  if (trackingId) {
+    if (!["amazon.de","www.amazon.de"].includes(source.hostname.toLowerCase())) {
+      throw new PublicationConflictError("Individuelle Amazon-Tracking-ID benötigt einen überprüfbaren amazon.de-Direktlink.");
+    }
+    source.searchParams.set("tag",trackingId);
+  }
   const base = job.content.format === "text" ? job.content.body : job.content.caption;
   const caption = `${base}\n\n${job.content.cta}\n${source}`;
   const hash = createHash("sha256").update(JSON.stringify({caption,content:job.content,jobId:job.id})).digest("hex");
@@ -41,7 +52,7 @@ export function publicationRepository(db: Database = getDatabase()) {
         const stored = await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE", [jobId]);
         if (!stored.rows[0]) throw new PublicationConflictError("Content-Job fehlt.");
         const job = parseJob(stored.rows[0].snapshot);
-        const { hash } = publicationContent(job);
+        const { hash } = publicationContent(job,await verifiedTrackingId(sql,jobId));
         const existing = await sql.query("SELECT * FROM publication_requests WHERE job_id=$1 AND platform='facebook' ORDER BY revision DESC LIMIT 1", [jobId]);
         if (existing.rows[0]) {
           if (existing.rows[0].content_hash === hash) {
@@ -72,7 +83,7 @@ export function publicationRepository(db: Database = getDatabase()) {
         const stored = await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE", [jobId]);
         if (!stored.rows[0]) throw new PublicationConflictError("Content-Job fehlt.");
         const job = parseJob(stored.rows[0].snapshot);
-        const { caption, hash } = publicationContent(job);
+        const { caption, hash } = publicationContent(job,await verifiedTrackingId(sql,jobId));
         const attempt = await sql.query("SELECT * FROM original_visual_attempts WHERE job_id=$1 AND content_hash=$2 FOR UPDATE", [jobId, hash]);
         if (attempt.rows[0]?.status !== "attempted" || attempt.rows[0].model !== asset.model) {
           throw new PublicationConflictError("Bildversuch fehlt, ist bereits gebunden oder der Entwurf wurde geändert.");
@@ -100,14 +111,7 @@ export function publicationRepository(db: Database = getDatabase()) {
         const stored = await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE", [jobId]);
         if (!stored.rows[0]) throw new PublicationConflictError("Content-Job fehlt.");
         const job = parseJob(stored.rows[0].snapshot);
-        const eligibilityError = facebookPagePublicationError(job);
-        if (eligibilityError) throw new PublicationConflictError(eligibilityError);
-        if (!job.content || job.content.format === "video") throw new PublicationConflictError("Bild- oder Textentwurf fehlt.");
-        const source = new URL(job.opportunity.product.affiliateUrl);
-        if (source.protocol !== "https:" || source.username || source.password) throw new PublicationConflictError("Affiliate-Link ist nicht sicher.");
-        const base = job.content.format === "text" ? job.content.body : job.content.caption;
-        const caption = `${base}\n\n${job.content.cta}\n${source}`;
-        const contentHash = createHash("sha256").update(JSON.stringify({caption,content:job.content,jobId})).digest("hex");
+        const {caption,hash:contentHash}=publicationContent(job,await verifiedTrackingId(sql,jobId));
         const existing = await sql.query("SELECT * FROM publication_requests WHERE job_id=$1 AND platform='facebook' ORDER BY revision DESC LIMIT 1", [jobId]);
         if (existing.rows[0]) {
           if (existing.rows[0].content_hash === contentHash) return publication(existing.rows[0]);
@@ -204,7 +208,13 @@ export function publicationRepository(db: Database = getDatabase()) {
       return db.transaction(async sql => {
         const result = await sql.query("UPDATE publication_requests SET status='published',meta_post_id=$2,permalink=$3,updated_at=now() WHERE id=$1 AND status='publishing' AND publish_attempted_at IS NOT NULL RETURNING *", [id,metaPostId,permalink]);
         if (!result.rows[0]) throw new PublicationConflictError("Unklarer Veröffentlichungsstatus; keine Wiederholung.");
-        await sql.query("INSERT INTO publications(id,job_id,platform,status,url,published_at) VALUES($1,$2,'facebook','published',$3,now()) ON CONFLICT(job_id,platform) DO NOTHING", [crypto.randomUUID(),result.rows[0].job_id,permalink]);
+        const linked = await sql.query(`INSERT INTO publications(id,job_id,platform,status,url,published_at,external_post_id)
+          VALUES($1,$2,'facebook','published',$3,now(),$4)
+          ON CONFLICT(job_id,platform) DO UPDATE SET external_post_id=EXCLUDED.external_post_id
+          WHERE publications.external_post_id IS NULL OR publications.external_post_id=EXCLUDED.external_post_id
+          RETURNING id`,
+          [crypto.randomUUID(),result.rows[0].job_id,permalink,metaPostId]);
+        if (!linked.rows.length) throw new PublicationConflictError("Anderer Meta-Post ist bereits diesem Content zugeordnet.");
         return publication(result.rows[0]);
       });
     },

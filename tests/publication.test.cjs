@@ -3,6 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {PGlite}=require('@electric-sql/pglite');
 const {memoryRepository}=require('../.test-build/lib/memory/repository');
+const {timelineRepository}=require('../.test-build/lib/memory/timeline');
 const {productionRepository}=require('../.test-build/lib/production/repository');
 const {publicationRepository}=require('../.test-build/lib/meta/publication-gate');
 const {runContentJob}=require('../.test-build/lib/content/orchestrator');
@@ -13,14 +14,18 @@ test('Facebook publication needs a distinct signed WhatsApp decision and claims 
   const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
   const old=process.env.WHATSAPP_APPROVER_WA_ID;process.env.WHATSAPP_APPROVER_WA_ID='491234';
   try{
-    for(const file of ['001_memory.sql','002_production_gates.sql','003_faceless_so.sql','004_daily_drafts.sql','005_publication_gate.sql','006_daily_notification.sql','007_publication_revisions.sql','008_weekly_reports.sql'])await pg.exec(fs.readFileSync(`db/migrations/${file}`,'utf8'));
+    for(const file of ['001_memory.sql','002_production_gates.sql','003_faceless_so.sql','004_daily_drafts.sql','005_publication_gate.sql','006_daily_notification.sql','007_publication_revisions.sql','008_weekly_reports.sql','009_original_visual_attempts.sql','010_content_history.sql'])await pg.exec(fs.readFileSync(`db/migrations/${file}`,'utf8'));
     const memory=memoryRepository(db),publication=publicationRepository(db),inbound=productionRepository(db);
     const opportunity=opportunitySchema.parse({product:{name:'Kuscheldecke',sourceUrl:'https://www.amazon.de/s?k=Kuscheldecke',affiliateUrl:'https://www.amazon.de/s?k=Kuscheldecke',price:'',targetGroup:'Haushalte',benefits:'Größe und Material vergleichen',notes:''},useCase:'Ein kühler Herbstabend auf dem Sofa mit einer Decke.',targetPlatform:'facebook',budget:'low'});
-    const id=crypto.randomUUID();await memory.claim(id,opportunity,'reference');
+    const id=crypto.randomUUID();const claimed=await memory.claim(id,opportunity,'reference');
     const job=await runContentJob(opportunity,{id,onUpdate:memory.save,loadLearning:memory.learn});
     assert.equal(job.content.format,'image');await memory.approve(id);
+    const timeline=timelineRepository(db);
+    await timeline.bindAffiliateTracking(claimed.contentId,'amazon','confirmed-test-21');
     const pending=await publication.prepare(id,'491234');
     assert.equal(pending.status,'preparing');assert.equal((await publication.prepare(id,'491234')).id,pending.id);
+    assert.match(pending.caption,/tag=confirmed-test-21/);
+    await assert.rejects(timeline.bindAffiliateTracking(claimed.contentId,'amazon','other-tag-21'),/anders gebunden/);
     const groupOpportunity={...opportunity,goal:'community'};
     const groupId=crypto.randomUUID();await memory.claim(groupId,groupOpportunity,'reference');
     const groupJob=await runContentJob(groupOpportunity,{id:groupId,onUpdate:memory.save,loadLearning:memory.learn});
