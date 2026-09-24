@@ -24,7 +24,7 @@ export async function requestFacebookApproval(jobId:string){
   } catch (error) {
     if (error instanceof WhatsAppRejectedError) {
       await repo.releaseRejectedWhatsAppSend(publication.id);
-      console.info(JSON.stringify({event:"whatsapp_publication_rejected",publicationId:publication.id,code:error.code,subcode:error.subcode,httpStatus:error.httpStatus}));
+      console.info(JSON.stringify({event:"whatsapp_publication_rejected",publicationId:publication.id,code:error.code,subcode:error.subcode,httpStatus:error.httpStatus,providerMessage:error.providerMessage}));
       throw new PublicationConflictError("Meta hat die WhatsApp eindeutig abgelehnt. Token/Berechtigung prüfen; danach kann derselbe Entwurf sicher erneut angefragt werden.");
     }
     throw error;
