@@ -43,6 +43,23 @@ export async function sendDailyNotificationTemplate(to = process.env.WHATSAPP_AP
   }, to);
 }
 
+export function weeklyNotificationTemplateConfigured() {
+  return process.env.WHATSAPP_WEEKLY_REPORT_TEMPLATE_ENABLED === "true"
+    && !!process.env.WHATSAPP_WEEKLY_REPORT_TEMPLATE_NAME?.match(/^[a-z0-9_]+$/)
+    && !!process.env.WHATSAPP_WEEKLY_REPORT_TEMPLATE_LANGUAGE?.match(/^[a-z]{2}(?:_[A-Z]{2})?$/);
+}
+
+export async function sendWeeklyNotificationTemplate(to = process.env.WHATSAPP_APPROVER_WA_ID) {
+  if (!weeklyNotificationTemplateConfigured()) throw new Error("Genehmigte WhatsApp-Wochenvorlage und Kostenfreigabe fehlen.");
+  return sendWhatsAppMessage({
+    type: "template",
+    template: {
+      name: process.env.WHATSAPP_WEEKLY_REPORT_TEMPLATE_NAME,
+      language: { code: process.env.WHATSAPP_WEEKLY_REPORT_TEMPLATE_LANGUAGE },
+    },
+  }, to);
+}
+
 async function sendWhatsAppMessage(message: Record<string, unknown>, to = process.env.WHATSAPP_APPROVER_WA_ID) {
   const token = accessToken();
   const sender = phoneNumberId();
