@@ -2,6 +2,35 @@
 
 Stand: 24. September 2026. Branch `feat/production-gates-whatsapp`.
 
+## Migration 006 im Preview erfolgreich
+
+Vercel-Runtime-Nachweis vom 24.09.2026, Deployment
+`dpl_6L5vKhUvgx8f8mktPGFpfKcWAJqU`, Commit
+`bffa271f5919856c1b2a0017dfc3be7169b692ad`, Branch
+`feat/production-gates-whatsapp`. Der Betreiber verwendete ausschließlich die
+bestehende Route `POST /api/admin/migrate`.
+
+| UTC | HTTP | `applied` | `alreadyApplied` |
+| --- | --- | --- | --- |
+| 08:31:54 | 200 | `006_daily_notification.sql` | 001–005 |
+| 08:32:10 | 200 | leer | 001–006 |
+| 08:32:14 | 200 | leer | 001–006 |
+| 08:32:23 | 200 | leer | 001–006 |
+| 08:32:32 | 200 | leer | 001–006 |
+| 08:32:34 | 200 | leer | 001–006 |
+
+Alle Ergebnisse wurden in den strukturierten `database_migration`-Events
+gesehen. Der erste und zweite Aufruf erfüllen den geforderten Nachweis;
+die zusätzlichen Wiederholungen blieben ebenfalls ohne SQL-Migration.
+Kein manueller Datenbankeingriff. Der erfolgreiche Migrations-/Ledger-Zugriff
+bestätigt die Verbindung zu Preview-Postgres. Er bestätigt noch keine
+Content-, Freigabe- oder Veröffentlichungseinträge.
+
+Beim ersten Aufruf erschien dieselbe Postgres-SSL-Moduswarnung wie zuvor auf
+älteren Deployments. Kein Migrationsfehler, keine Änderung der TLS-Einstellungen.
+Keine Secrets im Nachweis. Frühere Aussagen „006 nicht ausgeführt“ weiter unten
+sind historische Befunde und durch diesen Abschnitt überholt.
+
 ## Live-Nachprüfung nach Vercel-Neuverbindung
 
 Geprüft am 24.09.2026 gegen 08:28 UTC, Preview-Commit

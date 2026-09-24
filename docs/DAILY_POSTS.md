@@ -65,11 +65,14 @@ in `publications` gespeichert. Bei unklarem Meta-Ergebnis bleibt der Lauf
 gesperrt. Instagram ist noch nicht integriert. Der tägliche Entwurf ist darum
 noch keine Zusage für einen täglichen sichtbaren Post.
 
-Die Migration 005 ist im Preview angewendet; der Blob-Token ist vorhanden und
+Die Migrationen 001–006 sind im Preview angewendet; 006 wurde am 24.09.2026
+um 08:31:54 UTC über den geschützten Migrationsweg angewendet, Wiederholungen
+meldeten ausschließlich `alreadyApplied` (siehe [VERIFICATION.md](VERIFICATION.md)).
+Der Blob-Token ist vorhanden und
 die Meta-Verbindung wurde lesend geprüft. Die Facebook-Schreibberechtigung
 und der vollständige WhatsApp-/Meta-Durchlauf sind damit noch nicht bewiesen.
 Vor autonomen täglichen Benachrichtigungen die genehmigte WhatsApp-Vorlage,
-Kategorie samt Gebühren klären und Migration 006 anwenden. Der Scout wählt saisonale Suchauswahlen, noch
+Kategorie samt Gebühren klären und Migration 006 auch in Production bestätigen. Der Scout wählt saisonale Suchauswahlen, noch
 keine verifizierten Einzelprodukte. Natürliche Änderungswünsche für
 Bild-/Textbeiträge werden
 gespeichert und sperren den Post; eine neue Revision durch die Spezialagenten

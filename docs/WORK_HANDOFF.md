@@ -4,6 +4,27 @@ Stand: 24. September 2026. Offener Draft-PR #6 auf
 `feat/production-gates-whatsapp`. Weder nach `main` gemergt noch für Production
 freigegeben.
 
+## Migration 006 live bestätigt (24.09., 08:31–08:32 UTC)
+
+Der Betreiber hat die bestehende geschützte Preview-Route aufgerufen. Die
+Runtime-Logs belegen auf `dpl_6L5vKhUvgx8f8mktPGFpfKcWAJqU`, Commit
+`bffa271f5919856c1b2a0017dfc3be7169b692ad`:
+
+- 08:31:54 UTC, HTTP 200: ausschließlich `006_daily_notification.sql` angewendet;
+  001–005 in `alreadyApplied`.
+- 08:32:10 UTC, HTTP 200: `applied: []`; 001–006 in `alreadyApplied`.
+- Vier weitere Aufrufe um 08:32:14, :23, :32 und :34 UTC ebenfalls HTTP 200,
+  ohne angewendete Migration. Keine erneute Ausführung der älteren SQL-Dateien.
+
+Damit sind Preview-Migration 006, Idempotenz und die Datenbankverbindung über
+den bestehenden Migrationsweg praktisch bestätigt. Eine Postgres-SSL-Warnung
+begleitete den ersten Aufruf; die Migration war erfolgreich. Kein manuelles
+SQL, kein Reset des Ledgers, kein eigener zusätzlicher Migrationsaufruf.
+Die früheren Aussagen „006 offen“ unten sind historisch und damit überholt.
+Facebook-/Faceless-E2E und Production bleiben offen. Für den Facebook-Test
+zuerst den geschützten Verlauf und offene Freigaben prüfen, dann den vorhandenen
+Tagesentwurf-Flow mit zwei getrennten WhatsApp-Freigaben verwenden.
+
 ## Vercel-Zugriff wiederhergestellt (24.09., ca. 08:28 UTC)
 
 Die erneute Verbindung ist erfolgreich: Team `agentstudiots-boop` und Projekt

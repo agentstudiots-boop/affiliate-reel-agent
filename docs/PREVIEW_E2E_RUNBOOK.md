@@ -1,6 +1,7 @@
 # Kontrollierter Live-Nachweis für PR #6
 
-Stand: 24.09.2026. Dieser Ablauf ist vorbereitet, **noch nicht live ausgeführt**.
+Stand: 24.09.2026. **Migration 006 ist live bestätigt**; Facebook- und
+Faceless-Durchlauf sind vorbereitet, aber noch nicht live ausgeführt.
 Eine lokale Simulation ersetzt keinen Meta-/Faceless-Nachweis. Wochenbericht
 und natürliche Bild-/Textrevision gehören zum separaten Arbeitsauftrag.
 
@@ -23,6 +24,12 @@ und natürliche Bild-/Textrevision gehören zum separaten Arbeitsauftrag.
   weiterhin offen. Fehlende Einstellungen nicht stillschweigend ergänzen.
 
 ## 2. Migration 006 zweimal über die geschützte Route
+
+Erledigt am 24.09.2026: 08:31:54 UTC nur 006 angewendet, 08:32:10 UTC
+001–006 bereits angewendet; vier weitere Wiederholungen ebenfalls ohne Änderung.
+Deployment und vollständiger Nachweis: [VERIFICATION.md](VERIFICATION.md).
+Für dieses Preview nicht erneut ausführen. Die folgenden Regeln gelten für
+die spätere Production-Migration bzw. andere noch nicht geprüfte Datenbanken.
 
 Ersten und zweiten Aufruf mit Zeitpunkt und Deployment-ID dokumentieren.
 Erwartet: zuerst nur `006_daily_notification.sql` angewendet; danach
