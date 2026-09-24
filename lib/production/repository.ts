@@ -211,8 +211,20 @@ export function productionRepository(db: Database = getDatabase()) {
         const notificationResult = input.replyToMessageId
           ? await sql.query("SELECT * FROM daily_drafts WHERE notification_message_id=$1 AND status='awaiting_approval' AND whatsapp_message_id IS NULL FOR UPDATE", [input.replyToMessageId])
           : await sql.query("SELECT * FROM daily_drafts WHERE notification_message_id IS NOT NULL AND status='awaiting_approval' AND whatsapp_message_id IS NULL ORDER BY created_at DESC LIMIT 2 FOR UPDATE", []);
-        if (!input.replyToMessageId && approvalResult.rows.length + publicationResult.rows.length + dailyResult.rows.length + notificationResult.rows.length !== 1) return { handled: false as const, reason: "ambiguous_approval" as const };
-        if (!approvalResult.rows[0] && !publicationResult.rows[0] && !dailyResult.rows[0] && !notificationResult.rows[0]) return { handled: false as const, reason: "no_pending_approval" as const };
+        const weeklyResult = input.replyToMessageId
+          ? await sql.query("SELECT * FROM weekly_reports WHERE notification_message_id=$1 AND status='notification_sent' AND whatsapp_message_id IS NULL FOR UPDATE", [input.replyToMessageId])
+          : await sql.query("SELECT * FROM weekly_reports WHERE notification_message_id IS NOT NULL AND status='notification_sent' AND whatsapp_message_id IS NULL ORDER BY created_at DESC LIMIT 2 FOR UPDATE", []);
+        if (!input.replyToMessageId && approvalResult.rows.length + publicationResult.rows.length + dailyResult.rows.length + notificationResult.rows.length + weeklyResult.rows.length !== 1) return { handled: false as const, reason: "ambiguous_approval" as const };
+        if (!approvalResult.rows[0] && !publicationResult.rows[0] && !dailyResult.rows[0] && !notificationResult.rows[0] && !weeklyResult.rows[0]) return { handled: false as const, reason: "no_pending_approval" as const };
+
+        if (weeklyResult.rows[0]) {
+          if (input.body.trim().toLocaleLowerCase("de-DE").replace(/[.!?]+$/, "") !== "wochenbilanz") {
+            return { handled: false as const, reason: "weekly_notification_requires_request" as const };
+          }
+          await sql.query("UPDATE whatsapp_events SET intent='weekly_report_reply' WHERE message_id=$1", [input.id]);
+          const weekStart = new Date(String(weeklyResult.rows[0].week_start)).toISOString().slice(0, 10);
+          return { handled: true as const, intent: "weekly_report_reply" as const, weeklyReportWeekStart: weekStart };
+        }
 
         if (notificationResult.rows[0]) {
           // The generic template never contains an approvable draft. Only a
