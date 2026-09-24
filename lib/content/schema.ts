@@ -67,7 +67,7 @@ export type JobStatus = "queued" | "checking" | "ideating" | "selecting" | "prod
 export type JobEvent = { sequence: number; at: string; agent: AgentName; kind: "status" | "response" | "decision" | "error"; message: string; data?: unknown };
 export type Decision = { ideaId: string; format: Content["format"]; reason: string; ranking: { ideaId: string; score: number; rationale: string }[] };
 export type ContentJob = {
-  version: 1; id: string; createdAt: string; updatedAt: string; status: JobStatus;
+  version: 1; id: string; contentId?: string; createdAt: string; updatedAt: string; status: JobStatus;
   mode: "reference" | "ai"; opportunity: Opportunity; events: JobEvent[];
   ideas?: Idea[]; decision?: Decision; content?: Content; review?: Review; marketing?: Marketing;
   revisions: number; modelCalls: number; totalTokens: number; error?: string;

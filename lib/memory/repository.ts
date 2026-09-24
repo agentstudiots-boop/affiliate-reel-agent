@@ -4,6 +4,7 @@ import { parseJob } from "../content/history";
 import { getDatabase, type Database } from "./db";
 import { evaluateHistory } from "./learning";
 import { performanceSchema, type HistoricalCase, type PerformanceInput } from "./schema";
+import { newContentId } from "../content/identity";
 
 export class ConflictError extends Error {}
 export function productId(source: string) {
@@ -18,21 +19,24 @@ export function memoryRepository(db: Database = getDatabase()) {
   return {
     async claim(id: string, opportunity: Opportunity, mode: "reference"|"ai") {
       const now = new Date().toISOString();
-      const job: ContentJob = { version: 1, id, createdAt: now, updatedAt: now, status: "queued", mode, opportunity, events: [], revisions: 0, modelCalls: 0, totalTokens: 0 };
+      const job: ContentJob = { version: 1, id, contentId: newContentId(), createdAt: now, updatedAt: now, status: "queued", mode, opportunity, events: [], revisions: 0, modelCalls: 0, totalTokens: 0 };
       await db.transaction(async sql => {
         const pid = productId(opportunity.product.sourceUrl);
         await sql.query("INSERT INTO products(id,name,source_url) VALUES($1,$2,$3) ON CONFLICT(id) DO NOTHING", [pid, opportunity.product.name, opportunity.product.sourceUrl]);
-        const result = await sql.query(`INSERT INTO content_jobs(id,product_id,category,use_case_key,goal,target_platform,trend,opportunity,status,snapshot,created_at,updated_at)
-          VALUES($1,$2,$3,$4,$5,$6,$7,$8,'queued',$9,$10,$10) ON CONFLICT(id) DO NOTHING RETURNING id`,
-          [id,pid,opportunity.category,opportunity.useCaseKey,opportunity.goal,opportunity.targetPlatform,opportunity.trend,JSON.stringify(opportunity),JSON.stringify(job),now]);
+        const result = await sql.query(`INSERT INTO content_jobs(id,content_id,product_id,category,use_case_key,goal,target_platform,trend,opportunity,status,snapshot,created_at,updated_at)
+          VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'queued',$10,$11,$11) ON CONFLICT DO NOTHING RETURNING id`,
+          [id,job.contentId,pid,opportunity.category,opportunity.useCaseKey,opportunity.goal,opportunity.targetPlatform,opportunity.trend,JSON.stringify(opportunity),JSON.stringify(job),now]);
         if (!result.rows.length) throw new ConflictError("Dieser Auftrag existiert bereits. Verlauf laden statt erneut starten.");
+        await sql.query("INSERT INTO affiliate_tracking(content_id,provider) VALUES($1,'amazon')", [job.contentId]);
       });
       return job;
     },
     async save(job: ContentJob) {
       await db.transaction(async sql => {
-        const locked = await sql.query("SELECT event_sequence FROM content_jobs WHERE id=$1 FOR UPDATE",[job.id]);
+        const locked = await sql.query("SELECT event_sequence,content_id FROM content_jobs WHERE id=$1 FOR UPDATE",[job.id]);
         if (!locked.rows.length) throw new Error("Job fehlt in Postgres.");
+        if (job.contentId && job.contentId !== locked.rows[0].content_id) throw new ConflictError("content_id darf nicht geändert werden.");
+        job.contentId = String(locked.rows[0].content_id);
         const sequence = job.events.at(-1)?.sequence || 0;
         if (Number(locked.rows[0].event_sequence) >= sequence) return;
         const agents = [...new Set(job.events.map(e => e.agent))];
