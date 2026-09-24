@@ -14,6 +14,7 @@ function publication(row: Record<string, unknown>) {
     metaPostId: row.meta_post_id ? String(row.meta_post_id) : null,
     permalink: row.permalink ? String(row.permalink) : null,
     feedback: String(row.feedback || ""), revision: Number(row.revision || 1),
+    whatsappSendAttempted: !!row.whatsapp_send_attempted_at,
   };
 }
 
@@ -64,6 +65,21 @@ export function publicationRepository(db: Database = getDatabase()) {
     async claimWhatsAppSend(id: string) {
       const result = await db.query("UPDATE publication_requests SET whatsapp_send_attempted_at=now() WHERE id=$1 AND status='pending' AND image_url IS NOT NULL AND whatsapp_send_attempted_at IS NULL RETURNING id", [id]);
       if (!result.rows[0]) throw new PublicationConflictError("WhatsApp bereits gesendet oder Ergebnis unklar.");
+    },
+    async releaseRejectedWhatsAppSend(id: string) {
+      const result = await db.query(
+        "UPDATE publication_requests SET whatsapp_send_attempted_at=NULL,updated_at=now() WHERE id=$1 AND status='pending' AND whatsapp_message_id IS NULL AND whatsapp_send_attempted_at IS NOT NULL RETURNING id",
+        [id],
+      );
+      if (!result.rows[0]) throw new PublicationConflictError("WhatsApp-Versandversuch kann nicht sicher freigegeben werden.");
+    },
+    async resetWhatsAppSendAfterOperatorConfirmation(jobId: string) {
+      const result = await db.query(
+        "UPDATE publication_requests SET whatsapp_send_attempted_at=NULL,updated_at=now() WHERE job_id=$1 AND platform='facebook' AND status='pending' AND whatsapp_message_id IS NULL AND whatsapp_send_attempted_at IS NOT NULL RETURNING *",
+        [jobId],
+      );
+      if (!result.rows[0]) throw new PublicationConflictError("Kein bestätigbarer offener WhatsApp-Versandversuch gefunden.");
+      return publication(result.rows[0]);
     },
     async bindMessage(id: string, messageId: string) {
       const result = await db.query("UPDATE publication_requests SET whatsapp_message_id=$2,updated_at=now() WHERE id=$1 AND status='pending' AND whatsapp_message_id IS NULL RETURNING *", [id,messageId]);
