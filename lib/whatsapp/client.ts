@@ -1,3 +1,9 @@
+export class WhatsAppRejectedError extends Error {
+  constructor(public readonly code: number, public readonly subcode: number, public readonly httpStatus: number) {
+    super("WhatsApp request was definitively rejected by Meta");
+  }
+}
+
 const graphVersion = () => process.env.META_GRAPH_API_VERSION || "v25.0";
 // Legacy Vercel secrets have a doubled T in WHATTSAPP; Vercel secret keys cannot be renamed in place.
 const accessToken = () => process.env.WHATSAPP_ACCESS_TOKEN || process.env.WHATTSAPP_ACCESS_TOKEN;
@@ -76,8 +82,11 @@ async function sendWhatsAppMessage(message: Record<string, unknown>, to = proces
       },
       body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to, ...message }),
     });
-    const data = await response.json() as { messages?: Array<{ id?: string }>; error?: { message?: string } };
-    if (!response.ok) throw new Error(data.error?.message || `WhatsApp HTTP ${response.status}`);
+    const data = await response.json() as { messages?: Array<{ id?: string }>; error?: { message?: string; code?: number; error_subcode?: number } };
+    if (!response.ok) {
+      if (response.status >= 400 && response.status < 500) throw new WhatsAppRejectedError(data.error?.code || 0, data.error?.error_subcode || 0, response.status);
+      throw new Error(`WhatsApp HTTP ${response.status}`);
+    }
     const id = data.messages?.[0]?.id;
     if (!id) throw new Error("WhatsApp hat keine Message-ID bestätigt.");
     return id;
