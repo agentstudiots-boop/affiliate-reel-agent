@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   }
   try {
     const result = await createDailyDraft();
-    console.info(JSON.stringify({ event: "daily_draft", status: result.status }));
+    console.info(JSON.stringify({ event: "daily_draft", status: result.status, whatsapp: "whatsapp" in result ? result.whatsapp : undefined, jobId: "jobId" in result ? result.jobId : undefined }));
     return Response.json(result, { status: result.status === "failed" ? 503 : 200, headers: { "Cache-Control": "no-store" } });
   } catch {
     console.error(JSON.stringify({ event: "daily_draft_storage_failed" }));

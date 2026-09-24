@@ -64,8 +64,10 @@ export async function reviseApprovedStaticContent(job: ContentJob, feedback: str
   return next;
 }
 
-export function selectIdea(ideas: Idea[], opportunity: Opportunity, learning?: LearningEvidence): Decision {
-  const eligible = opportunity.targetPlatform === "instagram" ? ideas.filter(i => i.format !== "text") : ideas;
+export function selectIdea(ideas: Idea[], opportunity: Opportunity, learning?: LearningEvidence, allowedFormats?: ReadonlyArray<Content["format"]>): Decision {
+  const eligible = ideas.filter(i => (opportunity.targetPlatform !== "instagram" || i.format !== "text")
+    && (!allowedFormats || allowedFormats.includes(i.format)));
+  if (!eligible.length) throw new Error("Für diesen Veröffentlichungsweg fehlt eine geeignete Formatidee.");
   const ranking = eligible.map(idea => {
     const s = idea.scores;
     const historyAdjustment = learning?.groups.find(g => g.format === idea.format)?.adjustment || 0;
@@ -77,7 +79,7 @@ export function selectIdea(ideas: Idea[], opportunity: Opportunity, learning?: L
   }).sort((a, b) => b.score - a.score || a.ideaId.localeCompare(b.ideaId));
   const selected = ideas.find(i => i.id === ranking[0].ideaId)!;
   return { ideaId: selected.id, format: selected.format, ranking,
-    reason: `${selected.rationale} Gewichtet nach Ziel (${opportunity.goal}) und Budget (${opportunity.budget}). ${learning?.summary || "Keine historischen Messwerte berücksichtigt."} Keine garantierte Conversion-Prognose.` };
+    reason: `${selected.rationale} Gewichtet nach Ziel (${opportunity.goal}) und Budget (${opportunity.budget}). ${allowedFormats ? `Veröffentlichungsweg erlaubt ${allowedFormats.join(", ")}. ` : ""}${learning?.summary || "Keine historischen Messwerte berücksichtigt."} Keine garantierte Conversion-Prognose.` };
 }
 
 export function inspectContent(content: Content, decision: Decision): Review {
@@ -107,6 +109,7 @@ export function inspectContent(content: Content, decision: Decision): Review {
 export async function runContentJob(raw: Opportunity, options: {
   mode?: "reference" | "ai"; signal?: AbortSignal; onUpdate?: (job: ContentJob) => void | Promise<void>;
   id?: string; loadLearning?: (opportunity: Opportunity) => Promise<LearningEvidence>;
+  allowedFormats?: ReadonlyArray<Content["format"]>;
   generate?: Generator; // Dependency injection for deterministic, cost-free contract tests.
 } = {}): Promise<ContentJob> {
   const opportunity = opportunitySchema.parse(raw);
@@ -147,7 +150,7 @@ export async function runContentJob(raw: Opportunity, options: {
     await status("selecting", "Orchestrator bewertet Ideen und wählt das Format");
     const learning = options.loadLearning ? await options.loadLearning(opportunity) : undefined;
     if (learning) await emit("orchestrator", "decision", learning.summary, learning);
-    job.decision = selectIdea(job.ideas, opportunity, learning);
+    job.decision = selectIdea(job.ideas, opportunity, learning, options.allowedFormats);
     await emit("orchestrator", "decision", job.decision.reason, job.decision);
     const idea = job.ideas.find(i => i.id === job.decision!.ideaId)!;
     // Explicit bounded loop: first draft plus at most two revisions. No recursion or agent routing from model output.

@@ -5,6 +5,7 @@ import type { LearningEvidence } from "@/lib/memory/schema";
 import { PerformanceEditor } from "@/app/performance-editor";
 import { ProductionGate } from "@/app/production-gate";
 import { PublicationGate } from "@/app/publication-gate";
+import { OperationsPanel } from "@/app/operations-panel";
 import type { Product } from "@/lib/types";
 import { parseJob } from "@/lib/content/history";
 import { opportunitySchema, terminalStatuses, type Content, type ContentJob, type JobStatus, type Opportunity } from "@/lib/content/schema";
@@ -135,6 +136,7 @@ export function ContentStudio({ product }: { product: Product }) {
     <p className="muted">Tavily recherchiert aktuelle Trends und Produktquellen. Die Content-Planung arbeitet regelbasiert ohne generative Modellkosten.</p>
     <label>Zugangscode für Planung & Datenbank<input type="password" autoComplete="off" value={password} onChange={e => setPassword(e.target.value)} /><small>Der Code wird nicht im Browser gespeichert.</small></label>
     <p className={databaseReady ? "muted" : "error"}>{databaseReady ? "Postgres konfiguriert. Verlauf laden prüft die Verbindung." : "Postgres muss noch eingerichtet werden. Neue Jobs werden erst mit zentralem Speicher gestartet."}</p>
+    <OperationsPanel password={password} />
     <div className="contentActions"><button type="button" className="ghost" disabled={busy || !password || !databaseReady} onClick={()=>loadHistory()}>Gespeicherten Verlauf laden</button>{jobs.length >= 50 && <button type="button" className="ghost" disabled={busy} onClick={()=>loadHistory(true)}>Ältere Jobs laden</button>}</div>
     {error && <p role="alert" className="error">{error}</p>}
     <div className="contentActions"><button type="button" className="primary" disabled={!ready || busy || !databaseReady || !password} onClick={plan}>{busy ? "Orchestrator plant …" : "Ideen & passendes Format planen"}</button>{busy && <button type="button" className="ghost" onClick={() => abortRef.current?.abort()}>Stoppen</button>}</div>

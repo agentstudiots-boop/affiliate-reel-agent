@@ -127,15 +127,15 @@ export function formatWeeklyReport(start: Date, end: Date, metrics: WeeklyReport
     `Wochenbilanz · ${date(start)}–${date(new Date(end.getTime() - 1))}`,
     "",
     `Veröffentlicht: ${metrics.publishedTotal} · Facebook ${metrics.publishedFacebook} · Instagram ${metrics.publishedInstagram}`,
-    `Neu erfasste Messstände: ${metrics.measuredPublications} · Klicks ${metrics.clicks} · Verkäufe/Conversions ${metrics.conversions}`,
-    `Affiliate-Erlös: ${euro(metrics.revenueCents)}`,
-    `Erfasste Produktionskosten: ${costs}`,
-    `Rechnerisches Ergebnis aus bekannten Kosten: ${euro(profit)}`,
+    metrics.measuredPublications ? `Neu erfasste Messstände: ${metrics.measuredPublications} · Klicks ${metrics.clicks} · Verkäufe/Conversions ${metrics.conversions}` : "Klicks/Verkäufe: keine Messwerte erfasst (nicht als null bestätigt)",
+    metrics.measuredPublications ? `Affiliate-Erlös laut Messständen: ${euro(metrics.revenueCents)}` : "Affiliate-Erlös: unbekannt – kein Messwert erfasst",
+    metrics.measuredPublications ? `Erfasste Produktionskosten: ${costs}` : "Produktionskosten für Beiträge: keine Messwerte erfasst",
+    metrics.measuredPublications ? `Teilwert aus erfassten Erlösen und bekannten Kosten: ${euro(profit)}${metrics.unknownCostPublications ? " (weitere Kosten unbekannt)" : ""}` : "Ergebnis: ohne Messwerte nicht berechenbar",
     `Faceless: ${metrics.facelessPaidStarts} kostenpflichtige Starts · ${metrics.facelessCredits} Credits laut gespeicherter Quote`,
     followerLine("Facebook-Follower", metrics.facebookFollowers, metrics.facebookFollowerDelta),
     followerLine("Instagram-Follower", metrics.instagramFollowers, metrics.instagramFollowerDelta),
     "",
-    "Hinweis: Klicks, Conversions, Erlöse und Kosten stammen ausschließlich aus den in Postgres erfassten Messständen dieser Woche. Fehlende Quellen werden nicht geschätzt.",
+    "Hinweis: Klicks, Conversions, Erlöse und Kosten stammen ausschließlich aus den in Postgres neu erfassten Messständen dieser Woche. Ein Messstand kann kumulative Werte seit Veröffentlichung enthalten; daraus wird kein Wochenzuwachs abgeleitet. Fehlende Quellen werden nicht geschätzt.",
   ].join("\n");
 }
 
