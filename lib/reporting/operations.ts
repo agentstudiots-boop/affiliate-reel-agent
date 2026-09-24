@@ -1,6 +1,6 @@
 import { getDatabase, type Database } from "../memory/db";
 import { imageProviderStatus } from "../content/image-provider";
-import { dailyNotificationTemplateConfigured, weeklyNotificationTemplateConfigured } from "../whatsapp/client";
+import { dailyNotificationTemplateConfigured, weeklyNotificationTemplateConfigured, whatsappApprovalReady } from "../whatsapp/client";
 
 export async function getOperationsSnapshot(db: Database = getDatabase()) {
   const [days, posts, reports] = await Promise.all([
@@ -36,6 +36,8 @@ export async function getOperationsSnapshot(db: Database = getDatabase()) {
     environment: process.env.VERCEL_ENV === "production" ? "production" : "preview_or_local",
     readiness: {
       cronSecretConfigured: !!process.env.CRON_SECRET,
+      tavilyConfigured: !!process.env.TAVILY_API_KEY,
+      whatsappConfigured: whatsappApprovalReady(),
       dailyTemplateConfigured: dailyNotificationTemplateConfigured(),
       weeklyTemplateConfigured: weeklyNotificationTemplateConfigured(),
       blobConfigured: !!process.env.BLOB_READ_WRITE_TOKEN,

@@ -4,7 +4,7 @@ import { useState } from "react";
 
 type Snapshot = {
   environment: "production" | "preview_or_local";
-  readiness: { cronSecretConfigured: boolean; dailyTemplateConfigured: boolean; weeklyTemplateConfigured: boolean;
+  readiness: { cronSecretConfigured: boolean; tavilyConfigured: boolean; whatsappConfigured: boolean; dailyTemplateConfigured: boolean; weeklyTemplateConfigured: boolean;
     blobConfigured: boolean; imageProviderConfigured: boolean; imageProviderReason: string };
   days: Array<{ day: string; jobId: string; status: string; product: string; format: string | null;
     notificationSent: boolean; contentApprovalSent: boolean; publicationStatus: string | null;
@@ -47,7 +47,7 @@ export function OperationsPanel({ password }: { password: string }) {
     {error && <p role="alert" className="error">{error}</p>}
     {data && <>
       <p><strong>Umgebung:</strong> {data.environment === "production" ? "Production" : "Preview / lokal – kein automatischer Vercel-Cronlauf"}</p>
-      <p><strong>Konfiguration:</strong> Cron-Zugang {data.readiness.cronSecretConfigured ? "vorhanden" : "fehlt"} · Tagesvorlage {data.readiness.dailyTemplateConfigured ? "aktiv" : "fehlt"} · Bildprovider {data.readiness.imageProviderConfigured ? "bereit" : data.readiness.imageProviderReason} · Blob {data.readiness.blobConfigured ? "bereit" : "fehlt"}.</p>
+      <p><strong>Konfiguration:</strong> Cron-Zugang {data.readiness.cronSecretConfigured ? "vorhanden" : "fehlt"} · Tavily {data.readiness.tavilyConfigured ? "bereit" : "fehlt"} · WhatsApp {data.readiness.whatsappConfigured ? "bereit" : "unvollständig"} · Tagesvorlage {data.readiness.dailyTemplateConfigured ? "aktiv" : "fehlt"} · Bildprovider {data.readiness.imageProviderConfigured ? "bereit" : data.readiness.imageProviderReason} · Blob {data.readiness.blobConfigured ? "bereit" : "fehlt"}.</p>
       <h4>Letzte Tagesläufe</h4>
       {data.days.length ? <div style={{overflowX:"auto"}}><table><thead><tr><th>Tag</th><th>Produkt</th><th>Planung</th><th>WhatsApp</th><th>Beitrag</th></tr></thead><tbody>
         {data.days.map(day => <tr key={day.day}><td>{day.day}</td><td>{day.product}</td><td>{dailyLabels[day.status] || day.status}{day.format ? ` · ${day.format}` : ""}</td>
