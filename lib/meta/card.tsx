@@ -3,7 +3,9 @@ import { put } from "@vercel/blob";
 import { getDatabase } from "@/lib/memory/db";
 import { parseJob } from "@/lib/content/history";
 
-// Original typographic card: no borrowed product photo or unverified model claim.
+// Debug-/Fallback-Preview only. This typographic card must never be bound to a
+// publication request or sent as a publishable creative.
+export const SOCIAL_CARD_PUBLISHABLE = false;
 export async function createSocialCard(jobId: string) {
   const stored = await getDatabase().query("SELECT snapshot FROM content_jobs WHERE id=$1", [jobId]);
   if (!stored.rows[0]) throw new Error("Content-Job fehlt.");
