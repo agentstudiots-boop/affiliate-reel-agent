@@ -1,8 +1,56 @@
 import { imageSchema } from "../schema";
 import type { Brief, Generator } from "../agent";
 
+function shorten(value: string, max: number) {
+  const clean = value.trim();
+  if (clean.length <= max) return clean;
+  const slice = clean.slice(0, max);
+  const boundary = Math.max(slice.lastIndexOf(". "), slice.lastIndexOf("! "), slice.lastIndexOf("? "));
+  return boundary > max * 0.45 ? slice.slice(0, boundary + 1) : slice.replace(/\\s+\\S*$/, "").trim() + "…";
+}
+
+function reviseReferenceImage(brief: Brief) {
+  if (brief.previous?.format !== "image" || !brief.changeRequest) throw new Error("Vorheriger Bild-Plan und Änderungsauftrag fehlen.");
+  const request = brief.changeRequest.toLocaleLowerCase("de-DE");
+  const next = structuredClone(brief.previous);
+  let applied = false;
+
+  if (/kürzer|kompakter|weniger text|text reduzieren|text kürzen/.test(request)) {
+    next.caption = shorten(next.caption, 520);
+    next.slides = next.slides.map(slide => ({ ...slide, copy: shorten(slide.copy, 150), headline: shorten(slide.headline, 72) }));
+    applied = true;
+  }
+  if (/weniger werblich|nicht so werblich|sachlicher|neutraler/.test(request)) {
+    next.caption = `Werbung | ${brief.opportunity.product.name} als Produktidee für ${brief.idea.useCase}. Eignung, Lieferumfang und Herstellerangaben am konkreten Modell prüfen. Bei einem Kauf über den Affiliate-Link kann eine Provision anfallen.`;
+    next.cta = new URL(brief.opportunity.product.sourceUrl).pathname === "/s"
+      ? "Bei Interesse kannst du die verlinkte Auswahl sachlich vergleichen."
+      : "Bei Interesse kannst du die Angaben zum verlinkten Produkt prüfen.";
+    applied = true;
+  }
+  if (/(hook|überschrift|titel).{0,30}kürzer|kürzere.{0,20}(hook|überschrift|titel)/.test(request)) {
+    next.hook = shorten(next.hook, 72);
+    next.title = shorten(next.title, 72);
+    if (next.slides[0]) next.slides[0].headline = shorten(next.slides[0].headline, 64);
+    applied = true;
+  }
+  if (/((carousel|folien).{0,30}(kürzer|weniger))|weniger folien/.test(request) && next.slides.length > 3) {
+    next.slides = [next.slides[0], next.slides[1], next.slides.at(-1)!];
+    next.layout = "carousel";
+    applied = true;
+  }
+  if (/cta.{0,30}(ändern|neutral|sachlich|weniger werblich)|(ändern|neutral|sachlich).{0,30}cta/.test(request)) {
+    next.cta = new URL(brief.opportunity.product.sourceUrl).pathname === "/s"
+      ? "Bei Interesse kannst du die verlinkte Auswahl vergleichen."
+      : "Bei Interesse kannst du die Produktangaben im Link prüfen.";
+    applied = true;
+  }
+  if (!applied) throw new Error("Änderungswunsch im Referenzmodus nicht eindeutig umsetzbar. Bitte z. B. „kürzer“, „weniger werblich“, „weniger Folien“, „Hook kürzer“ oder „CTA sachlicher“ schreiben.");
+  return imageSchema.parse(next);
+}
+
 export function imageAgent(brief: Brief, generate: Generator) {
   return generate("image", "Erstelle ein Einzelbild oder 3–7 zusammenhängende Carousel-Slides passend zum freigegebenen Konzept. Je Slide: Überschrift, knapper Text, konkrete Bildgestaltung, Bildprompt und Alt-Text. Keine gefälschten Produktfotos oder Typografie im generierten Bild verlangen; Schrift im Layout ergänzen. Keine Bilder erzeugen.", brief, imageSchema, () => {
+    if (brief.changeRequest) return reviseReferenceImage(brief);
     const { idea, opportunity } = brief;
     const vacuum = /vakuumier|vakuum.?versiegl/i.test(opportunity.product.name);
     const items = vacuum ? [
