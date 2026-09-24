@@ -3,6 +3,8 @@ import { publicationRepository } from "@/lib/meta/publication-gate";
 import { publishFacebookPhoto } from "@/lib/meta/publisher";
 import { requestFacebookApproval } from "@/lib/meta/request-publication";
 import { sendDailyApproval } from "@/lib/daily/draft";
+import { sendWhatsAppText } from "@/lib/whatsapp/client";
+import { deliverWeeklyReport } from "@/lib/reporting/weekly";
 import { extractIncomingWhatsAppMessages, verifyMetaWebhookSignature, verifyWhatsAppChallenge } from "@/lib/whatsapp/security";
 
 export const runtime = "nodejs";
@@ -43,6 +45,10 @@ export async function POST(request: Request) {
     try {
       const result = await repo.applyIncomingWhatsApp({ ...message, payload });
       console.info(JSON.stringify({ event: "whatsapp_approval_message", messageId: message.id, handled: result.handled, reason: "reason" in result ? result.reason : undefined, intent: "intent" in result ? result.intent : undefined }));
+      if (result.handled && "weeklyReportWeekStart" in result && typeof result.weeklyReportWeekStart === "string") {
+        try { await deliverWeeklyReport(result.weeklyReportWeekStart); }
+        catch { console.error(JSON.stringify({ event: "weekly_report_delivery_unknown", weekStart: result.weeklyReportWeekStart })); }
+      }
       if (result.handled && "dailyNotificationJobId" in result && typeof result.dailyNotificationJobId === "string") {
         // The inbound reply opens the service window. Claim the full draft
         // message before sending; Meta webhook retries cannot duplicate it.
@@ -54,6 +60,25 @@ export async function POST(request: Request) {
         // separate publication request is sent once and has its own decision.
         try { await requestFacebookApproval(result.dailyJobId); }
         catch { console.error(JSON.stringify({event:"daily_publication_preparation_unknown",jobId:result.dailyJobId})); }
+      }
+      if (result.handled && "publicationId" in result && typeof result.publicationId === "string" && result.intent === "changes_requested") {
+        const publicationRepo = publicationRepository();
+        try {
+          const revised = await publicationRepo.reviseRequested(result.publicationId);
+          if (revised.daily) {
+            try { await sendDailyApproval(revised.job.id); }
+            catch { console.error(JSON.stringify({ event: "publication_revision_approval_send_unknown", jobId: revised.job.id })); }
+          } else {
+            try { await sendWhatsAppText("Änderung übernommen. Der überarbeitete Content-Plan ist wieder freigabepflichtig. Bitte im Content Studio prüfen und freigeben; eine alte Veröffentlichungsfreigabe kann nicht mehr posten."); }
+            catch { console.error(JSON.stringify({ event: "publication_revision_notice_unknown", jobId: revised.job.id })); }
+          }
+          console.info(JSON.stringify({ event: "publication_revision", publicationId: result.publicationId, jobId: revised.job.id, status: "awaiting_approval" }));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Änderung nicht eindeutig umsetzbar.";
+          try { await sendWhatsAppText(`Änderungswunsch gespeichert, aber noch nicht automatisch umgesetzt: ${message}`); }
+          catch { console.error(JSON.stringify({ event: "publication_revision_clarification_unknown", publicationId: result.publicationId })); }
+          console.info(JSON.stringify({ event: "publication_revision", publicationId: result.publicationId, status: "needs_clarification" }));
+        }
       }
       if (result.handled && "publicationId" in result && typeof result.publicationId === "string" && result.intent === "approve") {
         const publicationRepo = publicationRepository();
