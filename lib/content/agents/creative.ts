@@ -1,8 +1,7 @@
 import { creativeSchema, type Opportunity } from "../schema";
-import { analyzeProductInspiration, type ProductInspiration } from "../product-inspiration";
-import type { Generator } from "../agent";
+import type { Generator, ProductInspiration } from "../agent";
 
-export function creativeAgent(opportunity: Opportunity, generate: Generator, inspiration: ProductInspiration = analyzeProductInspiration(opportunity)) {
+export function creativeAgent(opportunity: Opportunity, generate: Generator, inspiration: ProductInspiration) {
   return generate("creative", `Entwickle drei unterschiedliche starke Werbeideen: je eine für Video, Bild/Carousel und Text.
 Jede Idee: konkrete Alltagssituation, emotionaler Hook, Handlung, Nutzen, ehrliche Grenzen und Formatbegründung.
 Nutze die mitgelieferte Product-Inspiration nur als redaktionelle Inspirationsquelle. Bei Such-/Kategorie-Seiten kategorisch bleiben und kein konkretes Modell vortäuschen.
