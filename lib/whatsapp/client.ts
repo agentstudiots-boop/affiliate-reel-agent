@@ -21,6 +21,29 @@ export function whatsappApprovalReady() {
 }
 
 export async function sendWhatsAppText(body: string, to = process.env.WHATSAPP_APPROVER_WA_ID) {
+  return sendWhatsAppMessage({ type: "text", text: { preview_url: false, body } }, to);
+}
+
+// This template is only a notification. It must never count as content approval.
+// An operator must approve its Meta category and tariff before enabling it.
+export function dailyNotificationTemplateConfigured() {
+  return process.env.WHATSAPP_DAILY_TEMPLATE_ENABLED === "true"
+    && !!process.env.WHATSAPP_DAILY_TEMPLATE_NAME?.match(/^[a-z0-9_]+$/)
+    && !!process.env.WHATSAPP_DAILY_TEMPLATE_LANGUAGE?.match(/^[a-z]{2}(?:_[A-Z]{2})?$/);
+}
+
+export async function sendDailyNotificationTemplate(to = process.env.WHATSAPP_APPROVER_WA_ID) {
+  if (!dailyNotificationTemplateConfigured()) throw new Error("Genehmigte WhatsApp-Tagesvorlage und Kostenfreigabe fehlen.");
+  return sendWhatsAppMessage({
+    type: "template",
+    template: {
+      name: process.env.WHATSAPP_DAILY_TEMPLATE_NAME,
+      language: { code: process.env.WHATSAPP_DAILY_TEMPLATE_LANGUAGE },
+    },
+  }, to);
+}
+
+async function sendWhatsAppMessage(message: Record<string, unknown>, to = process.env.WHATSAPP_APPROVER_WA_ID) {
   const token = accessToken();
   const sender = phoneNumberId();
   if (!token || !sender || !to) throw new Error("WhatsApp-Freigabe ist noch nicht vollständig konfiguriert.");
@@ -34,13 +57,7 @@ export async function sendWhatsAppText(body: string, to = process.env.WHATSAPP_A
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        recipient_type: "individual",
-        to,
-        type: "text",
-        text: { preview_url: false, body },
-      }),
+      body: JSON.stringify({ messaging_product: "whatsapp", recipient_type: "individual", to, ...message }),
     });
     const data = await response.json() as { messages?: Array<{ id?: string }>; error?: { message?: string } };
     if (!response.ok) throw new Error(data.error?.message || `WhatsApp HTTP ${response.status}`);

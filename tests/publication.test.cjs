@@ -13,7 +13,7 @@ test('Facebook publication needs a distinct signed WhatsApp decision and claims 
   const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
   const old=process.env.WHATSAPP_APPROVER_WA_ID;process.env.WHATSAPP_APPROVER_WA_ID='491234';
   try{
-    for(const file of ['001_memory.sql','002_production_gates.sql','003_faceless_so.sql','004_daily_drafts.sql','005_publication_gate.sql'])await pg.exec(fs.readFileSync(`db/migrations/${file}`,'utf8'));
+    for(const file of ['001_memory.sql','002_production_gates.sql','003_faceless_so.sql','004_daily_drafts.sql','005_publication_gate.sql','006_daily_notification.sql'])await pg.exec(fs.readFileSync(`db/migrations/${file}`,'utf8'));
     const memory=memoryRepository(db),publication=publicationRepository(db),inbound=productionRepository(db);
     const opportunity=opportunitySchema.parse({product:{name:'Kuscheldecke',sourceUrl:'https://www.amazon.de/s?k=Kuscheldecke',affiliateUrl:'https://www.amazon.de/s?k=Kuscheldecke',price:'',targetGroup:'Haushalte',benefits:'Größe und Material vergleichen',notes:''},useCase:'Ein kühler Herbstabend auf dem Sofa mit einer Decke.',targetPlatform:'facebook',budget:'low'});
     const id=crypto.randomUUID();await memory.claim(id,opportunity,'reference');
@@ -61,5 +61,23 @@ test('Facebook publication needs a distinct signed WhatsApp decision and claims 
     assert.equal((await memory.list()).find(row=>row.id===id3).status,'approved');
     assert.equal((await pg.query("SELECT status FROM daily_drafts WHERE job_id=$1",[id3])).rows[0].status,'content_approved');
     assert.equal((await publication.get(id3)),null,'content approval cannot post without a second WhatsApp decision');
+    const id4=crypto.randomUUID();await memory.claim(id4,opportunity,'reference');
+    await runContentJob(opportunity,{id:id4,onUpdate:memory.save,loadLearning:memory.learn});
+    await pg.query("INSERT INTO daily_drafts(day,job_id,status,notification_send_attempted_at,notification_message_id) VALUES('2026-09-25',$1,'awaiting_approval',now(),'wamid.notice')",[id4]);
+    const untrusted=await inbound.applyIncomingWhatsApp({id:'wamid.notice.stranger',from:'499999',body:'Entwurf',replyToMessageId:'wamid.notice',payload:{}});
+    assert.equal(untrusted.reason,'untrusted_sender');
+    const premature=await inbound.applyIncomingWhatsApp({id:'wamid.notice.premature',from:'491234',body:'Freigeben',replyToMessageId:'wamid.notice',payload:{}});
+    assert.equal(premature.reason,'notification_requires_entwurf');
+    assert.equal((await memory.list()).find(row=>row.id===id4).status,'awaiting_approval');
+    const requested=await inbound.applyIncomingWhatsApp({id:'wamid.notice.reply',from:'491234',body:'Entwurf',replyToMessageId:'wamid.notice',payload:{}});
+    assert.equal(requested.dailyNotificationJobId,id4);
+    assert.equal((await inbound.applyIncomingWhatsApp({id:'wamid.notice.reply',from:'491234',body:'Entwurf',replyToMessageId:'wamid.notice',payload:{}})).reason,'duplicate');
+    assert.equal((await memory.list()).find(row=>row.id===id4).status,'awaiting_approval');
+    await pg.query("UPDATE daily_drafts SET whatsapp_send_attempted_at=now(),whatsapp_message_id='wamid.full-draft' WHERE job_id=$1",[id4]);
+    assert.equal((await inbound.applyIncomingWhatsApp({id:'wamid.notice.late',from:'491234',body:'Freigeben',replyToMessageId:'wamid.notice',payload:{}})).reason,'no_pending_approval');
+    const actual=await inbound.applyIncomingWhatsApp({id:'wamid.full.approve',from:'491234',body:'Freigeben',replyToMessageId:'wamid.full-draft',payload:{}});
+    assert.equal(actual.dailyJobId,id4);
+    assert.equal((await memory.list()).find(row=>row.id===id4).status,'approved');
+    assert.equal(await publication.get(id4),null,'notification and first approval cannot publish');
   }finally{if(old===undefined)delete process.env.WHATSAPP_APPROVER_WA_ID;else process.env.WHATSAPP_APPROVER_WA_ID=old;await pg.close();}
 });

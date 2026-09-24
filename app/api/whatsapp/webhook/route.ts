@@ -2,6 +2,7 @@ import { productionRepository } from "@/lib/production/repository";
 import { publicationRepository } from "@/lib/meta/publication-gate";
 import { publishFacebookPhoto } from "@/lib/meta/publisher";
 import { requestFacebookApproval } from "@/lib/meta/request-publication";
+import { sendDailyApproval } from "@/lib/daily/draft";
 import { extractIncomingWhatsAppMessages, verifyMetaWebhookSignature, verifyWhatsAppChallenge } from "@/lib/whatsapp/security";
 
 export const runtime = "nodejs";
@@ -42,6 +43,12 @@ export async function POST(request: Request) {
     try {
       const result = await repo.applyIncomingWhatsApp({ ...message, payload });
       console.info(JSON.stringify({ event: "whatsapp_approval_message", messageId: message.id, handled: result.handled, reason: "reason" in result ? result.reason : undefined, intent: "intent" in result ? result.intent : undefined }));
+      if (result.handled && "dailyNotificationJobId" in result && typeof result.dailyNotificationJobId === "string") {
+        // The inbound reply opens the service window. Claim the full draft
+        // message before sending; Meta webhook retries cannot duplicate it.
+        try { await sendDailyApproval(result.dailyNotificationJobId); }
+        catch { console.error(JSON.stringify({event:"daily_approval_send_unknown",jobId:result.dailyNotificationJobId})); }
+      }
       if(result.handled && "dailyJobId" in result && typeof result.dailyJobId === "string" && result.intent === "approve"){
         // The incoming reply opens a 24-hour customer-service window. The
         // separate publication request is sent once and has its own decision.

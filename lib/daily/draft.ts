@@ -3,6 +3,36 @@ import { getDatabase } from "@/lib/memory/db";
 import { memoryRepository } from "@/lib/memory/repository";
 import type { Opportunity } from "@/lib/content/schema";
 import { sendWhatsAppText } from "@/lib/whatsapp/client";
+import { dailyNotificationTemplateConfigured, sendDailyNotificationTemplate } from "@/lib/whatsapp/client";
+import { parseJob } from "@/lib/content/history";
+import { facebookPagePublicationError } from "@/lib/meta/publication-eligibility";
+
+export async function sendDailyApproval(jobId: string) {
+  const db = getDatabase();
+  const record = await db.query(
+    `SELECT d.day,j.snapshot FROM daily_drafts d JOIN content_jobs j ON j.id=d.job_id
+     WHERE d.job_id=$1 AND d.status='awaiting_approval' AND d.whatsapp_message_id IS NULL`,
+    [jobId],
+  );
+  if (!record.rows[0]) return false;
+  const job = parseJob(record.rows[0].snapshot);
+  if (job.status !== "awaiting_approval") return false;
+  const recent = await db.query(
+    "SELECT 1 FROM whatsapp_events WHERE wa_id=$1 AND received_at>now()-interval '24 hours' LIMIT 1",
+    [(process.env.WHATSAPP_APPROVER_WA_ID || "").replace(/\D/g, "")],
+  );
+  if (!recent.rows.length) return false;
+  const claimed = await db.query(
+    `UPDATE daily_drafts SET whatsapp_send_attempted_at=now() WHERE job_id=$1
+     AND status='awaiting_approval' AND whatsapp_message_id IS NULL
+     AND whatsapp_send_attempted_at IS NULL RETURNING day`, [jobId],
+  );
+  if (!claimed.rows.length) return false;
+  const summary = job.content?.format === "text" ? job.content.body : job.content?.format === "image" ? job.content.caption : "Videoentwurf";
+  const messageId = await sendWhatsAppText(`Content-Freigabe · Tagesentwurf ${new Date(String(claimed.rows[0].day)).toISOString().slice(0, 10)}\nProdukt: ${job.opportunity.product.name}\nFormat: ${job.content?.format || "unbekannt"} · Facebook\n\n${(summary || "").slice(0, 1100)}\n\nSuchauswahl, kein geprüftes Einzelprodukt. Antworte auf DIESE Nachricht mit „Freigeben“, um den Content-Plan freizugeben. Danach kommt eine ZWEITE WhatsApp für die Veröffentlichung. „Ablehnen“ stoppt den Auftrag, Änderungswünsche bitte als Text. Noch kein Post ist online.`);
+  await db.query("UPDATE daily_drafts SET whatsapp_message_id=$2,updated_at=now() WHERE job_id=$1 AND status='awaiting_approval'", [jobId, messageId]);
+  return true;
+}
 
 // Cron runs in Production only. The date claim happens before any external search
 // so a retried invocation cannot buy another search or send another message.
@@ -36,7 +66,10 @@ export async function createDailyDraft(day = new Date().toISOString().slice(0, 1
     await repo.claim(jobId, opportunity, "reference");
     const job = await runContentJob(opportunity, { id: jobId, mode: "reference",
       loadLearning: value => repo.learn(value), onUpdate: value => repo.save(value) });
-    const status = job.status === "awaiting_approval" ? "awaiting_approval" : "needs_input";
+    // Do not seek an approval for a plan that the later Facebook gate rejects.
+    const publishablePlan = job.status === "awaiting_approval"
+      && !facebookPagePublicationError({ ...job, status: "approved" });
+    const status = publishablePlan ? "awaiting_approval" : "needs_input";
     await db.query("UPDATE daily_drafts SET status=$2,updated_at=now() WHERE day=$1", [day, status]);
     if (status === "awaiting_approval") {
       const approver = (process.env.WHATSAPP_APPROVER_WA_ID || "").replace(/\D/g, "");
@@ -46,15 +79,18 @@ export async function createDailyDraft(day = new Date().toISOString().slice(0, 1
         "SELECT 1 FROM whatsapp_events WHERE wa_id=$1 AND received_at > now()-interval '24 hours' LIMIT 1",
         [approver],
       ) : { rows: [] };
-      if (!window.rows.length) return { status, jobId, whatsapp: "template_required" as const };
-      const attempted = await db.query(
-        "UPDATE daily_drafts SET whatsapp_send_attempted_at=now() WHERE day=$1 AND whatsapp_send_attempted_at IS NULL RETURNING day",
-        [day],
-      );
-      if (attempted.rows.length) {
-        const summary = job.content?.format === "text" ? job.content.body : job.content?.format === "image" ? job.content.caption : "Videoentwurf";
-        const messageId = await sendWhatsAppText(`Content-Freigabe · Tagesentwurf ${day}\nProdukt: ${candidate.name}\nFormat: ${job.content?.format || "unbekannt"} · Facebook\n\n${(summary || "").slice(0, 1100)}\n\nSuchauswahl, kein geprüftes Einzelprodukt. Antworte auf DIESE Nachricht mit „Freigeben“, um den Content-Plan freizugeben. Danach kommt eine ZWEITE WhatsApp für die Veröffentlichung. „Ablehnen“ stoppt den Auftrag, Änderungswünsche bitte als Text. Noch kein Post ist online.`);
-        await db.query("UPDATE daily_drafts SET whatsapp_message_id=$2,updated_at=now() WHERE day=$1", [day, messageId]);
+      if (window.rows.length) await sendDailyApproval(jobId);
+      else {
+        if (!approver || !dailyNotificationTemplateConfigured()) return { status, jobId, whatsapp: "template_required" as const };
+        const attempted = await db.query(
+          `UPDATE daily_drafts SET notification_send_attempted_at=now() WHERE day=$1
+           AND notification_send_attempted_at IS NULL RETURNING day`, [day],
+        );
+        if (attempted.rows.length) {
+          const messageId = await sendDailyNotificationTemplate();
+          await db.query("UPDATE daily_drafts SET notification_message_id=$2,updated_at=now() WHERE day=$1", [day, messageId]);
+        }
+        return { status, jobId, whatsapp: "notification_sent" as const };
       }
     }
     return { status, jobId };

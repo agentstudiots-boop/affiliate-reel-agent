@@ -7,7 +7,7 @@ const {chooseVideoProvider,FACELESS_LEARNING_TARGET}=require('../.test-build/lib
 const {classifyWhatsAppReply}=require('../.test-build/lib/whatsapp/intent');
 const {extractIncomingWhatsAppMessages,verifyMetaWebhookSignature,verifyWhatsAppChallenge}=require('../.test-build/lib/whatsapp/security');
 const {productionRepository}=require('../.test-build/lib/production/repository');
-const {whatsappConfig}=require('../.test-build/lib/whatsapp/client');
+const {whatsappConfig,sendDailyNotificationTemplate}=require('../.test-build/lib/whatsapp/client');
 const {facelessClient,narration}=require('../.test-build/lib/production/faceless-so');
 const {memoryRepository}=require('../.test-build/lib/memory/repository');
 const {runContentJob}=require('../.test-build/lib/content/orchestrator');
@@ -94,6 +94,24 @@ test('existing misspelled Vercel WhatsApp secrets remain usable without exposing
   }finally{for(const key of keys){if(old[key]===undefined)delete process.env[key];else process.env[key]=old[key];}}
 });
 
+test('business-initiated daily template stays disabled without approved explicit configuration',async()=>{
+  const keys=['WHATSAPP_ACCESS_TOKEN','WHATSAPP_PHONE_NUMBER_ID','WHATSAPP_APPROVER_WA_ID','WHATSAPP_DAILY_TEMPLATE_ENABLED','WHATSAPP_DAILY_TEMPLATE_NAME','WHATSAPP_DAILY_TEMPLATE_LANGUAGE'];
+  const old=Object.fromEntries(keys.map(key=>[key,process.env[key]])),previousFetch=global.fetch;
+  const calls=[];
+  try{
+    process.env.WHATSAPP_ACCESS_TOKEN='test-token';process.env.WHATSAPP_PHONE_NUMBER_ID='123456';process.env.WHATSAPP_APPROVER_WA_ID='491234';
+    process.env.WHATSAPP_DAILY_TEMPLATE_NAME='daily_draft_notice';process.env.WHATSAPP_DAILY_TEMPLATE_LANGUAGE='de';
+    delete process.env.WHATSAPP_DAILY_TEMPLATE_ENABLED;
+    global.fetch=async(url,options)=>{calls.push(JSON.parse(options.body));return {ok:true,json:async()=>({messages:[{id:'wamid.notice'}]})};};
+    await assert.rejects(sendDailyNotificationTemplate(),/Kostenfreigabe/);
+    assert.equal(calls.length,0);
+    process.env.WHATSAPP_DAILY_TEMPLATE_ENABLED='true';
+    assert.equal(await sendDailyNotificationTemplate(),'wamid.notice');
+    assert.deepEqual(calls[0].template,{name:'daily_draft_notice',language:{code:'de'}});
+    assert.equal(calls[0].to,'491234');assert.equal(calls[0].type,'template');
+  }finally{global.fetch=previousFetch;for(const key of keys){if(old[key]===undefined)delete process.env[key];else process.env[key]=old[key];}}
+});
+
 test('production repository is idempotent and cannot start spend before WhatsApp approval',async()=>{
   const pg=new PGlite();
   const db={
@@ -107,6 +125,7 @@ test('production repository is idempotent and cannot start spend before WhatsApp
     await pg.exec(fs.readFileSync('db/migrations/003_faceless_so.sql','utf8'));
     await pg.exec(fs.readFileSync('db/migrations/004_daily_drafts.sql','utf8'));
     await pg.exec(fs.readFileSync('db/migrations/005_publication_gate.sql','utf8'));
+    await pg.exec(fs.readFileSync('db/migrations/006_daily_notification.sql','utf8'));
     const memory=memoryRepository(db);
     const id=crypto.randomUUID();
     await memory.claim(id,opportunity,'reference');
@@ -176,7 +195,7 @@ test('WhatsApp change request is revised by orchestrator and needs fresh editori
   const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
   const old=process.env.WHATSAPP_APPROVER_WA_ID;process.env.WHATSAPP_APPROVER_WA_ID='491234';
   try{
-    for(const file of ['001_memory.sql','002_production_gates.sql','003_faceless_so.sql','004_daily_drafts.sql','005_publication_gate.sql'])await pg.exec(fs.readFileSync(`db/migrations/${file}`,'utf8'));
+    for(const file of ['001_memory.sql','002_production_gates.sql','003_faceless_so.sql','004_daily_drafts.sql','005_publication_gate.sql','006_daily_notification.sql'])await pg.exec(fs.readFileSync(`db/migrations/${file}`,'utf8'));
     const memory=memoryRepository(db),production=productionRepository(db),id=crypto.randomUUID();
     await memory.claim(id,opportunity,'reference');
     await runContentJob(opportunity,{id,onUpdate:memory.save,loadLearning:memory.learn});

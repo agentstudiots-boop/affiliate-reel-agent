@@ -208,8 +208,21 @@ export function productionRepository(db: Database = getDatabase()) {
         const dailyResult = input.replyToMessageId
           ? await sql.query("SELECT * FROM daily_drafts WHERE whatsapp_message_id=$1 AND status='awaiting_approval' FOR UPDATE", [input.replyToMessageId])
           : await sql.query("SELECT * FROM daily_drafts WHERE status='awaiting_approval' AND whatsapp_message_id IS NOT NULL ORDER BY created_at DESC LIMIT 2 FOR UPDATE", []);
-        if (!input.replyToMessageId && approvalResult.rows.length + publicationResult.rows.length + dailyResult.rows.length !== 1) return { handled: false as const, reason: "ambiguous_approval" as const };
-        if (!approvalResult.rows[0] && !publicationResult.rows[0] && !dailyResult.rows[0]) return { handled: false as const, reason: "no_pending_approval" as const };
+        const notificationResult = input.replyToMessageId
+          ? await sql.query("SELECT * FROM daily_drafts WHERE notification_message_id=$1 AND status='awaiting_approval' AND whatsapp_message_id IS NULL FOR UPDATE", [input.replyToMessageId])
+          : await sql.query("SELECT * FROM daily_drafts WHERE notification_message_id IS NOT NULL AND status='awaiting_approval' AND whatsapp_message_id IS NULL ORDER BY created_at DESC LIMIT 2 FOR UPDATE", []);
+        if (!input.replyToMessageId && approvalResult.rows.length + publicationResult.rows.length + dailyResult.rows.length + notificationResult.rows.length !== 1) return { handled: false as const, reason: "ambiguous_approval" as const };
+        if (!approvalResult.rows[0] && !publicationResult.rows[0] && !dailyResult.rows[0] && !notificationResult.rows[0]) return { handled: false as const, reason: "no_pending_approval" as const };
+
+        if (notificationResult.rows[0]) {
+          // The generic template never contains an approvable draft. Only a
+          // request for the full draft can trigger the later approval message.
+          if (input.body.trim().toLocaleLowerCase("de-DE").replace(/[.!?]+$/, "") !== "entwurf") {
+            return { handled: false as const, reason: "notification_requires_entwurf" as const };
+          }
+          await sql.query("UPDATE whatsapp_events SET intent='notification_reply' WHERE message_id=$1", [input.id]);
+          return { handled: true as const, intent: "notification_reply" as const, dailyNotificationJobId: String(notificationResult.rows[0].job_id) };
+        }
 
         if (dailyResult.rows[0]) {
           const daily = dailyResult.rows[0];

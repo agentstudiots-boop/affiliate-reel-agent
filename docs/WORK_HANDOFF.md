@@ -1,6 +1,6 @@
 # Work handoff
 
-Stand: 23. September 2026. Offener Draft-PR #6 auf
+Stand: 24. September 2026. Offener Draft-PR #6 auf
 `feat/production-gates-whatsapp`. Weder nach `main` gemergt noch für Production
 freigegeben.
 
@@ -16,14 +16,15 @@ freigegeben.
   PR-Previews zeigte die lesende Meta-Diagnose `connected`: Systemnutzer,
   Facebook-Seite und verknüpftes Instagram-Konto waren erreichbar. Ein
   Meta-Schreibaufruf wurde dadurch noch nicht bewiesen.
-- Der Preview-Build zu `2bed3c2` und GitHub Quality waren erfolgreich.
+- Die bisherigen Preview-Builds bis `e722f62` und GitHub Quality waren erfolgreich.
   Browserprüfung: Seite lädt, Postgres wird als konfiguriert angezeigt. Die
   Veröffentlichungssperre erklärt inzwischen vor dem Klick, warum ein
   gespeicherter Job keinen Facebook-Seitenpost ergeben kann.
-- Eine nachfolgende Änderung bindet eingehende signierte WhatsApp-Nachrichten
+- Eine bereits geprüfte Änderung bindet eingehende signierte WhatsApp-Nachrichten
   zusätzlich an `WHATSAPP_PHONE_NUMBER_ID` (oder die bestehende Schreibweise
-  `WHATTSAPP_PHONE_NUMBER_ID`). Die lokalen Prüfungen bestehen: TypeScript,
-  ESLint, 38 Tests und Next.js-Build. Den neuen Preview-Build separat abwarten.
+  `WHATTSAPP_PHONE_NUMBER_ID`). Die lokalen Prüfungen inklusive neuer
+  Tagesvorlage bestehen: TypeScript, ESLint, 39 Tests und Next.js-Build.
+  Den Preview-Build zur jüngsten Änderung separat abwarten.
 - Bisher wurde kein kostenpflichtiger Faceless-Auftrag und kein echter
   Facebook-Post durch das System ausgelöst. Keine Secrets in GitHub schreiben.
 
@@ -49,11 +50,13 @@ freigegeben.
 
 ## Noch offen / externe Entscheidung
 
-- Tägliche Entwürfe werden im Production-Cron vorbereitet. Freier WhatsApp-Text
-  ist außerhalb des 24-Stunden-Fensters nicht möglich: Eine genehmigte Vorlage,
-  deren Kategorie und mögliche Gebühren müssen vor autonomem täglichen Versand
-  geklärt werden. Der aktuelle Cron versendet nur bei offenem Servicefenster;
-  sonst wartet der Entwurf im Content Studio.
+- Tägliche Entwürfe werden im Production-Cron vorbereitet. Für Benachrichtigungen
+  außerhalb des 24-Stunden-Fensters ist eine **deaktivierte** Meta-Vorlage ohne
+  Content-Freigabe vorbereitet. Erst `Entwurf` als Antwort sendet den ganzen
+  Entwurf im Servicefenster. Migration `006_daily_notification.sql` ist neu und
+  muss vor einem Preview-Durchlauf angewendet werden. Meta-Vorlage,
+  Genehmigung, Kategorie, wiederkehrende Gebühren und ausdrückliche Aktivierung
+  stehen aus; ohne sie speichert der Cron nur den Entwurf.
 - Das tatsächliche Faceless.so-Video-E2E und die Meta-Schreibberechtigung sind
   noch nicht praktisch bestätigt. Es fehlt ein echter, bewusst freigegebener
   Publishing-Durchlauf.

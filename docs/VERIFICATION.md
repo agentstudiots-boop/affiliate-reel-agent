@@ -1,17 +1,18 @@
 # Verifikation des offenen PR #6
 
-Stand: 23. September 2026. Branch `feat/production-gates-whatsapp`.
+Stand: 24. September 2026. Branch `feat/production-gates-whatsapp`.
 
 ## Lokal und CI
 
-- Nach der letzten Änderung: `npm run typecheck`, `npm run lint`, `npm test`
-  (38 bestanden) und `npm run build` erfolgreich. Tests verwendeten keine
+- Nach der Benachrichtigungsvorlage: `npm run typecheck`, `npm run lint`, `npm test`
+  (39 bestanden) und `npm run build` erfolgreich. Tests verwendeten keine
   kostenpflichtigen oder externen Schreibaufrufe.
-- GitHub Quality und Vercel Preview zu `2bed3c2` waren erfolgreich. Die
-  unmittelbar folgende WhatsApp-Empfängernummer-Prüfung wurde lokal ebenfalls
-  erfolgreich geprüft; ihr Preview-Build folgt mit dem nächsten PR-Commit.
+- GitHub Quality und Vercel Preview zu `e722f62` waren erfolgreich. Die
+  Tagesvorlage und Migration 006 wurden lokal geprüft; ihr Preview-Build
+  folgt mit dem nächsten PR-Commit.
 - Die Tests decken getrennte Content-, Render- und Publikationsfreigaben,
   ungültige Sender, „ja“, Nachrichten-Deduplikation, genau einen Publish-Claim,
+  eine nicht genehmigende Tagesbenachrichtigung, deaktivierten Vorlagenversand,
   Sperre inkompatibler Facebook-Jobs und Abgleich der im Meta-Webhook
   enthaltenen Empfängernummer ab.
 
@@ -35,7 +36,10 @@ Stand: 23. September 2026. Branch `feat/production-gates-whatsapp`.
 3. Faceless.so-Quote und ein einziges bewusst freigegebenes Video mit
    Statusabfrage, fertiger URL und Persistenz prüfen. Kostenpflichtigen
    Provideraufruf nicht als allgemeinen Regressionstest wiederholen.
-4. Erst dann PR finalisieren, `main` mergen, Production deployen, Migration
+4. Migration 006 im Preview zweimal über die geschützte Route bestätigen. Erst
+   dann Tagesvorlage mit bekannter Kategorie und Tarif einrichten und das
+   Benachrichtigungs- und Dialogverhalten in Preview prüfen.
+5. Erst dann PR finalisieren, `main` mergen, Production deployen, Migration
    in Production ausführen und Smoke-Test durchführen. Fehlende genehmigte
    WhatsApp-Vorlage für initiierte Tagesnachrichten gesondert klären.
 

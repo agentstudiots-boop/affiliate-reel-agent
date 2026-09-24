@@ -1,13 +1,14 @@
 # Tägliche Entwürfe und Veröffentlichung
 
-Stand: 23. September 2026.
+Stand: 24. September 2026.
 
 ## Automatischer Teil
 
 Production-Cron `/api/cron/daily-draft` startet täglich um 07:00 UTC. Er benötigt
 `CRON_SECRET`, `DATABASE_URL`, `CONTENT_STUDIO_PASSWORD`, `TAVILY_API_KEY` und
 die bereits eingerichteten WhatsApp-Sendevariablen. Die Migration
-`004_daily_drafts.sql` muss vorher in Production über die geschützte Route
+`004_daily_drafts.sql`, `005_publication_gate.sql` und
+`006_daily_notification.sql` müssen vorher in Production über die geschützte Route
 angewendet werden. Vercel-Cron läuft nicht auf Preview; dort nur mit einem
 autorisierten, ausdrücklich gewollten Aufruf prüfen.
 
@@ -20,12 +21,40 @@ einen kostenlosen Referenzentwurf für Facebook mit Budget `low`; der Job und
 das Scout-Ergebnis werden in Postgres gespeichert. Eine Content-Freigabe per
 WhatsApp mit Auszug und Job-ID wird ausschließlich dann einmalig gesendet, wenn die
 Approver-ID innerhalb der letzten 24 Stunden eine Nachricht an die API gesendet
-hat. Für tägliche initiierte Nachrichten außerhalb dieses Fensters muss zunächst
-eine genehmigte WhatsApp-Vorlage einschließlich der möglichen Nachrichtengebühren
-eingerichtet werden. Ohne Vorlage wartet der Entwurf gespeichert im Content Studio.
+hat. Für tägliche initiierte Nachrichten außerhalb dieses Fensters ist eine
+separate, ausdrücklich aktivierte WhatsApp-Vorlage vorbereitet. Ohne genehmigte
+Vorlage und geklärte Nachrichtengebühren wartet der Entwurf weiterhin gespeichert
+im Content Studio. Die Vorlage ist **nur eine Benachrichtigung**. Auf sie kann
+kein Content freigegeben werden. Erst die Antwort `Entwurf` löst im geöffneten
+Servicefenster eine zweite Nachricht mit Produkt, Inhalt und eigener
+Content-Freigabe aus. Ein vorzeitiges `Freigeben` auf die Benachrichtigung
+wird ignoriert. Jeder Versand hat einen dauerhaften Claim vor dem Netzwerkaufruf;
+unklare Ergebnisse werden nicht erneut gesendet.
 Eine ausdrückliche erste Antwort genehmigt nur den Content-Plan. Das System
 bereitet danach eine originale Textgrafik vor und schickt eine **zweite**
 WhatsApp-Nachricht zur finalen Freigabe des Facebook-Posts.
+
+### Vorlage erst nach Kostenentscheidung aktivieren
+
+Im Meta WhatsApp Manager eine **reine Textvorlage ohne Platzhalter oder Buttons**
+zur Freigabe einreichen, etwa:
+
+> Ein neuer Tagesentwurf für deine private Content-Planung ist bereit. Antworte
+> auf diese Nachricht mit „Entwurf“, um den vollständigen Entwurf zu erhalten.
+> Erst danach kannst du den Inhalt und separat die Veröffentlichung freigeben.
+
+Meta entscheidet über die Kategorie und Genehmigung. Vor der Aktivierung die
+im eigenen WhatsApp Manager für Empfängerland und Kategorie angezeigten Kosten
+und die wiederkehrende Nutzung mit dem Betreiber klären. Die Anwendung liest
+keinen verbindlichen Live-Tarif und behauptet keinen festen Betrag. Nach
+Genehmigung den **exakten** Vorlagennamen und Sprachcode serverseitig als
+`WHATSAPP_DAILY_TEMPLATE_NAME` und `WHATSAPP_DAILY_TEMPLATE_LANGUAGE` eintragen,
+zum Beispiel `de`. Ausschließlich nach Kostenfreigabe
+`WHATSAPP_DAILY_TEMPLATE_ENABLED=true` setzen und neu deployen. Vorher ist
+diese Funktion aus. Preview und Production getrennt konfigurieren. Keine Vorlage
+mit einem „Freigeben“-Button verwenden; der Text muss zum beschriebenen
+zweistufigen Dialog passen. Das erste kostenpflichtige Senden ist ein eigener
+bewusster Betriebsschritt.
 
 ## Noch offen
 
@@ -40,7 +69,7 @@ Die Migration 005 ist im Preview angewendet; der Blob-Token ist vorhanden und
 die Meta-Verbindung wurde lesend geprüft. Die Facebook-Schreibberechtigung
 und der vollständige WhatsApp-/Meta-Durchlauf sind damit noch nicht bewiesen.
 Vor autonomen täglichen Benachrichtigungen die genehmigte WhatsApp-Vorlage,
-Kategorie samt Gebühren klären. Der Scout wählt saisonale Suchauswahlen, noch
+Kategorie samt Gebühren klären und Migration 006 anwenden. Der Scout wählt saisonale Suchauswahlen, noch
 keine verifizierten Einzelprodukte. Natürliche Änderungswünsche für
 Bild-/Textbeiträge werden
 gespeichert und sperren den Post; eine neue Revision durch die Spezialagenten
