@@ -1,4 +1,4 @@
-import { cachedMetaConnection, metaConfig } from "./connection";
+import { cachedMetaConnection, metaConfig, pagePublishingToken } from "./connection";
 
 export class FacebookPublishFailure extends Error {
   constructor(public phase: "image" | "connection" | "request" | "response", public detail: string,
@@ -17,11 +17,13 @@ export async function publishFacebookPhoto(imageUrl: string, message: string, tr
   const report = await cachedMetaConnection();
   const config = metaConfig();
   if (report.status !== "connected" || !report.resolved?.pageId || !config.token) throw new FacebookPublishFailure("connection", report.status);
+  const pageToken = await pagePublishingToken(report.resolved.pageId, config, transport);
+  if(pageToken.status!=="ready")throw new FacebookPublishFailure("connection",`page_token_${pageToken.status}`,pageToken.httpStatus,pageToken.code,pageToken.subcode);
   const form = new URLSearchParams({url:imageUrl,message,published:"true"});
   let response: Response;
   try {
     response = await transport(`https://graph.facebook.com/${config.version}/${report.resolved.pageId}/photos`,{
-      method:"POST",headers:{Authorization:`Bearer ${config.token}`,"Content-Type":"application/x-www-form-urlencoded"},
+      method:"POST",headers:{Authorization:`Bearer ${pageToken.token}`,"Content-Type":"application/x-www-form-urlencoded"},
       body:form,signal:AbortSignal.timeout(15000),cache:"no-store",redirect:"error",
     });
   } catch { throw new FacebookPublishFailure("request", "network_or_timeout"); }
