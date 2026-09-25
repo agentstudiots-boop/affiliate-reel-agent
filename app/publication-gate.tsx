@@ -37,6 +37,12 @@ export function PublicationGate({job,password}:{job:ContentJob;password:string})
       result.status==="not_found"?"Im abgefragten Zeitfenster wurde kein passendes Seitenfoto gefunden. Das beweist keine fehlgeschlagene Veröffentlichung; der Auftrag bleibt gesperrt.":
       `Abgleich unvollständig (${result.reason}). Der Auftrag bleibt gesperrt.`);
   }catch(caught){setError(caught instanceof Error?caught.message:"Abgleich fehlgeschlagen.")}finally{setBusy(false)}}
+  async function reuseVisual(){setBusy(true);setError("");setNotice("");try{
+    const response=await fetch("/api/publication",{method:"POST",headers:{"Content-Type":"application/json","x-content-password":password},body:JSON.stringify({action:"reuse_visual",jobId:job.id,confirmedNoVisiblePost:true})});
+    const data=await response.json();if(!response.ok)throw new Error(data.error||"Das Bild konnte nicht erneut freigegeben werden.");
+    setRecord(data.publication);
+    setNotice(data.whatsapp==="approved_template_required"?"Vorhandenes Bild erneut vorbereitet. Für die WhatsApp-Nachricht fehlt eine genehmigte Vorlage.":data.approvalSent?"Vorhandenes Bild: neue WhatsApp-Freigabe versendet. Nur eine Antwort auf DIESE neue Nachricht kann posten.":"Vorhandenes Bild erneut vorbereitet. WhatsApp-Status prüfen.");
+  }catch(caught){setError(caught instanceof Error?caught.message:"Erneute Freigabe fehlgeschlagen.")}finally{setBusy(false)}}
   return <section className="reviewBox"><h3>Facebook-Beitrag · separate Freigabe</h3>
     <p>Ausgewählter Job: {job.opportunity.product.name} · {job.marketing?.primary || "Marketingplan fehlt"}.</p>
     {provider&&<p role="status">{provider.configured?`Bildprovider: ${provider.provider==="replicate"?"Replicate":"OpenAI"} · Modell: ${provider.model}`:provider.reason}</p>}
@@ -47,6 +53,7 @@ export function PublicationGate({job,password}:{job:ContentJob;password:string})
       {record.status==="pending"&&record.whatsappSendAttempted&&!record.whatsappMessageId&&<div className="reviewBox"><p>Der letzte WhatsApp-Versand wurde versucht, aber keine Message-ID gespeichert.</p><button type="button" className="ghost" disabled={busy} onClick={resetWhatsApp}>{busy?"Bitte warten …":"Ich bestätige: keine WhatsApp angekommen"}</button></div>}
       {record.status==="pending"&&!record.whatsappSendAttempted&&!eligibilityError&&<button type="button" disabled={busy} onClick={request}>{busy?"Bitte warten …":"WhatsApp-Freigabe senden / Status prüfen"}</button>}
       {record.status==="unknown"&&<button type="button" className="ghost" disabled={busy||!password} onClick={reconcile}>{busy?"Prüfung läuft …":"Facebook-Fotos lesend abgleichen"}</button>}
+      {record.status==="unknown"&&record.imageUrl&&<div className="reviewBox"><p>Wenn auf der Facebook-Seite kein Beitrag sichtbar ist, kann das gespeicherte Originalbild genau einmal neu zur WhatsApp-Freigabe vorbereitet werden. Vorher prüft der Server die Seitenfotos erneut. Ein fehlender Treffer schließt einen Doppelpost nicht sicher aus.</p><button type="button" disabled={busy||!password} onClick={reuseVisual}>{busy?"Bitte warten …":"Kein Post sichtbar – vorhandenes Bild erneut freigeben"}</button></div>}
       {reconciliation&&<p role="status">{reconciliation}</p>}
       {record.permalink&&<p><a href={record.permalink} target="_blank" rel="noopener noreferrer">Veröffentlichten Beitrag öffnen ↗</a></p>}
       {record.feedback&&<p>Änderungswunsch: {record.feedback}</p>}</>}

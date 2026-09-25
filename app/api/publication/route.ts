@@ -14,6 +14,7 @@ const postSchema = z.union([
   z.object({ jobId: idSchema, action: z.literal("request").optional() }),
   z.object({ jobId: idSchema, action: z.literal("reset_whatsapp"), confirmedNoMessage: z.literal(true) }),
   z.object({ jobId: idSchema, action: z.literal("reconcile") }),
+  z.object({ jobId: idSchema, action: z.literal("reuse_visual"), confirmedNoVisiblePost: z.literal(true) }),
 ]);
 function guard(request: Request) {
   if (!authorized(request)) return Response.json({error:"Zugangscode erforderlich."},{status:401});
@@ -42,6 +43,18 @@ export async function POST(request: Request) {
       const publication=await publicationRepository().resetWhatsAppSendAfterOperatorConfirmation(input.jobId);
       console.info(JSON.stringify({event:"whatsapp_publication_reset_confirmed",publicationId:publication.id,jobId:input.jobId}));
       return Response.json({publication,reset:true});
+    }
+    if(input.action==="reuse_visual"){
+      const target=await publicationRepository().reconciliationTarget(input.jobId);
+      const reconciliation=await reconcileFacebookPhoto(target.caption,target.attemptedAt);
+      if(reconciliation.status!=="not_found")throw new PublicationConflictError(
+        reconciliation.status==="found"?"Facebook hat bereits ein passendes Foto gefunden. Kein zweiter Post.":"Facebook-Abgleich nicht vollständig; kein zweiter Post."
+      );
+      const approver=(process.env.WHATSAPP_APPROVER_WA_ID||"").replace(/\D/g,"");
+      if(!approver)throw new PublicationConflictError("WhatsApp-Freigabe ist nicht eingerichtet.");
+      const publication=await publicationRepository().reuseUnknownVisual(input.jobId,approver);
+      console.info(JSON.stringify({event:"facebook_visual_reuse",jobId:input.jobId,publicationId:publication.id,revision:publication.revision}));
+      return Response.json(await requestFacebookApproval(input.jobId));
     }
     return Response.json(await requestFacebookApproval(input.jobId));
   } catch(error) {

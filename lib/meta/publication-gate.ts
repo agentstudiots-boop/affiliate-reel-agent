@@ -44,6 +44,35 @@ export function publicationRepository(db: Database = getDatabase()) {
       if (!result.rows[0]) throw new PublicationConflictError("Kein unklarer Facebook-Versuch für diesen Job vorhanden.");
       return { caption: String(result.rows[0].caption), attemptedAt: new Date(result.rows[0].publish_attempted_at as string).toISOString() };
     },
+    async reuseUnknownVisual(jobId: string, approver: string) {
+      return db.transaction(async sql => {
+        const stored = await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE", [jobId]);
+        if (!stored.rows[0]) throw new PublicationConflictError("Content-Job fehlt.");
+        const { hash, caption } = publicationContent(parseJob(stored.rows[0].snapshot));
+        const previous = await sql.query("SELECT * FROM publication_requests WHERE job_id=$1 AND platform='facebook' ORDER BY revision DESC LIMIT 1 FOR UPDATE", [jobId]);
+        const row = previous.rows[0];
+        if (!row || row.status !== "unknown" || !row.publish_attempted_at || row.content_hash !== hash || !row.image_url) {
+          throw new PublicationConflictError("Nur ein ungeklärter Post mit unverändertem Bild kann neu freigegeben werden.");
+        }
+        const attempts = await sql.query("SELECT count(*)::int AS count FROM publication_requests WHERE job_id=$1 AND platform='facebook' AND publish_attempted_at IS NOT NULL", [jobId]);
+        if (Number(attempts.rows[0].count) !== 1) throw new PublicationConflictError("Für diesen Auftrag wurde bereits mehr als ein Veröffentlichungsversuch begonnen.");
+        const visual = await sql.query("SELECT status,sha256,image_url FROM original_visual_attempts WHERE job_id=$1 AND content_hash=$2", [jobId, hash]);
+        const asset = visual.rows[0];
+        let verified = false;
+        try {
+          const url = new URL(String(row.image_url));
+          verified = asset?.status === "media_ready" && asset.image_url === row.image_url && /^[a-f0-9]{64}$/.test(String(asset.sha256))
+            && url.protocol === "https:" && url.hostname.endsWith(".public.blob.vercel-storage.com")
+            && url.pathname === `/generated/facebook/${jobId}/${asset.sha256}.png`;
+        } catch { /* Reject malformed media URLs. */ }
+        if (!verified) throw new PublicationConflictError("Das alte Originalbild konnte nicht sicher zugeordnet werden.");
+        const result = await sql.query(
+          "INSERT INTO publication_requests(id,job_id,platform,status,caption,image_url,content_hash,approver_wa_id,revision) VALUES($1,$2,'facebook','pending',$3,$4,$5,$6,$7) RETURNING *",
+          [crypto.randomUUID(), jobId, caption, row.image_url, hash, approver, Number(row.revision) + 1],
+        );
+        return publication(result.rows[0]);
+      });
+    },
     async claimVisual(jobId: string, model: string, provider = "openai"): Promise<{ job: ContentJob; existing: null | ReturnType<typeof publication> }> {
       if (!["openai", "replicate"].includes(provider)) throw new PublicationConflictError("Bildprovider ungültig.");
       return db.transaction(async sql => {
