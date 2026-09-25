@@ -36,7 +36,18 @@ const base = { title: text, hook: text, useCase: text, productIntegration: text,
 export const videoSchema = z.object({ ...base, format: z.literal("video"), durationSeconds: z.number().int().min(10).max(40),
   scenes: z.array(z.object({ durationSeconds: z.number().int().min(2).max(10), visual: text, audio: text, overlay: text })).min(3).max(8), caption: text,
 });
+export const visualConceptSchema = z.object({
+  kind: z.enum(["lifestyle", "application", "editorial_collage", "comparison", "carousel_guide"]),
+  mainIdea: text,
+  productRelation: text,
+  everydaySituation: text,
+  sourceKind: z.enum(["product", "search", "category", "unknown"]),
+  representation: z.enum(["generic_category", "verified_product_context"]),
+  originality: z.literal("original_editorial"),
+  visualWeight: z.enum(["image_led", "balanced", "text_led"]),
+});
 export const imageSchema = z.object({ ...base, format: z.literal("image"), layout: z.enum(["single", "carousel"]),
+  visualConcept: visualConceptSchema.optional(),
   slides: z.array(z.object({ headline: text, copy: text, visual: text, prompt: text, alt: text })).min(1).max(7), caption: text,
 });
 export const textSchema = z.object({ ...base, format: z.literal("text"), style: z.enum(["recommendation", "expert", "community"]), body: z.string().min(120).max(5000) });

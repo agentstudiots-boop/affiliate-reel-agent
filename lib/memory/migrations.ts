@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { getDatabase, type Database } from "./db";
 
-const migrationNames = ["001_memory.sql", "002_production_gates.sql", "003_faceless_so.sql", "004_daily_drafts.sql", "005_publication_gate.sql", "006_daily_notification.sql", "007_publication_revisions.sql", "008_weekly_reports.sql"] as const;
+const migrationNames = ["001_memory.sql", "002_production_gates.sql", "003_faceless_so.sql", "004_daily_drafts.sql", "005_publication_gate.sql", "006_daily_notification.sql", "007_publication_revisions.sql", "008_weekly_reports.sql", "009_original_visual_attempts.sql", "010_replicate_visual_provider.sql"] as const;
 
 export type MigrationResult = {
   applied: string[];

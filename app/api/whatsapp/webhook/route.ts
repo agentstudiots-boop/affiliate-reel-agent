@@ -1,6 +1,6 @@
 import { productionRepository } from "@/lib/production/repository";
 import { publicationRepository } from "@/lib/meta/publication-gate";
-import { publishFacebookPhoto } from "@/lib/meta/publisher";
+import { FacebookPublishFailure, publishFacebookPhoto } from "@/lib/meta/publisher";
 import { requestFacebookApproval } from "@/lib/meta/request-publication";
 import { sendDailyApproval } from "@/lib/daily/draft";
 import { sendWhatsAppText } from "@/lib/whatsapp/client";
@@ -83,13 +83,18 @@ export async function POST(request: Request) {
       if (result.handled && "publicationId" in result && typeof result.publicationId === "string" && result.intent === "approve") {
         const publicationRepo = publicationRepository();
         const claimed = await publicationRepo.claimPublish(result.publicationId);
+        let phase = "publish";
         try {
           const posted = await publishFacebookPhoto(claimed.imageUrl!, claimed.caption);
+          phase = "persist";
           await publicationRepo.published(claimed.id, posted.id, posted.permalink);
           console.info(JSON.stringify({ event: "facebook_publication", publicationId: claimed.id, status: "published" }));
-        } catch {
+        } catch (error) {
           await publicationRepo.markUnknown(claimed.id);
-          console.error(JSON.stringify({ event: "facebook_publication", publicationId: claimed.id, status: "unknown" }));
+          console.error(JSON.stringify({ event: "facebook_publication", publicationId: claimed.id, status: "unknown",
+            phase: error instanceof FacebookPublishFailure ? error.phase : phase,
+            detail: error instanceof FacebookPublishFailure ? error.detail : "unclassified",
+            ...(error instanceof FacebookPublishFailure ? {httpStatus:error.httpStatus,code:error.code,subcode:error.subcode} : {}) }));
         }
       }
     } catch {

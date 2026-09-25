@@ -3,8 +3,24 @@ import { parseJob } from "../content/history";
 import { getDatabase, type Database } from "../memory/db";
 import { facebookPagePublicationError } from "./publication-eligibility";
 import { reviseApprovedStaticContent } from "../content/orchestrator";
+import type { OriginalVisualAsset } from "../content/image-provider";
+import type { ContentJob } from "../content/schema";
 
 export class PublicationConflictError extends Error {}
+
+function publicationContent(job: ContentJob) {
+  const eligibilityError = facebookPagePublicationError(job);
+  if (eligibilityError) throw new PublicationConflictError(eligibilityError);
+  if (!job.content || job.content.format === "video") throw new PublicationConflictError("Bild- oder Textentwurf fehlt.");
+  let source: URL;
+  try { source = new URL(job.opportunity.product.affiliateUrl); }
+  catch { throw new PublicationConflictError("Affiliate-Link fehlt."); }
+  if (source.protocol !== "https:" || source.username || source.password) throw new PublicationConflictError("Affiliate-Link ist nicht sicher.");
+  const base = job.content.format === "text" ? job.content.body : job.content.caption;
+  const caption = `${base}\n\n${job.content.cta}\n${source}`;
+  const hash = createHash("sha256").update(JSON.stringify({caption,content:job.content,jobId:job.id})).digest("hex");
+  return { caption, hash };
+}
 
 function publication(row: Record<string, unknown>) {
   return {
@@ -20,6 +36,70 @@ function publication(row: Record<string, unknown>) {
 
 export function publicationRepository(db: Database = getDatabase()) {
   return {
+    async reconciliationTarget(jobId: string) {
+      const result = await db.query(
+        "SELECT caption,publish_attempted_at FROM publication_requests WHERE job_id=$1 AND platform='facebook' AND status='unknown' AND publish_attempted_at IS NOT NULL ORDER BY revision DESC LIMIT 1",
+        [jobId],
+      );
+      if (!result.rows[0]) throw new PublicationConflictError("Kein unklarer Facebook-Versuch für diesen Job vorhanden.");
+      return { caption: String(result.rows[0].caption), attemptedAt: new Date(result.rows[0].publish_attempted_at as string).toISOString() };
+    },
+    async claimVisual(jobId: string, model: string, provider = "openai"): Promise<{ job: ContentJob; existing: null | ReturnType<typeof publication> }> {
+      if (!["openai", "replicate"].includes(provider)) throw new PublicationConflictError("Bildprovider ungültig.");
+      return db.transaction(async sql => {
+        const stored = await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE", [jobId]);
+        if (!stored.rows[0]) throw new PublicationConflictError("Content-Job fehlt.");
+        const job = parseJob(stored.rows[0].snapshot);
+        const { hash } = publicationContent(job);
+        const existing = await sql.query("SELECT * FROM publication_requests WHERE job_id=$1 AND platform='facebook' ORDER BY revision DESC LIMIT 1", [jobId]);
+        if (existing.rows[0]) {
+          if (existing.rows[0].content_hash === hash) {
+            if (existing.rows[0].image_url) return { job, existing: publication(existing.rows[0]) };
+            throw new PublicationConflictError("Bildversuch bereits begonnen; Ergebnis prüfen, nicht erneut generieren.");
+          }
+          if (!["changes_requested","rejected"].includes(String(existing.rows[0].status))) {
+            throw new PublicationConflictError("Der Entwurf wurde verändert. Alte Veröffentlichungsfreigabe ist gesperrt.");
+          }
+        }
+        const claimed = await sql.query(
+          "INSERT INTO original_visual_attempts(job_id,content_hash,provider,model) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING RETURNING job_id",
+          [jobId, hash, provider, model],
+        );
+        if (!claimed.rows[0]) throw new PublicationConflictError("Bildversuch bereits begonnen; Ergebnis prüfen, nicht erneut generieren.");
+        return { job, existing: null };
+      });
+    },
+    async prepareWithVisual(jobId: string, approver: string, asset: OriginalVisualAsset) {
+      const expectedPath = asset.sha256 && /^[a-f0-9]{64}$/.test(asset.sha256) ? `/generated/facebook/${jobId}/${asset.sha256}.png` : "";
+      let validUrl = false;
+      try { const parsed = new URL(asset.url); validUrl = parsed.protocol === "https:" && parsed.hostname.endsWith(".public.blob.vercel-storage.com") && parsed.pathname === expectedPath; }
+      catch { /* Invalid asset stays blocked. */ }
+      if (!["openai", "replicate"].includes(asset.provider) || asset.mediaType !== "image" || !asset.model || !validUrl) {
+        throw new PublicationConflictError("Verifiziertes Originalbild fehlt.");
+      }
+      return db.transaction(async sql => {
+        const stored = await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE", [jobId]);
+        if (!stored.rows[0]) throw new PublicationConflictError("Content-Job fehlt.");
+        const job = parseJob(stored.rows[0].snapshot);
+        const { caption, hash } = publicationContent(job);
+        const attempt = await sql.query("SELECT * FROM original_visual_attempts WHERE job_id=$1 AND content_hash=$2 FOR UPDATE", [jobId, hash]);
+        if (attempt.rows[0]?.status !== "attempted" || attempt.rows[0].model !== asset.model || attempt.rows[0].provider !== asset.provider) {
+          throw new PublicationConflictError("Bildversuch fehlt, ist bereits gebunden oder der Entwurf wurde geändert.");
+        }
+        const previous = await sql.query("SELECT * FROM publication_requests WHERE job_id=$1 AND platform='facebook' ORDER BY revision DESC LIMIT 1", [jobId]);
+        if (previous.rows[0] && !["changes_requested","rejected"].includes(String(previous.rows[0].status))) {
+          throw new PublicationConflictError("Alte Veröffentlichungsfreigabe ist gesperrt.");
+        }
+        const revision = Number(previous.rows[0]?.revision || 0) + 1;
+        const result = await sql.query(
+          "INSERT INTO publication_requests(id,job_id,platform,status,caption,image_url,content_hash,approver_wa_id,revision) VALUES($1,$2,'facebook','pending',$3,$4,$5,$6,$7) RETURNING *",
+          [crypto.randomUUID(), jobId, caption, asset.url, hash, approver, revision],
+        );
+        await sql.query("UPDATE original_visual_attempts SET status='media_ready',media_ready_at=now(),sha256=$3,image_url=$4,usage=$5 WHERE job_id=$1 AND content_hash=$2",
+          [jobId, hash, asset.sha256, asset.url, asset.usage ? JSON.stringify(asset.usage) : null]);
+        return publication(result.rows[0]);
+      });
+    },
     async get(jobId: string) {
       const result = await db.query("SELECT * FROM publication_requests WHERE job_id=$1 AND platform='facebook' ORDER BY revision DESC LIMIT 1", [jobId]);
       return result.rows[0] ? publication(result.rows[0]) : null;
@@ -58,6 +138,7 @@ export function publicationRepository(db: Database = getDatabase()) {
       return String(result.rows[0].job_id);
     },
     async bindImage(id: string, url: string) {
+      if (url.includes("/social-cards/")) throw new PublicationConflictError("Preview-Textkarte darf nicht veröffentlicht werden.");
       const result = await db.query("UPDATE publication_requests SET status='pending',image_url=$2,updated_at=now() WHERE id=$1 AND status='unknown' AND image_url IS NULL AND whatsapp_send_attempted_at IS NULL RETURNING *", [id,url]);
       if (!result.rows[0]) throw new PublicationConflictError("Bild konnte nicht zugeordnet werden.");
       return publication(result.rows[0]);
@@ -121,7 +202,7 @@ export function publicationRepository(db: Database = getDatabase()) {
       });
     },
     async claimPublish(id: string) {
-      const result = await db.query("UPDATE publication_requests SET status='publishing',publish_attempted_at=now(),updated_at=now() WHERE id=$1 AND status='approved' AND whatsapp_message_id IS NOT NULL AND publish_attempted_at IS NULL AND image_url IS NOT NULL RETURNING *", [id]);
+      const result = await db.query("UPDATE publication_requests SET status='publishing',publish_attempted_at=now(),updated_at=now() WHERE id=$1 AND status='approved' AND whatsapp_message_id IS NOT NULL AND publish_attempted_at IS NULL AND image_url IS NOT NULL AND image_url NOT LIKE '%/social-cards/%' RETURNING *", [id]);
       if (!result.rows[0]) throw new PublicationConflictError("Veröffentlichung nicht freigegeben oder bereits versucht.");
       return publication(result.rows[0]);
     },

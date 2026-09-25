@@ -1,7 +1,7 @@
 "use client";
 import {useState} from "react";
 import type {publicMetaReport} from "@/lib/meta/connection";
-type Report=ReturnType<typeof publicMetaReport>;
+type Report=ReturnType<typeof publicMetaReport>&{pagePublishing:{status:string;source:string;httpStatus?:number;code?:number;subcode?:number}};
 export function MetaConnection(){
   const [report,setReport]=useState<Report|null>(null);const [busy,setBusy]=useState(false);const [error,setError]=useState("");
   async function check(){setBusy(true);setError("");try{
@@ -16,6 +16,7 @@ export function MetaConnection(){
     {report && <div className={report.status==="connected"?"reviewBox":"error"} role="status"><strong>{report.status==="connected"?"Verbindung bestätigt":`Diagnose: ${report.status}`}</strong><p>{report.message}</p>
       <small>Geprüft: {new Date(report.checkedAt).toLocaleString("de-DE")} · Ergebnis maximal zwei Minuten zwischengespeichert.</small>
       <p>Server-Token: {report.configured.token?"vorhanden":"fehlt"} · Facebook-ID: {report.pageIdResolved?"ermittelt":"noch offen"} · Instagram-ID: {report.instagramIdResolved?"ermittelt":"noch offen"}</p>
+      <p>Facebook-Foto-Freigabe: {report.pagePublishing.status==="ready"?`Page-Token geprüft (${report.pagePublishing.source==="derived"?"aus Systemnutzer abgeleitet":"konfiguriert"})`:`Page-Token ${report.pagePublishing.status}; vor einem neuen Veröffentlichungsversuch beheben.`}</p>
       {!!report.missingPermissions.length && <p>Fehlende Berechtigungen: {report.missingPermissions.join(", ")}</p>}
       <p>Automatisches Publishing ist weiterhin deaktiviert.</p>
     </div>}

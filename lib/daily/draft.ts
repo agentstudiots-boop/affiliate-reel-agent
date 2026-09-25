@@ -64,10 +64,10 @@ export async function createDailyDraft(day = new Date().toISOString().slice(0, 1
     };
     const repo = memoryRepository(db);
     await repo.claim(jobId, opportunity, "reference");
-    const job = await runContentJob(opportunity, { id: jobId, mode: "reference",
+    const job = await runContentJob(opportunity, { id: jobId, mode: "reference", allowedFormats: ["image"],
       loadLearning: value => repo.learn(value), onUpdate: value => repo.save(value) });
     // Do not seek an approval for a plan that the later Facebook gate rejects.
-    const publishablePlan = job.status === "awaiting_approval"
+    const publishablePlan = job.status === "awaiting_approval" && job.content?.format === "image"
       && !facebookPagePublicationError({ ...job, status: "approved" });
     const status = publishablePlan ? "awaiting_approval" : "needs_input";
     await db.query("UPDATE daily_drafts SET status=$2,updated_at=now() WHERE day=$1", [day, status]);
@@ -79,7 +79,10 @@ export async function createDailyDraft(day = new Date().toISOString().slice(0, 1
         "SELECT 1 FROM whatsapp_events WHERE wa_id=$1 AND received_at > now()-interval '24 hours' LIMIT 1",
         [approver],
       ) : { rows: [] };
-      if (window.rows.length) await sendDailyApproval(jobId);
+      if (window.rows.length) {
+        const sent = await sendDailyApproval(jobId);
+        return { status, jobId, whatsapp: sent ? "approval_sent" as const : "approval_not_sent" as const };
+      }
       else {
         if (!approver || !dailyNotificationTemplateConfigured()) return { status, jobId, whatsapp: "template_required" as const };
         const attempted = await db.query(
