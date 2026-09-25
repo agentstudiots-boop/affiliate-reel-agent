@@ -43,9 +43,12 @@ Pro Szene konkrete visuelle Handlung, sprechbarer Dialog/Voiceover und Einblendu
     if (brief.changeRequest) return reviseReferenceVideo(brief);
     const { idea, opportunity } = brief;
     const vacuum = /vakuumier|vakuum.?versiegl/i.test(opportunity.product.name);
+    const blanket = /kuscheldecke|wohndecke|fleecedecke/i.test(opportunity.product.name);
     const copy = readerCopy(brief);
     const cta = new URL(opportunity.product.sourceUrl).pathname === "/s"
-      ? vacuum ? "Passende Geräte in der verlinkten Auswahl ansehen." : "Vergleiche die Angaben in der verlinkten Auswahl."
+      ? vacuum ? "Passende Geräte in der verlinkten Auswahl ansehen."
+        : blanket && opportunity.targetPlatform === "instagram" ? "Welche Decke passt zu dir? Die Auswahl steht im Beitragstext."
+          : "Vergleiche die Angaben in der verlinkten Auswahl."
       : "Eignung und Details beim verlinkten Produkt prüfen.";
     const scenes = vacuum ? [
       { durationSeconds: 5, visual: "Inszenierte Werbeszene am Familientisch: Oma schneidet das gebräunte Steak an. Nahaufnahme: rosa Kern, saftige Schnittfläche, Kräuterbutter schmilzt. Ihr überraschter Blick zu Papa.", audio: "Oma: Das hast du doch nicht selbst gemacht!", overlay: "Werbung · inszenierte Szene" },

@@ -46,7 +46,7 @@ test('a home and living reel does not call blankets devices in its spoken CTA', 
   assert.equal(job.content.format, 'video');
   assert.match(job.content.scenes[0].audio, /Werbung\. Feierabend, Tee in der Hand/);
   assert.match(job.content.scenes[1].audio, /einwickeln oder eher leicht/);
-  assert.match(job.content.scenes.at(-1).audio, /verlinkten Auswahl/);
+  assert.match(job.content.scenes.at(-1).audio, /Welche Decke passt zu dir\?.*Beitragstext/);
   assert.doesNotMatch(job.content.scenes.at(-1).audio, /Geräte/);
 });
 
