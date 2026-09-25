@@ -33,7 +33,9 @@ export function readerCopy(brief: Brief) {
       intro,
       advice: "Welche zu dir passt, hängt von Größe, Material und Pflege ab.",
       question: "Soll sie dich auf dem Sofa ganz einwickeln oder eher als leichte Decke dienen?",
-      spoken: [tea && sofa ? "Feierabend, Tee und eine Decke fürs Sofa." : bed ? "Eine Decke für ruhige Abende im Bett?" : "Welche Decke passt zu deinem Alltag?", "Soll sie groß und weich sein?", "Achte auf Größe, Material und Pflege."],
+      spoken: [tea && sofa ? "Feierabend, Tee in der Hand – jetzt fehlt nur die Decke." : bed ? "Eine Decke für ruhige Abende im Bett?" : "Welche Decke passt zu deinem Alltag?",
+        tea && sofa ? "Soll sie dich einwickeln oder eher leicht auf dem Sofa liegen?" : "Soll sie groß und weich sein?",
+        tea && sofa ? "Vergleiche vor dem Kauf Größe, Material und Pflege." : "Achte auf Größe, Material und Pflege."],
       link, disclosure,
     };
   }
