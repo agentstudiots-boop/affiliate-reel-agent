@@ -44,7 +44,9 @@ Pro Szene konkrete visuelle Handlung, sprechbarer Dialog/Voiceover und Einblendu
     const { idea, opportunity } = brief;
     const vacuum = /vakuumier|vakuum.?versiegl/i.test(opportunity.product.name);
     const copy = readerCopy(brief);
-    const cta = new URL(opportunity.product.sourceUrl).pathname === "/s" ? "Passende Geräte in der verlinkten Auswahl ansehen." : "Eignung und Details beim verlinkten Produkt prüfen.";
+    const cta = new URL(opportunity.product.sourceUrl).pathname === "/s"
+      ? vacuum ? "Passende Geräte in der verlinkten Auswahl ansehen." : "Vergleiche die Angaben in der verlinkten Auswahl."
+      : "Eignung und Details beim verlinkten Produkt prüfen.";
     const scenes = vacuum ? [
       { durationSeconds: 5, visual: "Inszenierte Werbeszene am Familientisch: Oma schneidet das gebräunte Steak an. Nahaufnahme: rosa Kern, saftige Schnittfläche, Kräuterbutter schmilzt. Ihr überraschter Blick zu Papa.", audio: "Oma: Das hast du doch nicht selbst gemacht!", overlay: "Werbung · inszenierte Szene" },
       { durationSeconds: 4, visual: "Papa lächelt. Schnitt als Rückblende zur Küchenarbeitsfläche; Vakuumierer und separates Sous-vide-Gerät sichtbar.", audio: "Papa: Doch. Mit Vakuumierer und Sous-vide-Garer.", overlay: "Zwei Geräte, zwei Aufgaben" },

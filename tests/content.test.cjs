@@ -35,6 +35,19 @@ test('routes video, carousel and text by objective and economics without calling
   } finally { global.fetch = original; }
 });
 
+test('a home and living reel does not call blankets devices in its spoken CTA', async () => {
+  const job = await runContentJob({
+    ...opportunity,
+    product: { name: 'Kuscheldecke', sourceUrl: 'https://www.amazon.de/s?k=Kuscheldecke', affiliateUrl: '', price: '', targetGroup: 'Menschen für ruhige Abende zu Hause', benefits: 'Größe, Material und Pflege vergleichen', notes: 'Suchauswahl ohne Angaben zu einem einzelnen Modell' },
+    useCase: 'Feierabend mit Tee und einer Decke auf dem Sofa.',
+    category: 'home_living', targetPlatform: 'instagram', budget: 'quality',
+  }, { allowedFormats: ['video'] });
+  assert.equal(job.status, 'awaiting_approval');
+  assert.equal(job.content.format, 'video');
+  assert.match(job.content.scenes.at(-1).audio, /verlinkten Auswahl/);
+  assert.doesNotMatch(job.content.scenes.at(-1).audio, /Geräte/);
+});
+
 test('allows two revisions, sends feedback through orchestrator and stops at eight model calls', async () => {
   let reviews = 0;
   const briefs = [];
