@@ -34,12 +34,13 @@ Content-Freigabe aus. Ein vorzeitiges `Freigeben` auf die Benachrichtigung
 wird ignoriert. Jeder Versand hat einen dauerhaften Claim vor dem Netzwerkaufruf;
 unklare Ergebnisse werden nicht erneut gesendet.
 Eine ausdrückliche erste Antwort genehmigt nur den Content-Plan. Für einen
-freigabefähigen **Bildentwurf** erzeugt der konfigurierte OpenAI-Provider genau
+freigabefähigen **Bildentwurf** erzeugt der konfigurierte Bildprovider genau
 ein Originalbild und legt es in Vercel Blob ab. Erst danach legt das System eine
 Publication Request an und schickt eine **zweite** WhatsApp zur finalen
 Freigabe des Facebook-Posts. Reine Textentwürfe ohne Original-Visual bleiben
-gesperrt. Ohne `OPENAI_API_KEY` und Migration `009_original_visual_attempts.sql`
-stoppt dieser Schritt; die ursprüngliche Textkarte ist nie publishbar.
+gesperrt. Ohne `REPLICATE_API_TOKEN` oder `OPENAI_API_KEY` stoppt dieser Schritt;
+für Replicate sind die Migrationen `009_original_visual_attempts.sql` und
+`010_replicate_visual_provider.sql` nötig. Die ursprüngliche Textkarte ist nie publishbar.
 
 ### Vorlage erst nach Kostenentscheidung aktivieren
 

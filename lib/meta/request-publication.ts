@@ -21,7 +21,7 @@ export async function requestFacebookApproval(jobId:string){
 
   const approver=(process.env.WHATSAPP_APPROVER_WA_ID||"").replace(/\D/g,"");
   const repo=publicationRepository();
-  const claim=await repo.claimVisual(jobId,imageProviderStatus().model);
+  const claim=await repo.claimVisual(jobId,imageProviderStatus().model,provider.name);
   let publication=claim.existing;
   if(!publication){
     const asset=await provider.render(claim.job);

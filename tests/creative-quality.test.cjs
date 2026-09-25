@@ -81,11 +81,18 @@ test('single product page does not turn unverified benefits into model claims',a
 });
 
 test('missing image provider cannot silently fall back to the typographic card',()=>{
-  const status=imageProviderStatus();
-  assert.equal(status.configured,false);
-  assert.equal(status.provider,'openai');
-  assert.equal(getOriginalVisualProvider(),null);
-  assert.match(status.reason,/OPENAI_API_KEY fehlt/i);
+  const previous={replicate:process.env.REPLICATE_API_TOKEN,openai:process.env.OPENAI_API_KEY};
+  try {
+    delete process.env.REPLICATE_API_TOKEN;delete process.env.OPENAI_API_KEY;
+    const status=imageProviderStatus();
+    assert.equal(status.configured,false);
+    assert.equal(status.provider,null);
+    assert.equal(getOriginalVisualProvider(),null);
+    assert.match(status.reason,/OPENAI_API_KEY/i);
+  } finally {
+    if(previous.replicate===undefined)delete process.env.REPLICATE_API_TOKEN;else process.env.REPLICATE_API_TOKEN=previous.replicate;
+    if(previous.openai===undefined)delete process.env.OPENAI_API_KEY;else process.env.OPENAI_API_KEY=previous.openai;
+  }
 });
 
 test('publication eligibility rejects a legacy weak image before a publication request can be created',()=>{

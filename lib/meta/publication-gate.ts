@@ -36,7 +36,8 @@ function publication(row: Record<string, unknown>) {
 
 export function publicationRepository(db: Database = getDatabase()) {
   return {
-    async claimVisual(jobId: string, model: string): Promise<{ job: ContentJob; existing: null | ReturnType<typeof publication> }> {
+    async claimVisual(jobId: string, model: string, provider = "openai"): Promise<{ job: ContentJob; existing: null | ReturnType<typeof publication> }> {
+      if (!["openai", "replicate"].includes(provider)) throw new PublicationConflictError("Bildprovider ungültig.");
       return db.transaction(async sql => {
         const stored = await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE", [jobId]);
         if (!stored.rows[0]) throw new PublicationConflictError("Content-Job fehlt.");
@@ -53,8 +54,8 @@ export function publicationRepository(db: Database = getDatabase()) {
           }
         }
         const claimed = await sql.query(
-          "INSERT INTO original_visual_attempts(job_id,content_hash,provider,model) VALUES($1,$2,'openai',$3) ON CONFLICT DO NOTHING RETURNING job_id",
-          [jobId, hash, model],
+          "INSERT INTO original_visual_attempts(job_id,content_hash,provider,model) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING RETURNING job_id",
+          [jobId, hash, provider, model],
         );
         if (!claimed.rows[0]) throw new PublicationConflictError("Bildversuch bereits begonnen; Ergebnis prüfen, nicht erneut generieren.");
         return { job, existing: null };
@@ -65,7 +66,7 @@ export function publicationRepository(db: Database = getDatabase()) {
       let validUrl = false;
       try { const parsed = new URL(asset.url); validUrl = parsed.protocol === "https:" && parsed.hostname.endsWith(".public.blob.vercel-storage.com") && parsed.pathname === expectedPath; }
       catch { /* Invalid asset stays blocked. */ }
-      if (asset.provider !== "openai" || asset.mediaType !== "image" || !asset.model || !validUrl) {
+      if (!["openai", "replicate"].includes(asset.provider) || asset.mediaType !== "image" || !asset.model || !validUrl) {
         throw new PublicationConflictError("Verifiziertes Originalbild fehlt.");
       }
       return db.transaction(async sql => {
@@ -74,7 +75,7 @@ export function publicationRepository(db: Database = getDatabase()) {
         const job = parseJob(stored.rows[0].snapshot);
         const { caption, hash } = publicationContent(job);
         const attempt = await sql.query("SELECT * FROM original_visual_attempts WHERE job_id=$1 AND content_hash=$2 FOR UPDATE", [jobId, hash]);
-        if (attempt.rows[0]?.status !== "attempted" || attempt.rows[0].model !== asset.model) {
+        if (attempt.rows[0]?.status !== "attempted" || attempt.rows[0].model !== asset.model || attempt.rows[0].provider !== asset.provider) {
           throw new PublicationConflictError("Bildversuch fehlt, ist bereits gebunden oder der Entwurf wurde geändert.");
         }
         const previous = await sql.query("SELECT * FROM publication_requests WHERE job_id=$1 AND platform='facebook' ORDER BY revision DESC LIMIT 1", [jobId]);

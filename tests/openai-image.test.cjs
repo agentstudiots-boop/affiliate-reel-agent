@@ -51,16 +51,19 @@ async function setup() {
 
 test('missing key is fail-closed, configured key selects OpenAI without calling it', () => {
   const old = process.env.OPENAI_API_KEY;
+  const replicate = process.env.REPLICATE_API_TOKEN;
   try {
+    delete process.env.REPLICATE_API_TOKEN;
     delete process.env.OPENAI_API_KEY;
     assert.equal(imageProviderStatus().configured,false);
-    assert.match(imageProviderStatus().reason,/OPENAI_API_KEY fehlt/);
+    assert.match(imageProviderStatus().reason,/OPENAI_API_KEY/);
     assert.equal(getOriginalVisualProvider(),null);
     process.env.OPENAI_API_KEY='test-only-mock-key';
     assert.equal(imageProviderStatus().configured,true);
     assert.equal(imageProviderStatus().model,DEFAULT_OPENAI_IMAGE_MODEL);
     assert.equal(getOriginalVisualProvider().name,'openai');
-  } finally { if (old === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY=old; }
+  } finally { if (old === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY=old;
+    if (replicate === undefined) delete process.env.REPLICATE_API_TOKEN; else process.env.REPLICATE_API_TOKEN=replicate; }
 });
 
 test('visual prompt stays categorical on search and excludes unverified model claims', async () => {

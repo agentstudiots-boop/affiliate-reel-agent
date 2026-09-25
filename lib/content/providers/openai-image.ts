@@ -44,7 +44,7 @@ export function buildOriginalVisualPrompt(job: ContentJob): string {
   ].filter(Boolean).join("\n");
 }
 
-function pngIsPlausible(bytes: Buffer): boolean {
+export function pngIsPlausible(bytes: Buffer): boolean {
   if (bytes.length < 100 || bytes.length > MAX_IMAGE_BYTES) return false;
   if (!bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]))) return false;
   if (bytes.readUInt32BE(8) !== 13 || bytes.toString("ascii", 12, 16) !== "IHDR") return false;
