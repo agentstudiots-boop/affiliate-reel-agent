@@ -11,6 +11,7 @@ export function PublicationGate({job,password}:{job:ContentJob;password:string})
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
+  const [reconciliation,setReconciliation]=useState("");
   const refresh=useCallback(async()=>{
     if(!password)return;
     const response=await fetch(`/api/publication?jobId=${encodeURIComponent(job.id)}`,{headers:{"x-content-password":password},cache:"no-store"});
@@ -28,6 +29,14 @@ export function PublicationGate({job,password}:{job:ContentJob;password:string})
     setRecord(data.publication);
     setNotice(data.whatsapp==="approved_template_required"?"Entwurf gespeichert. Für WhatsApp außerhalb des 24-Stunden-Fensters fehlt eine genehmigte Meta-Vorlage.":data.approvalSent?"WhatsApp-Freigabe versendet. Nur deine ausdrückliche Antwort veröffentlicht genau einmal.":"Status aktualisiert.");
   }catch(caught){setError(caught instanceof Error?caught.message:"Anfrage fehlgeschlagen.")}finally{setBusy(false)}}
+  async function reconcile(){setBusy(true);setError("");setReconciliation("");try{
+    const response=await fetch("/api/publication",{method:"POST",headers:{"Content-Type":"application/json","x-content-password":password},body:JSON.stringify({action:"reconcile",jobId:job.id})});
+    const data=await response.json();if(!response.ok)throw new Error(data.error||"Lesender Abgleich fehlgeschlagen.");
+    const result=data.reconciliation;
+    setReconciliation(result.status==="found"?`Passendes Seitenfoto gefunden: ${result.permalink}`:
+      result.status==="not_found"?"Im abgefragten Zeitfenster wurde kein passendes Seitenfoto gefunden. Das beweist keine fehlgeschlagene Veröffentlichung; der Auftrag bleibt gesperrt.":
+      `Abgleich unvollständig (${result.reason}). Der Auftrag bleibt gesperrt.`);
+  }catch(caught){setError(caught instanceof Error?caught.message:"Abgleich fehlgeschlagen.")}finally{setBusy(false)}}
   return <section className="reviewBox"><h3>Facebook-Beitrag · separate Freigabe</h3>
     <p>Ausgewählter Job: {job.opportunity.product.name} · {job.marketing?.primary || "Marketingplan fehlt"}.</p>
     {provider&&<p role="status">{provider.configured?`Bildprovider: ${provider.provider==="replicate"?"Replicate":"OpenAI"} · Modell: ${provider.model}`:provider.reason}</p>}
@@ -37,6 +46,8 @@ export function PublicationGate({job,password}:{job:ContentJob;password:string})
       <div className="postCopy">{record.caption}</div>
       {record.status==="pending"&&record.whatsappSendAttempted&&!record.whatsappMessageId&&<div className="reviewBox"><p>Der letzte WhatsApp-Versand wurde versucht, aber keine Message-ID gespeichert.</p><button type="button" className="ghost" disabled={busy} onClick={resetWhatsApp}>{busy?"Bitte warten …":"Ich bestätige: keine WhatsApp angekommen"}</button></div>}
       {record.status==="pending"&&!record.whatsappSendAttempted&&!eligibilityError&&<button type="button" disabled={busy} onClick={request}>{busy?"Bitte warten …":"WhatsApp-Freigabe senden / Status prüfen"}</button>}
+      {record.status==="unknown"&&<button type="button" className="ghost" disabled={busy||!password} onClick={reconcile}>{busy?"Prüfung läuft …":"Facebook-Fotos lesend abgleichen"}</button>}
+      {reconciliation&&<p role="status">{reconciliation}</p>}
       {record.permalink&&<p><a href={record.permalink} target="_blank" rel="noopener noreferrer">Veröffentlichten Beitrag öffnen ↗</a></p>}
       {record.feedback&&<p>Änderungswunsch: {record.feedback}</p>}</>}
     {notice&&<p role="status">{notice}</p>}{error&&<p role="alert" className="error">{error}</p>}
