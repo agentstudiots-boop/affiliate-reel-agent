@@ -49,7 +49,7 @@ async function fixture(t) {
       sends.push(pending.id);
       return publication.bindMessage(pending.id, 'wamid.publication');
     } },
-    '@/lib/meta/publisher': { publishFacebookPhoto: async (image, caption) => {
+    '@/lib/meta/publisher': { FacebookPublishFailure: require('../.test-build/lib/meta/publisher').FacebookPublishFailure, publishFacebookPhoto: async (image, caption) => {
       writes.push({ image, caption });
       if (state.unknown) throw new Error('Simulated accepted post with response lost');
       return { id: '123_456', permalink: 'https://www.facebook.com/123_456' };
