@@ -10,6 +10,7 @@ type ImageContent = Extract<Content, { format: "image" }>;
 
 const fallbackPattern = /symbolgrafik|textkarte|reine(?:r|s)?\s+text|nur\s+typografie|typografische\s+karte|platzhalter|fallback[-\s]?grafik/i;
 const copiedCommercePattern = /amazon[-\s]?(?:ui|screenshot|bild)|händler[-\s]?screenshot|logo\s+(?:kopieren|übernehmen)|produktfoto\s+kopieren/i;
+const internalCaptionPattern = /redaktionelle (?:übersicht|orientierung|produktidee)|nur separat verifizierte modellangaben|konkrete eigenschaften in der verlinkten auswahl/i;
 
 export function evaluateImageCreativeQuality(content: ImageContent): CreativeQualityResult {
   const issues: string[] = [];
@@ -31,6 +32,7 @@ export function evaluateImageCreativeQuality(content: ImageContent): CreativeQua
   const visualText = [content.title, content.hook, ...content.slides.flatMap(slide => [slide.visual, slide.prompt, slide.alt])].join(" ");
   if (fallbackPattern.test(visualText)) issues.push("Generische Symbol-, Platzhalter- oder Textkarten sind nicht veröffentlichungsreif.");
   if (copiedCommercePattern.test(visualText)) issues.push("Händlerbilder, Shop-Screenshots oder Logos dürfen nicht als Creative übernommen werden.");
+  if (internalCaptionPattern.test(content.caption)) issues.push("Die Caption enthält interne Prüfhinweise statt eines lesbaren Beitrags.");
   if (content.slides.some(slide => slide.visual.trim().length < 20 || slide.prompt.trim().length < 40)) {
     issues.push("Mindestens ein Slide hat kein ausreichend konkretes visuelles Briefing.");
   }

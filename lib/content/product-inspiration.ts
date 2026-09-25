@@ -53,6 +53,8 @@ function preset(name: string, useCase: string, category: Opportunity["category"]
     ? ["Kompatibilität", "Abmessungen", "Herstellerangaben"]
     : category === "kitchen"
       ? ["Eignung für den Anwendungsfall", "Zubehör", "Pflege und Herstellerhinweise"]
+      : category === "home_living"
+        ? ["Material", "Maße", "Pflegehinweise"]
       : ["Eignung für den Alltag", "Größe oder Ausführung", "Pflege und Herstellerhinweise"];
   return {
     categoryLabel: name,

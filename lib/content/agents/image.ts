@@ -23,6 +23,18 @@ function visualConcept(brief: Brief) {
   };
 }
 
+function readerCaption(brief: Brief, subdued = false) {
+  const { inspiration } = brief;
+  const linkTarget = inspiration.editorialMode === "category" ? "in der verlinkten Auswahl" : "auf der verlinkten Produktseite";
+  if (/kuscheldecke|wohndecke|fleecedecke/i.test(inspiration.categoryLabel)) {
+    if (subdued) return `Werbung | Wenn du eine Kuscheldecke für ruhige Abende auf dem Sofa suchst, lohnt sich ein Blick auf Größe, Material und Pflegehinweise. Prüfe die Angaben ${linkTarget} und entscheide, was zu deinem Alltag passt. Bei einem Kauf über den Affiliate-Link kann ich eine Provision erhalten.`;
+    return `Werbung | Feierabend, Tee und ein Platz auf dem Sofa: Eine Kuscheldecke macht den ruhigen Abend ein bisschen gemütlicher. Welche zu dir passt, hängt von Größe, Material und Pflege ab. Prüfe die Angaben ${linkTarget} – besonders, wenn du dich ganz einwickeln möchtest. Bei einem Kauf über den Affiliate-Link kann ich eine Provision erhalten.`;
+  }
+  const criteria = inspiration.purchaseCriteria.slice(0, 3).join(", ");
+  if (subdued) return `Werbung | Bei ${inspiration.categoryLabel} lohnt es sich, ${criteria} zu vergleichen. Prüfe die Angaben ${linkTarget} und entscheide, welche Ausführung zu deinem Alltag passt. Bei einem Kauf über den Affiliate-Link kann ich eine Provision erhalten.`;
+  return `Werbung | ${inspiration.categoryLabel}: Worauf kommt es dir im Alltag an? Beim Vergleichen helfen ${criteria} als Orientierung. Prüfe die konkreten Angaben ${linkTarget}, bevor du dich entscheidest. Bei einem Kauf über den Affiliate-Link kann ich eine Provision erhalten.`;
+}
+
 function reviseReferenceImage(brief: Brief) {
   if (brief.previous?.format !== "image" || !brief.changeRequest) throw new Error("Vorheriger Bild-Plan und Änderungsauftrag fehlen.");
   const request = brief.changeRequest.toLocaleLowerCase("de-DE");
@@ -37,7 +49,7 @@ function reviseReferenceImage(brief: Brief) {
   }
   if (/weniger werblich|nicht so werblich|sachlicher|neutraler/.test(request)) {
     const inspiration = brief.inspiration;
-    next.caption = `Werbung | ${inspiration.categoryLabel} als redaktionelle Produktidee für ${brief.idea.useCase}. Eignung und Herstellerangaben am konkreten Produkt bzw. in der verlinkten Auswahl prüfen. Bei einem Kauf über den Affiliate-Link kann eine Provision anfallen.`;
+    next.caption = readerCaption(brief, true);
     next.cta = inspiration.editorialMode === "category"
       ? "Bei Interesse kannst du die verlinkte Auswahl sachlich vergleichen."
       : "Bei Interesse kannst du die verifizierbaren Produktangaben im Link prüfen.";
@@ -113,10 +125,8 @@ Keine Typografie in das generierte Bild verlangen; Schrift wird später im Layou
         alt: visual,
         prompt: `Originelles redaktionelles Social-Media-Visual im Hochformat 4:5. ${visual} Hochwertiger Editorial-/Lifestyle-Look, glaubwürdige Materialien und Licht, klare visuelle Hauptaussage, ausreichend freie Fläche für später gesetzte kurze Redaktionstexte. Keine Logos, keine Shop-Oberfläche, keine eingebrannte Schrift, keine exakte Modellnachbildung und keine erfundenen Produkteigenschaften.`,
       })),
-      caption: categoryMode
-        ? `Werbung | ${inspiration.categoryLabel} für ${idea.useCase}: Diese redaktionelle Übersicht ordnet Anwendung und Kaufkriterien ein. Konkrete Eigenschaften in der verlinkten Auswahl jeweils anhand der Herstellerangaben prüfen. Bei einem Kauf über den Affiliate-Link kann eine Provision anfallen.`
-        : `Werbung | ${inspiration.categoryLabel} als Produktidee für ${idea.useCase}. Nur separat verifizierte Modellangaben übernehmen; weitere Angaben am konkreten Produkt prüfen. Bei einem Kauf über den Affiliate-Link kann eine Provision anfallen.`,
-      cta: categoryMode ? "Passende Produkte in der verlinkten Auswahl anhand der Kriterien vergleichen." : "Produktdetails über den gekennzeichneten Link prüfen.",
+      caption: readerCaption({ ...brief, inspiration }),
+      cta: categoryMode ? "Optionen in der Auswahl ansehen und vergleichen." : "Produktdetails über den gekennzeichneten Link prüfen.",
       disclosure: "Werbung | Affiliate-Link" as const,
       checks: [
         "Visual muss als originelles redaktionelles Creative vorliegen; Textkarte/Symbolgrafik ist nur Preview.",

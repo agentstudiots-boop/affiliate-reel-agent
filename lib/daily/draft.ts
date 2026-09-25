@@ -59,7 +59,7 @@ export async function createDailyDraft(day = new Date().toISOString().slice(0, 1
         price: "", targetGroup: candidate.targetGroup,
         benefits: "Produktidee für einen Alltagseinsatz; Eignung und Eigenschaften am konkreten Modell prüfen.",
         notes: `Suchauswahl statt konkretem Produkt. Noch zu prüfen: ${candidate.benefitsToVerify.join(", ")}.` },
-      category: "household", useCaseKey: "seasonal-product-guide", targetPlatform: "facebook",
+      category: candidate.category === "Wohnen" ? "home_living" : "household", useCaseKey: "seasonal-product-guide", targetPlatform: "facebook",
       useCase: candidate.reelIdea, trend: candidate.whyNow, goal: "education", budget: "low", verifiedFacts: [],
     };
     const repo = memoryRepository(db);

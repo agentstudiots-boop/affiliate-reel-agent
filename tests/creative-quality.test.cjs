@@ -28,7 +28,7 @@ function baseImage(changes={}){
       prompt:'Originelles redaktionelles Lifestyle-Visual im Hochformat 4:5 mit neutraler Decke, Sofa, warmem Abendlicht, glaubwürdiger Textur und freier Fläche für später gesetzte Schrift. Keine Logos, keine Shop-Oberfläche, keine exakte Modellnachbildung.',
       alt:'Neutrale Kuscheldecke auf einem Sofa in warmer Wohnatmosphäre.'
     }],
-    caption:'Werbung | Redaktionelle Orientierung zu Kuscheldecken. Herstellerangaben am konkreten Produkt prüfen.',
+    caption:'Werbung | Ein ruhiger Abend auf dem Sofa: Bei einer Kuscheldecke lohnt sich ein Blick auf Material, Größe und Pflege.',
     cta:'Verlinkte Auswahl anhand der Kriterien vergleichen.',disclosure:'Werbung | Affiliate-Link',
     checks:['Keine Händlerbilder oder Modellbehauptungen verwenden.'],
     ...changes
@@ -52,16 +52,26 @@ test('concrete lifestyle visual brief passes the creative quality gate',()=>{
   assert.ok(result.score>=75);
 });
 
+test('internal briefing text cannot pass as a public image caption',()=>{
+  const result=evaluateImageCreativeQuality(baseImage({caption:'Werbung | Kuscheldecke für An einem kühlen Herbstabend: Diese redaktionelle Übersicht ordnet Anwendung und Kaufkriterien ein.'}));
+  assert.equal(result.passed,false);
+  assert.match(result.issues.join(' '),/interne Prüfhinweise/);
+});
+
 test('search result source stays categorical and produces an original carousel brief',async()=>{
   const opportunity=opportunitySchema.parse({
     product:{name:'Kuscheldecke',sourceUrl:'https://www.amazon.de/s?k=Kuscheldecke',affiliateUrl:'',price:'',targetGroup:'Haushalte',benefits:'Größe und Material vergleichen',notes:''},
-    useCase:'Ein kühler Herbstabend auf dem Sofa mit einer Decke.',targetPlatform:'facebook',budget:'low'
+    useCase:'An einem kühlen Herbstabend liegt eine neutrale Kuscheldecke auf dem Sofa. Eine Person sitzt mit Tee im warmen Licht.',category:'home_living',targetPlatform:'facebook',budget:'low'
   });
   const job=await runContentJob(opportunity);
   assert.equal(job.content.format,'image');
   assert.equal(job.content.visualConcept.sourceKind,'search');
   assert.equal(job.content.visualConcept.representation,'generic_category');
   assert.equal(job.content.layout,'carousel');
+  assert.equal(job.opportunity.category,'home_living');
+  assert.match(job.content.caption,/Feierabend, Tee.*Größe, Material und Pflege/);
+  assert.doesNotMatch(job.content.caption,/Kuscheldecke für An einem|redaktionelle Übersicht|neutral/i);
+  assert.match(job.content.cta,/Auswahl ansehen/);
   assert.doesNotMatch([job.content.title,job.content.hook,job.content.caption,...job.content.slides.map(s=>s.copy)].join(' '),/beste(?:r|s)?\b/i);
   assert.doesNotMatch(job.content.slides.map(s=>s.prompt).join(' '),/Amazon[-\s]?(?:UI|Screenshot|Bild)/i);
   assert.equal(job.review.passed,true,JSON.stringify(job.review));
@@ -78,6 +88,7 @@ test('single product page does not turn unverified benefits into model claims',a
   assert.equal(job.content.visualConcept.representation,'generic_category');
   const publicCopy=[job.content.caption,...job.content.slides.flatMap(s=>[s.headline,s.copy])].join(' ');
   assert.doesNotMatch(publicCopy,/wasserdicht|selbstheizend/i);
+  assert.match(job.content.caption,/verlinkten Produktseite/);
 });
 
 test('missing image provider cannot silently fall back to the typographic card',()=>{
