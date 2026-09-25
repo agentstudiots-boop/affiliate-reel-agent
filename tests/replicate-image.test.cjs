@@ -107,3 +107,27 @@ test('failure, timeout, invalid output, invalid PNG and Blob failure never creat
     }
   } finally {await pg.close()}
 });
+
+test('Replicate HTTP failures are classified without leaking provider response or token',async()=>{
+  const {pg,job}=await setup();
+  const originalLog=console.error;
+  try {
+    const approved=await job();
+    for(const [status,category] of [[401,'auth'],[402,'billing'],[403,'access'],[404,'model_or_endpoint'],[422,'request_schema'],[429,'rate_limit'],[503,'provider_error']]){
+      let posts=0,logged='';
+      console.error=value=>{logged=value};
+      const provider=createReplicateImageProvider('private-test-token',DEFAULT_REPLICATE_IMAGE_MODEL,{
+        request:async(url,options)=>{
+          assert.equal(options.method,'POST');posts++;
+          return new Response(JSON.stringify({detail:'private-test-token prompt user secret; aspect_ratio invalid'}),{status});
+        },
+      });
+      await assert.rejects(provider.render(approved),/Kein automatischer zweiter Versuch/);
+      const record=JSON.parse(logged);
+      assert.equal(posts,1);assert.equal(record.httpStatus,status);assert.equal(record.category,category);
+      assert.equal(record.predictionId,null);assert.equal(record.phase,'create');
+      assert.doesNotMatch(logged,/private-test-token|user secret/);
+      if(status===422)assert.equal(record.detail,'Ungültiges Feld: aspect_ratio');
+    }
+  } finally {console.error=originalLog;await pg.close()}
+});
