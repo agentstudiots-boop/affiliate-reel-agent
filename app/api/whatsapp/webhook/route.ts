@@ -61,7 +61,7 @@ export async function POST(request: Request) {
         try { await requestFacebookApproval(result.dailyJobId); }
         catch { console.error(JSON.stringify({event:"daily_publication_preparation_unknown",jobId:result.dailyJobId})); }
       }
-      if (result.handled && "publicationId" in result && typeof result.publicationId === "string" && result.intent === "changes_requested") {
+      if (result.handled && "publicationId" in result && typeof result.publicationId === "string" && result.intent === "changes_requested" && result.platform === "facebook") {
         const publicationRepo = publicationRepository();
         try {
           const revised = await publicationRepo.reviseRequested(result.publicationId);
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
           console.info(JSON.stringify({ event: "publication_revision", publicationId: result.publicationId, status: "needs_clarification" }));
         }
       }
-      if (result.handled && "publicationId" in result && typeof result.publicationId === "string" && result.intent === "approve") {
+      if (result.handled && "publicationId" in result && typeof result.publicationId === "string" && result.intent === "approve" && result.platform === "facebook") {
         const publicationRepo = publicationRepository();
         const claimed = await publicationRepo.claimPublish(result.publicationId);
         let phase = "publish";

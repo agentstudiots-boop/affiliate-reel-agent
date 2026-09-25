@@ -1,4 +1,5 @@
 "use client";
+import { InstagramReelGate } from "./instagram-reel-gate";
 
 import { useEffect, useState } from "react";
 import type { ContentJob } from "@/lib/content/schema";
@@ -112,6 +113,7 @@ export function ProductionGate({ job, password, onRevised }: { job: ContentJob; 
       {run.status === "approved_for_spend" && <button type="button" className="primary" disabled={busy} onClick={() => action("startVideo")}>Freigegebenes Video einmalig erstellen – kostet {run.estimatedProviderCredits} Credits</button>}
       {run.status === "rendering" && <><p>Videostart wurde beansprucht. {run.providerJobId ? "Provider-Auftrag bestätigt." : "Provider-Ergebnis unklar: keinen zweiten kostenpflichtigen Start auslösen."}</p>{run.providerJobId && <button type="button" disabled={busy} onClick={() => action("pollVideo")}>Provider-Status abfragen / MP4 fertigstellen</button>}</>}
       {run.status === "ready" && run.outputUrl && <p><a href={run.outputUrl} target="_blank" rel="noreferrer">Fertiges Video ansehen</a> · Veröffentlichung erfordert eine separate Freigabe.</p>}
+      {run.status === "ready" && job.marketing?.primary === "Instagram Reel" && <InstagramReelGate job={job} password={password} />}
       {run.status === "changes_requested" && <><p>Änderungsauftrag gespeichert. Der Orchestrator gibt ihn an den Video-Agenten weiter. Im Referenzmodus sind konkrete Szenen-, CTA- und Tempoänderungen unterstützt.</p><button type="button" disabled={busy} onClick={() => action("reviseContent")}>Änderung bearbeiten und neuen Content-Plan vorlegen</button></>}
       {status?.approval && <p><b>Freigabe:</b> {status.approval.status}{status.approval.whatsappMessageId ? " · WhatsApp-Nachricht bestätigt" : " · Versand nicht bestätigt; manuell prüfen"}</p>}
       {status && !status.configuration.whatsappApprovalReady && <p className="muted">WhatsApp ist teilweise vorbereitet. Für den signierten Freigabe-Webhook fehlen noch mindestens Verify-Token/App-Secret oder die freigegebene Empfänger-WA-ID.</p>}

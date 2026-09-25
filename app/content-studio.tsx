@@ -16,7 +16,7 @@ const labels: Record<JobStatus, string> = {
   reviewing: "Qualität prüfen", revising: "Überarbeiten", marketing: "Marketing planen", awaiting_approval: "Freigabe offen", needs_input: "Klärung nötig", failed: "Fehlgeschlagen", interrupted: "Unterbrochen", approved: "Plan freigegeben",
 };
 
-export function ContentStudio({ product }: { product: Product }) {
+export function ContentStudio({ product, onFillReelTest }: { product: Product; onFillReelTest: () => void }) {
   const [useCase, setUseCase] = useState("");
   const [trend, setTrend] = useState("");
   const [goal, setGoal] = useState<Opportunity["goal"]>("conversion");
@@ -30,6 +30,7 @@ export function ContentStudio({ product }: { product: Product }) {
   const [category,setCategory] = useState<Opportunity["category"]>("general");
   const [useCaseKey,setUseCaseKey] = useState("general");
   const [targetPlatform,setTargetPlatform] = useState<Opportunity["targetPlatform"]>("any");
+  const [formatPreference,setFormatPreference] = useState<"automatic"|"video">("automatic");
   const [databaseReady,setDatabaseReady] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const job = jobs.find(j => j.id === selectedId) || jobs[0];
@@ -73,7 +74,7 @@ export function ContentStudio({ product }: { product: Product }) {
     const execute = async () => {
       const response = await fetch("/api/content", { method: "POST", signal: controller.signal,
         headers: { "Content-Type": "application/json", "x-content-password": password },
-        body: JSON.stringify({ requestId: crypto.randomUUID(), opportunity: parsed.data, mode: "reference" }) });
+        body: JSON.stringify({ requestId: crypto.randomUUID(), opportunity: parsed.data, mode: "reference", formatPreference: targetPlatform === "instagram" ? formatPreference : "automatic" }) });
       if (!response.ok) { const data = await response.json(); throw new Error(data.error || "Planung konnte nicht starten."); }
       if (!response.body) throw new Error("Keine Antwort vom Orchestrator erhalten.");
       const reader = response.body.getReader();
@@ -123,6 +124,11 @@ export function ContentStudio({ product }: { product: Product }) {
 
   return <section className="panel contentStudio" id="content-studio">
     <div className="panelTitle"><span>02</span><div><h2>Content-Planung</h2><p>Die überzeugendste Anwendung bestimmt das Format.</p></div></div>
+    <button type="button" className="ghost" onClick={() => {
+      onFillReelTest(); setUseCase("An einem kühlen Abend sitzt eine Person mit einer Tasse Tee auf dem Sofa und sucht eine passende Kuscheldecke.");
+      setGoal("conversion"); setBudget("quality"); setCategory("home_living"); setTargetPlatform("instagram"); setFormatPreference("video");
+      setUseCaseKey("kuscheldecke-reel-test");
+    }}>Kuscheldecken-Reeltest vorausfüllen · noch keine Kosten</button>
     <p className="agentHierarchy">Creative → Orchestrator → Video, Bild oder Text → Orchestrator → Marketing</p>
     <label>Konkrete Alltagssituation / Use Case<textarea value={useCase} maxLength={1600} onChange={e => setUseCase(e.target.value)} placeholder="Zum Beispiel: Beim Familienessen staunt Oma über das rosa Steak. Papa erklärt Vakuumierer, Sous-vide-Garer und das Anbraten." /></label>
     <label>Trend oder Anlass (optional)<input value={trend} maxLength={600} onChange={e => setTrend(e.target.value)} placeholder="Welcher Anlass macht die Idee gerade relevant?" /></label>
@@ -132,6 +138,7 @@ export function ContentStudio({ product }: { product: Product }) {
     </div>
     <div className="two"><label>Produktkategorie<select value={category} onChange={e=>setCategory(e.target.value as Opportunity["category"])}><option value="general">Noch nicht eingeordnet</option><option value="kitchen">Küche</option><option value="household">Haushalt</option><option value="home_living">Home &amp; Living</option><option value="technology">Technik</option><option value="leisure">Freizeit</option></select></label>
     <label>Zielplattform<select value={targetPlatform} onChange={e=>setTargetPlatform(e.target.value as Opportunity["targetPlatform"])}><option value="any">Noch offen</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option></select></label></div>
+    {targetPlatform === "instagram" && <label>Formatwahl<select value={formatPreference} onChange={e=>setFormatPreference(e.target.value as "automatic"|"video")}><option value="automatic">Automatisch wählen</option><option value="video">Instagram Reel gezielt testen (Video)</option></select><small>Ein gezielter Test erzwingt einen Videoentwurf und kann nach gesonderter WhatsApp-Kostenfreigabe Faceless-Credits verbrauchen.</small></label>}
     <label>Anwendungsgruppe für ähnliche Fälle<input value={useCaseKey} onChange={e=>setUseCaseKey(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,"-"))} maxLength={80} placeholder="z. B. sous-vide oder vorratshaltung" /><small>Für vergleichbare Anwendungen denselben Begriff verwenden. „general“ aktiviert noch keinen historischen Vergleich.</small></label>
     <p className="muted">Tavily recherchiert aktuelle Trends und Produktquellen. Die Content-Planung arbeitet regelbasiert ohne generative Modellkosten.</p>
     <label>Zugangscode für Planung & Datenbank<input type="password" autoComplete="off" value={password} onChange={e => setPassword(e.target.value)} /><small>Der Code wird nicht im Browser gespeichert.</small></label>

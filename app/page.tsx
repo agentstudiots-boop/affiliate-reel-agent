@@ -206,7 +206,15 @@ export default function Home() {
           <button type="button" className="primary" onClick={() => document.getElementById("content-studio")?.scrollIntoView({ behavior: "smooth" })}>Weiter zur Content-Planung</button>
         </section>
 
-        <ContentStudio product={state.product} />
+        <ContentStudio product={state.product} onFillReelTest={() => {
+          setProductReview(null);
+          setState(current => ({ ...current, product: {
+            name: "Kuscheldecke", sourceUrl: "https://www.amazon.de/s?k=Kuscheldecke", affiliateUrl: "", price: "",
+            targetGroup: "Menschen, die eine Decke für ruhige Abende zu Hause suchen",
+            benefits: "Größe, Material und Pflege als Kaufkriterien vergleichen",
+            notes: "Suchauswahl, keine verifizierten Eigenschaften eines einzelnen Modells.",
+          }, updatedAt: new Date().toISOString() }));
+        }} />
       </section>
 
       {state.concept && <details className="legacyContent"><summary>Bisherigen Reel-Entwurf und Videoauftrag öffnen</summary>

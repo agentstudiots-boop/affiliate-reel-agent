@@ -6,7 +6,7 @@ import { authorized } from "@/lib/memory/auth";
 import { ConflictError, memoryRepository } from "@/lib/memory/repository";
 export const runtime = "nodejs";
 export const maxDuration = 300;
-const requestSchema = z.object({ requestId: z.string().uuid(), opportunity: opportunitySchema, mode: z.literal("reference").default("reference") });
+const requestSchema = z.object({ requestId: z.string().uuid(), opportunity: opportunitySchema, mode: z.literal("reference").default("reference"), formatPreference: z.enum(["automatic","video"]).default("automatic") });
 export function GET() {
   return Response.json({ databaseConfigured: databaseConfigured(), planningMode: "reference", researchProvider: "tavily", maxRevisions: 2, maxModelCalls: 0 }, { headers: { "Cache-Control": "no-store" } });
 }
@@ -19,6 +19,9 @@ export async function POST(request: Request) {
     const raw = await request.text();
     if (raw.length > 24000) return Response.json({ error: "Briefing zu groß." }, { status: 413 });
     input = requestSchema.parse(JSON.parse(raw));
+    if (input.formatPreference === "video" && input.opportunity.targetPlatform !== "instagram") {
+      return Response.json({ error: "Ein gezielter Reel-Test braucht die Zielplattform Instagram." }, { status: 400 });
+    }
   } catch { return Response.json({ error: "Bitte Produkt, Link, Zielgruppe und konkreten Use Case vollständig eintragen." }, { status: 400 }); }
   const repo = memoryRepository();
   try { await repo.claim(input.requestId,input.opportunity,input.mode); }
@@ -29,7 +32,7 @@ export async function POST(request: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        await runContentJob(input.opportunity, { id: input.requestId, mode: input.mode, signal, async loadLearning(opportunity) {
+        await runContentJob(input.opportunity, { id: input.requestId, mode: input.mode, signal, ...(input.formatPreference === "video" ? { allowedFormats: ["video" as const] } : {}), async loadLearning(opportunity) {
           try { return await repo.learn(opportunity); } catch { throw new Error("Historischer Datenbankvergleich nicht verfügbar. Planung gestoppt."); }
         }, async onUpdate(job) {
           // Database commit precedes UI delivery. A lost browser connection cannot erase saved work.

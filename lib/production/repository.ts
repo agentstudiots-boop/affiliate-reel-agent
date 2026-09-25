@@ -264,7 +264,7 @@ export function productionRepository(db: Database = getDatabase()) {
           await sql.query("UPDATE publication_requests SET status=$2,feedback=$3,decided_at=now(),updated_at=now() WHERE id=$1", [publication.id,status,decision.feedback]);
           await sql.query("UPDATE whatsapp_events SET intent=$2,approval_request_id=NULL WHERE message_id=$1", [input.id,decision.intent]);
           return { handled: true as const, intent: decision.intent, feedback: decision.feedback,
-            publicationId: String(publication.id), jobId: String(publication.job_id) };
+            publicationId: String(publication.id), jobId: String(publication.job_id), platform: String(publication.platform) };
         }
 
         const approval = mapApproval(approvalResult.rows[0]);
