@@ -36,6 +36,14 @@ function publication(row: Record<string, unknown>) {
 
 export function publicationRepository(db: Database = getDatabase()) {
   return {
+    async reconciliationTarget(jobId: string) {
+      const result = await db.query(
+        "SELECT caption,publish_attempted_at FROM publication_requests WHERE job_id=$1 AND platform='facebook' AND status='unknown' AND publish_attempted_at IS NOT NULL ORDER BY revision DESC LIMIT 1",
+        [jobId],
+      );
+      if (!result.rows[0]) throw new PublicationConflictError("Kein unklarer Facebook-Versuch für diesen Job vorhanden.");
+      return { caption: String(result.rows[0].caption), attemptedAt: new Date(result.rows[0].publish_attempted_at as string).toISOString() };
+    },
     async claimVisual(jobId: string, model: string, provider = "openai"): Promise<{ job: ContentJob; existing: null | ReturnType<typeof publication> }> {
       if (!["openai", "replicate"].includes(provider)) throw new PublicationConflictError("Bildprovider ungültig.");
       return db.transaction(async sql => {
