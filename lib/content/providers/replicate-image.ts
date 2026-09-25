@@ -14,6 +14,25 @@ const TIMEOUT_MS = 95_000; // Leave time for the 120-second publication route to
 type Prediction = { id?: unknown; status?: unknown; output?: unknown; metrics?: { predict_time?: unknown } };
 type Dependencies = { request?: typeof fetch; upload?: typeof put; timeoutMs?: number; pollIntervalMs?: number };
 
+class ReplicateFailure extends Error {
+  constructor(public readonly category: string, public readonly httpStatus?: number, public readonly detail?: string) {
+    super(category);
+  }
+}
+
+function httpFailure(status: number, body: string): ReplicateFailure {
+  const category = ({ 401: "auth", 402: "billing", 403: "access", 404: "model_or_endpoint", 422: "request_schema", 429: "rate_limit" } as Record<number, string>)[status]
+    || (status >= 500 ? "provider_error" : "request_rejected");
+  // Provider responses can echo prompts or credentials. Only emit fixed labels and known field names.
+  const field = ["aspect_ratio", "output_format", "prompt", "input", "model", "version"].find(name => new RegExp(`\\b${name}\\b`, "i").test(body));
+  const detail = status === 422 && field ? `Ungültiges Feld: ${field}` : ({
+    auth: "Token abgelehnt", billing: "Abrechnung oder Guthaben prüfen", access: "Zugriff abgelehnt",
+    model_or_endpoint: "Modell oder Endpunkt nicht gefunden", request_schema: "Eingabe abgelehnt",
+    rate_limit: "Rate Limit", provider_error: "Providerfehler", request_rejected: "Anfrage abgelehnt",
+  } as Record<string, string>)[category];
+  return new ReplicateFailure(category, status, detail);
+}
+
 function predictionId(value: unknown): string | null {
   return typeof value === "string" && /^[a-z0-9]{12,64}$/.test(value) ? value : null;
 }
@@ -73,10 +92,12 @@ export function createReplicateImageProvider(key: string, model = DEFAULT_REPLIC
         body: JSON.stringify({ input: { prompt, aspect_ratio: "4:5", output_format: "png", ...(model.endsWith("-ultra") ? { raw: true } : {}) } }),
         signal: deadline,
       });
-      if (!created.ok) throw new OriginalVisualError("Replicate hat die Bildanfrage abgelehnt.");
-      let prediction = await created.json() as Prediction;
+      if (!created.ok) throw httpFailure(created.status, (await created.text()).slice(0, 2048));
+      let prediction: Prediction;
+      try { prediction = await created.json() as Prediction; }
+      catch { throw new ReplicateFailure("invalid_prediction_response"); }
       id = predictionId(prediction?.id);
-      if (!id) throw new OriginalVisualError("Replicate hat keine gültige Vorhersage-ID geliefert.");
+      if (!id) throw new ReplicateFailure("invalid_prediction_id");
       phase = "poll";
       while (prediction.status === "starting" || prediction.status === "processing") {
         await new Promise<void>((resolve, reject) => {
@@ -86,13 +107,17 @@ export function createReplicateImageProvider(key: string, model = DEFAULT_REPLIC
           if (deadline.aborted) aborted();
         });
         const polled = await request(`${API}/predictions/${id}`, { headers: { Authorization: `Bearer ${key}` }, signal: deadline });
-        if (!polled.ok) throw new OriginalVisualError("Replicate-Status nicht abrufbar.");
-        prediction = await polled.json() as Prediction;
-        if (predictionId(prediction?.id) !== id) throw new OriginalVisualError("Replicate-Status gehört zu einem anderen Bildversuch.");
+        if (!polled.ok) throw httpFailure(polled.status, (await polled.text()).slice(0, 2048));
+        try { prediction = await polled.json() as Prediction; }
+        catch { throw new ReplicateFailure("invalid_prediction_response"); }
+        if (predictionId(prediction?.id) !== id) throw new ReplicateFailure("prediction_id_mismatch");
       }
-      if (prediction.status !== "succeeded") throw new OriginalVisualError("Replicate-Bildversuch fehlgeschlagen oder Ergebnis unklar.");
+      if (prediction.status !== "succeeded") throw new ReplicateFailure(
+        prediction.status === "failed" || prediction.status === "canceled" ? prediction.status : "unknown_status",
+      );
+      phase = "output";
       const url = outputUrl(prediction.output);
-      if (!url) throw new OriginalVisualError("Replicate hat keine gültige einzelne Bild-URL geliefert.");
+      if (!url) throw new ReplicateFailure("invalid_output");
       phase = "download";
       const image = await request(url.href, { redirect: "manual", signal: deadline });
       const bytes = await readPng(image);
@@ -107,8 +132,13 @@ export function createReplicateImageProvider(key: string, model = DEFAULT_REPLIC
       const predictTime = prediction.metrics?.predict_time;
       const usage = { predictionId: id, ...(typeof predictTime === "number" && Number.isFinite(predictTime) && predictTime >= 0 ? { predictTimeSeconds: predictTime } : {}) };
       return { url: blobUrl.href, provider: "replicate", mediaType: "image", model, sha256, generatedAt: new Date().toISOString(), usage };
-    } catch {
-      console.error(JSON.stringify({ event: "replicate_image_failed", jobId: job.id, model, predictionId: id, phase }));
+    } catch (error) {
+      const failure = error instanceof ReplicateFailure ? error : null;
+      const category = failure?.category || (deadline.aborted ? "timeout" : phase === "blob" ? "blob_error" : phase === "download" ? "invalid_media" : "unexpected_error");
+      console.error(JSON.stringify({ event: "replicate_image_failed", jobId: job.id, model, predictionId: id, phase,
+        ...(failure?.httpStatus ? { httpStatus: failure.httpStatus } : {}), category,
+        ...(failure?.detail ? { detail: failure.detail } : {}),
+      }));
       throw new OriginalVisualError("Replicate-Bildversuch fehlgeschlagen oder Ergebnis unklar. Kein automatischer zweiter Versuch.");
     }
   } };
