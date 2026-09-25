@@ -25,7 +25,19 @@ function classifySource(url: URL): ProductSourceKind {
 
 function preset(name: string, useCase: string, category: Opportunity["category"]) {
   const value = `${name} ${useCase}`.toLocaleLowerCase("de-DE");
-  if (/kuscheldecke|wohndecke|fleecedecke|decke/.test(value)) {
+  if (/heizdecke|wärmedecke|elektrische decke/.test(name.toLocaleLowerCase("de-DE"))) {
+    return {
+      categoryLabel: "Heizdecke",
+      visualDirections: [
+        "Ruhige Wohnzimmerszene mit neutraler Heizdecke; keine sichtbare Nutzung entgegen den Herstellerhinweisen.",
+        "Detailansicht einer neutralen Decke ohne Markenlogo, Kabel- oder Bedienfeld-Nachbau.",
+        "Eigenständiger Vergleichsaufbau für Maße, Pflege und Hinweise zur sicheren Nutzung.",
+      ],
+      purchaseCriteria: ["Maße", "Pflegehinweise", "Herstellerhinweise zur sicheren Nutzung"],
+      useCases: ["Kühle Abende zu Hause", "Nutzung nur gemäß Herstellerhinweisen", "Passende Größe und Pflege vergleichen"],
+    };
+  }
+  if (/kuscheldecke|wohndecke|fleecedecke/.test(value) || /^decke\b/i.test(name)) {
     return {
       categoryLabel: "Kuscheldecke",
       visualDirections: [

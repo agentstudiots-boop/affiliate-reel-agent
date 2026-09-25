@@ -1,5 +1,6 @@
 import { videoSchema } from "../schema";
 import type { Brief, Generator } from "../agent";
+import { readerCaption, readerCopy } from "../editorial-copy";
 
 function reviseReferenceVideo(brief: Brief) {
   if (brief.previous?.format !== "video" || !brief.changeRequest) throw new Error("Vorheriger Video-Plan und Änderungsauftrag fehlen.");
@@ -42,6 +43,7 @@ Pro Szene konkrete visuelle Handlung, sprechbarer Dialog/Voiceover und Einblendu
     if (brief.changeRequest) return reviseReferenceVideo(brief);
     const { idea, opportunity } = brief;
     const vacuum = /vakuumier|vakuum.?versiegl/i.test(opportunity.product.name);
+    const copy = readerCopy(brief);
     const cta = new URL(opportunity.product.sourceUrl).pathname === "/s" ? "Passende Geräte in der verlinkten Auswahl ansehen." : "Eignung und Details beim verlinkten Produkt prüfen.";
     const scenes = vacuum ? [
       { durationSeconds: 5, visual: "Inszenierte Werbeszene am Familientisch: Oma schneidet das gebräunte Steak an. Nahaufnahme: rosa Kern, saftige Schnittfläche, Kräuterbutter schmilzt. Ihr überraschter Blick zu Papa.", audio: "Oma: Das hast du doch nicht selbst gemacht!", overlay: "Werbung · inszenierte Szene" },
@@ -52,15 +54,15 @@ Pro Szene konkrete visuelle Handlung, sprechbarer Dialog/Voiceover und Einblendu
       { durationSeconds: 5, visual: "Zurück am Familientisch. Warmes Licht, rosa Anschnitt groß im Bild. Oma nimmt einen Bissen und nickt lächelnd.", audio: "Oma: Dann komm ich nächste Woche wieder!", overlay: "Eine Idee fürs nächste Familienessen" },
       { durationSeconds: 5, visual: "Produktübersicht mit beiden getrennten Geräten, passenden Beuteln und fertigem Teller. CTA im Schnitt ergänzen.", audio: cta, overlay: "Auswahl ansehen · Affiliate-Link" },
     ] : [
-      { durationSeconds: 5, visual: `Konkrete Ausgangssituation zeigen: ${idea.situation}`, audio: idea.hook, overlay: "Werbung · Anwendungsidee" },
-      { durationSeconds: 7, visual: `Anwendung inszenieren: ${idea.useCase}. Nur nach Prüfung der tatsächlichen Geräteeignung drehen.`, audio: "Hier zählt, ob das Produkt zu deiner Anwendung passt.", overlay: "Eignung am konkreten Modell prüfen" },
-      { durationSeconds: 7, visual: `Nachvollziehbares Ergebnis zeigen: ${idea.benefit}. Keine unbestätigten Vorher-Nachher-Effekte simulieren.`, audio: "Prüfe Funktionen, Zubehör und Voraussetzungen für deinen Alltag.", overlay: "Funktion · Zubehör · Voraussetzungen" },
+      { durationSeconds: 5, visual: `Konkrete Ausgangssituation zeigen: ${idea.situation}`, audio: copy.spoken[0], overlay: "Werbung · Anwendungsidee" },
+      { durationSeconds: 7, visual: `Anwendung inszenieren: ${idea.useCase}. Keine unbestätigten Funktionen als Tatsache zeigen.`, audio: copy.spoken[1], overlay: "Anwendung im Alltag" },
+      { durationSeconds: 7, visual: `Nachvollziehbares Ergebnis zeigen: ${idea.benefit}. Keine unbestätigten Vorher-Nachher-Effekte simulieren.`, audio: copy.spoken[2], overlay: "Vor dem Kauf prüfen" },
       { durationSeconds: 5, visual: `Das Produkt ${opportunity.product.name} im Kontext der Anwendung zeigen.`, audio: cta, overlay: "Werbung · Affiliate-Link" },
     ];
     return { format: "video" as const, title: idea.title, hook: idea.hook, useCase: idea.useCase,
       productIntegration: vacuum ? "Vakuumierer verschließt; separates Wasserbad gart; Pfanne erzeugt Kruste. Zubehör ist nicht automatisch im Lieferumfang." : idea.benefit,
       durationSeconds: scenes.reduce((s, x) => s + x.durationSeconds, 0), scenes, cta, disclosure: "Werbung | Affiliate-Link" as const,
-      caption: `Werbung | ${idea.benefit} ${vacuum ? "Fiktive Familienszene, kein Testbericht. Sous-vide benötigt geeignete Beutel und ein separates temperiertes Wasserbad. Ergebnis abhängig von Lebensmittel und korrekter Zubereitung. Vakuumieren kann außerdem bei geeigneten Lebensmitteln und korrekter Lagerung die Haltbarkeit verlängern; Kühlung und Hygiene bleiben erforderlich." : "Redaktionelle Anwendungsidee; Eignung anhand der Herstellerangaben prüfen."} ${cta} Bei einem Kauf über den Affiliate-Link kann eine Provision anfallen.`,
+      caption: vacuum ? `Werbung | ${idea.benefit} Fiktive Familienszene, kein Testbericht. Sous-vide benötigt geeignete Beutel und ein separates temperiertes Wasserbad. Ergebnis abhängig von Lebensmittel und korrekter Zubereitung. Vakuumieren kann außerdem bei geeigneten Lebensmitteln und korrekter Lagerung die Haltbarkeit verlängern; Kühlung und Hygiene bleiben erforderlich. ${cta} Bei einem Kauf über den Affiliate-Link kann eine Provision anfallen.` : readerCaption(brief),
       checks: ["Modelleignung und Herstellerhinweise prüfen.", "Dialog ist inszenierte Werbung, keine echte Kundenbewertung.", "Sprecher, Schnitt, Untertitel und Einblendungen produzieren. Dies ist ein Drehbuch, kein fertiges Video.", opportunity.product.notes || "Keine zusätzlichen Modellnachweise hinterlegt."],
     };
   });

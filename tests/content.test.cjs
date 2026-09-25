@@ -111,7 +111,7 @@ test('specialists cannot import each other or an orchestrator', () => {
   for (const file of readdirSync('lib/content/agents')) {
     const source = readFileSync(`lib/content/agents/${file}`, 'utf8');
     for (const match of source.matchAll(/from\s+["']([^"']+)/g)) {
-      assert.ok(['../schema', '../agent'].includes(match[1]), `${file} has an unauthorized dependency: ${match[1]}`);
+      assert.ok(['../schema', '../agent', '../editorial-copy'].includes(match[1]), `${file} has an unauthorized dependency: ${match[1]}`);
     }
   }
 });

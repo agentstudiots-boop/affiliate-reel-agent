@@ -5,6 +5,10 @@ const {PGlite}=require('@electric-sql/pglite');
 const {evaluateImageCreativeQuality}=require('../.test-build/lib/content/creative-quality');
 const {imageProviderStatus,getOriginalVisualProvider}=require('../.test-build/lib/content/image-provider');
 const {runContentJob}=require('../.test-build/lib/content/orchestrator');
+const {readerCopy}=require('../.test-build/lib/content/editorial-copy');
+const {analyzeProductInspiration}=require('../.test-build/lib/content/product-inspiration');
+const {textAgent}=require('../.test-build/lib/content/agents/text');
+const {videoAgent}=require('../.test-build/lib/content/agents/video');
 const {imageSchema,opportunitySchema}=require('../.test-build/lib/content/schema');
 const {facebookPagePublicationError}=require('../.test-build/lib/meta/publication-eligibility');
 const {publicationRepository}=require('../.test-build/lib/meta/publication-gate');
@@ -89,6 +93,43 @@ test('single product page does not turn unverified benefits into model claims',a
   const publicCopy=[job.content.caption,...job.content.slides.flatMap(s=>[s.headline,s.copy])].join(' ');
   assert.doesNotMatch(publicCopy,/wasserdicht|selbstheizend/i);
   assert.match(job.content.caption,/verlinkten Produktseite/);
+});
+
+test('reference copy changes with the situation and distinguishes electric from ordinary blankets',async()=>{
+  const ordinary=opportunitySchema.parse({
+    product:{name:'Kuscheldecke',sourceUrl:'https://www.amazon.de/s?k=Kuscheldecke',affiliateUrl:'',price:'',targetGroup:'Haushalte',benefits:'Kriterien vergleichen',notes:''},
+    useCase:'Auf dem Sofa eine Decke mit einer Tasse Tee für einen ruhigen Abend auswählen.',category:'home_living',targetPlatform:'facebook',budget:'low'
+  });
+  const sofa=await runContentJob(ordinary);
+  assert.match(sofa.content.caption,/Feierabend, Tee/);
+  const bed=await runContentJob({...ordinary,useCase:'Im Bett abends ein Buch lesen und dazu eine passende Decke auswählen.'});
+  assert.match(bed.content.caption,/Abends im Bett/);
+  assert.doesNotMatch(bed.content.caption,/Tee|Sofa/);
+
+  const heated=opportunitySchema.parse({...ordinary,product:{...ordinary.product,name:'Heizdecke',sourceUrl:'https://www.amazon.de/s?k=Heizdecke'},useCase:'Für kühle Abende zu Hause eine Heizdecke auswählen.'});
+  const inspiration=analyzeProductInspiration(heated);
+  assert.equal(inspiration.categoryLabel,'Heizdecke');
+  assert.match(inspiration.purchaseCriteria.join(' '),/sicheren Nutzung/);
+  const heatedCopy=readerCopy({opportunity:heated,inspiration,idea:sofa.ideas[0]});
+  assert.match(heatedCopy.intro,/Heizdecke/);
+  assert.doesNotMatch(`${heatedCopy.intro} ${heatedCopy.advice}`,/Kuscheldecke|Feierabend, Tee|garantiert/i);
+});
+
+test('text and reel use the same grounded category copy and spoken lines fit their scenes',async()=>{
+  const opportunity=opportunitySchema.parse({
+    product:{name:'Aufbewahrungsbox',sourceUrl:'https://www.amazon.de/s?k=Aufbewahrungsbox',affiliateUrl:'',price:'',targetGroup:'Haushalte',benefits:'Kriterien vergleichen',notes:''},
+    useCase:'Kleinteile zu Hause geordnet aufbewahren, ohne viel Platz zu verlieren.',category:'household',targetPlatform:'facebook',budget:'low'
+  });
+  const job=await runContentJob(opportunity);
+  const inspiration=analyzeProductInspiration(opportunity);
+  const reference=async (_agent,_instruction,_input,_schema,make)=>make();
+  const text=await textAgent({opportunity,inspiration,idea:job.ideas.find(idea=>idea.format==='text')},reference);
+  const video=await videoAgent({opportunity,inspiration,idea:job.ideas.find(idea=>idea.format==='video')},reference);
+  assert.match(text.body,/Welche Aufgabe soll es dir im Alltag erleichtern/);
+  assert.doesNotMatch(text.body,/Dabei geht es um diesen Anwendungsfall|kein eigener Produkttest/);
+  assert.match(video.caption,/Aufbewahrungsbox.*konkreten Aufgabe/);
+  assert.doesNotMatch(video.caption,/Redaktionelle Anwendungsidee/);
+  assert.ok(video.scenes.every(scene=>scene.audio.split(/\s+/).length<=scene.durationSeconds*2.8));
 });
 
 test('missing image provider cannot silently fall back to the typographic card',()=>{

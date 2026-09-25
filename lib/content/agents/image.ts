@@ -1,5 +1,6 @@
 import { imageSchema } from "../schema";
 import type { Brief, Generator } from "../agent";
+import { readerCaption } from "../editorial-copy";
 
 function shorten(value: string, max: number) {
   const clean = value.trim();
@@ -21,18 +22,6 @@ function visualConcept(brief: Brief) {
     originality: "original_editorial" as const,
     visualWeight: "image_led" as const,
   };
-}
-
-function readerCaption(brief: Brief, subdued = false) {
-  const { inspiration } = brief;
-  const linkTarget = inspiration.editorialMode === "category" ? "in der verlinkten Auswahl" : "auf der verlinkten Produktseite";
-  if (/kuscheldecke|wohndecke|fleecedecke/i.test(inspiration.categoryLabel)) {
-    if (subdued) return `Werbung | Wenn du eine Kuscheldecke für ruhige Abende auf dem Sofa suchst, lohnt sich ein Blick auf Größe, Material und Pflegehinweise. Prüfe die Angaben ${linkTarget} und entscheide, was zu deinem Alltag passt. Bei einem Kauf über den Affiliate-Link kann ich eine Provision erhalten.`;
-    return `Werbung | Feierabend, Tee und ein Platz auf dem Sofa: Eine Kuscheldecke macht den ruhigen Abend ein bisschen gemütlicher. Welche zu dir passt, hängt von Größe, Material und Pflege ab. Prüfe die Angaben ${linkTarget} – besonders, wenn du dich ganz einwickeln möchtest. Bei einem Kauf über den Affiliate-Link kann ich eine Provision erhalten.`;
-  }
-  const criteria = inspiration.purchaseCriteria.slice(0, 3).join(", ");
-  if (subdued) return `Werbung | Bei ${inspiration.categoryLabel} lohnt es sich, ${criteria} zu vergleichen. Prüfe die Angaben ${linkTarget} und entscheide, welche Ausführung zu deinem Alltag passt. Bei einem Kauf über den Affiliate-Link kann ich eine Provision erhalten.`;
-  return `Werbung | ${inspiration.categoryLabel}: Worauf kommt es dir im Alltag an? Beim Vergleichen helfen ${criteria} als Orientierung. Prüfe die konkreten Angaben ${linkTarget}, bevor du dich entscheidest. Bei einem Kauf über den Affiliate-Link kann ich eine Provision erhalten.`;
 }
 
 function reviseReferenceImage(brief: Brief) {
