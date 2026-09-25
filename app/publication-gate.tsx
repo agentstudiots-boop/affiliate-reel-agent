@@ -7,7 +7,7 @@ type Publication={id:string;status:string;caption:string;imageUrl:string|null;pe
 export function PublicationGate({job,password}:{job:ContentJob;password:string}){
   const eligibilityError=facebookPagePublicationError(job)|| (job.content?.format!=="image"?"Ein eigenständiger Bildentwurf ist für das Original-Visual erforderlich.":null);
   const [record,setRecord]=useState<Publication|null>(null);
-  const [provider,setProvider]=useState<{configured:boolean;reason:string;model:string}|null>(null);
+  const [provider,setProvider]=useState<{configured:boolean;provider:"replicate"|"openai"|null;reason:string;model:string}|null>(null);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
@@ -30,7 +30,7 @@ export function PublicationGate({job,password}:{job:ContentJob;password:string})
   }catch(caught){setError(caught instanceof Error?caught.message:"Anfrage fehlgeschlagen.")}finally{setBusy(false)}}
   return <section className="reviewBox"><h3>Facebook-Beitrag · separate Freigabe</h3>
     <p>Ausgewählter Job: {job.opportunity.product.name} · {job.marketing?.primary || "Marketingplan fehlt"}.</p>
-    {provider&&<p role="status">{provider.configured?`Bildprovider: OpenAI · Modell: ${provider.model}`:provider.reason}</p>}
+    {provider&&<p role="status">{provider.configured?`Bildprovider: ${provider.provider==="replicate"?"Replicate":"OpenAI"} · Modell: ${provider.model}`:provider.reason}</p>}
     {eligibilityError?<p role="status">{eligibilityError} Der gespeicherte Job wird durch Änderungen am Formular oben nicht geändert.</p>:<p>Für die Publishing-Freigabe ist ein eigenständiges Original-Visual erforderlich. Die frühere Text-/Symbolgrafik ist nur noch Debug-Preview und darf nicht veröffentlicht werden. Fehlt ein produktiver Bildprovider, stoppt der Server vor dem Anlegen einer Publication Request.</p>}
     {!record&&!eligibilityError&&<button type="button" disabled={busy||!password} onClick={request}>{busy?"Vorbereitung läuft …":"Beitrag vorbereiten & WhatsApp-Freigabe anfragen"}</button>}
     {record&&<><p>Status: <strong>{record.status}</strong></p>{record.imageUrl&&<a href={record.imageUrl} target="_blank" rel="noopener noreferrer">Grafik prüfen ↗</a>}
