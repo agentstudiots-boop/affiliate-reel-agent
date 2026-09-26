@@ -39,7 +39,7 @@ async function fixture(t) {
         assert.equal(JSON.parse(options.body).model, 'storyboard');
         if (state.paidUnknown) throw new Error('Simulated response lost after acceptance');
         data = { id: 'video-test', model: 'storyboard', creditsUsed: state.charged }; break;
-      case 'GET /api/v1/videos/video-test/status': data = { status: state.generation }; break;
+      case 'GET /api/v1/videos/video-test/status': data = { status: state.generation, ...(state.generation === 'failed' ? { errorMessages: ['Provider generation failed'] } : {}) }; break;
       case 'POST /api/v1/videos/video-test/render':
         if (state.renderUnknown) throw new Error('Simulated render response lost');
         data = { renderId: 'render-test' }; break;
@@ -117,6 +117,18 @@ test('unknown paid result remains claimed and cannot cause a second purchase', a
   const run = await f.repository.getByJobId(f.id);
   assert.equal(run.status, 'rendering'); assert.equal(run.providerJobId, null);
   assert.equal((await f.repository.latestApproval(f.id)).status, 'consumed');
+});
+
+test('failed generation exposes read-only provider diagnostics without another purchase', async t => {
+  const f = await fixture(t); await f.approve(); await f.post('startVideo');
+  f.state.generation = 'failed';
+  assert.equal((await f.post('pollVideo')).data.stage, 'failed');
+  const response = await f.route.GET(new Request(`https://local.test/api/production?jobId=${f.id}&diagnostics=1`,
+    { headers: { 'x-content-password': 'local-route-test' } }));
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).providerDiagnostics, { status: 'failed', errorMessages: ['Provider generation failed'] });
+  assert.equal(f.paid().length, 1);
+  assert.equal(f.renders().length, 0);
 });
 
 test('unknown MP4 render result is reconciled by reads only', async t => {
