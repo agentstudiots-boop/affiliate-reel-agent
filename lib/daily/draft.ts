@@ -9,6 +9,7 @@ import { dailyNotificationTemplateConfigured, sendDailyNotificationTemplate } fr
 import { parseJob } from "@/lib/content/history";
 import { facebookPagePublicationError } from "@/lib/meta/publication-eligibility";
 import { imageBrief } from "@/lib/content/image-brief";
+import { isPumpkinCarvingProduct } from "@/lib/content/category";
 
 export async function sendDailyApproval(jobId: string) {
   const db = getDatabase();
@@ -67,7 +68,7 @@ export async function createDailyDraft(day = new Intl.DateTimeFormat("en-CA", { 
     const opportunity: Opportunity = {
       product: candidate.resolvedProduct || { name: candidate.name, sourceUrl: "https://www.amazon.de/", affiliateUrl: "",
         price: "", targetGroup: candidate.targetGroup, benefits: "Konkretes Produkt noch nicht aufgelöst.", notes: "product_unresolved" },
-      category: candidate.category === "Wohnen" ? "home_living" : "household", useCaseKey: "seasonal-product-guide", targetPlatform: "facebook",
+      category: isPumpkinCarvingProduct(candidate.resolvedProduct?.name || candidate.name) || candidate.category === "Wohnen" ? "home_living" : "household", useCaseKey: "seasonal-product-guide", targetPlatform: "facebook",
       useCase: candidate.reelIdea, trend: candidate.whyNow, goal: "education", budget: "low", verifiedFacts: [],
     };
     const repo = memoryRepository(db);
