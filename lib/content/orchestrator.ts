@@ -22,6 +22,8 @@ export async function reviseApprovedVideo(job: ContentJob, feedback: string): Pr
   if (!idea) throw new Error("Gewählte Idee fehlt.");
   const draft = contentSchema.parse(await videoAgent({ opportunity: job.opportunity, idea, inspiration: analyzeProductInspiration(job.opportunity), previous: job.content, changeRequest: feedback }, createGenerator({ mode: job.mode })));
   const review = inspectContent(draft, job.decision);
+  review.issues.push(...pumpkinCreativeIssues(job.opportunity, draft));
+  if (review.issues.length) { review.passed = false; review.score = Math.min(40, review.score); }
   if (!review.passed) throw new Error(`Überarbeitung verletzt redaktionelle Prüfung: ${review.issues.join(" ")}`);
   const next = structuredClone(job);
   next.revisions++;
