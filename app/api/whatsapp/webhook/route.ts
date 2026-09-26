@@ -65,6 +65,12 @@ export async function POST(request: Request) {
   let failed = false;
   for (const message of messages) {
     try {
+      if (/^(status|weiter)[.!?]*$/i.test(message.body.trim())
+        && message.from.replace(/\D/g, "") === (process.env.WHATSAPP_APPROVER_WA_ID || "").replace(/\D/g, "")) {
+        const claimed=await getDatabase().query("INSERT INTO whatsapp_events(message_id,wa_id,reply_to_message_id,body,payload) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING RETURNING message_id",[message.id,message.from,message.replyToMessageId,message.body,JSON.stringify(payload)]);
+        if(claimed.rows.length)await sendWhatsAppText("Ich prüfe den letzten freigegebenen Reel-Auftrag und setze offene Schritte fort. Falls ein Kostenangebot oder eine Veröffentlichungsfreigabe ansteht, kommt sie als eigene WhatsApp-Nachricht.");
+        continue;
+      }
       if (await handleContentApproval({ ...message, payload }, async jobId => {
         try {
           const record=await getDatabase().query("SELECT snapshot FROM content_jobs WHERE id=$1",[jobId]);

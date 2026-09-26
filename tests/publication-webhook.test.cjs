@@ -35,12 +35,14 @@ async function fixture(t) {
   // Simulate only the already delivered first draft message. All decisions
   // below pass through the real signature-verified webhook and SQL repository.
   await pg.query("INSERT INTO daily_drafts(day,job_id,status,whatsapp_send_attempted_at,whatsapp_message_id) VALUES('2026-09-24',$1,'awaiting_approval',now(),'wamid.content')", [id]);
-  const writes = [], sends = [];
+  const writes = [], sends = [], notices = [];
   const state = { unknown: false };
   const route = loadRoute('app/api/whatsapp/webhook/route.ts', {
     '@/lib/whatsapp/content-approval': { handleContentApproval: async () => false },
     'next/server': { after: () => {} },
+    '@/lib/memory/db': { getDatabase: () => db },
     '@/lib/production/repository': { productionRepository: () => inbound },
+    '@/lib/whatsapp/client': { sendWhatsAppText: async text => { notices.push(text); return 'wamid.status.notice'; } },
     '@/lib/meta/publication-gate': { publicationRepository: () => publication },
     '@/lib/daily/draft': { sendDailyApproval: async () => { throw new Error('Unexpected notification path'); } },
     '@/lib/meta/request-publication': { requestFacebookApproval: async jobId => {
@@ -61,14 +63,25 @@ async function fixture(t) {
     const body = JSON.stringify({ object: 'whatsapp_business_account', entry: [{ changes: [{ value: {
       metadata: { phone_number_id: overrides.phone || env.WHATSAPP_PHONE_NUMBER_ID },
       messages: [{ id: messageId, from: overrides.from || env.WHATSAPP_APPROVER_WA_ID, type: 'text',
-        text: { body: 'Freigeben' }, context: { id: replyToMessageId } }],
+        text: { body: overrides.body || 'Freigeben' }, context: { id: replyToMessageId } }],
     } }] }] });
     const signature = overrides.invalidSignature ? 'sha256=invalid' : `sha256=${createHmac('sha256', env.META_APP_SECRET).update(body).digest('hex')}`;
     return new Request('https://local.test/api/whatsapp/webhook', { method: 'POST',
       headers: { 'x-hub-signature-256': signature }, body });
   }
-  return { pg, id, publication, memory, route, request, writes, sends, state };
+  return { pg, id, publication, memory, route, request, writes, sends, notices, state };
 }
+
+test('Status resumes WhatsApp work once without becoming a content change', async t => {
+  const f = await fixture(t);
+  const message = f.request('status-once', null, { body: 'Status' });
+  assert.equal((await f.route.POST(message)).status, 200);
+  assert.equal((await f.route.POST(f.request('status-once', null, { body: 'Status' }))).status, 200);
+  assert.equal(f.notices.length, 1);
+  assert.match(f.notices[0], /offene Schritte/);
+  assert.equal((await f.pg.query("SELECT count(*)::int AS n FROM whatsapp_events WHERE message_id='status-once'")).rows[0].n, 1);
+  assert.equal((await f.pg.query('SELECT count(*)::int AS n FROM whatsapp_instructions')).rows[0].n, 0);
+});
 
 test('signed webhook keeps both Facebook approvals separate and publishes once on concurrent delivery', async t => {
   const f = await fixture(t);
