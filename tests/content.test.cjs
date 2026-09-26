@@ -44,10 +44,12 @@ test('a home and living reel does not call blankets devices in its spoken CTA', 
   }, { allowedFormats: ['video'] });
   assert.equal(job.status, 'awaiting_approval');
   assert.equal(job.content.format, 'video');
-  assert.match(job.content.scenes[0].audio, /Werbung\. Feierabend, Tee in der Hand/);
+  assert.match(job.content.scenes[0].audio, /^Feierabend, Tee in der Hand/);
   assert.match(job.content.scenes[1].audio, /einwickeln oder eher leicht/);
   assert.match(job.content.scenes.at(-1).audio, /Welche Decke passt zu dir\?.*Beitragstext/);
   assert.doesNotMatch(job.content.scenes.at(-1).audio, /Geräte/);
+  assert.doesNotMatch(job.content.scenes[0].audio, /^Werbung\b/);
+  assert.match(job.content.caption, /^Werbung \|/);
 });
 
 test('allows two revisions, sends feedback through orchestrator and stops at eight model calls', async () => {
