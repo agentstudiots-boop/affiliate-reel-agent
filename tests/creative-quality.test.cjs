@@ -139,7 +139,10 @@ test('pumpkin reel tells a visible carving story with product context and no mod
     useCase:'Eine erwachsene Person schnitzt aus einem echten Kürbis eine Laterne.',category:'household',targetPlatform:'instagram',budget:'quality',verifiedFacts:[]
   });
   const job=await runContentJob(opportunity,{allowedFormats:['video']});
+  assert.equal(job.opportunity.category,'home_living');
   assert.equal(job.content.format,'video');
+  assert.match(job.marketing.adaptation,/Schnitzen eines echten Halloween-Kürbisses/);
+  assert.doesNotMatch(job.marketing.adaptation,/appetitlich|kochen|essen/i);
   assert.equal(job.review.passed,true,JSON.stringify(job.review));
   const visuals=job.content.scenes.map(scene=>scene.visual).join(' ');
   const voice=job.content.scenes.map(scene=>scene.audio).join(' ');
