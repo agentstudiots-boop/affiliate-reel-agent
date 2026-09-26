@@ -6,6 +6,7 @@ import { imageAgent } from "./agents/image";
 import { textAgent } from "./agents/text";
 import { marketingAgent } from "./agents/marketing";
 import { analyzeProductInspiration } from "./product-inspiration";
+import { classifyOpportunity } from "./category";
 import { evaluateImageCreativeQuality } from "./creative-quality";
 import { createGenerator } from "./model";
 import { contentSchema, opportunitySchema, reviewSchema, type AgentName, type Content, type ContentJob, type Decision, type Idea, type JobEvent, type JobStatus, type Opportunity, type Review } from "./schema";
@@ -112,7 +113,7 @@ export async function runContentJob(raw: Opportunity, options: {
   allowedFormats?: ReadonlyArray<Content["format"]>;
   generate?: Generator; // Dependency injection for deterministic, cost-free contract tests.
 } = {}): Promise<ContentJob> {
-  const opportunity = opportunitySchema.parse(raw);
+  const opportunity = classifyOpportunity(opportunitySchema.parse(raw));
   const now = new Date().toISOString();
   const job: ContentJob = { version: 1, id: options.id || crypto.randomUUID(), createdAt: now, updatedAt: now,
     status: "queued", mode: options.mode || "reference", opportunity, events: [], revisions: 0, modelCalls: 0, totalTokens: 0 };
