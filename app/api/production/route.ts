@@ -58,6 +58,7 @@ const mutation = z.discriminatedUnion("action", [
   z.object({ action: z.literal("startVideo"), jobId: z.string().uuid() }),
   z.object({ action: z.literal("pollVideo"), jobId: z.string().uuid() }),
   z.object({ action: z.literal("reviseContent"), jobId: z.string().uuid() }),
+  z.object({ action: z.literal("requestRevision"), jobId: z.string().uuid(), feedback: z.string().trim().min(5).max(1200) }),
 ]);
 
 export async function POST(request: Request) {
@@ -72,6 +73,10 @@ export async function POST(request: Request) {
       return Response.json({ ...prepared, configuration: publicConfiguration() }, { headers: { "Cache-Control": "no-store" } });
     }
     if (input.action === "reviseContent") return Response.json({ job: await repo.reviseRequestedVideo(input.jobId) }, { headers: { "Cache-Control": "no-store" } });
+    if (input.action === "requestRevision") {
+      await repo.requestVideoRevision(input.jobId, input.feedback);
+      return Response.json({ job: await repo.reviseRequestedVideo(input.jobId) }, { headers: { "Cache-Control": "no-store" } });
+    }
     const run = await repo.getByJobId(input.jobId);
     if (!run || run.providerMode !== "FACELESS_STORYBOARD") throw new ProductionConflictError("Nur vorbereitete Faceless Storyboard-Läufe werden unterstützt.");
     const provider = facelessClient();
