@@ -1,6 +1,6 @@
 # Work handoff
 
-## Reel-Test 26.09.2026: WhatsApp-Kostenfreigabe offen
+## Reel-Test 26.09.2026: Faceless-Generierung fehlgeschlagen
 
 Der Nutzer hat einen Instagram-Reel-Test mit WhatsApp-Kostenfreigabe beauftragt
 und verlangt einen produktbezogenen Handlungsbogen mit Storytelling und Emotion.
@@ -13,21 +13,32 @@ aktuellen Preview erstellt, inhaltlich freigegeben und für Faceless Storyboard
 vorbereitet. Drehbuch: echter Kürbis im Vordergrund, Erwachsene schnitzen Augen
 und Mund, fertige Laterne, emotionale Auflösung und YAVOCOS als mögliche
 Werkzeugwahl ohne unbelegte Modellmerkmale. Sprecherin: Mila Winter (deutsch).
-Quote: 20 Faceless-Credits, beim Abruf 275 Credits verfügbar; EUR-Kosten und
-Affiliate-Provision unbekannt. Die WhatsApp-Kostenanfrage wurde einmal gesendet
-und mit einer Message-ID gebunden. Zuletzt `awaiting_whatsapp_approval`/
-`approval_requests.pending`. Kein Faceless-Kauf und kein Instagram-Post.
+Quote: 20 Faceless-Credits, vorher 275 verfügbar; EUR-Kosten und Provision
+unbekannt. Der Nutzer antwortete um 15:01 Berlin direkt auf die WhatsApp-
+Kostenanfrage mit `Freigeben`; der Webhook bestätigte die Freigabe und startete
+das Video **automatisch genau einmal** um 13:01:49 UTC. Provider-ID
+`6ab7c23dc48e59b4c2ff87e7`. Die zweite, zitierende WhatsApp-Antwort um
+15:03 Berlin ergab `no_pending_approval` und keinen zweiten Start.
 
-Erst nach **ausdrücklicher Antwort auf genau diese WhatsApp** und lesendem
-Nachweis `approved_for_spend` den einmaligen Start für diesen neuen Job
-ausführen. Anschließend Status/Render abgleichen, MP4 auf tatsächliches
-Kürbisschnitzen prüfen und nur bei passender Qualität die separate Instagram-
-Veröffentlichungsfreigabe anfordern. Faceless erhält derzeit ausschließlich
-den Sprechtext und erzeugt eigene statische Bilder; die visuellen Szenen im
-Drehbuch lassen sich über diese API nicht einzeln erzwingen. Bei unpassendem
-Video keine Instagram-Freigabe anfordern und keine weitere Produktion ohne
-neue Kostenentscheidung starten. Code-Commit `876b11ac3680251afcfcc3fcf393880e63189a2a`,
-Preview READY, Quality #117 erfolgreich.
+Um 13:03:58 UTC wurde der Auftrag `failed`. Geschützte, ausschließlich lesende
+Faceless-Statusabfrage: `Storyboard generated ZERO visual items for a 19s video —
+failing the job so the queue retries instead of shipping a black video`.
+Provider-Status auch später `failed`; keine Render-ID, MP4 oder Instagram-
+Veröffentlichung. `approval_requests.status='consumed'`; keine automatische
+erneute Produktion. Der lesende `/me`-Creditstand betrug später weiterhin 275;
+das beweist **keine** genaue Transaktion. Die offizielle Faceless-Dokumentation
+beschreibt Credits bei Erstellung und keine automatische Erstattung bei
+gescheiterter Generierung. Konto-Ledger/Support klären, bevor ein neuer Versuch
+mit neuer Kostenfreigabe erwogen wird. Nie auf Verdacht denselben Auftrag neu
+kaufen. Der neue Diagnoseknopf im Content Studio zeigt den Providerfehler ohne
+Schreibaufruf; Code zur Diagnose auf PR #6 und Preview deployed.
+
+Faceless erhält ausschließlich den Sprechtext und erzeugt eigene statische
+Bilder; die visuellen Szenen im Drehbuch lassen sich über diese API nicht einzeln
+erzwingen. Ein weiterer Versuch kann daher weder visuelle Produktgenauigkeit
+noch Funktion des Anbieters garantieren. Code-Commit für Storytelling
+`876b11ac3680251afcfcc3fcf393880e63189a2a`, Preview READY, Quality #117
+erfolgreich.
 
 Die folgenden Checkpoints sind frühere Stände.
 
