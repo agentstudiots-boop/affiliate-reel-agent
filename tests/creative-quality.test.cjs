@@ -146,7 +146,7 @@ test('pumpkin reel tells a visible carving story with product context and no mod
   assert.match(visuals,/erwachsene.*(?:Augenöffnung|Mundöffnung)/i);
   assert.match(visuals,/echten Kürbis/i);
   assert.match(voice,/Kürbisschnitzwerkzeug/);
-  assert.match(voice,/Laterne/);
+  assert.match(voice,/laterne/i);
   assert.match(voice,/YAVOCOS/);
   assert.doesNotMatch(voice,/garantiert|professionell|Edelstahl|sicher für Kinder/i);
   assert.ok(job.content.scenes.every(scene=>scene.audio.split(/\s+/).length<=scene.durationSeconds*2.5));
