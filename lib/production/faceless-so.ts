@@ -17,9 +17,12 @@ export function narration(job: ContentJob) {
 
 export function facelessVisualDirection(job: ContentJob) {
   if (!/kürbis.*schnitz|schnitz.*kürbis/i.test(job.opportunity.product.name)) return undefined;
+  const childInPlan = job.content?.format === "video" && job.content.scenes.some(scene => /\bkind\b/i.test(scene.visual) && !/keine kinder/i.test(scene.visual));
   return {
-    masterStyle: "Originale vertikale Halloween-Bastelszene. Ein großer echter orangefarbener Kürbis steht durchgehend im Vordergrund. Erwachsene Hände zeichnen ein Gesicht vor und schneiden mit einem kleinen neutralen Kürbisschnitzwerkzeug sichtbar Augen und Mund aus. Am Schluss leuchtet die fertige Kürbislaterne im Abendlicht. Glaubwürdige Materialien und Handlung; keine exakte Abbildung des verlinkten Markenmodells.",
-    globalNegativePrompt: "Keine Speisen, Backwaren, Pasta oder Pfanne. Keine Küchenmesser, Kinder, Markenlogos, Produktverpackungen, Shop-Oberflächen oder eingebrannte Schrift. Kein bloßes Dekor ohne sichtbar geschnitzten Kürbis.",
+    masterStyle: childInPlan
+      ? "Originale vertikale Halloween-Bastelszene. Ein großer echter orangefarbener Kürbis steht im Vordergrund. Ein Kind zeichnet das Gesicht vor und schöpft mit einem Löffel Kerne aus; eine erwachsene Person führt allein das kleine Kürbisschnitzwerkzeug und schneidet sichtbar Augen und Mund aus. Kind und erwachsene Person freuen sich gemeinsam über die leuchtende Deko-Laterne. Glaubwürdige, beaufsichtigte Handlung; keine exakte Abbildung des verlinkten Markenmodells."
+      : "Originale vertikale Halloween-Bastelszene. Ein großer echter orangefarbener Kürbis steht durchgehend im Vordergrund. Erwachsene Hände zeichnen ein Gesicht vor und schneiden mit einem kleinen neutralen Kürbisschnitzwerkzeug sichtbar Augen und Mund aus. Am Schluss leuchtet die fertige Kürbislaterne im Abendlicht. Glaubwürdige Materialien und Handlung; keine exakte Abbildung des verlinkten Markenmodells.",
+    globalNegativePrompt: `Keine Speisen, Backwaren, Pasta oder Pfanne. Keine Küchenmesser, ${childInPlan ? "kein Kind mit Schneidwerkzeug und keine Kinderhände an der Klinge" : "Kinder"}, Markenlogos, Produktverpackungen, Shop-Oberflächen oder eingebrannte Schrift. Kein bloßes Dekor ohne sichtbar geschnitzten Kürbis.`,
   };
 }
 
