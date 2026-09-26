@@ -1,5 +1,14 @@
 # Work handoff
 
+## Live-Checkpoint 26.09.2026, 09:21 UTC
+
+Preview `dpl_Cyxv1gXsPpzWGrwnScYH2jtEuSRo` / Code-Commit `ac494b4` READY;
+GitHub Quality #100 erfolgreich. Der geschützte Migrationsweg bestätigt HTTP 200:
+`applied: [012_whatsapp_instructions.sql]`, 001–011 ausschließlich `alreadyApplied`.
+Schemaaktivierung ist damit abgeschlossen. Ein echter neuer WhatsApp-Änderungstest
+und die anschließenden menschlichen Freigaben bleiben offen. Keine alte
+Nachrichten-ID wieder abspielen.
+
 ## Zusatzauftrag 26.09.2026: WhatsApp-Intent-Parser
 
 Im bestehenden PR #6 ergänzt; Hauptauftrag und Produktionsfreigabe bleiben offen.

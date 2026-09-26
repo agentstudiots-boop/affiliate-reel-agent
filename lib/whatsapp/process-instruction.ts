@@ -39,8 +39,14 @@ export async function processOperatorInstruction(input:OperatorMessage,
     const busy=row?await sql.query("SELECT 1 FROM whatsapp_instructions WHERE job_id=$1 AND status IN ('parsing','parsed') LIMIT 1",[row.id]):{rows:[]};
     const job=row&&!busy.rows.length?parseJob(row.snapshot):null;
     await sql.query("INSERT INTO whatsapp_instructions(message_id,job_id,publication_id,context_hash,status) VALUES($1,$2,$3,$4,$5)",[input.id,job?.id||null,job?row!.publication_id:null,job?hash(job):null,job?'parsing':'clarify']);
-    if(job&&row?.publication_id)await sql.query("UPDATE publication_requests SET status='changes_requested',feedback=$2,updated_at=now() WHERE id=$1 AND status IN ('pending','changes_requested')",[row.publication_id,input.body]);
-    if(job)await sql.query("UPDATE daily_drafts SET status='changes_requested',feedback=$2,updated_at=now() WHERE job_id=$1 AND status='awaiting_approval'",[job.id,input.body]);
+    if(job&&row?.publication_id){
+      const held=await sql.query("UPDATE publication_requests SET status='changes_requested',feedback=$2,updated_at=now() WHERE id=$1 AND status IN ('pending','changes_requested','rejected') AND publish_attempted_at IS NULL RETURNING id",[row.publication_id,input.body]);
+      if(!held.rows.length)throw Error('stale_instruction_context');
+    }
+    if(job){
+      const held=await sql.query("UPDATE daily_drafts SET status='changes_requested',feedback=$2,updated_at=now() WHERE job_id=$1 AND status IN ('awaiting_approval','changes_requested') RETURNING job_id",[job.id,input.body]);
+      if(!row?.publication_id&&!held.rows.length)throw Error('stale_instruction_context');
+    }
     return job?{job,publicationId:row!.publication_id as string|null}: {job:null,publicationId:null};
   });
   if(!claim)return true; // Durable dedup precedes inference and notifications.
