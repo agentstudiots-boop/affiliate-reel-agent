@@ -6,6 +6,7 @@ import { reviseApprovedVideo, reviseApprovedStaticContent, reviseOperatorInstruc
 import { interpretInstruction, validateInstruction } from "./instruction";
 import { classifyWhatsAppReply } from "./intent";
 import { sendWhatsAppText, WhatsAppRejectedError } from "./client";
+import { instagramReelCaption } from "../meta/instagram-reel";
 import type { ContentJob } from "../content/schema";
 
 export function contentFingerprint(job: ContentJob) {
@@ -21,11 +22,12 @@ export function contentApprovalMessage(job: ContentJob) {
       ? `Bildbriefing:\n${content.slides.map((slide,index)=>`${index+1}. ${slide.visual}; Prompt: ${slide.prompt}; Text: ${slide.copy}`).join("\n")}`
       : `Beitrag:\n${content.body}`;
   const next=content.format==="video"
-    ? "Erst danach kann eine separate WhatsApp-Kostenfreigabe für den ausgewählten Videoproduzenten folgen. Die Veröffentlichung benötigt später eine weitere Freigabe."
+    ? "Danach kommt das Kostenangebot automatisch per WhatsApp. Erst deine dortige Freigabe startet genau eine Videoproduktion. Das fertige Video und der vollständige Post kommen vor der Veröffentlichung erneut per WhatsApp zur Prüfung. Keine Aktion im Content Studio nötig."
     : content.format==="image"
-      ? "Erst danach kann die Bildproduktion gesondert im Content Studio angefordert werden. Die Veröffentlichung benötigt später eine weitere WhatsApp-Freigabe."
+      ? "Diese Freigabe erlaubt genau eine kostenpflichtige Bildgenerierung; der Preis in Euro steht nicht vorab fest. Das fertige Bild und der Post kommen vor Veröffentlichung erneut per WhatsApp zur Prüfung. Keine Aktion im Content Studio nötig."
       : "Die spätere Veröffentlichung benötigt eine eigene WhatsApp-Freigabe.";
-  const message=`Inhaltsfreigabe · ${content.format} · ${job.opportunity.targetPlatform}\nProdukt: ${job.opportunity.product.name}\nASIN: ${job.opportunity.product.asin}\nTitel: ${content.title}\n${detail}\n${content.format==="text"?"":`Begleittext: ${content.caption}\n`}CTA: ${content.cta}\n${content.disclosure}\n\nAntworte auf DIESE Nachricht mit „Freigabe“, um genau diese Fassung zu genehmigen. Du kannst beliebig oft Änderungen als Text anfordern; jede neue Fassung kommt erneut zur Inhaltsfreigabe. „Ablehnen“ stoppt den Auftrag. ${next}`;
+  const caption=content.format==="video" && job.opportunity.targetPlatform==="instagram" ? instagramReelCaption(job) : content.format==="text" ? "" : content.caption;
+  const message=`Inhaltsfreigabe · ${content.format} · ${job.opportunity.targetPlatform}\nProdukt: ${job.opportunity.product.name}\nASIN: ${job.opportunity.product.asin}\nTitel: ${content.title}\n${detail}\n${content.format==="text"?"":`Vollständiger Begleittext einschließlich Affiliate-Link:\n${caption}\n`}CTA: ${content.cta}\n${content.disclosure}\n\nAntworte auf DIESE Nachricht mit „Freigabe“, um genau diese Fassung zu genehmigen. Du kannst beliebig oft Änderungen als Text anfordern; jede neue Fassung kommt erneut zur Inhaltsfreigabe. „Ablehnen“ stoppt den Auftrag. ${next}`;
   if (message.length>3900) throw Error("Der vollständige Entwurf ist für eine WhatsApp-Nachricht zu lang. Im Content Studio kürzen, bevor eine Freigabe angefragt wird.");
   return message;
 }
@@ -65,7 +67,7 @@ export async function requestContentApproval(jobId:string) {
 }
 
 type Incoming={id:string;from:string;body:string;replyToMessageId:string|null;payload:unknown};
-export async function handleContentApproval(input:Incoming) {
+export async function handleContentApproval(input:Incoming,onApproved?: (jobId:string)=>Promise<void>) {
   const db=getDatabase();
   const approver=(process.env.WHATSAPP_APPROVER_WA_ID||"").replace(/\D/g,"");
   if(!approver||input.from.replace(/\D/g,"")!==approver)return false;
@@ -177,7 +179,10 @@ export async function handleContentApproval(input:Incoming) {
     await sql.query("UPDATE whatsapp_events SET intent=$2 WHERE message_id=$1",[input.id,decision.intent]);
     return true;
   });
-  if(applied) await sendWhatsAppText(decision.intent==="approve"?"Inhalt freigegeben. Der Produzent wartet auf die gesonderte Produktionsfreigabe im Content Studio. Noch nichts produziert oder veröffentlicht.":"Entwurf abgelehnt. Es wurde nichts produziert oder veröffentlicht.");
+  if(applied) {
+    await sendWhatsAppText(decision.intent==="approve"?"Inhalt freigegeben. Die nächsten Schritte laufen über WhatsApp; du musst im Content Studio nichts zusätzlich freigeben.":"Entwurf abgelehnt. Es wurde nichts produziert oder veröffentlicht.");
+    if(decision.intent==="approve")await onApproved?.(String(request.job_id));
+  }
   return true;
 }
 

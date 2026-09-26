@@ -15,12 +15,19 @@ export function validReelVideoUrl(value: string, mode: "FACELESS_STORYBOARD" | "
   } catch { return false; }
 }
 
-function reelPublication(job: ContentJob, videoUrl: string) {
+export function instagramReelCaption(job: ContentJob) {
   requireJobProduct(job);
-  if (job.status !== "approved" || job.content?.format !== "video" || job.opportunity.targetPlatform !== "instagram" || job.marketing?.primary !== "Instagram Reel") throw new InstagramReelConflict("Freigegebener Instagram-Reel-Plan fehlt.");
+  if (job.content?.format !== "video") throw new InstagramReelConflict("Video-Begleittext fehlt.");
   const product = job.opportunity.product;
   const caption = `${job.content.caption}\n\n${product.name} · ASIN ${product.asin}\nAffiliate-Produktlink (als Text): ${product.affiliateUrl}`;
   if (caption.length > 2200) throw new InstagramReelConflict("Reel-Text ist für Instagram zu lang.");
+  return caption;
+}
+
+function reelPublication(job: ContentJob, videoUrl: string) {
+  requireJobProduct(job);
+  if (job.status !== "approved" || job.content?.format !== "video" || job.opportunity.targetPlatform !== "instagram" || job.marketing?.primary !== "Instagram Reel") throw new InstagramReelConflict("Freigegebener Instagram-Reel-Plan fehlt.");
+  const caption = instagramReelCaption(job);
   const hash = createHash("sha256").update(JSON.stringify({ jobId: job.id, videoUrl, content: job.content, caption })).digest("hex");
   return { caption, hash };
 }

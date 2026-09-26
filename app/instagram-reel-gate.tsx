@@ -31,7 +31,7 @@ export function InstagramReelGate({ job, password }: { job: ContentJob; password
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Status nicht verfügbar."); }
     finally { setBusy(false); }
   }
-  return <section className="reviewBox"><h4>Instagram Reel · eigene Veröffentlichungsfreigabe</h4>
+  return <section className="reviewBox"><h4>Instagram Reel · WhatsApp-Veröffentlichungsfreigabe</h4>
     <p>Das fertige MP4 und der Text müssen vor dem Post geprüft werden. Der Affiliate-Link steht in der Caption, ist dort aber nicht anklickbar.</p>
     {!reel && <button type="button" disabled={busy || !password} onClick={() => action("request")}>Video & Text per WhatsApp freigeben lassen</button>}
     {reel && <><p>Status: <strong>{reel.status}</strong></p><p><a href={reel.videoUrl} target="_blank" rel="noreferrer">Video ansehen ↗</a></p>
@@ -39,7 +39,7 @@ export function InstagramReelGate({ job, password }: { job: ContentJob; password
       {reel.status === "pending" && !reel.whatsappSendAttempted && <button type="button" disabled={busy} onClick={() => action("request")}>WhatsApp-Freigabe senden</button>}
       {reel.status === "pending" && reel.whatsappSendAttempted && !reel.whatsappMessageId && <p>WhatsApp-Versand unklar. Kein zweites Senden; Status manuell klären.</p>}
       {reel.status === "pending" && reel.whatsappMessageId && <p>Warte auf deine Antwort auf die neue WhatsApp-Nachricht.</p>}
-      {reel.status === "approved" && <button type="button" disabled={busy} onClick={() => action("publish")}>Freigegebenen Reel-Upload genau einmal starten</button>}
+      {reel.status === "approved" && <p>Deine WhatsApp-Freigabe ist gespeichert. Der einmalige Upload wird automatisch fortgesetzt.</p>}
       {reel.status === "processing" && <button type="button" disabled={busy} onClick={() => action("poll")}>Verarbeitung prüfen und Reel veröffentlichen</button>}
       {reel.status === "unknown" && <p>Meta-Ergebnis unklar oder Container fehlgeschlagen. Ein neuer Upload ist gesperrt; bitte Instagram direkt prüfen.</p>}
       {reel.permalink && <p><a href={reel.permalink} target="_blank" rel="noreferrer">Veröffentlichtes Reel öffnen ↗</a></p>}

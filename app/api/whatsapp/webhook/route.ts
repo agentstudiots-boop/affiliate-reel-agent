@@ -7,6 +7,9 @@ import { productionRepository } from "@/lib/production/repository";
 import { publicationRepository } from "@/lib/meta/publication-gate";
 import { FacebookPublishFailure, publishFacebookPhoto } from "@/lib/meta/publisher";
 import { requestFacebookApproval } from "@/lib/meta/request-publication";
+import { requestVideoCostApproval } from "@/lib/production/request-cost-approval";
+import { getDatabase } from "@/lib/memory/db";
+import { parseJob } from "@/lib/content/history";
 import { sendDailyApproval } from "@/lib/daily/draft";
 import { sendWhatsAppText } from "@/lib/whatsapp/client";
 import { deliverWeeklyReport } from "@/lib/reporting/weekly";
@@ -46,16 +49,37 @@ export async function POST(request: Request) {
     console.error(JSON.stringify({ event: "whatsapp_database_unavailable" }));
     return new Response("Storage unavailable", { status: 503, headers: { "Cache-Control": "no-store" } });
   }
+  let keepPolling=messages.some(message=>/^(status|weiter)[.!?]*$/i.test(message.body.trim()));
   after(async () => {
-    try { await continuePendingReels(); }
-    catch { console.error(JSON.stringify({ event: "reel_continuation_unavailable" })); }
+    // Keep observing an already claimed provider task after replying to Meta.
+    // Stop when human approval is due, or before the function's 300s limit.
+    const deadline=Date.now()+210_000;
+    try {
+      while(true){
+        const result=await continuePendingReels();
+        if(!keepPolling || !result.considered || (result.blocked && result.advanced===0) || Date.now()+15_000>=deadline)break;
+        await new Promise(resolve=>setTimeout(resolve,15_000));
+      }
+    } catch { console.error(JSON.stringify({ event: "reel_continuation_unavailable" })); }
   });
   let failed = false;
   for (const message of messages) {
     try {
-      if (await handleContentApproval({ ...message, payload })) continue;
+      if (await handleContentApproval({ ...message, payload }, async jobId => {
+        try {
+          const record=await getDatabase().query("SELECT snapshot FROM content_jobs WHERE id=$1",[jobId]);
+          if(!record.rows[0])return;
+          const job=parseJob(record.rows[0].snapshot);
+          if(job.content?.format==="video")await requestVideoCostApproval(jobId);
+          else if(job.content?.format==="image")await requestFacebookApproval(jobId);
+        } catch(error) {
+          console.warn(JSON.stringify({event:"content_approved_next_step_blocked",jobId,reason:error instanceof Error?error.message:"unknown"}));
+          try{await sendWhatsAppText(`Der Inhalt ist freigegeben, aber der nächste Schritt ist noch blockiert: ${error instanceof Error?error.message:"Status unklar."} Es wurde nichts zusätzlich gekauft oder veröffentlicht. Antworte mit „Status“, nachdem der Zugang geprüft wurde.`);}catch{}
+        }
+      })) continue;
       if (await processOperatorInstruction({ ...message, payload }, { sendApproval: sendDailyApproval })) continue;
       const result = await repo.applyIncomingWhatsApp({ ...message, payload });
+      if(result.handled && result.intent==="approve" && ("productionRunId" in result || ("platform" in result && result.platform==="instagram")))keepPolling=true;
       console.info(JSON.stringify({ event: "whatsapp_approval_message", messageId: message.id, handled: result.handled, reason: "reason" in result ? result.reason : undefined, intent: "intent" in result ? result.intent : undefined }));
       if (result.handled && "weeklyReportWeekStart" in result && typeof result.weeklyReportWeekStart === "string") {
         try { await deliverWeeklyReport(result.weeklyReportWeekStart); }

@@ -3,6 +3,7 @@ import { productionRepository, ProductionConflictError } from "../production/rep
 import { advanceVideo } from "../production/advance";
 import { instagramReelRepository, InstagramReelConflict } from "../meta/instagram-reel";
 import { advanceInstagram } from "../meta/advance-instagram";
+import { requestVideoCostApproval } from "../production/request-cost-approval";
 
 // Only saved, explicit approvals can reach a write. Unknown writes are never
 // candidates; rendering GETs always use the already persisted provider ID.
@@ -25,6 +26,19 @@ export async function continueReel(jobId: string) {
 }
 
 export async function continuePendingReels(db: Database = getDatabase(), advance = continueReel) {
+  // Recover a previously approved plan that has never reached the quote stage.
+  // This includes approvals processed before WhatsApp-only continuation shipped.
+  const unprepared=await db.query(`SELECT j.id FROM content_jobs j
+    WHERE j.status='approved' AND j.snapshot->'content'->>'format'='video'
+      AND j.snapshot->'opportunity'->>'targetPlatform'='instagram'
+      AND j.updated_at > now() - interval '24 hours'
+      AND NOT EXISTS (SELECT 1 FROM production_runs r WHERE r.job_id=j.id)
+      AND EXISTS (SELECT 1 FROM content_approval_requests c WHERE c.job_id=j.id AND c.status='approved' AND c.whatsapp_message_id IS NOT NULL)
+    ORDER BY j.updated_at DESC LIMIT 1`);
+  for(const row of unprepared.rows){
+    try {await requestVideoCostApproval(String(row.id));}
+    catch(error){console.warn(JSON.stringify({event:"video_cost_request_blocked",jobId:String(row.id),reason:error instanceof Error?error.message:"unknown"}));}
+  }
   const jobs = await db.query(`SELECT r.job_id FROM production_runs r JOIN content_jobs j ON j.id=r.job_id
     LEFT JOIN LATERAL (SELECT status,whatsapp_send_attempted_at,permalink FROM publication_requests
       WHERE job_id=r.job_id AND platform='instagram' ORDER BY revision DESC LIMIT 1) p ON true

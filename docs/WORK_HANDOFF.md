@@ -1,5 +1,31 @@
 # Work handoff
 
+## WhatsApp-only continuation after content approval
+
+The video agent writes the Reel caption. Instagram's publication layer appends
+the verified product name, ASIN and exact affiliate URL. The manual WhatsApp
+content request now displays that same final caption (including the URL), so
+the operator can check it before approval. Instagram organic captions show a
+text URL, not a clickable shopping button.
+
+After manual WhatsApp content approval, the webhook prepares the video job,
+gets a read-only Runway quote (Faceless only when Runway is not configured),
+and sends its cost and balance through WhatsApp. A separate explicit WhatsApp
+reply to this quoted amount authorizes exactly one paid provider POST. The
+Content Studio no longer needs a prepare, quote or start click. For Facebook
+image plans, the content approval authorizes the one claimed image generation,
+then the finished image and caption are presented for a final WhatsApp post
+approval. No public post is made just because content or costs were approved.
+
+The webhook observes an approved active Reel for at most 210 seconds after
+responding to Meta, stopping at the next human approval. A subsequent WhatsApp
+`Status`/`Weiter` message can resume observation if a provider takes longer.
+Previously approved Instagram jobs without a production run are picked up on
+the next signed WhatsApp webhook/continuation invocation. Provider charges,
+account balance and rendering quality still require live verification. The
+existing failed Faceless jobs must not be retried automatically.
+
+
 ## Inhaltsfreigabe: Betreiberkorrekturen bis zur Freigabe
 
 Die Grenze von zwei Revisionen gilt nur für die automatische Qualitätsrunde bei

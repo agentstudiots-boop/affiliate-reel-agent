@@ -54,6 +54,8 @@ test('WhatsApp approves the exact finished script before any video production ca
   const first=await requestContentApproval(id);
   assert.match(sent[0],/Drehbuch/);
   assert.match(sent[0],/Inhaltsfreigabe/);
+  assert.match(sent[0],/Affiliate-Produktlink \(als Text\): https:\/\/www\.amazon\.de\/dp\/B0D9YQR9CT\?tag=/);
+  assert.match(sent[0],/Keine Aktion im Content Studio nötig/);
   assert.equal(await handleContentApproval({id:'wamid.unclear',from:'491234',body:'Bitte mach das irgendwie anders.',replyToMessageId:first.messageId,payload:{}}),true);
   assert.match(sent.at(-1),/Bitte antworte mit deiner Präzisierung/);
   const clarificationId=`wamid.content.${sent.length}`;
