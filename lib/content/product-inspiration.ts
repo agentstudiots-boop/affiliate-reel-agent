@@ -25,6 +25,18 @@ function classifySource(url: URL): ProductSourceKind {
 
 function preset(name: string, useCase: string, category: Opportunity["category"]) {
   const value = `${name} ${useCase}`.toLocaleLowerCase("de-DE");
+  if (/kürbis.*schnitz|schnitz.*kürbis/i.test(name)) {
+    return {
+      categoryLabel: "Kürbisschnitzwerkzeuge",
+      visualDirections: [
+        "Ein großer echter orangefarbener Halloween-Kürbis mit eingeschnittenem Gesicht füllt den Vordergrund. Erwachsene Hände schnitzen sichtbar eine Augen- oder Mundöffnung mit einem kleinen neutralen Kürbisschnitzwerkzeug an einem Basteltisch; weitere kleine Schnitzwerkzeuge daneben.",
+        "Detail der Bearbeitung eines echten Kürbisses mit kleinem Schnitzwerkzeug, sichtbaren Kürbiskernen und Schalenresten; keine Speisen oder Backwaren.",
+        "Fertige geschnitzte Kürbislaternen als Ergebnis im Hintergrund, während der aktive Schnitzvorgang im Vordergrund bleibt.",
+      ],
+      purchaseCriteria: ["passende Werkzeugart", "Handhabung", "Herstellerhinweise"],
+      useCases: ["Eine erwachsene Person schnitzt eine Halloween-Kürbislaterne am Basteltisch", "Kürbis aushöhlen und Gesicht schnitzen", "Werkzeuge und Anwendung vor dem Kauf prüfen"],
+    };
+  }
   if (/heizdecke|wärmedecke|elektrische decke/.test(name.toLocaleLowerCase("de-DE"))) {
     return {
       categoryLabel: "Heizdecke",
