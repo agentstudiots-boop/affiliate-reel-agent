@@ -10,6 +10,7 @@ import type { ApprovalRequest } from "@/lib/production/schema";
 type StatusResponse = {
   run: ProductionRun | null;
   approval?: ApprovalRequest | null;
+  providerDiagnostics?: { status: string; errorMessages?: string[] } | null;
   progress?: { renderId: string | null; renderAttempted: boolean } | null;
   learningPolicy: VideoProviderDecision;
   configuration: {
@@ -34,8 +35,8 @@ export function ProductionGate({ job, password, onRevised }: { job: ContentJob; 
   const [script, setScript] = useState("");
   const [voiceId, setVoiceId] = useState("");
 
-  async function refresh() {
-    const response = await fetch(`/api/production?jobId=${encodeURIComponent(job.id)}`, { headers: { "x-content-password": password }, cache: "no-store" });
+  async function refresh(diagnostics = false) {
+    const response = await fetch(`/api/production?jobId=${encodeURIComponent(job.id)}${diagnostics ? "&diagnostics=1" : ""}`, { headers: { "x-content-password": password }, cache: "no-store" });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Status konnte nicht geladen werden.");
     setStatus(data);
@@ -112,6 +113,7 @@ export function ProductionGate({ job, password, onRevised }: { job: ContentJob; 
       {run.status === "awaiting_whatsapp_approval" && <p>WhatsApp-Freigabe offen. Antworte auf die Nachricht; danach hier den Status neu laden.</p>}
       {run.status === "approved_for_spend" && <button type="button" className="primary" disabled={busy} onClick={() => action("startVideo")}>Freigegebenes Video einmalig erstellen – kostet {run.estimatedProviderCredits} Credits</button>}
       {run.status === "rendering" && <><p>Videostart wurde beansprucht. {run.providerJobId ? "Provider-Auftrag bestätigt." : "Provider-Ergebnis unklar: keinen zweiten kostenpflichtigen Start auslösen."}</p>{run.providerJobId && <button type="button" disabled={busy} onClick={() => action("pollVideo")}>Provider-Status abfragen / MP4 fertigstellen</button>}</>}
+      {run.status === "failed" && <><p className="error">Der bereits bezahlte Provider-Auftrag ist fehlgeschlagen. Keine erneute Produktion ohne neue Kostenentscheidung starten.</p>{run.providerJobId && <button type="button" disabled={busy} onClick={() => refresh(true).catch(caught => setError(caught instanceof Error ? caught.message : "Provider-Fehler nicht lesbar"))}>Fehlerursache beim Provider lesen – keine Kosten</button>}{status?.providerDiagnostics && <p className="error">Provider-Status: {status.providerDiagnostics.status}. {status.providerDiagnostics.errorMessages?.join(" · ") || "Keine weitere Fehlerbeschreibung verfügbar."}</p>}</>}
       {run.status === "ready" && run.outputUrl && <p><a href={run.outputUrl} target="_blank" rel="noreferrer">Fertiges Video ansehen</a> · Veröffentlichung erfordert eine separate Freigabe.</p>}
       {run.status === "ready" && job.marketing?.primary === "Instagram Reel" && <InstagramReelGate job={job} password={password} />}
       {run.status === "changes_requested" && <><p>Änderungsauftrag gespeichert. Der Orchestrator gibt ihn an den Video-Agenten weiter. Im Referenzmodus sind konkrete Szenen-, CTA- und Tempoänderungen unterstützt.</p><button type="button" disabled={busy} onClick={() => action("reviseContent")}>Änderung bearbeiten und neuen Content-Plan vorlegen</button></>}
