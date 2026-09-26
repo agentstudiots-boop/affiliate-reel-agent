@@ -211,7 +211,10 @@ export function productionRepository(db: Database = getDatabase()) {
           ? await sql.query("SELECT * FROM publication_requests WHERE whatsapp_message_id=$1 AND status='pending' FOR UPDATE", [input.replyToMessageId])
           : await sql.query("SELECT * FROM publication_requests WHERE approver_wa_id=$1 AND status='pending' AND whatsapp_message_id IS NOT NULL ORDER BY created_at DESC LIMIT 2 FOR UPDATE", [input.from]);
         const dailyResult = input.replyToMessageId
-          ? await sql.query("SELECT * FROM daily_drafts WHERE whatsapp_message_id=$1 AND status='awaiting_approval' FOR UPDATE", [input.replyToMessageId])
+          ? await sql.query(`SELECT * FROM daily_drafts WHERE whatsapp_message_id=$1
+              AND (status='awaiting_approval' OR (status='changes_requested'
+                AND lower(trim(feedback)) IN ('freigegeben','freigegeben.','freigegeben!')))
+              FOR UPDATE`, [input.replyToMessageId])
           : await sql.query("SELECT * FROM daily_drafts WHERE status='awaiting_approval' AND whatsapp_message_id IS NOT NULL ORDER BY created_at DESC LIMIT 2 FOR UPDATE", []);
         const notificationResult = input.replyToMessageId
           ? await sql.query("SELECT * FROM daily_drafts WHERE notification_message_id=$1 AND status='awaiting_approval' AND whatsapp_message_id IS NULL FOR UPDATE", [input.replyToMessageId])
