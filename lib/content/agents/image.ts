@@ -1,6 +1,7 @@
 import { imageSchema } from "../schema";
 import type { Brief, Generator } from "../agent";
 import { readerCaption } from "../editorial-copy";
+import { asksForNaturalCopy } from "../editorial-feedback";
 
 function shorten(value: string, max: number) {
   const clean = value.trim();
@@ -30,6 +31,11 @@ function reviseReferenceImage(brief: Brief) {
   const next = structuredClone(brief.previous);
   next.visualConcept ||= visualConcept(brief);
   let applied = false;
+
+  if (asksForNaturalCopy(request)) {
+    next.caption = readerCaption(brief, true);
+    applied = true;
+  }
 
   if (/kürzer|kompakter|weniger text|text reduzieren|text kürzen/.test(request)) {
     next.caption = shorten(next.caption, 520);

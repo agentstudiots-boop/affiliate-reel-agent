@@ -1,6 +1,7 @@
 import { textSchema } from "../schema";
 import type { Brief, Generator } from "../agent";
 import { readerCopy } from "../editorial-copy";
+import { asksForNaturalCopy } from "../editorial-feedback";
 
 function shorten(value: string, max: number) {
   const clean = value.trim();
@@ -15,6 +16,12 @@ function reviseReferenceText(brief: Brief) {
   const request = brief.changeRequest.toLocaleLowerCase("de-DE");
   const next = structuredClone(brief.previous);
   let applied = false;
+
+  if (asksForNaturalCopy(request)) {
+    const copy=readerCopy(brief);
+    next.body=`Werbung | Affiliate-Link\n\n${copy.intro}\n\n${copy.advice} ${copy.link}\n\n${copy.question}\n\n${copy.disclosure}`;
+    applied = true;
+  }
 
   if (/kürzer|kompakter|text kürzen|weniger text/.test(request)) {
     const paragraphs = next.body.split(/\\n\\n+/).map(part => part.trim()).filter(Boolean);

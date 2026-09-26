@@ -1,6 +1,7 @@
 import { videoSchema } from "../schema";
 import type { Brief, Generator } from "../agent";
 import { readerCaption, readerCopy } from "../editorial-copy";
+import { asksForNaturalCopy } from "../editorial-feedback";
 
 const pumpkinReelCta = "Das Kürbisschnitzset findest du über den Produktlink. Prüfe vorab die Herstellerhinweise.";
 function pumpkinReelCaption(asin: string, withChild: boolean) {
@@ -27,10 +28,11 @@ function reviseReferenceVideo(brief: Brief) {
     next.productIntegration = "Das Kind beteiligt sich am Entwurf und Ausschöpfen; die erwachsene Person führt das Schnitzwerkzeug. Der echte Kürbis, die sichtbare Schnitzhandlung und die fertige Deko-Laterne bleiben im Mittelpunkt. Konkrete Modellmerkmale bleiben ungeprüft.";
     applied = true;
   }
-  if (/(?:begleittext|caption|posttext)/i.test(request) && /(?:passt nicht|system|intern|natürlich|lesbar|verständlicher|überarbeiten)/i.test(request)) {
+  if (asksForNaturalCopy(request)) {
+    const pumpkin=/kürbis.*schnitz|schnitz.*kürbis/i.test(brief.opportunity.product.name);
     const withChild = /\bkind(?:er)?\b/i.test(next.scenes.map(s => s.visual).join(" "));
-    next.caption = pumpkinReelCaption(brief.opportunity.product.asin!,withChild);
-    next.cta = pumpkinReelCta;
+    next.caption = pumpkin ? pumpkinReelCaption(brief.opportunity.product.asin!,withChild) : readerCaption(brief);
+    next.cta = pumpkin ? pumpkinReelCta : "Weitere Angaben zum Produkt findest du über den Link im Beitrag.";
     if (/Produktname, ASIN und Produktlink stehen im Beitragstext/.test(next.scenes.at(-1)!.audio)) next.scenes.at(-1)!.audio = pumpkinReelCta;
     applied = true;
   }

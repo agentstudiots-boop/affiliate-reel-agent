@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { authorized } from "@/lib/memory/auth";
-import { databaseConfigured } from "@/lib/memory/db";
+import { databaseConfigured, getDatabase } from "@/lib/memory/db";
 import { ConflictError, memoryRepository } from "@/lib/memory/repository";
 import { performanceSchema } from "@/lib/memory/schema";
 import { requestContentApproval } from "@/lib/whatsapp/content-approval";
@@ -14,8 +14,14 @@ export async function GET(request: Request) {
   try {
     const params = new URL(request.url).searchParams;
     const jobId = params.get("jobId");
+    const approvalJobId = params.get("approvalJobId");
     const before = params.get("before");
     if (jobId) z.string().uuid().parse(jobId);
+    if (approvalJobId) {
+      const id=z.string().uuid().parse(approvalJobId);
+      const rows=await getDatabase().query("SELECT status,whatsapp_message_id FROM content_approval_requests WHERE job_id=$1 ORDER BY created_at DESC LIMIT 1",[id]);
+      return Response.json({approval:rows.rows[0] ? {status:rows.rows[0].status,delivered:!!rows.rows[0].whatsapp_message_id} : null},{headers:{"Cache-Control":"no-store"}});
+    }
     if (before) z.string().datetime().parse(before);
     const repo = memoryRepository();
     const data = jobId ? { performance: await repo.performance(jobId) } : { jobs: await repo.list(before || undefined) };
@@ -35,7 +41,8 @@ export async function POST(request: Request) {
     const repo=memoryRepository();
     return Response.json(input.action === "requestContentApproval" ? { approval:await requestContentApproval(input.jobId) } : { result:await repo.recordPerformance(input.data) });
   } catch(error) {
-    return Response.json({error:error instanceof z.ZodError ? error.issues.map(i=>i.message).join(" ") : error instanceof ConflictError ? error.message : "Speichern fehlgeschlagen. Keine Änderung bestätigt."},
+    const known=error instanceof Error && /^(Eine Inhaltsfreigabe ist bereits offen\.|WhatsApp-Servicefenster geschlossen\.|Der vollständige Entwurf ist für eine WhatsApp-Nachricht zu lang\.)/.test(error.message);
+    return Response.json({error:error instanceof z.ZodError ? error.issues.map(i=>i.message).join(" ") : error instanceof ConflictError || known ? (error as Error).message : "Speichern fehlgeschlagen. Keine Änderung bestätigt."},
       {status:error instanceof z.ZodError || error instanceof SyntaxError ? 400 : error instanceof ConflictError ? 409 : 503});
   }
 }

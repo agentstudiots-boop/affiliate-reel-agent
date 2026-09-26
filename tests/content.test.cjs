@@ -1,7 +1,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { readFileSync, readdirSync } = require('node:fs');
-const { runContentJob, inspectContent } = require('../.test-build/lib/content/orchestrator');
+const { runContentJob, inspectContent, reviseApprovedStaticContent, reviseApprovedVideo } = require('../.test-build/lib/content/orchestrator');
+const { asksForNaturalCopy } = require('../.test-build/lib/content/editorial-feedback');
 const { restoreHistory, parseJob } = require('../.test-build/lib/content/history');
 const { createGenerator } = require('../.test-build/lib/content/model');
 const { creativeSchema } = require('../.test-build/lib/content/schema');
@@ -11,6 +12,23 @@ const opportunity = {
   useCase: 'Oma staunt beim Familienessen über das Steak. Papa erklärt die Zubereitung.',
   trend: '', goal: 'conversion', budget: 'balanced', verifiedFacts: [],
 };
+
+test('ordinary German copy feedback reaches the right agent across post formats',async()=>{
+  assert.equal(asksForNaturalCopy('Der Begleittext passt nicht erkennbar klingt nach System intern'),true);
+  assert.equal(asksForNaturalCopy('Die Bildhandlung passt nicht zum Kürbis'),false);
+  for(const [format,changes] of [['video',{targetPlatform:'instagram',budget:'quality'}],['image',{budget:'low'}],['text',{goal:'community'}]]){
+    const job=await runContentJob({...opportunity,...changes},{allowedFormats:[format]});
+    assert.equal(job.status,'awaiting_approval');
+    job.status='approved';
+    const revised=format==='video'
+      ? await reviseApprovedVideo(job,'Der Begleittext klingt nach System intern, bitte lesbarer')
+      : await reviseApprovedStaticContent(job,format==='text'?'Der Text klingt maschinell, bitte menschlicher':'Die Caption klingt nach System intern, bitte lesbarer');
+    assert.equal(revised.status,'awaiting_approval');
+    assert.equal(revised.content.format,format);
+    assert.equal(revised.review.passed,true,JSON.stringify(revised.review));
+    assert.equal(revised.opportunity.product.asin,job.opportunity.product.asin);
+  }
+});
 
 test('routes video, carousel and text by objective and economics without calling a provider', async () => {
   const original = global.fetch;
@@ -129,7 +147,7 @@ test('specialists cannot import each other or an orchestrator', () => {
   for (const file of readdirSync('lib/content/agents')) {
     const source = readFileSync(`lib/content/agents/${file}`, 'utf8');
     for (const match of source.matchAll(/from\s+["']([^"']+)/g)) {
-      assert.ok(['../schema', '../agent', '../editorial-copy'].includes(match[1]), `${file} has an unauthorized dependency: ${match[1]}`);
+      assert.ok(['../schema', '../agent', '../editorial-copy', '../editorial-feedback'].includes(match[1]), `${file} has an unauthorized dependency: ${match[1]}`);
     }
   }
 });
