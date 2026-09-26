@@ -1,3 +1,4 @@
+const { approveContent } = require('./helpers/approve-content.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { PGlite } = require('@electric-sql/pglite');
@@ -27,7 +28,7 @@ async function fixture(t) {
   const opportunity=opportunitySchema.parse({product:{productVerifiedAt:'2026-09-26T08:00:00.000Z', productVerifiedName:'Kuscheldecke', name:'Kuscheldecke',sourceUrl:'https://www.amazon.de/dp/B000000001',affiliateUrl:'',price:'',targetGroup:'Haushalte',benefits:'Größe und Material vergleichen',notes:''},useCase:'Ein kühler Herbstabend auf dem Sofa mit einer Tasse Tee.',category:'home_living',targetPlatform:'instagram',budget:'quality'});
   await memory.claim(id,opportunity,'reference');
   await runContentJob(opportunity,{id,allowedFormats:['video'],onUpdate:memory.save});
-  const job=await memory.approve(id);
+  const job=await approveContent(db,memory,id);
   const repo=productionRepository(db), publications=instagramReelRepository(db);
   await repo.prepareVideo(id);
   const approval=await repo.createRenderApproval({jobId:id,estimatedCostCents:null,estimatedProviderCredits:20,estimatedCommissionCents:null,summary:'20 Credits',approverWaId:'4912345678',script:providerModule.narration(job),voiceId:'de-test'});

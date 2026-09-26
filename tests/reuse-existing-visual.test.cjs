@@ -1,3 +1,4 @@
+const { approveContent } = require('./helpers/approve-content.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -11,12 +12,12 @@ test('one new WhatsApp approval can reuse the verified image while the old unkno
   const pg=new PGlite();
   const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
   try{
-    for(const file of ['001_memory.sql','002_production_gates.sql','003_faceless_so.sql','004_daily_drafts.sql','005_publication_gate.sql','006_daily_notification.sql','007_publication_revisions.sql','008_weekly_reports.sql','009_original_visual_attempts.sql','010_replicate_visual_provider.sql','011_instagram_reel_publications.sql','012_whatsapp_instructions.sql'])await pg.exec(fs.readFileSync(`db/migrations/${file}`,'utf8'));
+    for(const file of ['001_memory.sql','002_production_gates.sql','003_faceless_so.sql','004_daily_drafts.sql','005_publication_gate.sql','006_daily_notification.sql','007_publication_revisions.sql','008_weekly_reports.sql','009_original_visual_attempts.sql','010_replicate_visual_provider.sql','011_instagram_reel_publications.sql','012_whatsapp_instructions.sql','014_content_approval_requests.sql'])await pg.exec(fs.readFileSync(`db/migrations/${file}`,'utf8'));
     const opportunity=opportunitySchema.parse({product:{productVerifiedAt:'2026-09-26T08:00:00.000Z', productVerifiedName:'Kuscheldecke', name:'Kuscheldecke',sourceUrl:'https://www.amazon.de/dp/B000000001',affiliateUrl:'https://www.amazon.de/dp/B000000001',price:'',targetGroup:'Haushalte',benefits:'Größe und Material vergleichen',notes:''},useCase:'Ein kühler Herbstabend auf dem Sofa mit einer Decke.',targetPlatform:'facebook',budget:'low'});
     const id=crypto.randomUUID(),memory=memoryRepository(db),repo=publicationRepository(db);
     await memory.claim(id,opportunity,'reference');
     await runContentJob(opportunity,{id,onUpdate:memory.save,loadLearning:memory.learn});
-    await memory.approve(id);
+    await approveContent(db,memory,id);
     const claimed=await repo.claimVisual(id,'test-model','replicate');
     assert.equal(claimed.existing,null);
     const sha='a'.repeat(64);

@@ -1,5 +1,36 @@
 # Work handoff
 
+## Aktuell 26.09.2026: Inhaltsfreigabe vor Produzenten
+
+Für manuell geplante Video-, Bild- und Textaufträge wird der vollständige
+Entwurf über `content_approval_requests` samt Fingerabdruck des Inhalts per
+WhatsApp vorgelegt. Die Studio-Schaltfläche verschickt nur die Freigabeanfrage;
+sie genehmigt keinen Inhalt mehr direkt. Bei offenem 24-Stunden-Fenster wird
+die Anfrage nach der Planung automatisch gesendet. WhatsApp-Änderungswünsche
+gehen vor einer Entscheidung an den zuständigen Video-, Bild- oder Text-Agenten;
+die geänderte Fassung benötigt eine neue Nachricht und neue Zustimmung. Die
+Video-Revision kann für nicht triviale Formulierungen das bestehende
+Replicate-Sprachmodell verwenden. Bildrevisionen greifen bei nicht erkannten
+Formulierungen auf den bestehenden strukturierten WhatsApp-Sprachmodell-Parser
+zurück; Bild-Agent und redaktionelle Prüfung validieren das Ergebnis. Freie
+Textrevisionen in der neuen manuellen Inhaltsfreigabe unterstützen bisher die
+Referenzagenten-Regeln; bei nicht eindeutiger Anweisung bleibt die alte
+Freigabe gesperrt und es wird nach Präzisierung gefragt.
+
+`prepareVideo`, `createRenderApproval` und `claimPaidCreation` prüfen den
+WhatsApp-Inhaltsfingerabdruck; Facebook-Bildgenerierung und Text-Postvorbereitung
+prüfen ihn ebenso. Tagesentwürfe behalten die bisherige WhatsApp-Inhaltsfreigabe
+über `daily_drafts.content_approved`. Danach bleiben Produktionskosten und
+Veröffentlichung separate Freigaben. Migration
+`014_content_approval_requests.sql` vor Einsatz ausführen. Lokaler Typecheck
+und alle 133 Tests waren grün. Keine neue kostenpflichtige Faceless-Erstellung
+für die beiden gescheiterten Runs; beide scheiterten nach dem akzeptierten
+Create mit null visuellen Elementen, genaue Provider-Ursache und tatsächliche
+Credit-Abrechnung sind unbekannt. Ein neuer Test nach Klärung braucht eine
+neue konkrete Freigabe.
+
+Die folgenden Checkpoints sind frühere Stände.
+
 ## Aktuell 26.09.2026: zweite Faceless-Generierung fehlgeschlagen
 
 Der Nutzer gab die neue WhatsApp-Kostenanfrage zum geänderten Kürbisschnitz-Reel

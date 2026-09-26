@@ -6,6 +6,7 @@ import { chooseVideoProvider } from "@/lib/production/policy";
 import { ProductionConflictError, productionRepository } from "@/lib/production/repository";
 import { facelessClient, facelessVisualDirection, FacelessError, narration } from "@/lib/production/faceless-so";
 import { sendWhatsAppText, whatsappApprovalReady, whatsappConfig } from "@/lib/whatsapp/client";
+import { requestContentApproval } from "@/lib/whatsapp/content-approval";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -72,10 +73,16 @@ export async function POST(request: Request) {
       const prepared = await repo.prepareVideo(input.jobId);
       return Response.json({ ...prepared, configuration: publicConfiguration() }, { headers: { "Cache-Control": "no-store" } });
     }
-    if (input.action === "reviseContent") return Response.json({ job: await repo.reviseRequestedVideo(input.jobId) }, { headers: { "Cache-Control": "no-store" } });
+    if (input.action === "reviseContent") {
+      const job=await repo.reviseRequestedVideo(input.jobId);
+      try { await requestContentApproval(job.id); } catch { /* Saved plan remains reviewable in the studio. */ }
+      return Response.json({job},{headers:{"Cache-Control":"no-store"}});
+    }
     if (input.action === "requestRevision") {
       await repo.requestVideoRevision(input.jobId, input.feedback);
-      return Response.json({ job: await repo.reviseRequestedVideo(input.jobId) }, { headers: { "Cache-Control": "no-store" } });
+      const job=await repo.reviseRequestedVideo(input.jobId);
+      try { await requestContentApproval(job.id); } catch { /* Saved plan remains reviewable in the studio. */ }
+      return Response.json({job},{headers:{"Cache-Control":"no-store"}});
     }
     const run = await repo.getByJobId(input.jobId);
     if (!run || run.providerMode !== "FACELESS_STORYBOARD") throw new ProductionConflictError("Nur vorbereitete Faceless Storyboard-Läufe werden unterstützt.");

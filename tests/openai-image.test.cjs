@@ -1,3 +1,4 @@
+const { approveContent } = require('./helpers/approve-content.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -45,7 +46,7 @@ async function setup() {
   async function job(input = opportunity()) {
     const id = crypto.randomUUID(); await memory.claim(id,input,'reference');
     await runContentJob(input,{id,onUpdate:memory.save,loadLearning:memory.learn});
-    return memory.approve(id);
+    return approveContent(db,memory,id);
   }
   return { pg, repo, job };
 }

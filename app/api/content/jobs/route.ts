@@ -3,6 +3,7 @@ import { authorized } from "@/lib/memory/auth";
 import { databaseConfigured } from "@/lib/memory/db";
 import { ConflictError, memoryRepository } from "@/lib/memory/repository";
 import { performanceSchema } from "@/lib/memory/schema";
+import { requestContentApproval } from "@/lib/whatsapp/content-approval";
 export const runtime = "nodejs";
 function guard(request: Request) {
   if (!authorized(request)) return Response.json({ error: "Zugangscode erforderlich." }, { status: 401 });
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
   } catch (error) { return Response.json({ error: error instanceof z.ZodError ? "Ungültige Abfrage." : "Datenbankabfrage fehlgeschlagen. Verbindung und Migration prüfen." },{ status: error instanceof z.ZodError ? 400 : 503 }); }
 }
 const mutation = z.discriminatedUnion("action",[
-  z.object({ action:z.literal("approve"), jobId:z.string().uuid() }),
+  z.object({ action:z.literal("requestContentApproval"), jobId:z.string().uuid() }),
   z.object({ action:z.literal("performance"), data:performanceSchema }),
 ]);
 export async function POST(request: Request) {
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
     if (raw.length > 12000) return Response.json({ error:"Eingabe zu groß." },{status:413});
     const input=mutation.parse(JSON.parse(raw));
     const repo=memoryRepository();
-    return Response.json(input.action === "approve" ? { job:await repo.approve(input.jobId) } : { result:await repo.recordPerformance(input.data) });
+    return Response.json(input.action === "requestContentApproval" ? { approval:await requestContentApproval(input.jobId) } : { result:await repo.recordPerformance(input.data) });
   } catch(error) {
     return Response.json({error:error instanceof z.ZodError ? error.issues.map(i=>i.message).join(" ") : error instanceof ConflictError ? error.message : "Speichern fehlgeschlagen. Keine Änderung bestätigt."},
       {status:error instanceof z.ZodError || error instanceof SyntaxError ? 400 : error instanceof ConflictError ? 409 : 503});

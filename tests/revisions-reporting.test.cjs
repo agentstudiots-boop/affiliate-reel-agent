@@ -1,3 +1,4 @@
+const { approveContent } = require('./helpers/approve-content.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -9,7 +10,7 @@ const {runContentJob}=require('../.test-build/lib/content/orchestrator');
 const {opportunitySchema}=require('../.test-build/lib/content/schema');
 const {buildWeeklyReportData,formatWeeklyReport,previousWeek}=require('../.test-build/lib/reporting/weekly');
 
-const migrations=['001_memory.sql','002_production_gates.sql','003_faceless_so.sql','004_daily_drafts.sql','005_publication_gate.sql','006_daily_notification.sql','007_publication_revisions.sql','008_weekly_reports.sql'];
+const migrations=['001_memory.sql','002_production_gates.sql','003_faceless_so.sql','004_daily_drafts.sql','005_publication_gate.sql','006_daily_notification.sql','007_publication_revisions.sql','008_weekly_reports.sql','014_content_approval_requests.sql'];
 const opportunity=opportunitySchema.parse({
   product:{productVerifiedAt:'2026-09-26T08:00:00.000Z', productVerifiedName:'Kuscheldecke', name:'Kuscheldecke',sourceUrl:'https://www.amazon.de/dp/B000000001',affiliateUrl:'https://www.amazon.de/dp/B000000001',price:'',targetGroup:'Haushalte',benefits:'Größe und Material vergleichen',notes:''},
   useCase:'Ein kühler Herbstabend auf dem Sofa mit einer Decke.',
@@ -28,7 +29,7 @@ test('natural WhatsApp feedback creates a new image/text plan and a versioned pu
     const id=crypto.randomUUID();await memory.claim(id,opportunity,'reference');
     const planned=await runContentJob(opportunity,{id,onUpdate:memory.save,loadLearning:memory.learn});
     assert.equal(planned.content.format,'image');
-    const approved=await memory.approve(id);
+    const approved=await approveContent(db,memory,id);
     const first=await publication.prepare(id,'491234');
     assert.equal(first.revision,1);
     await publication.claimImage(first.id);
@@ -50,7 +51,7 @@ test('natural WhatsApp feedback creates a new image/text plan and a versioned pu
     assert.equal((await publication.get(id)).status,'changes_requested');
     assert.equal((await publication.get(id)).revision,1);
 
-    await memory.approve(id);
+    await approveContent(db,memory,id);
     const second=await publication.prepare(id,'491234');
     assert.equal(second.revision,2);
     assert.notEqual(second.id,first.id);
@@ -69,7 +70,7 @@ test('weekly report aggregates only stored measurements and keeps follower prove
     const memory=memoryRepository(db);
     const id=crypto.randomUUID();await memory.claim(id,opportunity,'reference');
     await runContentJob(opportunity,{id,onUpdate:memory.save,loadLearning:memory.learn});
-    await memory.approve(id);
+    await approveContent(db,memory,id);
     const publicationId=crypto.randomUUID();
     await pg.query("INSERT INTO publications(id,job_id,platform,status,url,published_at) VALUES($1,$2,'facebook','published',$3,$4)",
       [publicationId,id,'https://www.facebook.com/example/posts/weekly','2026-09-16T12:00:00.000Z']);

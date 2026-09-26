@@ -1,3 +1,4 @@
+const { approveContent } = require('./helpers/approve-content.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { PGlite } = require('@electric-sql/pglite');
@@ -6,6 +7,13 @@ const { applyMigrations } = require('../.test-build/lib/memory/migrations');
 const { memoryRepository } = require('../.test-build/lib/memory/repository');
 const productionModule = require('../.test-build/lib/production/repository');
 const { facelessClient, facelessVisualDirection } = require('../.test-build/lib/production/faceless-so');
+
+test('Faceless receives the approved product action for ordinary Reels, too',()=>{
+  const direction=facelessVisualDirection({opportunity:{product:{name:'Kuscheldecke'}},content:{format:'video',scenes:[{visual:'Eine erwachsene Person legt die Kuscheldecke über ihre Schultern auf dem Sofa.'},{visual:'Sie zieht die Decke beim Lesen zurecht.'}]}});
+  assert.match(direction.masterStyle,/Kuscheldecke/);
+  assert.match(direction.masterStyle,/legt die Kuscheldecke über ihre Schultern/);
+  assert.match(direction.masterStyle,/zieht die Decke beim Lesen zurecht/);
+});
 const { runContentJob } = require('../.test-build/lib/content/orchestrator');
 const { opportunitySchema } = require('../.test-build/lib/content/schema');
 const { processOperatorInstruction } = require('../.test-build/lib/whatsapp/process-instruction');
@@ -65,7 +73,7 @@ async function fixture(t) {
   });
   await memory.claim(id, opportunity, 'reference');
   await runContentJob(opportunity, { id, onUpdate: memory.save, loadLearning: memory.learn });
-  await memory.approve(id);
+  await approveContent(db,memory,id);
   async function post(action, password = env.CONTENT_STUDIO_PASSWORD) {
     const response = await route.POST(new Request('https://local.test/api/production', { method: 'POST',
       headers: { 'x-content-password': password }, body: JSON.stringify({ action, jobId: id, voiceId: 'de-test' }) }));

@@ -6,6 +6,7 @@ import { facebookPagePublicationError } from "./publication-eligibility";
 import { reviseApprovedStaticContent } from "../content/orchestrator";
 import type { OriginalVisualAsset } from "../content/image-provider";
 import type { ContentJob } from "../content/schema";
+import { hasContentApproval } from "../whatsapp/content-approval";
 
 export class PublicationConflictError extends Error {}
 
@@ -85,6 +86,7 @@ export function publicationRepository(db: Database = getDatabase()) {
         const { hash, caption } = publicationContent(job);
         const visualError=visualContextError(job);
         if(visualError)throw new PublicationConflictError(visualError);
+        if (!await hasContentApproval(job,sql)) throw new PublicationConflictError("WhatsApp-Inhaltsfreigabe für den vollständigen Bildentwurf fehlt.");
         const existing = await sql.query("SELECT * FROM publication_requests WHERE job_id=$1 AND platform='facebook' ORDER BY revision DESC LIMIT 1", [jobId]);
         if (existing.rows[0]) {
           if (existing.rows[0].content_hash === hash) {
@@ -158,6 +160,7 @@ export function publicationRepository(db: Database = getDatabase()) {
         const job = parseJob(stored.rows[0].snapshot);
         const eligibilityError = facebookPagePublicationError(job);
         if (eligibilityError) throw new PublicationConflictError(eligibilityError);
+        if (!await hasContentApproval(job,sql)) throw new PublicationConflictError("WhatsApp-Inhaltsfreigabe für den vollständigen Textentwurf fehlt.");
         if (!job.content || job.content.format === "video") throw new PublicationConflictError("Bild- oder Textentwurf fehlt.");
         const source = new URL(job.opportunity.product.affiliateUrl);
         if (source.protocol !== "https:" || source.username || source.password) throw new PublicationConflictError("Affiliate-Link ist nicht sicher.");

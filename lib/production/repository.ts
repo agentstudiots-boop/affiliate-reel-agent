@@ -7,6 +7,7 @@ import { chooseVideoProvider } from "./policy";
 import { approvalRequestSchema, productionRunSchema, type ApprovalRequest, type ProductionRun } from "./schema";
 import { classifyWhatsAppReply } from "../whatsapp/intent";
 import { reviseApprovedVideo } from "../content/orchestrator";
+import { hasContentApproval } from "../whatsapp/content-approval";
 
 export class ProductionConflictError extends Error {}
 
@@ -89,6 +90,7 @@ export function productionRepository(db: Database = getDatabase()) {
         const job = parseJob(jobResult.rows[0].snapshot);
         requireJobProduct(job);
         if (job.status !== "approved") throw new ProductionConflictError("Vor Medienproduktion muss der Content-Plan gespeichert freigegeben sein.");
+        if (!await hasContentApproval(job, sql)) throw new ProductionConflictError("Erst den vollständigen Inhalt per WhatsApp freigeben.");
         if (job.content?.format !== "video") throw new ProductionConflictError("Dieser Produktionsweg ist derzeit nur für freigegebene Video-Pläne vorgesehen.");
 
         const existing = await sql.query("SELECT * FROM production_runs WHERE job_id=$1", [jobId]);
@@ -132,6 +134,7 @@ export function productionRepository(db: Database = getDatabase()) {
         const job = parseJob(jobResult.rows[0].snapshot);
         requireJobProduct(job);
         if (job.status !== "approved" || job.content?.format !== "video") throw new ProductionConflictError("Freigegebener Video-Plan fehlt.");
+        if (!await hasContentApproval(job,sql)) throw new ProductionConflictError("WhatsApp-Inhaltsfreigabe fehlt oder gehört zu einem älteren Drehbuch.");
         if (job.content.scenes.map(scene => scene.audio.trim()).join("\n\n") !== input.script) {
           throw new ProductionConflictError("Der Entwurf wurde seit der Quote geändert.");
         }
@@ -344,6 +347,7 @@ export function productionRepository(db: Database = getDatabase()) {
         const job = parseJob(stored.rows[0].snapshot);
         requireJobProduct(job);
         if (job.status !== "approved" || job.content?.format !== "video" || job.content.scenes.map(s => s.audio.trim()).join("\n\n") !== result.rows[0].provider_script) throw new ProductionConflictError("Produkt oder Drehbuch geändert.");
+        if (!await hasContentApproval(job,sql)) throw new ProductionConflictError("Inhaltsfreigabe vor Faceless-Aufruf fehlt.");
         const key = crypto.randomUUID();
         const claimed = await sql.query(
           "UPDATE production_runs SET status='rendering',provider_request_key=$2,provider_request_attempted_at=now(),updated_at=now() WHERE id=$1 AND status='approved_for_spend' RETURNING *",

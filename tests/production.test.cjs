@@ -1,3 +1,4 @@
+const { approveContent } = require('./helpers/approve-content.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -129,12 +130,13 @@ test('production repository is idempotent and cannot start spend before WhatsApp
     await pg.exec(fs.readFileSync('db/migrations/006_daily_notification.sql','utf8'));
     await pg.exec(fs.readFileSync('db/migrations/007_publication_revisions.sql','utf8'));
     await pg.exec(fs.readFileSync('db/migrations/008_weekly_reports.sql','utf8'));
+    await pg.exec(fs.readFileSync('db/migrations/014_content_approval_requests.sql','utf8'));
     const memory=memoryRepository(db);
     const id=crypto.randomUUID();
     await memory.claim(id,opportunity,'reference');
     const job=await runContentJob(opportunity,{id,onUpdate:memory.save,loadLearning:memory.learn});
     assert.equal(job.content.format,'video');
-    await memory.approve(id);
+    await approveContent(db,memory,id);
 
     const production=productionRepository(db);
     const first=await production.prepareVideo(id);
@@ -198,11 +200,11 @@ test('WhatsApp change request is revised by orchestrator and needs fresh editori
   const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
   const old=process.env.WHATSAPP_APPROVER_WA_ID;process.env.WHATSAPP_APPROVER_WA_ID='491234';
   try{
-    for(const file of ['001_memory.sql','002_production_gates.sql','003_faceless_so.sql','004_daily_drafts.sql','005_publication_gate.sql','006_daily_notification.sql','007_publication_revisions.sql','008_weekly_reports.sql'])await pg.exec(fs.readFileSync(`db/migrations/${file}`,'utf8'));
+    for(const file of ['001_memory.sql','002_production_gates.sql','003_faceless_so.sql','004_daily_drafts.sql','005_publication_gate.sql','006_daily_notification.sql','007_publication_revisions.sql','008_weekly_reports.sql','014_content_approval_requests.sql'])await pg.exec(fs.readFileSync(`db/migrations/${file}`,'utf8'));
     const memory=memoryRepository(db),production=productionRepository(db),id=crypto.randomUUID();
     await memory.claim(id,opportunity,'reference');
     await runContentJob(opportunity,{id,onUpdate:memory.save,loadLearning:memory.learn});
-    const approved=await memory.approve(id);
+    const approved=await approveContent(db,memory,id);
     await production.prepareVideo(id);
     const approval=await production.createRenderApproval({jobId:id,estimatedCostCents:null,estimatedProviderCredits:20,estimatedCommissionCents:null,summary:'Test',approverWaId:'491234',script:narration(approved),voiceId:'de-voice'});
     await production.claimWhatsAppSend(approval.id);await production.bindApprovalMessage(approval.id,'wamid.out');
@@ -216,7 +218,7 @@ test('WhatsApp change request is revised by orchestrator and needs fresh editori
     assert.notEqual(narration({...revised,status:'approved'}),narration(approved));
     assert.equal((await production.getByJobId(id)).status,'needs_provider_quote');
     await assert.rejects(production.claimPaidCreation(id,20),/WhatsApp-Freigabe/);
-    await memory.approve(id);
+    await approveContent(db,memory,id);
     await assert.rejects(production.reviseRequestedVideo(id),/Kein offener/);
     const raw=await pg.query('SELECT count(*) AS n FROM job_events WHERE job_id=$1',[id]);
     assert.equal(Number(raw.rows[0].n),revised.events.length+1);

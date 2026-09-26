@@ -1,3 +1,4 @@
+const { approveContent } = require('./helpers/approve-content.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {PGlite}=require('@electric-sql/pglite');
@@ -30,7 +31,7 @@ async function fixture(t,{asset=false}={}){
   let job=(await db.query('SELECT snapshot FROM content_jobs WHERE id=$1',[id])).rows[0].snapshot;
   let oldPublication;
   if(asset){
-    job=await memory.approve(id);await publication.claimVisual(id,'mock-model','replicate');
+    job=await approveContent(db,memory,id);await publication.claimVisual(id,'mock-model','replicate');
     const sha='a'.repeat(64),url=`https://test.public.blob.vercel-storage.com/generated/facebook/${id}/${sha}.png`;
     oldPublication=await publication.prepareWithVisual(id,'491234',{provider:'replicate',model:'mock-model',mediaType:'image',url,sha256:sha});
     await publication.bindMessage(oldPublication.id,'wamid.current');
@@ -155,7 +156,7 @@ test('text-only revision reuses exactly the verified original asset after renewe
   const f=await fixture(t,{asset:true});await f.process(message('text','Der Text ist zu werblich'),async()=>instruction('revise_text'));
   const next=await f.snapshot();assert.notEqual(next.content.caption,f.job.content.caption);assert.equal(visualFingerprint(next),visualFingerprint(f.job));assert.equal((await f.publication.get(f.id)).status,'changes_requested');
   await assert.rejects(f.publication.claimVisual(f.id,'mock-model','replicate'),/freigegeben|genehmigt|Freigabe/i);
-  await f.memory.approve(f.id);
+  await approveContent(f.db,f.memory,f.id);
   const reused=await f.publication.claimVisual(f.id,'mock-model','replicate');assert.ok(reused.existing);assert.equal(reused.existing.status,'pending');assert.equal(reused.existing.imageUrl,f.oldPublication.imageUrl);assert.equal(reused.existing.revision,2);
   assert.equal(reused.existing.whatsappMessageId,null);assert.notEqual(reused.existing.caption,f.oldPublication.caption);
   const attempts=(await f.db.query('SELECT usage,status FROM original_visual_attempts')).rows;assert.equal(attempts.length,2);assert.equal(attempts.filter(a=>a.usage?.newGeneration===false).length,1);assert.ok(attempts.every(a=>a.status==='media_ready'));
@@ -179,6 +180,7 @@ test('signed natural-language webhook only revises and requests review; no publi
   t.after(()=>{for(const key of Object.keys(env)){if(old[key]===undefined)delete process.env[key];else process.env[key]=old[key];}});
   let parses=0,paid=0,published=0;
   const route=loadRoute('app/api/whatsapp/webhook/route.ts',{
+    '@/lib/whatsapp/content-approval':{handleContentApproval:async()=>false},
     'next/server':{after:()=>{}},
     '@/lib/production/repository':{productionRepository:()=>productionRepository(f.db)},
     '@/lib/whatsapp/process-instruction':{processOperatorInstruction:input=>f.process(input,async()=>{parses++;return instruction('revise_image');})},

@@ -111,9 +111,9 @@ export function ContentStudio({ product, onFillReelTest }: { product: Product; o
   async function approve() {
     if (!job || job.status !== "awaiting_approval") return;
     try {
-      const response=await fetch("/api/content/jobs",{method:"POST",headers:{"Content-Type":"application/json","x-content-password":password},body:JSON.stringify({action:"approve",jobId:job.id})});
+      const response=await fetch("/api/content/jobs",{method:"POST",headers:{"Content-Type":"application/json","x-content-password":password},body:JSON.stringify({action:"requestContentApproval",jobId:job.id})});
       const data=await response.json();if(!response.ok)throw new Error(data.error);
-      remember(parseJob(data.job));
+      setError("Inhaltsfreigabe per WhatsApp versendet. Antworte auf die Nachricht. Nach der Freigabe den gespeicherten Verlauf neu laden.");
     }catch(caught){setError(caught instanceof Error?caught.message:"Freigabe konnte nicht gespeichert werden.");}
   }
   function download() {
@@ -166,7 +166,7 @@ export function ContentStudio({ product, onFillReelTest }: { product: Product; o
       {job.content && <ContentPreview content={job.content} />}
       {job.review && <p className={job.review.passed ? "muted" : "error"}>{job.review.passed ? "Redaktionelle Vorprüfung bestanden – keine unabhängige Faktenprüfung." : `Überarbeiten: ${job.review.issues.join(" ")}`}</p>}
       {job.marketing && <div className="marketingPlan"><h3>Marketing: {job.marketing.primary}</h3><p>{job.marketing.rationale}</p><p><b>Zielgruppe:</b> {job.marketing.audience}</p><p>{job.marketing.adaptation}</p><p><b>Linkplatzierung:</b> {job.marketing.linkPlacement}</p><p>{job.marketing.conversionHypothesis}</p><p><b>Messen:</b> {job.marketing.metrics.join(" · ")}</p><ul>{job.marketing.publishingChecks.map(c => <li key={c}>{c}</li>)}</ul></div>}
-      <div className="contentActions">{job.status === "awaiting_approval" && <button type="button" className="primary" onClick={approve}>Content-Plan nach Prüfung freigeben</button>}<button type="button" className="ghost" onClick={download}>Job & Protokoll herunterladen</button></div>
+      <div className="contentActions">{job.status === "awaiting_approval" && <button type="button" className="primary" onClick={approve}>Inhalt per WhatsApp zur Freigabe senden</button>}<button type="button" className="ghost" onClick={download}>Job & Protokoll herunterladen</button></div>
       {job.status === "approved" && <><p className="success">Content-Plan freigegeben. Kostenpflichtige Produktion und Veröffentlichung benötigen getrennte Freigaben.</p><ProductionGate job={job} password={password} onRevised={remember} />{job.content && job.content.format !== "video" && <PublicationGate key={job.id} job={job} password={password} />}</>}
       {terminalStatuses.includes(job.status) && <PerformanceEditor key={job.id} jobId={job.id} password={password} />}
       <details className="jobTrace"><summary>Entscheidungen & Agentenantworten ({job.events.length})</summary>{job.events.map(event => <article key={event.sequence}><small>{event.sequence} · {event.agent} · {new Date(event.at).toLocaleTimeString("de-DE")}</small><p>{event.message}</p>{event.data !== undefined && <details><summary>Strukturierte Antwort</summary><pre>{JSON.stringify(event.data, null, 2)}</pre></details>}</article>)}</details>

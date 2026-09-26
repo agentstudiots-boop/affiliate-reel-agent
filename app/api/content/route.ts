@@ -5,6 +5,7 @@ import { runContentJob } from "@/lib/orchestrator";
 import { databaseConfigured } from "@/lib/memory/db";
 import { authorized } from "@/lib/memory/auth";
 import { ConflictError, memoryRepository } from "@/lib/memory/repository";
+import { requestContentApproval } from "@/lib/whatsapp/content-approval";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 const requestSchema = z.object({ requestId: z.string().uuid(), opportunity: opportunitySchema, mode: z.literal("reference").default("reference"), formatPreference: z.enum(["automatic","video"]).default("automatic") });
@@ -40,13 +41,17 @@ export async function POST(request: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        await runContentJob(input.opportunity, { id: input.requestId, mode: input.mode, signal, ...(input.formatPreference === "video" ? { allowedFormats: ["video" as const] } : {}), async loadLearning(opportunity) {
+        const planned=await runContentJob(input.opportunity, { id: input.requestId, mode: input.mode, signal, ...(input.formatPreference === "video" ? { allowedFormats: ["video" as const] } : {}), async loadLearning(opportunity) {
           try { return await repo.learn(opportunity); } catch { throw new Error("Historischer Datenbankvergleich nicht verfügbar. Planung gestoppt."); }
         }, async onUpdate(job) {
           // Database commit precedes UI delivery. A lost browser connection cannot erase saved work.
           try { await repo.save(job); } catch { throw new Error("Postgres-Speicherung fehlgeschlagen. Planung gestoppt."); }
           if (!signal.aborted) controller.enqueue(encoder.encode(JSON.stringify(job)+"\n"));
         } });
+        if(planned.status==="awaiting_approval" && !signal.aborted) {
+          try { await requestContentApproval(planned.id); }
+          catch(error) { console.info(JSON.stringify({event:"content_approval_pending_manual_send",jobId:planned.id,reason:error instanceof Error?error.message:"unavailable"})); }
+        }
         if (!signal.aborted) controller.close();
       } catch { if (!signal.aborted) controller.error(new Error("Speicherung oder Planung unterbrochen. Gespeicherten Verlauf neu laden; kein automatischer Neustart.")); }
     },

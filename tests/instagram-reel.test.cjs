@@ -1,3 +1,4 @@
+const { approveContent } = require('./helpers/approve-content.cjs');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { PGlite } = require('@electric-sql/pglite');
@@ -27,7 +28,7 @@ async function fixture(t) {
   const planned = await runContentJob(opportunity,{ id, allowedFormats:['video'], onUpdate:memory.save });
   assert.equal(planned.status,'awaiting_approval',planned.error);
   assert.equal(planned.marketing.primary,'Instagram Reel');
-  await memory.approve(id);
+  await approveContent(db,memory,id);
   const video = 'https://exports.faceless.so/renders/abc123/123.mp4';
   await pg.query("INSERT INTO production_runs(id,job_id,content_type,provider,provider_mode,status,output_url) VALUES($1,$2,'video','faceless_video','FACELESS_STORYBOARD','ready',$3)", [crypto.randomUUID(),id,video]);
   const repo = instagramReelRepository(db);
@@ -124,6 +125,7 @@ test('signed approval for Instagram never invokes the Facebook publisher; the Re
   await f.repo.bindMessage(pub.id,'wamid.reel');
   let facebookCalls=0,creates=0,publishes=0;
   const webhook=loadRoute('app/api/whatsapp/webhook/route.ts',{
+    '@/lib/whatsapp/content-approval':{handleContentApproval:async()=>false},
     'next/server': { after: () => {} },
     '@/lib/production/repository':{productionRepository:()=>productionRepository(f.db)},
     '@/lib/daily/draft':{sendDailyApproval:async()=>{throw Error('Unexpected daily flow')}},

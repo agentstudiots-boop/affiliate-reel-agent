@@ -16,12 +16,19 @@ export function narration(job: ContentJob) {
 }
 
 export function facelessVisualDirection(job: ContentJob) {
-  if (!/kürbis.*schnitz|schnitz.*kürbis/i.test(job.opportunity.product.name)) return undefined;
+  const scenes=job.content?.format === "video" ? job.content.scenes.map(scene=>scene.visual).filter(Boolean) : [];
+  if (!/kürbis.*schnitz|schnitz.*kürbis/i.test(job.opportunity.product.name)) {
+    if (!scenes.length) return undefined;
+    return {
+      masterStyle: `Originale vertikale Alltagsszene: ${job.opportunity.product.name} steht in seiner konkreten Anwendung im Mittelpunkt. Zeige die Handlung und deren sichtbares Ergebnis; stütze dich auf die freigegebenen visuellen Szenen: ${scenes.join(" ").slice(0,1100)}. Keine unbestätigten Modellmerkmale oder exakten Nachbauten.`,
+      globalNegativePrompt: "Keine fremden Logos, Produktverpackungen, Shop-Oberflächen, unbelegten Produkteigenschaften oder eingebrannten Schriften.",
+    };
+  }
   const childInPlan = job.content?.format === "video" && job.content.scenes.some(scene => /\bkind\b/i.test(scene.visual) && !/keine kinder/i.test(scene.visual));
   return {
-    masterStyle: childInPlan
+    masterStyle: (childInPlan
       ? "Originale vertikale Halloween-Bastelszene. Ein großer echter orangefarbener Kürbis steht im Vordergrund. Ein Kind zeichnet das Gesicht vor und schöpft mit einem Löffel Kerne aus; eine erwachsene Person führt allein das kleine Kürbisschnitzwerkzeug und schneidet sichtbar Augen und Mund aus. Kind und erwachsene Person freuen sich gemeinsam über die leuchtende Deko-Laterne. Glaubwürdige, beaufsichtigte Handlung; keine exakte Abbildung des verlinkten Markenmodells."
-      : "Originale vertikale Halloween-Bastelszene. Ein großer echter orangefarbener Kürbis steht durchgehend im Vordergrund. Erwachsene Hände zeichnen ein Gesicht vor und schneiden mit einem kleinen neutralen Kürbisschnitzwerkzeug sichtbar Augen und Mund aus. Am Schluss leuchtet die fertige Kürbislaterne im Abendlicht. Glaubwürdige Materialien und Handlung; keine exakte Abbildung des verlinkten Markenmodells.",
+      : "Originale vertikale Halloween-Bastelszene. Ein großer echter orangefarbener Kürbis steht durchgehend im Vordergrund. Erwachsene Hände zeichnen ein Gesicht vor und schneiden mit einem kleinen neutralen Kürbisschnitzwerkzeug sichtbar Augen und Mund aus. Am Schluss leuchtet die fertige Kürbislaterne im Abendlicht. Glaubwürdige Materialien und Handlung; keine exakte Abbildung des verlinkten Markenmodells.") + (scenes.length ? ` Freigegebene sichtbare Handlungen: ${scenes.join(" ").slice(0,850)}` : ""),
     globalNegativePrompt: `Keine Speisen, Backwaren, Pasta oder Pfanne. Keine Küchenmesser, ${childInPlan ? "kein Kind mit Schneidwerkzeug und keine Kinderhände an der Klinge" : "Kinder"}, Markenlogos, Produktverpackungen, Shop-Oberflächen oder eingebrannte Schrift. Kein bloßes Dekor ohne sichtbar geschnitzten Kürbis.`,
   };
 }

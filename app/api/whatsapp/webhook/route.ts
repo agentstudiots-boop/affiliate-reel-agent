@@ -1,4 +1,6 @@
 import { processOperatorInstruction } from "@/lib/whatsapp/process-instruction";
+import { handleContentApproval } from "@/lib/whatsapp/content-approval";
+import { requestContentApproval } from "@/lib/whatsapp/content-approval";
 import { after } from "next/server";
 import { continuePendingReels } from "@/lib/automation/continue";
 import { productionRepository } from "@/lib/production/repository";
@@ -51,6 +53,7 @@ export async function POST(request: Request) {
   let failed = false;
   for (const message of messages) {
     try {
+      if (await handleContentApproval({ ...message, payload })) continue;
       if (await processOperatorInstruction({ ...message, payload }, { sendApproval: sendDailyApproval })) continue;
       const result = await repo.applyIncomingWhatsApp({ ...message, payload });
       console.info(JSON.stringify({ event: "whatsapp_approval_message", messageId: message.id, handled: result.handled, reason: "reason" in result ? result.reason : undefined, intent: "intent" in result ? result.intent : undefined }));
@@ -73,8 +76,8 @@ export async function POST(request: Request) {
       if (result.handled && "productionRunId" in result && result.intent === "changes_requested" && "jobId" in result && typeof result.jobId === "string") {
         try {
           const revised = await repo.reviseRequestedVideo(result.jobId);
-          try { await sendWhatsAppText(`Videoänderung für ${revised.opportunity.product.name} übernommen. Der überarbeitete Content-Plan muss erneut geprüft und freigegeben werden. Die alte Kostenfreigabe ist ungültig; es wurde nichts produziert oder veröffentlicht.`); }
-          catch { console.error(JSON.stringify({ event: "video_revision_notice_unknown", jobId: result.jobId })); }
+          try { await requestContentApproval(revised.id); }
+          catch { try { await sendWhatsAppText(`Videoänderung für ${revised.opportunity.product.name} übernommen. Die neue Inhaltsfreigabe konnte nicht zugestellt werden; bitte im Content Studio prüfen. Die alte Kostenfreigabe ist ungültig. Keine Produktion.`); } catch {} }
         } catch (error) {
           const message = error instanceof Error ? error.message : "Änderung nicht umsetzbar.";
           try { await sendWhatsAppText(`Änderungswunsch gespeichert; Video noch nicht geändert: ${message}. Im Content Studio prüfen. Keine Produktion oder Veröffentlichung.`); }
@@ -89,7 +92,7 @@ export async function POST(request: Request) {
             try { await sendDailyApproval(revised.job.id); }
             catch { console.error(JSON.stringify({ event: "publication_revision_approval_send_unknown", jobId: revised.job.id })); }
           } else {
-            try { await sendWhatsAppText("Änderung übernommen. Der überarbeitete Content-Plan ist wieder freigabepflichtig. Bitte im Content Studio prüfen und freigeben; eine alte Veröffentlichungsfreigabe kann nicht mehr posten."); }
+            try { await requestContentApproval(revised.job.id); }
             catch { console.error(JSON.stringify({ event: "publication_revision_notice_unknown", jobId: revised.job.id })); }
           }
           console.info(JSON.stringify({ event: "publication_revision", publicationId: result.publicationId, jobId: revised.job.id, status: "awaiting_approval" }));

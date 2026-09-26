@@ -11,6 +11,7 @@ const {publicationRepository}=require('../.test-build/lib/meta/publication-gate'
 const {instagramReelRepository}=require('../.test-build/lib/meta/instagram-reel');
 const {organicReelPayload,ORGANIC_REEL_CAPABILITIES}=require('../.test-build/lib/meta/instagram-publisher');
 const loadRoute=require('./helpers/load-route.cjs');
+const {approveContent}=require('./helpers/approve-content.cjs');
 const source='https://www.amazon.de/dp/B000000001'; // synthetic test ASIN, never a production default
 function product(changes={}) {return bindAmazonProduct({name:'Kuscheldecke Modell X',sourceUrl:source,affiliateUrl:'',price:'',targetGroup:'Haushalte',benefits:'Eignung vor Kauf prüfen',notes:'',productVerifiedAt:'2026-09-26T08:00:00.000Z',productVerifiedName:'Kuscheldecke Modell X',...changes});}
 function opportunity(p=product(),platform='facebook') {return opportunitySchema.parse({product:p,useCase:'Ein kühler Herbstabend auf dem Sofa mit einer Tasse Tee.',category:'home_living',targetPlatform:platform,budget:platform==='instagram'?'quality':'low'});}
@@ -74,7 +75,7 @@ test('final Facebook and Instagram writes reject legacy search jobs and tampered
   for(const platform of ['facebook','instagram']){
     const id=crypto.randomUUID(),input=opportunity(product(),platform);await f.memory.claim(id,input,'reference');
     await runContentJob(input,{id,onUpdate:f.memory.save,allowedFormats:[platform==='instagram'?'video':'image']});
-    const job=await f.memory.approve(id);let repo,pending;
+    const job=await approveContent(f.db,f.memory,id);let repo,pending;
     if(platform==='instagram'){
       await f.pg.query("INSERT INTO production_runs(id,job_id,content_type,provider,provider_mode,status,output_url) VALUES($1,$2,'video','faceless_video','FACELESS_STORYBOARD','ready','https://exports.faceless.so/a.mp4')",[crypto.randomUUID(),id]);
       repo=instagramReelRepository(f.db);pending=await repo.prepare(id,'4912345678');

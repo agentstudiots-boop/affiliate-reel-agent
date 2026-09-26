@@ -1,3 +1,4 @@
+const { approveContent } = require('./helpers/approve-content.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -24,7 +25,7 @@ async function setup(){
   const db=dbAdapter(pg),memory=memoryRepository(db),repo=publicationRepository(db);
   async function job(){
     const input=opportunitySchema.parse({product:{productVerifiedAt:'2026-09-26T08:00:00.000Z', productVerifiedName:'Kuscheldecke', name:'Kuscheldecke',sourceUrl:'https://www.amazon.de/dp/B000000001',affiliateUrl:'https://www.amazon.de/dp/B000000001',price:'',targetGroup:'Haushalte',benefits:'Material und Größe vergleichen',notes:''},useCase:'Ruhiger Abend mit einer Decke auf dem Sofa.',targetPlatform:'facebook',budget:'low'});
-    const jobId=crypto.randomUUID();await memory.claim(jobId,input,'reference');await runContentJob(input,{id:jobId,onUpdate:memory.save,loadLearning:memory.learn});return memory.approve(jobId);
+    const jobId=crypto.randomUUID();await memory.claim(jobId,input,'reference');await runContentJob(input,{id:jobId,onUpdate:memory.save,loadLearning:memory.learn});return approveContent(db,memory,jobId);
   }
   return {pg,repo,job};
 }
