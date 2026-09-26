@@ -1,5 +1,5 @@
 import { productionRepository, ProductionConflictError } from "./repository";
-import { facelessClient, FacelessError } from "./faceless-so";
+import { facelessClient, facelessVisualDirection, FacelessError } from "./faceless-so";
 
 // UI and automatic continuation use the same persistent one-attempt gates.
 export async function advanceVideo(jobId: string, action: "startVideo" | "pollVideo",
@@ -10,9 +10,10 @@ export async function advanceVideo(jobId: string, action: "startVideo" | "pollVi
     if (run.status !== "approved_for_spend") throw new ProductionConflictError("Keine gespeicherte WhatsApp-Freigabe für diesen Videostart.");
     const quote = await provider.quote();
     if (quote.balance < quote.credits) throw new ProductionConflictError("Faceless.so-Credits reichen nicht aus.");
+    const job = await repo.approvedJob(jobId);
     const claimed = await repo.claimPaidCreation(jobId, quote.credits);
     // This POST charges credits. Never retry automatically, even with the same idempotency key.
-    const created = await provider.create(claimed.script, claimed.voiceId, `Affiliate Reel ${jobId}`, claimed.key);
+    const created = await provider.create(claimed.script, claimed.voiceId, `Affiliate Reel ${jobId}`, claimed.key, facelessVisualDirection(job));
     // Preserve a confirmed paid job before reporting a cost discrepancy so
     // it remains observable without ever buying a replacement.
     const boundRun = await repo.bindProviderJob(claimed.run.id, created.id);
