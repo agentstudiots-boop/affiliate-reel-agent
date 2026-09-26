@@ -8,6 +8,7 @@ const productionModule = require('../.test-build/lib/production/repository');
 const { facelessClient, facelessVisualDirection } = require('../.test-build/lib/production/faceless-so');
 const { runContentJob } = require('../.test-build/lib/content/orchestrator');
 const { opportunitySchema } = require('../.test-build/lib/content/schema');
+const { processOperatorInstruction } = require('../.test-build/lib/whatsapp/process-instruction');
 
 async function fixture(t) {
   const pg = new PGlite();
@@ -108,6 +109,38 @@ test('production handler enforces WhatsApp gate and concurrent starts buy/render
   assert.equal((await f.post('startVideo')).status, 409); assert.equal(f.paid().length, 1);
 });
 
+test('a change to an open WhatsApp video quote revokes the old approval before revising', async t => {
+  const f = await fixture(t);
+  assert.equal((await f.post('prepareVideo')).status, 200);
+  assert.equal((await f.post('requestApproval')).status, 200);
+  const response = await f.route.POST(new Request('https://local.test/api/production', { method:'POST',
+    headers:{'x-content-password':'local-route-test'}, body:JSON.stringify({action:'requestRevision',jobId:f.id,feedback:'Szene 1 kürzer'}) }));
+  assert.equal(response.status,200);
+  assert.equal((await response.json()).job.status,'awaiting_approval');
+  assert.equal((await f.repository.latestApproval(f.id)).status,'changes_requested');
+  assert.equal((await f.repository.getByJobId(f.id)).status,'needs_provider_quote');
+  const oldQuoteReply=await f.repository.applyIncomingWhatsApp({id:'old-quote-approval',from:'491234',body:'Freigeben',replyToMessageId:'wamid.test.quote',payload:{}});
+  assert.equal(oldQuoteReply.handled,false);
+  assert.equal(f.paid().length,0);
+});
+
+test('quoted WhatsApp video change reaches production gate and revises without buying media', async t => {
+  const f=await fixture(t);
+  await f.post('prepareVideo');await f.post('requestApproval');
+  const input={id:'wa-video-change',from:'491234',body:'Bitte Szene 1 kürzer',replyToMessageId:'wamid.test.quote',payload:{}};
+  const intercepted=await processOperatorInstruction(input,{database:{query:(q,v)=>f.pg.query(q,v),transaction:fn=>f.pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v)}))},
+    interpret:async()=>{throw Error('Should not interpret a video message as an image change');},
+    send:async()=>{throw Error('No ambiguous notice');},sendApproval:async()=>false});
+  assert.equal(intercepted,false);
+  const decision=await f.repository.applyIncomingWhatsApp(input);
+  assert.equal(decision.intent,'changes_requested');
+  assert.equal(decision.jobId,f.id);
+  const revised=await f.repository.reviseRequestedVideo(decision.jobId);
+  assert.equal(revised.status,'awaiting_approval');
+  assert.equal((await f.repository.getByJobId(f.id)).status,'needs_provider_quote');
+  assert.equal(f.paid().length,0);
+});
+
 test('unknown paid result remains claimed and cannot cause a second purchase', async t => {
   const f = await fixture(t); await f.approve(); f.state.paidUnknown = true;
   assert.equal((await f.post('startVideo')).status, 503);
@@ -146,6 +179,13 @@ test('pumpkin video sends explicit visual direction to Faceless with the approve
   finally { if(previous===undefined) delete process.env.FACELESS_API_KEY; else process.env.FACELESS_API_KEY=previous; }
   assert.deepEqual({script:body.script,model:body.model,masterStyle:body.masterStyle,globalNegativePrompt:body.globalNegativePrompt},
     {script:'Ein echter Kürbis wird geschnitzt.',model:'storyboard',...visual});
+});
+
+test('a revised pumpkin visual direction includes supervised child participation', () => {
+  const visual=facelessVisualDirection({opportunity:{product:{name:'YAVOCOS Kürbis Schnitzset'}},content:{format:'video',scenes:[{visual:'Ein Kind zeichnet Augen und Mund auf den echten Kürbis.'}]}});
+  assert.match(visual.masterStyle,/Ein Kind zeichnet das Gesicht vor/);
+  assert.match(visual.globalNegativePrompt,/kein Kind mit Schneidwerkzeug/);
+  assert.doesNotMatch(visual.globalNegativePrompt,/Keine Küchenmesser, Kinder,/);
 });
 
 test('unknown MP4 render result is reconciled by reads only', async t => {
