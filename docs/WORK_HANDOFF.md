@@ -1,5 +1,36 @@
 # Work handoff
 
+## Reel-Test 26.09.2026: WhatsApp-Kostenfreigabe offen
+
+Der Nutzer hat einen Instagram-Reel-Test mit WhatsApp-Kostenfreigabe beauftragt
+und verlangt einen produktbezogenen Handlungsbogen mit Storytelling und Emotion.
+Der ältere Plan `cfa990ab-00ee-45cb-8a43-1e85a53c6636` ist zwar inzwischen
+inhaltlich freigegeben und als `needs_provider_quote` vorbereitet, hat aber
+einen generischen Sprechtext. Diesen Plan nicht für Video-Kosten freigeben.
+
+Der neue Instagram-Plan `dc31e5e2-ce68-43da-93b9-dcc4be21c007` wurde im
+aktuellen Preview erstellt, inhaltlich freigegeben und für Faceless Storyboard
+vorbereitet. Drehbuch: echter Kürbis im Vordergrund, Erwachsene schnitzen Augen
+und Mund, fertige Laterne, emotionale Auflösung und YAVOCOS als mögliche
+Werkzeugwahl ohne unbelegte Modellmerkmale. Sprecherin: Mila Winter (deutsch).
+Quote: 20 Faceless-Credits, beim Abruf 275 Credits verfügbar; EUR-Kosten und
+Affiliate-Provision unbekannt. Die WhatsApp-Kostenanfrage wurde einmal gesendet
+und mit einer Message-ID gebunden. Zuletzt `awaiting_whatsapp_approval`/
+`approval_requests.pending`. Kein Faceless-Kauf und kein Instagram-Post.
+
+Erst nach **ausdrücklicher Antwort auf genau diese WhatsApp** und lesendem
+Nachweis `approved_for_spend` den einmaligen Start für diesen neuen Job
+ausführen. Anschließend Status/Render abgleichen, MP4 auf tatsächliches
+Kürbisschnitzen prüfen und nur bei passender Qualität die separate Instagram-
+Veröffentlichungsfreigabe anfordern. Faceless erhält derzeit ausschließlich
+den Sprechtext und erzeugt eigene statische Bilder; die visuellen Szenen im
+Drehbuch lassen sich über diese API nicht einzeln erzwingen. Bei unpassendem
+Video keine Instagram-Freigabe anfordern und keine weitere Produktion ohne
+neue Kostenentscheidung starten. Code-Commit `876b11ac3680251afcfcc3fcf393880e63189a2a`,
+Preview READY, Quality #117 erfolgreich.
+
+Die folgenden Checkpoints sind frühere Stände.
+
 ## Aktueller Stand: 26.09.2026, nach WhatsApp-Bildablehnung
 
 - PR #6 bleibt Draft auf `feat/production-gates-whatsapp`. Geprüfter Code-Stand
