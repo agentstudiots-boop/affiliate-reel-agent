@@ -172,7 +172,13 @@ test('pumpkin reel tells a visible carving story with product context and no mod
   assert.match(family.content.scenes[1].visual,/Kind zeichnet Augen und Mund/);
   assert.match(family.content.scenes[2].visual,/erwachsene Person schnitzt/);
   assert.match(family.content.caption,/Kind zeichnet das Gesicht vor/);
+  assert.doesNotMatch(family.content.caption,/Produktname, ASIN und Produktlink stehen im Beitragstext|Werkzeugoption|mögliche Werkzeugwahl/);
+  assert.match(family.content.caption,/Werbung \|/);
   assert.equal(family.content.durationSeconds,30);
+  const natural=await reviseApprovedVideo(job,'Der Begleittext passt nicht erkennbar klingt nach System intern');
+  assert.equal(natural.status,'awaiting_approval');
+  assert.match(natural.content.caption,/Werbung \| Ein echter Kürbis/);
+  assert.doesNotMatch(natural.content.caption,/Produktname, ASIN und Produktlink stehen im Beitragstext/);
   const broader=await reviseApprovedVideo(job,'Bitte zeige zuerst die fertige Laterne und dann als Rückblende die Schnitzarbeit',async ()=>({
     ...job.content,scenes:[
       {...job.content.scenes[0],visual:'Die fertige leuchtende Kürbislaterne am Basteltisch. Dann Rückblende zum echten Kürbis und dem Vorzeichnen.'},

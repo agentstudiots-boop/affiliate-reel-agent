@@ -2,6 +2,11 @@ import { videoSchema } from "../schema";
 import type { Brief, Generator } from "../agent";
 import { readerCaption, readerCopy } from "../editorial-copy";
 
+const pumpkinReelCta = "Das Kürbisschnitzset findest du über den Produktlink. Prüfe vorab die Herstellerhinweise.";
+function pumpkinReelCaption(asin: string, withChild: boolean) {
+  return `Werbung | Ein echter Kürbis, eine Idee und ein gemeinsamer Halloweenabend: ${withChild ? "Ein Kind zeichnet das Gesicht vor und hilft beim Ausschöpfen. Ein Erwachsener schnitzt Augen und Mund." : "Erst das Gesicht vorzeichnen, dann schnitzt eine erwachsene Person Augen und Mund."} Am Ende leuchtet die selbst gestaltete Laterne. Du möchtest auch eine Kürbislaterne schnitzen? Schau dir das verlinkte Schnitzset und die Herstellerhinweise an (ASIN ${asin}). Bei einem Kauf über den Affiliate-Link kann ich eine Provision erhalten.`;
+}
+
 function reviseReferenceVideo(brief: Brief) {
   if (brief.previous?.format !== "video" || !brief.changeRequest) throw new Error("Vorheriger Video-Plan und Änderungsauftrag fehlen.");
   const request = brief.changeRequest.toLocaleLowerCase("de-DE");
@@ -18,8 +23,15 @@ function reviseReferenceVideo(brief: Brief) {
     next.scenes[3].visual = "Die erwachsene Person schnitzt die Mundöffnung fertig. Das Kind und die erwachsene Person betrachten gemeinsam die leuchtende Kürbislaterne und freuen sich über ihre Deko.";
     next.scenes[3].audio = "Dann entsteht der Mund. Gemeinsam freuen sie sich über die leuchtende Laterne.";
     next.scenes[4].visual = "Fertige geschnitzte Kürbislaterne und kleine neutrale Schnitzwerkzeuge am Basteltisch; Kind und erwachsene Person betrachten das Ergebnis. Keine Markenabbildung oder unbelegten Produkteigenschaften.";
-    next.caption = `Gemeinsam eine Halloweenlaterne gestalten: Ein Kind zeichnet das Gesicht vor und hilft beim Ausschöpfen; ein Erwachsener schnitzt Augen und Mund mit einem Kürbisschnitzwerkzeug. Das verlinkte YAVOCOS Kürbisschnitzset ist eine mögliche Werkzeugwahl. Lieferumfang und Hinweise bitte auf der Produktseite prüfen. Werbung | ASIN ${brief.opportunity.product.asin}. ${next.cta} Bei einem Kauf über den Affiliate-Link kann ich eine Provision erhalten.`;
+    next.caption = pumpkinReelCaption(brief.opportunity.product.asin!,true);
     next.productIntegration = "Das Kind beteiligt sich am Entwurf und Ausschöpfen; die erwachsene Person führt das Schnitzwerkzeug. Der echte Kürbis, die sichtbare Schnitzhandlung und die fertige Deko-Laterne bleiben im Mittelpunkt. Konkrete Modellmerkmale bleiben ungeprüft.";
+    applied = true;
+  }
+  if (/(?:begleittext|caption|posttext)/i.test(request) && /(?:passt nicht|system|intern|natürlich|lesbar|verständlicher|überarbeiten)/i.test(request)) {
+    const withChild = /\bkind(?:er)?\b/i.test(next.scenes.map(s => s.visual).join(" "));
+    next.caption = pumpkinReelCaption(brief.opportunity.product.asin!,withChild);
+    next.cta = pumpkinReelCta;
+    if (/Produktname, ASIN und Produktlink stehen im Beitragstext/.test(next.scenes.at(-1)!.audio)) next.scenes.at(-1)!.audio = pumpkinReelCta;
     applied = true;
   }
   if (/erste szene kürzer|szene 1 kürzer/.test(request)) {
@@ -63,7 +75,7 @@ Produktintegration, Voraussetzungen, CTA und Caption ausarbeiten. Feedback bei R
     const childRequested = pumpkin && /\b(?:kind(?:er)?|familie)\b/i.test(opportunity.useCase);
     const copy = readerCopy(brief);
     const cta = opportunity.targetPlatform === "instagram"
-      ? "Produktname, ASIN und Produktlink stehen im Beitragstext."
+      ? pumpkin ? pumpkinReelCta : "Weitere Angaben zum Produkt findest du über den Link im Beitrag."
       : "Eignung und Details beim verlinkten Produkt prüfen.";
     const scenes = pumpkin && childRequested ? [
       { durationSeconds: 6, visual: "Halloweenabend am Basteltisch. Ein großer echter orangefarbener Kürbis steht im Vordergrund. Ein Kind und eine erwachsene Person überlegen gemeinsam, wie die Laterne aussehen soll.", audio: "Heute gestalten wir gemeinsam eine Halloweenlaterne aus diesem Kürbis.", overlay: "Werbung · Eine Halloweenidee" },
@@ -107,7 +119,7 @@ Produktintegration, Voraussetzungen, CTA und Caption ausarbeiten. Feedback bei R
     return { format: "video" as const, title: pumpkin ? "Vom Kürbis zur Halloweenlaterne" : idea.title, hook: pumpkin ? "Ein Gesicht entsteht – und der Halloweenabend kann beginnen." : idea.hook, useCase: idea.useCase,
       productIntegration: pumpkin ? `${childRequested ? "Das Kind zeichnet und schöpft aus; nur die erwachsene Person führt das Schneidwerkzeug. " : ""}Der echte Kürbis und die Handlung des Schnitzens bleiben im Vordergrund. Das verlinkte Schnitzset wird als mögliche Werkzeugwahl eingeordnet; konkrete Modellmerkmale und Lieferumfang bleiben ungeprüft.` : vacuum ? "Vakuumierer verschließt; separates Wasserbad gart; Pfanne erzeugt Kruste. Zubehör ist nicht automatisch im Lieferumfang." : idea.benefit,
       durationSeconds: scenes.reduce((s, x) => s + x.durationSeconds, 0), scenes, cta, disclosure: "Werbung | Affiliate-Link" as const,
-      caption: pumpkin ? `Ein echter Kürbis wird zur Halloweenlaterne: ${childRequested ? "Ein Kind zeichnet das Gesicht vor und hilft beim Ausschöpfen; ein Erwachsener schnitzt Augen und Mund." : "Erst das Gesicht vorzeichnen, dann schnitzt eine erwachsene Person Augen und Mund."} Das verlinkte YAVOCOS Kürbisschnitzset ist eine mögliche Werkzeugwahl; Lieferumfang, Anwendung und Herstellerhinweise bitte auf der Produktseite prüfen. Werbung | ASIN ${opportunity.product.asin}. ${cta} Bei einem Kauf über den Affiliate-Link kann ich eine Provision erhalten.` : vacuum ? `Werbung | ${idea.benefit} Fiktive Familienszene, kein Testbericht. Sous-vide benötigt geeignete Beutel und ein separates temperiertes Wasserbad. Ergebnis abhängig von Lebensmittel und korrekter Zubereitung. Vakuumieren kann außerdem bei geeigneten Lebensmitteln und korrekter Lagerung die Haltbarkeit verlängern; Kühlung und Hygiene bleiben erforderlich. ${cta} Bei einem Kauf über den Affiliate-Link kann eine Provision anfallen.` : readerCaption(brief),
+      caption: pumpkin ? pumpkinReelCaption(opportunity.product.asin!,childRequested) : vacuum ? `Werbung | ${idea.benefit} Fiktive Familienszene, kein Testbericht. Sous-vide benötigt geeignete Beutel und ein separates temperiertes Wasserbad. Ergebnis abhängig von Lebensmittel und korrekter Zubereitung. Vakuumieren kann außerdem bei geeigneten Lebensmitteln und korrekter Lagerung die Haltbarkeit verlängern; Kühlung und Hygiene bleiben erforderlich. ${cta} Bei einem Kauf über den Affiliate-Link kann eine Provision anfallen.` : readerCaption(brief),
       checks: ["Modelleignung und Herstellerhinweise prüfen.", "Dialog ist inszenierte Werbung, keine echte Kundenbewertung.", "Sprecher, Schnitt, Untertitel und Einblendungen produzieren. Dies ist ein Drehbuch, kein fertiges Video.", opportunity.product.notes || "Keine zusätzlichen Modellnachweise hinterlegt."],
     };
   });

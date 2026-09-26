@@ -59,7 +59,7 @@ test('an existing job cannot be rebound to another ASIN or product name',async t
 
 test('Reel CTA stays textual, rejects a different product target, and cannot create a simulated Shopping button',async()=>{
   const job=await runContentJob(opportunity(product(),'instagram'),{allowedFormats:['video']});assert.equal(job.status,'awaiting_approval');
-  assert.match(job.content.cta,/Produktname, ASIN und Produktlink/);
+  assert.match(job.content.cta,/Produkt.*Link im Beitrag/);
   assert.equal(productIdentityError(job.opportunity.product,job.content.cta+' '+job.opportunity.product.affiliateUrl),null);
   assert.equal(productIdentityError(job.opportunity.product,'ASIN B000000002'),'product_unresolved');
   assert.equal(productIdentityError(job.opportunity.product,'https://www.amazon.de/dp/B000000002?tag=alltaeglichle-21'),'product_unresolved');
