@@ -5,7 +5,7 @@ const loadRoute = require('./helpers/load-route.cjs');
 const { applyMigrations } = require('../.test-build/lib/memory/migrations');
 const { memoryRepository } = require('../.test-build/lib/memory/repository');
 const productionModule = require('../.test-build/lib/production/repository');
-const { facelessClient } = require('../.test-build/lib/production/faceless-so');
+const { facelessClient, facelessVisualDirection } = require('../.test-build/lib/production/faceless-so');
 const { runContentJob } = require('../.test-build/lib/content/orchestrator');
 const { opportunitySchema } = require('../.test-build/lib/content/schema');
 
@@ -129,6 +129,23 @@ test('failed generation exposes read-only provider diagnostics without another p
   assert.deepEqual((await response.json()).providerDiagnostics, { status: 'failed', errorMessages: ['Provider generation failed'] });
   assert.equal(f.paid().length, 1);
   assert.equal(f.renders().length, 0);
+});
+
+test('pumpkin video sends explicit visual direction to Faceless with the approved narration', async () => {
+  const visual = facelessVisualDirection({opportunity:{product:{name:'YAVOCOS Halloween Kürbis Schnitzset'}}});
+  assert.match(visual.masterStyle,/echter orangefarbener Kürbis/);
+  assert.match(visual.globalNegativePrompt,/Keine Speisen/);
+  let body;
+  const provider = facelessClient(async (_url,options) => {
+    body=JSON.parse(options.body);
+    return Response.json({success:true,data:{id:'test-visual',model:'storyboard',creditsUsed:20}});
+  });
+  const previous=process.env.FACELESS_API_KEY;
+  process.env.FACELESS_API_KEY='local-provider-test';
+  try { await provider.create('Ein echter Kürbis wird geschnitzt.', 'de-test', 'Reel Test', 'one-use-key', visual); }
+  finally { if(previous===undefined) delete process.env.FACELESS_API_KEY; else process.env.FACELESS_API_KEY=previous; }
+  assert.deepEqual({script:body.script,model:body.model,masterStyle:body.masterStyle,globalNegativePrompt:body.globalNegativePrompt},
+    {script:'Ein echter Kürbis wird geschnitzt.',model:'storyboard',...visual});
 });
 
 test('unknown MP4 render result is reconciled by reads only', async t => {
