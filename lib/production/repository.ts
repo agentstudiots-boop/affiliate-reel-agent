@@ -173,6 +173,19 @@ export function productionRepository(db: Database = getDatabase()) {
       return mapApproval(result.rows[0]);
     },
 
+    async requestVideoRevision(jobId: string, feedback: string) {
+      if (!feedback.trim() || feedback.length > 1200) throw new ProductionConflictError("Änderungswunsch fehlt oder ist zu lang.");
+      return db.transaction(async sql => {
+        const run = await sql.query("SELECT * FROM production_runs WHERE job_id=$1 AND status='awaiting_whatsapp_approval' AND provider_request_attempted_at IS NULL FOR UPDATE", [jobId]);
+        if (!run.rows[0]) throw new ProductionConflictError("Keine ungenutzte Video-Kostenfreigabe für diesen Änderungswunsch offen.");
+        const approval = await sql.query("SELECT id FROM approval_requests WHERE production_run_id=$1 AND kind='render' AND status='pending' AND whatsapp_message_id IS NOT NULL FOR UPDATE", [run.rows[0].id]);
+        if (approval.rows.length !== 1) throw new ProductionConflictError("Offene WhatsApp-Freigabe nicht eindeutig.");
+        await sql.query("UPDATE approval_requests SET status='changes_requested',feedback=$2,decided_at=now() WHERE id=$1", [approval.rows[0].id, feedback]);
+        await sql.query("UPDATE production_runs SET status='changes_requested',revision_request=$2,updated_at=now() WHERE id=$1", [run.rows[0].id, feedback]);
+        return { jobId };
+      });
+    },
+
     async reviseRequestedVideo(jobId: string) {
       return db.transaction(async sql => {
         const run = await sql.query("SELECT * FROM production_runs WHERE job_id=$1 AND status='changes_requested' FOR UPDATE", [jobId]);
@@ -304,7 +317,7 @@ export function productionRepository(db: Database = getDatabase()) {
           "UPDATE whatsapp_events SET intent=$2,production_run_id=$3,approval_request_id=$4 WHERE message_id=$1",
           [input.id, decision.intent, approval.productionRunId, approval.id],
         );
-        return { handled: true as const, intent: decision.intent, feedback: decision.feedback, productionRunId: approval.productionRunId, approvalId: approval.id };
+        return { handled: true as const, intent: decision.intent, feedback: decision.feedback, productionRunId: approval.productionRunId, approvalId: approval.id, jobId: approval.jobId };
       });
     },
 
