@@ -79,5 +79,17 @@ test('Facebook publication needs a distinct signed WhatsApp decision and claims 
     assert.equal(actual.dailyJobId,id4);
     assert.equal((await memory.list()).find(row=>row.id===id4).status,'approved');
     assert.equal(await publication.get(id4),null,'notification and first approval cannot publish');
+    const id5=crypto.randomUUID();await memory.claim(id5,opportunity,'reference');
+    await runContentJob(opportunity,{id:id5,onUpdate:memory.save,loadLearning:memory.learn});
+    await pg.query("INSERT INTO daily_drafts(day,job_id,status,whatsapp_message_id,feedback) VALUES('2026-09-26',$1,'changes_requested','wamid.recovery','Freigegeben')",[id5]);
+    const recovered=await inbound.applyIncomingWhatsApp({id:'wamid.recovery.reply',from:'491234',body:'Freigeben',replyToMessageId:'wamid.recovery',payload:{}});
+    assert.equal(recovered.dailyJobId,id5);assert.equal(recovered.intent,'approve');
+    assert.equal((await memory.list()).find(row=>row.id===id5).status,'approved');
+    assert.equal(await publication.get(id5),null,'recovery does not publish');
+    const id6=crypto.randomUUID();await memory.claim(id6,opportunity,'reference');
+    await runContentJob(opportunity,{id:id6,onUpdate:memory.save,loadLearning:memory.learn});
+    await pg.query("INSERT INTO daily_drafts(day,job_id,status,whatsapp_message_id,feedback) VALUES('2026-09-27',$1,'changes_requested','wamid.real-change','Neues Bild bitte')",[id6]);
+    assert.equal((await inbound.applyIncomingWhatsApp({id:'wamid.real-change.reply',from:'491234',body:'Freigeben',replyToMessageId:'wamid.real-change',payload:{}})).reason,'no_pending_approval');
+    assert.equal((await memory.list()).find(row=>row.id===id6).status,'awaiting_approval');
   }finally{if(old===undefined)delete process.env.WHATSAPP_APPROVER_WA_ID;else process.env.WHATSAPP_APPROVER_WA_ID=old;await pg.close();}
 });
