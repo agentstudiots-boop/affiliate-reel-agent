@@ -5,7 +5,7 @@ const fs=require('node:fs');
 const {PGlite}=require('@electric-sql/pglite');
 const {evaluateImageCreativeQuality}=require('../.test-build/lib/content/creative-quality');
 const {imageProviderStatus,getOriginalVisualProvider}=require('../.test-build/lib/content/image-provider');
-const {runContentJob}=require('../.test-build/lib/content/orchestrator');
+const {runContentJob,reviseApprovedVideo}=require('../.test-build/lib/content/orchestrator');
 const {pumpkinCreativeIssues}=require('../.test-build/lib/content/category');
 const {readerCopy}=require('../.test-build/lib/content/editorial-copy');
 const {analyzeProductInspiration}=require('../.test-build/lib/content/product-inspiration');
@@ -158,6 +158,13 @@ test('pumpkin reel tells a visible carving story with product context and no mod
   assert.deepEqual(pumpkinCreativeIssues(job.opportunity,job.content,job.marketing),[]);
   assert.match(pumpkinCreativeIssues(job.opportunity,{...job.content,caption:'Appetitlich servieren.'}).join(' '),/Kochen oder Essen/);
   assert.match(pumpkinCreativeIssues(job.opportunity,{...job.content,scenes:job.content.scenes.map(scene=>({...scene,visual:'Dekoration auf einem Tisch',audio:'Schöne Stimmung'}))}).join(' '),/Kürbis.*Hauptmotiv/);
+  job.status='approved';
+  const revised=await reviseApprovedVideo(job,'Im Video dürfen Kinder beim Schnitzen mit beteiligt sein beziehungsweise im Video integriert sein');
+  assert.equal(revised.status,'awaiting_approval');
+  assert.match(revised.content.scenes[1].visual,/Kind zeichnet Augen und Mund/);
+  assert.match(revised.content.scenes[2].visual,/erwachsene Person schnitzt/);
+  assert.match(revised.content.caption,/Kind zeichnet das Gesicht vor/);
+  assert.deepEqual(pumpkinCreativeIssues(revised.opportunity,revised.content),[]);
 });
 
 test('missing image provider cannot silently fall back to the typographic card',()=>{
