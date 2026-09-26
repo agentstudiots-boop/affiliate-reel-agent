@@ -109,6 +109,16 @@ test('wrong pumpkin image briefing blocks both revision and paid prompt before p
   assert.equal(visualContextError(job),'visual_context_mismatch');assert.throws(()=>buildOriginalVisualPrompt(job),/visual_context_mismatch/);
 });
 
+test('combined pumpkin revision constrains the next image prompt',async()=>{
+  const job=await runContentJob(opportunity(),{allowedFormats:['image']});
+  const next=reviseOperatorInstruction(job,instruction('revise_both'));
+  assert.match(next.content.caption,/^Werbung \| Welche Kürbislaterne/);
+  const prompt=buildOriginalVisualPrompt(next);
+  assert.match(prompt,/mehrere kleine unmarkierte Kürbisschnitzwerkzeuge/);
+  assert.match(prompt,/Keine Speisen, keine Kücheninszenierung/);
+  assert.match(prompt,/ohne Funken/);
+});
+
 test('same WhatsApp message is claimed before LLM call: concurrent duplicate has one parse, revision and notice, no media',async t=>{
   const f=await fixture(t);let calls=0;let release;const paused=new Promise(resolve=>{release=resolve;});let entered;const started=new Promise(resolve=>{entered=resolve;});
   const first=f.process(message('one'),async()=>{calls++;entered();await paused;return instruction('revise_image');});
