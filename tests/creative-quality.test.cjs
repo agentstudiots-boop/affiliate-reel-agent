@@ -142,6 +142,7 @@ test('pumpkin reel tells a visible carving story with product context and no mod
   const job=await runContentJob(opportunity,{allowedFormats:['video']});
   assert.equal(job.opportunity.category,'home_living');
   assert.equal(job.content.format,'video');
+  assert.equal(job.content.durationSeconds,30,'new Instagram storyboard must fit one approved Runway task');
   assert.match(job.ideas.find(idea=>idea.format==='video').story,/schnitzt beides sichtbar/);
   assert.match(job.marketing.adaptation,/Schnitzen eines echten Halloween-Kürbisses/);
   assert.doesNotMatch(job.marketing.adaptation,/appetitlich|kochen|essen/i);

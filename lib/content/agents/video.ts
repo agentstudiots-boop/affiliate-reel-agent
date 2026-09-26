@@ -16,7 +16,7 @@ function reviseReferenceVideo(brief: Brief) {
     next.scenes[2].visual = "Nahaufnahme: Die erwachsene Person schnitzt mit einem kleinen neutralen Kürbisschnitzwerkzeug sichtbar die Augenöffnung aus dem echten Kürbis. Das Kind schaut daneben zu und sammelt mit einem Löffel Kürbiskerne. Hände des Kindes bleiben vom Schneidwerkzeug entfernt.";
     next.scenes[2].audio = "Während ein Erwachsener die Augenöffnung schnitzt, hilft das Kind beim Ausschöpfen. Der Kürbis bleibt im Mittelpunkt.";
     next.scenes[3].visual = "Die erwachsene Person schnitzt die Mundöffnung fertig. Das Kind und die erwachsene Person betrachten gemeinsam die leuchtende Kürbislaterne und freuen sich über ihre Deko.";
-    next.scenes[3].audio = "Jetzt entsteht noch der Mund. Und am Ende leuchtet unsere selbst gestaltete Halloweenlaterne.";
+    next.scenes[3].audio = "Dann entsteht der Mund. Gemeinsam freuen sie sich über die leuchtende Laterne.";
     next.scenes[4].visual = "Fertige geschnitzte Kürbislaterne und kleine neutrale Schnitzwerkzeuge am Basteltisch; Kind und erwachsene Person betrachten das Ergebnis. Keine Markenabbildung oder unbelegten Produkteigenschaften.";
     next.caption = `Gemeinsam eine Halloweenlaterne gestalten: Ein Kind zeichnet das Gesicht vor und hilft beim Ausschöpfen; ein Erwachsener schnitzt Augen und Mund mit einem Kürbisschnitzwerkzeug. Das verlinkte YAVOCOS Kürbisschnitzset ist eine mögliche Werkzeugwahl. Lieferumfang und Hinweise bitte auf der Produktseite prüfen. Werbung | ASIN ${brief.opportunity.product.asin}. ${next.cta} Bei einem Kauf über den Affiliate-Link kann ich eine Provision erhalten.`;
     next.productIntegration = "Das Kind beteiligt sich am Entwurf und Ausschöpfen; die erwachsene Person führt das Schnitzwerkzeug. Der echte Kürbis, die sichtbare Schnitzhandlung und die fertige Deko-Laterne bleiben im Mittelpunkt. Konkrete Modellmerkmale bleiben ungeprüft.";
@@ -52,7 +52,7 @@ function reviseReferenceVideo(brief: Brief) {
 
 export function videoAgent(brief: Brief, generate: Generator) {
   return generate("video", `Setze ausschließlich das vom Orchestrator ausgewählte Konzept in ein vollständiges Drehbuch um.
-Die Geschichte bestimmt die Dauer: 10–40 Sekunden, bei Erklärung meist 20–40. Summe aller Szenendauern muss durationSeconds entsprechen.
+Die Geschichte bestimmt die Dauer: Bei Instagram-Reels genau 30 Sekunden für den aktuellen Runway-Produktionsweg; bei anderen Formaten 10–40 Sekunden. Summe aller Szenendauern muss durationSeconds entsprechen.
 Pro Szene konkrete visuelle Handlung, sprechbarer Dialog/Voiceover und Einblendung. Maximal ca. 2,5 gesprochene Wörter pro Sekunde.
 Das Produkt und seine sichtbare Anwendung tragen die Geschichte: Ausgangssituation, konkrete Handlung, nachvollziehbares Ergebnis und eine menschliche Reaktion. Nur belegte Eigenschaften und Erleichterungen als Tatsachen darstellen; keine eigene Nutzung erfinden.
 Produktintegration, Voraussetzungen, CTA und Caption ausarbeiten. Feedback bei Revision gezielt beheben. Keine Videogenerierung auslösen.`, brief, videoSchema, () => {
@@ -65,11 +65,11 @@ Produktintegration, Voraussetzungen, CTA und Caption ausarbeiten. Feedback bei R
       ? "Produktname, ASIN und Produktlink stehen im Beitragstext."
       : "Eignung und Details beim verlinkten Produkt prüfen.";
     const scenes = pumpkin ? [
-      { durationSeconds: 7, visual: "Halloweenabend am Basteltisch. Ein großer echter orangefarbener Kürbis ohne Gesicht steht im Vordergrund. Eine erwachsene Person betrachtet ihn; Vorfreude auf die spätere Laterne.", audio: "Heute Abend soll aus diesem echten Kürbis eine Halloweenlaterne werden. Das Gesicht ist schon geplant.", overlay: "Werbung · Eine Halloweenidee" },
-      { durationSeconds: 7, visual: "Erwachsene Hände zeichnen Augen und Mund auf die Schale eines echten orangefarbenen Kürbisses. Ein kleines neutrales Kürbisschnitzwerkzeug liegt daneben; keine Kinder, keine Speisen.", audio: "Eine erwachsene Person zeichnet Augen und Mund auf die Schale. Dann beginnt das Schnitzen.", overlay: "Vom Entwurf zum Kürbisgesicht" },
-      { durationSeconds: 8, visual: "Nahaufnahme: Erwachsene Hände schneiden mit einem kleinen neutralen Kürbisschnitzwerkzeug sichtbar eine Augenöffnung aus dem echten Kürbis. Kürbisschale und Kerne am Basteltisch. Kein Küchenmesser oder Gebäck.", audio: "Mit einem kleinen Kürbisschnitzwerkzeug wird die erste Augenöffnung vorsichtig herausgeschnitten. Der Kürbis bleibt im Mittelpunkt.", overlay: "Ein echter Kürbis wird geschnitzt" },
-      { durationSeconds: 7, visual: "Die erwachsene Person schnitzt sichtbar die Mundöffnung fertig. Schnitt zur fertigen Kürbislaterne im Abendlicht. Sie lächelt über das Ergebnis. Kein exaktes Produktmodell nachbilden.", audio: "Danach entsteht der Mund. Im Abendlicht leuchtet das fertige Gesicht. Ein kleiner Halloweenmoment.", overlay: "Vom Kürbis zur Laterne" },
-      { durationSeconds: 7, visual: "Fertige geschnitzte Kürbislaterne und neutrale kleine Schnitzwerkzeuge am Basteltisch. Erwachsene Person daneben. Keine Markenabbildung, keine unbestätigten Eigenschaften, keine Shop-Schaltfläche.", audio: "Das YAVOCOS Kürbisschnitzset ist eine Werkzeugoption. Prüfe Lieferumfang und Hinweise auf der Produktseite.", overlay: "Produktdetails im Beitragstext · Werbung" },
+      { durationSeconds: 6, visual: "Halloweenabend am Basteltisch. Ein großer echter orangefarbener Kürbis ohne Gesicht steht im Vordergrund. Eine erwachsene Person betrachtet ihn; Vorfreude auf die spätere Laterne.", audio: "Aus diesem Kürbis soll heute Abend eine Halloweenlaterne werden.", overlay: "Werbung · Eine Halloweenidee" },
+      { durationSeconds: 6, visual: "Erwachsene Hände zeichnen Augen und Mund auf die Schale eines echten orangefarbenen Kürbisses. Ein kleines neutrales Kürbisschnitzwerkzeug liegt daneben; keine Kinder, keine Speisen.", audio: "Eine erwachsene Person zeichnet Augen und Mund auf die Schale. Dann beginnt das Schnitzen.", overlay: "Vom Entwurf zum Kürbisgesicht" },
+      { durationSeconds: 7, visual: "Nahaufnahme: Erwachsene Hände schneiden mit einem kleinen neutralen Kürbisschnitzwerkzeug sichtbar eine Augenöffnung aus dem echten Kürbis. Kürbisschale und Kerne am Basteltisch. Kein Küchenmesser oder Gebäck.", audio: "Mit dem Kürbisschnitzwerkzeug wird die erste Augenöffnung vorsichtig ausgeschnitten. Der Kürbis bleibt im Mittelpunkt.", overlay: "Ein echter Kürbis wird geschnitzt" },
+      { durationSeconds: 5, visual: "Die erwachsene Person schnitzt sichtbar die Mundöffnung fertig. Schnitt zur fertigen Kürbislaterne im Abendlicht. Sie lächelt über das Ergebnis. Kein exaktes Produktmodell nachbilden.", audio: "Dann entsteht der Mund. Gemeinsam freuen sie sich über die leuchtende Laterne.", overlay: "Vom Kürbis zur Laterne" },
+      { durationSeconds: 6, visual: "Fertige geschnitzte Kürbislaterne und neutrale kleine Schnitzwerkzeuge am Basteltisch. Erwachsene Person daneben. Keine Markenabbildung, keine unbestätigten Eigenschaften, keine Shop-Schaltfläche.", audio: "Das YAVOCOS Kürbisschnitzset ist eine Werkzeugoption. Prüfe Lieferumfang und Hinweise auf der Produktseite.", overlay: "Produktdetails im Beitragstext · Werbung" },
     ] : vacuum ? [
       { durationSeconds: 5, visual: "Inszenierte Werbeszene am Familientisch: Oma schneidet das gebräunte Steak an. Nahaufnahme: rosa Kern, saftige Schnittfläche, Kräuterbutter schmilzt. Ihr überraschter Blick zu Papa.", audio: "Oma: Das hast du doch nicht selbst gemacht!", overlay: "Werbung · inszenierte Szene" },
       { durationSeconds: 4, visual: "Papa lächelt. Schnitt als Rückblende zur Küchenarbeitsfläche; Vakuumierer und separates Sous-vide-Gerät sichtbar.", audio: "Papa: Doch. Mit Vakuumierer und Sous-vide-Garer.", overlay: "Zwei Geräte, zwei Aufgaben" },
@@ -84,6 +84,19 @@ Produktintegration, Voraussetzungen, CTA und Caption ausarbeiten. Feedback bei R
       { durationSeconds: 7, visual: `Nachvollziehbares Ergebnis zeigen: ${idea.benefit}. Keine unbestätigten Vorher-Nachher-Effekte simulieren.`, audio: copy.spoken[2], overlay: "Vor dem Kauf prüfen" },
       { durationSeconds: 5, visual: `Das Produkt ${opportunity.product.name} im Kontext der Anwendung zeigen.`, audio: cta, overlay: "Werbung · Affiliate-Link" },
     ];
+    if (opportunity.targetPlatform === "instagram") {
+      // Keep the whole approved story inside one 30-second Runway task.
+      let total = scenes.reduce((sum, scene) => sum + scene.durationSeconds, 0);
+      while (total !== 30) {
+        const candidates = scenes.map((scene, index) => ({scene,index})).filter(({scene}) => total > 30 ? scene.durationSeconds > 2 : scene.durationSeconds < 10);
+        if (!candidates.length) throw new Error("30-Sekunden-Storyboard lässt sich nicht aufteilen.");
+        candidates.sort((a,b) => total > 30
+          ? b.scene.durationSeconds - a.scene.durationSeconds || a.index - b.index
+          : a.scene.durationSeconds - b.scene.durationSeconds || a.index - b.index);
+        candidates[0].scene.durationSeconds += total > 30 ? -1 : 1;
+        total += total > 30 ? -1 : 1;
+      }
+    }
     return { format: "video" as const, title: pumpkin ? "Vom Kürbis zur Halloweenlaterne" : idea.title, hook: pumpkin ? "Ein Gesicht entsteht – und der Halloweenabend kann beginnen." : idea.hook, useCase: idea.useCase,
       productIntegration: pumpkin ? "Der echte Kürbis und die Handlung des Schnitzens bleiben im Vordergrund. Das verlinkte Schnitzset wird als mögliche Werkzeugwahl eingeordnet; konkrete Modellmerkmale und Lieferumfang bleiben ungeprüft." : vacuum ? "Vakuumierer verschließt; separates Wasserbad gart; Pfanne erzeugt Kruste. Zubehör ist nicht automatisch im Lieferumfang." : idea.benefit,
       durationSeconds: scenes.reduce((s, x) => s + x.durationSeconds, 0), scenes, cta, disclosure: "Werbung | Affiliate-Link" as const,
