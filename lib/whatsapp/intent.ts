@@ -2,6 +2,7 @@ import type { WhatsAppIntent } from "../production/schema";
 
 const approve = new Set([
   "freigeben",
+  "freigegeben",
   "freigabe",
   "genehmigt",
   "genehmigen",
