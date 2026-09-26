@@ -69,9 +69,24 @@ export async function handleContentApproval(input:Incoming) {
   const db=getDatabase();
   const approver=(process.env.WHATSAPP_APPROVER_WA_ID||"").replace(/\D/g,"");
   if(!approver||input.from.replace(/\D/g,"")!==approver)return false;
-  const match=input.replyToMessageId
+  let match=input.replyToMessageId
     ? await db.query("SELECT * FROM content_approval_requests WHERE whatsapp_message_id=$1 AND status IN ('pending','changes_requested') AND approver_wa_id=$2",[input.replyToMessageId,approver])
     : await db.query("SELECT * FROM content_approval_requests WHERE status='pending' AND whatsapp_message_id IS NOT NULL AND approver_wa_id=$1 ORDER BY created_at DESC LIMIT 2",[approver]);
+  // A clarification reply may quote our explanatory message rather than the
+  // original approval. Resume only when exactly one unresolved content change
+  // exists and no other approval can plausibly own the incoming message.
+  if(!match.rows.length){
+    if(/^(entwurf|wochenbilanz)[.!?]*$/i.test(input.body.trim()))return false;
+    const quoted=input.replyToMessageId
+      ? await db.query("SELECT 1 FROM approval_requests WHERE whatsapp_message_id=$1 UNION ALL SELECT 1 FROM publication_requests WHERE whatsapp_message_id=$1 UNION ALL SELECT 1 FROM daily_drafts WHERE whatsapp_message_id=$1 LIMIT 1",[input.replyToMessageId])
+      : {rows:[]};
+    if(!quoted.rows.length){
+      const other=await db.query("SELECT 1 FROM content_approval_requests WHERE status='pending' AND whatsapp_message_id IS NOT NULL UNION ALL SELECT 1 FROM approval_requests WHERE status='pending' AND whatsapp_message_id IS NOT NULL UNION ALL SELECT 1 FROM publication_requests WHERE status='pending' AND whatsapp_message_id IS NOT NULL UNION ALL SELECT 1 FROM daily_drafts WHERE status='awaiting_approval' AND whatsapp_message_id IS NOT NULL LIMIT 1");
+      if(!other.rows.length){
+        match=await db.query("SELECT * FROM content_approval_requests WHERE status='changes_requested' AND whatsapp_message_id IS NOT NULL AND approver_wa_id=$1 ORDER BY created_at DESC LIMIT 2",[approver]);
+      }
+    }
+  }
   if(match.rows.length!==1) return false;
   if(!input.replyToMessageId){
     const other=await db.query("SELECT 1 FROM approval_requests WHERE status='pending' AND whatsapp_message_id IS NOT NULL UNION ALL SELECT 1 FROM publication_requests WHERE status='pending' AND whatsapp_message_id IS NOT NULL UNION ALL SELECT 1 FROM daily_drafts WHERE status='awaiting_approval' AND whatsapp_message_id IS NOT NULL LIMIT 1");
@@ -125,7 +140,7 @@ export async function handleContentApproval(input:Incoming) {
         }
       }
     } catch(error) {
-      await sendWhatsAppText(`Änderungswunsch für ${original.opportunity.product.name} verstanden, aber noch nicht übernommen: ${error instanceof Error?error.message:"Überarbeitung fehlgeschlagen."} Bitte präzisieren. Keine Produktion gestartet.`);
+      await sendWhatsAppText(`Änderungswunsch für ${original.opportunity.product.name} verstanden, aber noch nicht übernommen: ${error instanceof Error?error.message:"Überarbeitung fehlgeschlagen."} Bitte antworte mit deiner Präzisierung; der Auftrag bleibt gesperrt. Keine Produktion gestartet.`);
       return true;
     }
     const applied=await db.transaction(async sql=>{

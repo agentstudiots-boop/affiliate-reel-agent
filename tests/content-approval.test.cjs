@@ -54,7 +54,10 @@ test('WhatsApp approves the exact finished script before any video production ca
   const first=await requestContentApproval(id);
   assert.match(sent[0],/Drehbuch/);
   assert.match(sent[0],/Inhaltsfreigabe/);
-  assert.equal((await handleContentApproval({id:'wamid.change',from:'491234',body:'Kinder dürfen beim Zeichnen des Kürbisgesichts dabei sein, die erwachsene Person schneidet.',replyToMessageId:first.messageId,payload:{}})),true);
+  assert.equal(await handleContentApproval({id:'wamid.unclear',from:'491234',body:'Bitte mach das irgendwie anders.',replyToMessageId:first.messageId,payload:{}}),true);
+  assert.match(sent.at(-1),/Bitte antworte mit deiner Präzisierung/);
+  const clarificationId=`wamid.content.${sent.length}`;
+  assert.equal((await handleContentApproval({id:'wamid.change',from:'491234',body:'Kinder dürfen beim Zeichnen des Kürbisgesichts dabei sein, die erwachsene Person schneidet.',replyToMessageId:clarificationId,payload:{}})),true);
   const changed=(await memory.list()).find(job=>job.id===id);
   assert.equal(changed.status,'awaiting_approval');
   assert.match(changed.content.scenes.map(scene=>scene.visual).join(' '),/Kind/);

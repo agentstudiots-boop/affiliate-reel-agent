@@ -12,7 +12,10 @@ Veröffentlichung gesperrt. Nur eine ausdrückliche Antwort „Freigabe“ auf d
 aktuelle Fassung genehmigt den Inhalt; bisheriges „Freigeben“ bleibt als explizite
 Freigabe kompatibel. Antworten auf überholte Nachrichten starten keine Arbeit.
 Technische oder redaktionell unklare Änderungswünsche bleiben gesperrt und
-erfordern eine Präzisierung. Kein zusätzlicher Medienkauf ist mit dieser Änderung
+erfordern eine Präzisierung. Wenn nur ein gesperrter Inhaltsauftrag offen ist,
+kann die Präzisierung auch als Antwort auf die Rückfrage des Bots kommen;
+bei mehreren offenen Aufträgen ist eine eindeutige Freigabenachricht nötig.
+Kein zusätzlicher Medienkauf ist mit dieser Änderung
 verbunden; Modellinterpretationen können eigene Providerkosten auslösen.
 
 Der lokale Integrationstest führt vier aufeinanderfolgende WhatsApp-Korrekturen
