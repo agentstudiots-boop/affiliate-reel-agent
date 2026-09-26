@@ -106,8 +106,8 @@ export async function handleContentApproval(input:Incoming) {
           const review=inspectContent(revised.content!,revised.decision!);
           if(!review.passed)throw Error(`Redaktionelle Prüfung: ${review.issues.join(" ")}`);
           revised.review=review;
-          revised.events.push({sequence:revised.events.length+1,at:revised.updatedAt,agent:"orchestrator",kind:"decision",message:`WhatsApp-Wunsch an Bild-Agenten weitergegeben: ${input.body.slice(0,500)}`});
-          revised.events.push({sequence:revised.events.length+1,at:revised.updatedAt,agent:"image",kind:"response",message:"Geändertes Bildbriefing zur erneuten Inhaltsfreigabe vorgelegt.",data:revised.content});
+          revised.events.push({sequence:revised.events.length+1,at:revised.updatedAt,agent:"orchestrator",kind:"decision",message:`WhatsApp-Wunsch strukturiert ins Bildbriefing übernommen: ${input.body.slice(0,500)}`});
+          revised.events.push({sequence:revised.events.length+1,at:revised.updatedAt,agent:"orchestrator",kind:"response",message:"Validiertes Bildbriefing zur erneuten Inhaltsfreigabe vorgelegt.",data:revised.content});
         }
       }
     } catch(error) {

@@ -12,7 +12,7 @@ die geänderte Fassung benötigt eine neue Nachricht und neue Zustimmung. Die
 Video-Revision kann für nicht triviale Formulierungen das bestehende
 Replicate-Sprachmodell verwenden. Bildrevisionen greifen bei nicht erkannten
 Formulierungen auf den bestehenden strukturierten WhatsApp-Sprachmodell-Parser
-zurück; Bild-Agent und redaktionelle Prüfung validieren das Ergebnis. Freie
+zurück; der Orchestrator prüft das daraus erstellte Bildbriefing redaktionell. Freie
 Textrevisionen in der neuen manuellen Inhaltsfreigabe unterstützen bisher die
 Referenzagenten-Regeln; bei nicht eindeutiger Anweisung bleibt die alte
 Freigabe gesperrt und es wird nach Präzisierung gefragt.
