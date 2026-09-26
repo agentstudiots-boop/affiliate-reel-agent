@@ -8,6 +8,7 @@ import { sendWhatsAppText } from "@/lib/whatsapp/client";
 import { dailyNotificationTemplateConfigured, sendDailyNotificationTemplate } from "@/lib/whatsapp/client";
 import { parseJob } from "@/lib/content/history";
 import { facebookPagePublicationError } from "@/lib/meta/publication-eligibility";
+import { imageBrief } from "@/lib/content/image-brief";
 
 export async function sendDailyApproval(jobId: string) {
   const db = getDatabase();
@@ -36,7 +37,7 @@ export async function sendDailyApproval(jobId: string) {
     ? 'um die Textrevision freizugeben. Das bestehende Bild bleibt erhalten; keine neue Bildgenerierung'
     : `um den Content-Plan und eine einmalige kostenpflichtige Bildgenerierung freizugeben (Bildprovider: ${imageProviderStatus().provider || "nicht eingerichtet"}, EUR-Kosten nicht vorab bestätigt)`;
   const summary = job.content?.format === "text" ? job.content.body : job.content?.format === "image" ? job.content.caption : "Videoentwurf";
-  const visualBrief = job.content?.format === "image" ? `\n\nBildbriefing: ${job.content.slides.map(slide=>slide.visual).join(" ").slice(0,600)}` : "";
+  const visualBrief = job.content?.format === "image" ? `\n\nBildbriefing für das Titelbild:\n${imageBrief(job)}` : "";
   const messageId = await sendWhatsAppText(`Content-Freigabe · Tagesentwurf ${new Date(String(claimed.rows[0].day)).toISOString().slice(0, 10)}\nProdukt: ${job.opportunity.product.name}\nFormat: ${job.content?.format || "unbekannt"} · Facebook\n\n${(summary || "").slice(0, 1100)}${visualBrief}\n\nASIN: ${job.opportunity.product.asin}\nProduktlink: ${job.opportunity.product.affiliateUrl}\n Antworte auf DIESE Nachricht mit „Freigeben“, ${costText}. Danach kommt eine ZWEITE WhatsApp für die Veröffentlichung. „Ablehnen“ stoppt den Auftrag, Änderungswünsche bitte als Text. Noch kein Post ist online.`);
   await db.query("UPDATE daily_drafts SET whatsapp_message_id=$2,updated_at=now() WHERE job_id=$1 AND status='awaiting_approval'", [jobId, messageId]);
   return true;
