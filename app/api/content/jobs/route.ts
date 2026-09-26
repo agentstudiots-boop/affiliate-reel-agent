@@ -3,7 +3,7 @@ import { authorized } from "@/lib/memory/auth";
 import { databaseConfigured, getDatabase } from "@/lib/memory/db";
 import { ConflictError, memoryRepository } from "@/lib/memory/repository";
 import { performanceSchema } from "@/lib/memory/schema";
-import { requestContentApproval, resumeFailedVideoCorrection } from "@/lib/whatsapp/content-approval";
+import { requestContentApproval, resumeFailedVideoCorrection, revisePendingVideoCaption } from "@/lib/whatsapp/content-approval";
 export const runtime = "nodejs";
 function guard(request: Request) {
   if (!authorized(request)) return Response.json({ error: "Zugangscode erforderlich." }, { status: 401 });
@@ -31,6 +31,7 @@ export async function GET(request: Request) {
 const mutation = z.discriminatedUnion("action",[
   z.object({ action:z.literal("requestContentApproval"), jobId:z.string().uuid() }),
   z.object({ action:z.literal("resumeFailedVideoCorrection"), jobId:z.string().uuid() }),
+  z.object({ action:z.literal("revisePendingVideoCaption"), jobId:z.string().uuid() }),
   z.object({ action:z.literal("performance"), data:performanceSchema }),
 ]);
 export async function POST(request: Request) {
@@ -42,6 +43,7 @@ export async function POST(request: Request) {
     const repo=memoryRepository();
     return Response.json(input.action === "requestContentApproval" ? { approval:await requestContentApproval(input.jobId) }
       : input.action === "resumeFailedVideoCorrection" ? await resumeFailedVideoCorrection(input.jobId)
+      : input.action === "revisePendingVideoCaption" ? await revisePendingVideoCaption(input.jobId)
       : { result:await repo.recordPerformance(input.data) });
   } catch(error) {
     const known=error instanceof Error && /^(Eine Inhaltsfreigabe ist bereits offen\.|WhatsApp-Servicefenster geschlossen\.|Der vollständige Entwurf ist für eine WhatsApp-Nachricht zu lang\.)/.test(error.message);

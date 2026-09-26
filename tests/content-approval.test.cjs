@@ -8,7 +8,32 @@ const {memoryRepository}=require('../.test-build/lib/memory/repository');
 const {productionRepository}=require('../.test-build/lib/production/repository');
 const {runContentJob}=require('../.test-build/lib/content/orchestrator');
 const {opportunitySchema}=require('../.test-build/lib/content/schema');
-const {requestContentApproval,handleContentApproval,hasContentApproval}=require('../.test-build/lib/whatsapp/content-approval');
+const {requestContentApproval,handleContentApproval,hasContentApproval,revisePendingVideoCaption}=require('../.test-build/lib/whatsapp/content-approval');
+
+test('operator caption correction revokes the exact pending WhatsApp approval and resends human copy',async t=>{
+  const pg=new PGlite();t.after(()=>pg.close());
+  const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
+  await applyMigrations(db);
+  t.mock.method(dbModule,'getDatabase',()=>db);
+  const old=process.env.WHATSAPP_APPROVER_WA_ID;process.env.WHATSAPP_APPROVER_WA_ID='491234';
+  t.after(()=>{if(old===undefined)delete process.env.WHATSAPP_APPROVER_WA_ID;else process.env.WHATSAPP_APPROVER_WA_ID=old;});
+  const sent=[];t.mock.method(whatsapp,'sendWhatsAppText',async body=>{sent.push(body);return `wamid.caption.${sent.length}`;});
+  const memory=memoryRepository(db),id=crypto.randomUUID();
+  const opportunity=opportunitySchema.parse({product:{name:'YAVOCOS Kürbis Schnitzset',productVerifiedName:'YAVOCOS Kürbis Schnitzset',productVerifiedAt:'2026-09-26T08:00:00.000Z',sourceUrl:'https://www.amazon.de/dp/B0D9YQR9CT',affiliateUrl:'',price:'',targetGroup:'Halloween-Bastler',benefits:'Produktdetails prüfen',notes:''},useCase:'Ein Kind zeichnet das Gesicht auf einen echten Kürbis, ein Erwachsener schnitzt, das Kind schöpft Kerne aus.',category:'home_living',targetPlatform:'instagram',budget:'quality'});
+  await memory.claim(id,opportunity,'reference');
+  const draft=await runContentJob(opportunity,{id,allowedFormats:['video'],onUpdate:memory.save});
+  await db.query("INSERT INTO whatsapp_events(message_id,wa_id,body,payload) VALUES('wamid.open-caption','491234','Entwurf','{}')");
+  const first=await requestContentApproval(id);
+  const changed=await revisePendingVideoCaption(id);
+  assert.equal(changed.approvalSent,true);
+  assert.notEqual(changed.job.content.caption,draft.content.caption);
+  assert.match(changed.job.content.caption,/Erst die Idee für ein Kürbisgesicht/);
+  assert.doesNotMatch(changed.job.content.caption,/kein Testbericht|Werkzeugoption/);
+  assert.equal((await db.query('SELECT status FROM content_approval_requests WHERE id=$1',[first.id])).rows[0].status,'rejected');
+  assert.equal((await db.query("SELECT count(*)::int AS n FROM content_approval_requests WHERE job_id=$1 AND status='pending'",[id])).rows[0].n,1);
+  assert.equal((await db.query('SELECT count(*)::int AS n FROM production_runs')).rows[0].n,0);
+  assert.equal(await hasContentApproval(changed.job,db),false);
+});
 
 test('WhatsApp approves the exact finished script before any video production can be prepared',async t=>{
   const pg=new PGlite();t.after(()=>pg.close());
