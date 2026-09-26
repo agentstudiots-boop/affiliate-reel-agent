@@ -5,10 +5,10 @@ import { asksForNaturalCopy } from "../editorial-feedback";
 
 const pumpkinReelCta = "Das Kürbisschnitzset findest du über den Produktlink. Prüfe vorab die Herstellerhinweise.";
 function pumpkinReelCaption(asin: string, withChild: boolean) {
-  return `Werbung | Ein echter Kürbis, eine Idee und ein gemeinsamer Halloweenabend: ${withChild ? "Ein Kind zeichnet das Gesicht vor und hilft beim Ausschöpfen. Ein Erwachsener schnitzt Augen und Mund." : "Erst das Gesicht vorzeichnen, dann schnitzt eine erwachsene Person Augen und Mund."} Am Ende leuchtet die selbst gestaltete Laterne. Du möchtest auch eine Kürbislaterne schnitzen? Schau dir das verlinkte Schnitzset und die Herstellerhinweise an (ASIN ${asin}). Bei einem Kauf über den Affiliate-Link kann ich eine Provision erhalten.`;
+  return `Werbung | Aus diesem Kürbis soll eine Laterne werden. 🎃 ${withChild ? "Das Kind zeichnet das Gesicht vor und hilft später beim Ausschöpfen. Ein Erwachsener übernimmt das Schnitzen." : "Das Gesicht wird vorgezeichnet, dann schnitzt ein Erwachsener Augen und Mund aus."} Abends leuchtet die fertige Kürbislaterne. Wenn ihr das auch ausprobieren möchtet, habe ich euch das YAVOCOS Kürbisschnitzset (ASIN ${asin}) verlinkt. Bitte schaut vor dem Kauf nach, was enthalten ist und wie die Werkzeuge angewendet werden. Über den Affiliate-Link kann ich eine Provision erhalten.`;
 }
 function warmerPumpkinCaption(asin: string, withChild: boolean) {
-  return `Werbung | Ein Kürbis wird zur Halloweenlaterne: ${withChild ? "Das Kind malt ein Gesicht auf die Schale, ein Erwachsener schnitzt Augen und Mund. Beim Ausschöpfen der Kerne hilft das Kind mit." : "Zuerst entsteht die Zeichnung, dann schnitzt ein Erwachsener Augen und Mund."} Am Abend leuchtet die fertige Laterne. Lust auf euren eigenen Kürbismoment? Das verlinkte Schnitzset kannst du dir auf der Produktseite ansehen (ASIN ${asin}). Dort findest du Lieferumfang und Hinweise. Bei einem Kauf über den Affiliate-Link kann ich eine Provision erhalten.`;
+  return `Werbung | Erst die Idee für ein Kürbisgesicht, dann leuchtet die fertige Laterne im Dunkeln. 🎃 ${withChild ? "Das Kind zeichnet Augen und Mund vor und hilft beim Ausschöpfen. Das Schnitzen übernimmt ein Erwachsener." : "Ein Erwachsener zeichnet das Gesicht vor und schnitzt Augen und Mund aus."} Wenn ihr selbst eine Kürbislaterne gestalten möchtet: Ich habe das YAVOCOS Kürbisschnitzset (ASIN ${asin}) verlinkt. Schaut euch vor dem Kauf den Lieferumfang und die Anwendungshinweise an. Wenn ihr über meinen Affiliate-Link kauft, kann ich eine Provision erhalten.`;
 }
 
 function reviseReferenceVideo(brief: Brief) {
@@ -34,7 +34,7 @@ function reviseReferenceVideo(brief: Brief) {
   if (asksForNaturalCopy(request)) {
     const pumpkin=/kürbis.*schnitz|schnitz.*kürbis/i.test(brief.opportunity.product.name);
     const withChild = /\bkind(?:er)?\b/i.test(next.scenes.map(s => s.visual).join(" "));
-    next.caption = pumpkin ? warmerPumpkinCaption(brief.opportunity.product.asin!,withChild) : readerCaption(brief,true);
+    next.caption = pumpkin ? warmerPumpkinCaption(brief.opportunity.product.asin!,withChild) : readerCaption(brief);
     next.cta = pumpkin ? pumpkinReelCta : "Weitere Angaben zum Produkt findest du über den Link im Beitrag.";
     if (/Produktname, ASIN und Produktlink stehen im Beitragstext/.test(next.scenes.at(-1)!.audio)) next.scenes.at(-1)!.audio = pumpkinReelCta;
     applied = true;
@@ -124,7 +124,7 @@ Produktintegration, Voraussetzungen, CTA und Caption ausarbeiten. Feedback bei R
     return { format: "video" as const, title: pumpkin ? "Vom Kürbis zur Halloweenlaterne" : idea.title, hook: pumpkin ? "Ein Gesicht entsteht – und der Halloweenabend kann beginnen." : idea.hook, useCase: idea.useCase,
       productIntegration: pumpkin ? `${childRequested ? "Das Kind zeichnet und schöpft aus; nur die erwachsene Person führt das Schneidwerkzeug. " : ""}Der echte Kürbis und die Handlung des Schnitzens bleiben im Vordergrund. Das verlinkte Schnitzset wird als mögliche Werkzeugwahl eingeordnet; konkrete Modellmerkmale und Lieferumfang bleiben ungeprüft.` : vacuum ? "Vakuumierer verschließt; separates Wasserbad gart; Pfanne erzeugt Kruste. Zubehör ist nicht automatisch im Lieferumfang." : idea.benefit,
       durationSeconds: scenes.reduce((s, x) => s + x.durationSeconds, 0), scenes, cta, disclosure: "Werbung | Affiliate-Link" as const,
-      caption: pumpkin ? pumpkinReelCaption(opportunity.product.asin!,childRequested) : vacuum ? `Werbung | ${idea.benefit} Fiktive Familienszene, kein Testbericht. Sous-vide benötigt geeignete Beutel und ein separates temperiertes Wasserbad. Ergebnis abhängig von Lebensmittel und korrekter Zubereitung. Vakuumieren kann außerdem bei geeigneten Lebensmitteln und korrekter Lagerung die Haltbarkeit verlängern; Kühlung und Hygiene bleiben erforderlich. ${cta} Bei einem Kauf über den Affiliate-Link kann eine Provision anfallen.` : readerCaption(brief),
+      caption: pumpkin ? pumpkinReelCaption(opportunity.product.asin!,childRequested) : vacuum ? `Werbung | Erst das Abendessen planen, dann die einzelnen Schritte vorbereiten: Ein Vakuumierer verschließt das Lebensmittel in einem geeigneten Beutel. Fürs Sous-vide-Garen braucht es zusätzlich ein temperiertes Wasserbad, für die Kruste danach eine Pfanne. Kühlung und Hygiene bleiben wichtig. Was das verlinkte Modell kann und welches Zubehör dazugehört, steht auf der Produktseite. Bei einem Kauf über den Affiliate-Link kann ich eine Provision erhalten.` : readerCaption(brief),
       checks: ["Modelleignung und Herstellerhinweise prüfen.", "Dialog ist inszenierte Werbung, keine echte Kundenbewertung.", "Sprecher, Schnitt, Untertitel und Einblendungen produzieren. Dies ist ein Drehbuch, kein fertiges Video.", opportunity.product.notes || "Keine zusätzlichen Modellnachweise hinterlegt."],
     };
   });

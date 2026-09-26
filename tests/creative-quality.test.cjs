@@ -157,6 +157,9 @@ test('pumpkin reel tells a visible carving story with product context and no mod
   assert.doesNotMatch(voice,/garantiert|professionell|Edelstahl|sicher für Kinder/i);
   assert.ok(job.content.scenes.every(scene=>scene.audio.split(/\s+/).length<=scene.durationSeconds*2.5));
   assert.deepEqual(pumpkinCreativeIssues(job.opportunity,job.content,job.marketing),[]);
+  assert.doesNotMatch(job.content.caption,/fiktive Szene|kein Testbericht|Produktname, ASIN|Werkzeugoption/i);
+  const internal={...job.content,caption:'Werbung | Fiktive Familienszene, kein Testbericht. Produktname, ASIN und Produktlink stehen im Beitragstext.'};
+  assert.match(require('../.test-build/lib/content/orchestrator').inspectContent(internal,job.decision).issues.join(' '),/interne Hinweise/);
   assert.match(pumpkinCreativeIssues(job.opportunity,{...job.content,caption:'Appetitlich servieren.'}).join(' '),/Kochen oder Essen/);
   assert.match(pumpkinCreativeIssues(job.opportunity,{...job.content,scenes:job.content.scenes.map(scene=>({...scene,visual:'Dekoration auf einem Tisch',audio:'Schöne Stimmung'}))}).join(' '),/Kürbis.*Hauptmotiv/);
   job.status='approved';
@@ -177,11 +180,11 @@ test('pumpkin reel tells a visible carving story with product context and no mod
   assert.equal(family.content.durationSeconds,30);
   const natural=await reviseApprovedVideo(job,'Der Begleittext passt nicht erkennbar klingt nach System intern');
   assert.equal(natural.status,'awaiting_approval');
-  assert.match(natural.content.caption,/Werbung \| Ein Kürbis wird zur Halloweenlaterne/);
+  assert.match(natural.content.caption,/Werbung \| Erst die Idee für ein Kürbisgesicht/);
   assert.doesNotMatch(natural.content.caption,/Produktname, ASIN und Produktlink stehen im Beitragstext/);
   const plain=await reviseApprovedVideo(job,'Der Begleittext ist unpassend formuliert',async()=>{throw Error('Kein externer Parser nötig');});
   assert.notEqual(plain.content.caption,job.content.caption);
-  assert.match(plain.content.caption,/Kürbis wird zur Halloweenlaterne/);
+  assert.match(plain.content.caption,/Das Schnitzen übernimmt ein Erwachsener/);
   const broader=await reviseApprovedVideo(job,'Bitte zeige zuerst die fertige Laterne und dann als Rückblende die Schnitzarbeit',async ()=>({
     ...job.content,scenes:[
       {...job.content.scenes[0],visual:'Die fertige leuchtende Kürbislaterne am Basteltisch. Dann Rückblende zum echten Kürbis und dem Vorzeichnen.'},

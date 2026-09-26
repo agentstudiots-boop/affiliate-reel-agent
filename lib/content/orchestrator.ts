@@ -101,6 +101,7 @@ export function inspectContent(content: Content, decision: Decision): Review {
   if (content.format === "video") {
     if (content.scenes.reduce((sum, scene) => sum + scene.durationSeconds, 0) !== content.durationSeconds) issues.push("Szenendauern passen nicht zur Gesamtlänge.");
     if (content.scenes.some(scene => scene.audio.split(/\s+/).length > scene.durationSeconds * 2.8)) issues.push("Dialog oder Voiceover ist für die Szenendauer zu lang.");
+    if (/fiktive (?:familien)?szene|kein testbericht|produktname, asin|redaktionelle anwendungsidee|modellmerkmale bleiben ungeprüft/i.test(content.caption)) issues.push("Der Begleittext enthält interne Hinweise statt einer lesbaren Videobeschreibung.");
   }
   let imageQualityScore = 100;
   if (content.format === "image") {
