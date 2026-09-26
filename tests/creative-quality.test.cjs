@@ -6,6 +6,7 @@ const {PGlite}=require('@electric-sql/pglite');
 const {evaluateImageCreativeQuality}=require('../.test-build/lib/content/creative-quality');
 const {imageProviderStatus,getOriginalVisualProvider}=require('../.test-build/lib/content/image-provider');
 const {runContentJob}=require('../.test-build/lib/content/orchestrator');
+const {pumpkinCreativeIssues}=require('../.test-build/lib/content/category');
 const {readerCopy}=require('../.test-build/lib/content/editorial-copy');
 const {analyzeProductInspiration}=require('../.test-build/lib/content/product-inspiration');
 const {textAgent}=require('../.test-build/lib/content/agents/text');
@@ -141,6 +142,7 @@ test('pumpkin reel tells a visible carving story with product context and no mod
   const job=await runContentJob(opportunity,{allowedFormats:['video']});
   assert.equal(job.opportunity.category,'home_living');
   assert.equal(job.content.format,'video');
+  assert.match(job.ideas.find(idea=>idea.format==='video').story,/schnitzt beides sichtbar/);
   assert.match(job.marketing.adaptation,/Schnitzen eines echten Halloween-Kürbisses/);
   assert.doesNotMatch(job.marketing.adaptation,/appetitlich|kochen|essen/i);
   assert.equal(job.review.passed,true,JSON.stringify(job.review));
@@ -153,6 +155,9 @@ test('pumpkin reel tells a visible carving story with product context and no mod
   assert.match(voice,/YAVOCOS/);
   assert.doesNotMatch(voice,/garantiert|professionell|Edelstahl|sicher für Kinder/i);
   assert.ok(job.content.scenes.every(scene=>scene.audio.split(/\s+/).length<=scene.durationSeconds*2.5));
+  assert.deepEqual(pumpkinCreativeIssues(job.opportunity,job.content,job.marketing),[]);
+  assert.match(pumpkinCreativeIssues(job.opportunity,{...job.content,caption:'Appetitlich servieren.'}).join(' '),/Kochen oder Essen/);
+  assert.match(pumpkinCreativeIssues(job.opportunity,{...job.content,scenes:job.content.scenes.map(scene=>({...scene,visual:'Dekoration auf einem Tisch',audio:'Schöne Stimmung'}))}).join(' '),/Kürbis.*Hauptmotiv/);
 });
 
 test('missing image provider cannot silently fall back to the typographic card',()=>{
