@@ -7,6 +7,7 @@ import { textAgent } from "./agents/text";
 import { marketingAgent } from "./agents/marketing";
 import { analyzeProductInspiration } from "./product-inspiration";
 import { classifyOpportunity, pumpkinCreativeIssues } from "./category";
+import { interpretVideoRevision } from "../whatsapp/video-revision";
 import { evaluateImageCreativeQuality } from "./creative-quality";
 import { createGenerator } from "./model";
 import { contentSchema, opportunitySchema, reviewSchema, type AgentName, type Content, type ContentJob, type Decision, type Idea, type JobEvent, type JobStatus, type Opportunity, type Review } from "./schema";
@@ -14,13 +15,21 @@ import type { Generator } from "./agent";
 
 export const MAX_REVISIONS = 2;
 
-export async function reviseApprovedVideo(job: ContentJob, feedback: string): Promise<ContentJob> {
+export async function reviseApprovedVideo(job: ContentJob, feedback: string, interpret = interpretVideoRevision): Promise<ContentJob> {
   if (job.status !== "approved" || job.content?.format !== "video" || !job.decision || !job.ideas) throw new Error("Freigegebener Video-Plan fehlt.");
   if (job.revisions >= MAX_REVISIONS) throw new Error("Maximal zwei Überarbeitungen erreicht.");
   if (job.mode !== "reference") throw new Error("Für diesen Modus ist kein geprüfter Änderungs-Generator aktiv.");
   const idea = job.ideas.find(item => item.id === job.decision!.ideaId);
   if (!idea) throw new Error("Gewählte Idee fehlt.");
-  const draft = contentSchema.parse(await videoAgent({ opportunity: job.opportunity, idea, inspiration: analyzeProductInspiration(job.opportunity), previous: job.content, changeRequest: feedback }, createGenerator({ mode: job.mode })));
+  let draft: Content;
+  try { draft = contentSchema.parse(await videoAgent({ opportunity: job.opportunity, idea, inspiration: analyzeProductInspiration(job.opportunity), previous: job.content, changeRequest: feedback }, createGenerator({ mode: job.mode }))); }
+  catch (error) {
+    if (!(error instanceof Error) || !error.message.startsWith("Änderungswunsch im Referenzmodus nicht eindeutig umsetzbar.")) throw error;
+    const proposal = await interpret(job, feedback);
+    draft = contentSchema.parse(await videoAgent({ opportunity: job.opportunity, idea, inspiration: analyzeProductInspiration(job.opportunity), previous: job.content, changeRequest: feedback },
+      async (_agent, _instruction, _input, schema) => schema.parse(proposal)));
+  }
+  requireProduct(job.opportunity.product, JSON.stringify(draft));
   const review = inspectContent(draft, job.decision);
   review.issues.push(...pumpkinCreativeIssues(job.opportunity, draft));
   if (review.issues.length) { review.passed = false; review.score = Math.min(40, review.score); }
