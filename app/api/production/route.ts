@@ -28,7 +28,8 @@ function publicConfiguration() {
 export async function GET(request: Request) {
   const denied = guard(request); if (denied) return denied;
   try {
-    const jobId = z.string().uuid().parse(new URL(request.url).searchParams.get("jobId"));
+    const params = new URL(request.url).searchParams;
+    const jobId = z.string().uuid().parse(params.get("jobId"));
     const repo = productionRepository();
     const [run, approval, successfulVideos] = await Promise.all([
       repo.getByJobId(jobId),
@@ -41,6 +42,8 @@ export async function GET(request: Request) {
       learningPolicy: chooseVideoProvider(successfulVideos),
       configuration: publicConfiguration(),
       progress: run?.status === "rendering" ? await repo.providerProgress(jobId) : null,
+      providerDiagnostics: params.get("diagnostics") === "1" && run?.status === "failed" && run.providerJobId
+        ? await facelessClient().videoStatus(run.providerJobId) : null,
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return Response.json({ error: error instanceof z.ZodError ? "Ungültige Job-ID." : "Produktionsstatus konnte nicht geladen werden." },
