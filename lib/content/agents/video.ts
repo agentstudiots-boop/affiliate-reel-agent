@@ -7,6 +7,21 @@ function reviseReferenceVideo(brief: Brief) {
   const request = brief.changeRequest.toLocaleLowerCase("de-DE");
   const next = structuredClone(brief.previous);
   let applied = false;
+  if (/kinder?\b/i.test(request) && /(?:beteilig|integrier|mitmach|mitmach|helfen|dabei|schnitz)/i.test(request)
+    && /kürbis.*schnitz|schnitz.*kürbis/i.test(brief.opportunity.product.name)) {
+    next.scenes[0].visual = "Halloweenabend am Basteltisch: Ein großer echter orangefarbener Kürbis im Vordergrund. Ein Kind und eine erwachsene Person überlegen gemeinsam, wie die leuchtende Laterne aussehen soll.";
+    next.scenes[0].audio = "Heute gestalten wir gemeinsam eine Halloweenlaterne. Aus diesem echten Kürbis soll ein Gesicht werden.";
+    next.scenes[1].visual = "Das Kind zeichnet Augen und Mund auf den echten Kürbis; die erwachsene Person sitzt direkt daneben und bereitet das kleine Kürbisschnitzwerkzeug vor. Gemeinsames Basteln als Hauptmotiv.";
+    next.scenes[1].audio = "Zuerst zeichnet das Kind Augen und Mund vor. Dann beginnt die Schnitzarbeit unter Aufsicht.";
+    next.scenes[2].visual = "Nahaufnahme: Die erwachsene Person schnitzt mit einem kleinen neutralen Kürbisschnitzwerkzeug sichtbar die Augenöffnung aus dem echten Kürbis. Das Kind schaut daneben zu und sammelt mit einem Löffel Kürbiskerne. Hände des Kindes bleiben vom Schneidwerkzeug entfernt.";
+    next.scenes[2].audio = "Während ein Erwachsener die Augenöffnung schnitzt, hilft das Kind beim Ausschöpfen. Der Kürbis bleibt im Mittelpunkt.";
+    next.scenes[3].visual = "Die erwachsene Person schnitzt die Mundöffnung fertig. Das Kind und die erwachsene Person betrachten gemeinsam die leuchtende Kürbislaterne und freuen sich über ihre Deko.";
+    next.scenes[3].audio = "Jetzt entsteht noch der Mund. Und am Ende leuchtet unsere selbst gestaltete Halloweenlaterne.";
+    next.scenes[4].visual = "Fertige geschnitzte Kürbislaterne und kleine neutrale Schnitzwerkzeuge am Basteltisch; Kind und erwachsene Person betrachten das Ergebnis. Keine Markenabbildung oder unbelegten Produkteigenschaften.";
+    next.caption = `Gemeinsam eine Halloweenlaterne gestalten: Ein Kind zeichnet das Gesicht vor und hilft beim Ausschöpfen; ein Erwachsener schnitzt Augen und Mund mit einem Kürbisschnitzwerkzeug. Das verlinkte YAVOCOS Kürbisschnitzset ist eine mögliche Werkzeugwahl. Lieferumfang und Hinweise bitte auf der Produktseite prüfen. Werbung | ASIN ${brief.opportunity.product.asin}. ${next.cta} Bei einem Kauf über den Affiliate-Link kann ich eine Provision erhalten.`;
+    next.productIntegration = "Das Kind beteiligt sich am Entwurf und Ausschöpfen; die erwachsene Person führt das Schnitzwerkzeug. Der echte Kürbis, die sichtbare Schnitzhandlung und die fertige Deko-Laterne bleiben im Mittelpunkt. Konkrete Modellmerkmale bleiben ungeprüft.";
+    applied = true;
+  }
   if (/erste szene kürzer|szene 1 kürzer/.test(request)) {
     next.scenes[0].durationSeconds = Math.max(2, next.scenes[0].durationSeconds - 2);
     applied = true;
