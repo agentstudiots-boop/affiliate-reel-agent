@@ -21,6 +21,21 @@ export async function processOperatorInstruction(input:OperatorMessage,
   const literal=classifyWhatsAppReply(input.body);
   if(literal.intent!=="changes_requested" || /^(entwurf|wochenbilanz)[.!?]*$/i.test(input.body.trim()))return false;
   const db=database ?? getDatabase();
+  // A reply to a video-cost request belongs to the production gate. Do not
+  // consume its message ID in the image/text instruction inbox first.
+  if (input.replyToMessageId) {
+    const video=await db.query(`SELECT 1 FROM approval_requests
+      WHERE whatsapp_message_id=$1 AND approver_wa_id=$2 AND kind='render' AND status='pending' LIMIT 1`,
+    [input.replyToMessageId,trusted]);
+    if (video.rows.length) return false;
+  }
+  else {
+    const openVideo=await db.query(`SELECT count(*)::int AS n FROM approval_requests
+      WHERE approver_wa_id=$1 AND kind='render' AND status='pending' AND whatsapp_message_id IS NOT NULL`,[trusted]);
+    const other=await db.query(`SELECT 1 FROM publication_requests WHERE platform='facebook' AND status='pending' AND approver_wa_id=$1 AND whatsapp_message_id IS NOT NULL
+      UNION ALL SELECT 1 FROM daily_drafts WHERE status='awaiting_approval' AND whatsapp_message_id IS NOT NULL LIMIT 1`,[trusted]);
+    if (Number(openVideo.rows[0]?.n)===1 && !other.rows.length) return false;
+  }
   const claim=await db.transaction(async sql=>{
     const added=await sql.query("INSERT INTO whatsapp_events(message_id,wa_id,reply_to_message_id,body,payload) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING RETURNING message_id",[input.id,input.from,input.replyToMessageId,input.body,JSON.stringify(input.payload)]);
     if(!added.rows.length)return null;
