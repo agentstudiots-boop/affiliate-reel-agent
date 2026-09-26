@@ -6,6 +6,12 @@
     "outDir": ".test-build",
     "rootDir": ".",
     "strict": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    },
     "esModuleInterop": true,
     "skipLibCheck": true,
     "types": [
@@ -14,7 +20,12 @@
   },
   "include": [
     "lib/content/**/*.ts",
+    "lib/product-resolver.ts",
     "lib/memory/**/*.ts",
-    "lib/meta/**/*.ts"
+    "lib/meta/**/*.ts",
+    "lib/production/**/*.ts",
+    "lib/whatsapp/**/*.ts",
+    "lib/reporting/**/*.ts",
+    "lib/automation/**/*.ts"
   ]
 }

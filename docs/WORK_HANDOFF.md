@@ -1,0 +1,500 @@
+# Work handoff
+
+## Aktuell 26.09.2026: Inhaltsfreigabe vor Produzenten
+
+Für manuell geplante Video-, Bild- und Textaufträge wird der vollständige
+Entwurf über `content_approval_requests` samt Fingerabdruck des Inhalts per
+WhatsApp vorgelegt. Die Studio-Schaltfläche verschickt nur die Freigabeanfrage;
+sie genehmigt keinen Inhalt mehr direkt. Bei offenem 24-Stunden-Fenster wird
+die Anfrage nach der Planung automatisch gesendet. WhatsApp-Änderungswünsche
+gehen vor einer Entscheidung an den zuständigen Video-, Bild- oder Text-Agenten;
+die geänderte Fassung benötigt eine neue Nachricht und neue Zustimmung. Die
+Video-Revision kann für nicht triviale Formulierungen das bestehende
+Replicate-Sprachmodell verwenden. Bildrevisionen greifen bei nicht erkannten
+Formulierungen auf den bestehenden strukturierten WhatsApp-Sprachmodell-Parser
+zurück; der Orchestrator prüft das daraus erstellte Bildbriefing redaktionell. Freie
+Textrevisionen in der neuen manuellen Inhaltsfreigabe unterstützen bisher die
+Referenzagenten-Regeln; bei nicht eindeutiger Anweisung bleibt die alte
+Freigabe gesperrt und es wird nach Präzisierung gefragt.
+
+`prepareVideo`, `createRenderApproval` und `claimPaidCreation` prüfen den
+WhatsApp-Inhaltsfingerabdruck; Facebook-Bildgenerierung und Text-Postvorbereitung
+prüfen ihn ebenso. Tagesentwürfe behalten die bisherige WhatsApp-Inhaltsfreigabe
+über `daily_drafts.content_approved`. Danach bleiben Produktionskosten und
+Veröffentlichung separate Schritte: Für Video kommt eine eigene
+WhatsApp-Kostenfreigabe; bei manuell geplanten Bildern muss nach Inhaltsfreigabe
+die Bildproduktion im geschützten Studio angefordert werden; der Tagesentwurf
+bündelt Bildkosten schon in seiner ersten WhatsApp-Freigabe. Migration
+`014_content_approval_requests.sql` vor Einsatz ausführen. Lokaler Typecheck
+und alle 133 Tests waren grün. Keine neue kostenpflichtige Faceless-Erstellung
+für die beiden gescheiterten Runs; beide scheiterten nach dem akzeptierten
+Create mit null visuellen Elementen, genaue Provider-Ursache und tatsächliche
+Credit-Abrechnung sind unbekannt. Ein neuer Test nach Klärung braucht eine
+neue konkrete Freigabe.
+
+Die folgenden Checkpoints sind frühere Stände.
+
+## Aktuell 26.09.2026: zweite Faceless-Generierung fehlgeschlagen
+
+Der Nutzer gab die neue WhatsApp-Kostenanfrage zum geänderten Kürbisschnitz-Reel
+frei. Der signierte Webhook verarbeitete `approve` und verbrauchte die Freigabe
+einmal; der Provider-Auftrag wurde bestätigt. Beim lesenden Statusabgleich war
+der Run `failed`: `Storyboard generated ZERO visual items for a 35s video —
+failing the job so the queue retries instead of shipping a black video`.
+Kein MP4, keine Instagram-Veröffentlichung. Die zweite Provider-Generierung
+scheiterte damit wie die erste trotz längerem Skript und visueller Vorgaben.
+**Keine weitere kostenpflichtige Faceless-Erstellung auf Verdacht.** Tatsächliche
+Credit-Belastung/Erstattung beim Provider anhand des Kontos prüfen; Ursache mit
+Provider klären oder alternativen Videoweg aufbauen. Die offiziellen API-Dokumente
+führen keine dokumentierte Lösung für null erzeugte Bilder auf.
+
+Für allgemeine natürliche Videoänderungen gab es zuvor nur wenige feste
+Formulierungen. Der Video-Orchestrator versucht diese weiter ohne Modellkosten;
+für andere Änderungen nutzt er den bestehenden Replicate-Sprachmodellzugang
+für genau einen strukturierten Videovorschlag. Der Vorschlag geht durch den
+Video-Agenten und durch Struktur-, Produkt- und Themenprüfung; bei Unsicherheit
+bleibt er gesperrt. Modellarbeit erfolgt außerhalb der DB-Transaktion; der
+gespeicherte Job wird vor dem Schreiben erneut auf Änderungen geprüft. Kein
+permanentes Fine-Tuning. Code in Draft PR #6 auf Branch
+`feat/production-gates-whatsapp`, letzter Fach-Commit
+`e024acbd48bbf199b2ef59a9e5dc899e25cd0556`; lokal Typecheck, Lint und
+132 Tests bestanden. Live-Modellrevision über WhatsApp noch nicht E2E geprüft.
+
+Die folgenden Checkpoints sind frühere Stände.
+
+## Aktuell 26.09.2026: WhatsApp-Videoänderung übernommen
+
+Der Nutzer antwortete auf die Video-Kostenanfrage mit dem Wunsch, Kinder beim
+Kürbisschnitzen einzubeziehen. Die alte WhatsApp-Instruktionsroute ordnete nur
+Bild/Text/Facebook-Aufträge zu und quittierte die zitierte Antwort irreführend
+mit „keine eindeutig zuordenbare offene Freigabe“. Diese alte eingehende
+Nachricht blieb als unzugeordnet gespeichert und wurde nicht erneut abgespielt.
+
+Die Route leitet künftig Antworten auf eine offene Video-Kostenanfrage an die
+Produktionsfreigabe weiter. Ein Änderungswunsch sperrt die bisherige Quote,
+erstellt einen überarbeiteten Content-Plan und verlangt eine neue Freigabe.
+Zusätzlich kann derselbe Schritt im Content Studio sicher angestoßen werden.
+Code auf Draft PR #6, Branch `feat/production-gates-whatsapp`, Commit
+`4ea10f0c43c3a60cbc02330b8814183483cd9f12`, Preview READY; Typecheck,
+Lint und 131 Tests bestehen. Production ist weiterhin nicht aktualisiert.
+
+Der bereits unzugeordnete Änderungswunsch wurde über den geschützten
+Content-Studio-Weg in **denselben** Job `0a15c294-1038-479a-aefe-3e88069f6f3b`
+übernommen: ein Kind zeichnet das Gesicht und hilft mit einem Löffel beim
+Ausschöpfen, eine erwachsene Person führt das Schnitzwerkzeug, danach freuen
+sich beide über die leuchtende Kürbislaterne. Der alte Approval-Status ist
+`changes_requested`, der Plan wurde nochmals geprüft und freigegeben. Eine
+neue kostenlose Quote betrug wieder 20 Faceless-Credits (275 angezeigt,
+EUR-Wert unbekannt); Stimme Mila Winter. Die **neue** WhatsApp-Kostenfreigabe
+ist gesendet und hat Status `pending`, Produktionsstatus
+`awaiting_whatsapp_approval`. Noch kein neues kostenpflichtiges Video und kein
+Instagram-Post. Nur eine Antwort auf die **neue** WhatsApp darf die einmalige
+Produktion freigeben. Der Provider erzeugt eigene statische Bilder; die
+konkreten Bilder sind trotz visueller Vorgaben nicht garantiert. Die spätere
+Veröffentlichung braucht eine separate WhatsApp-Freigabe.
+
+Die folgenden Checkpoints sind frühere Stände.
+
+## Aktuell 26.09.2026: neuer Kürbisschnitz-Reel-Plan
+
+Der Nutzer hat klargestellt: Kürbisschnitzen ist Home & Living/Deko/Basteln,
+keine Küche. Der Creative Agent legt den sichtbaren Schnitzvorgang, das Werkzeug
+und die fertige Deko-Laterne als Geschichte an; die Kategorie wird vor der
+Planung normalisiert. Die Prüfung blockiert fehlende Kürbis-/Schnitzmotive sowie
+Essensbegriffe in der öffentlichen Copy. Das zuvor pauschale „appetitlich“ im
+Marketing wurde ersetzt; die Steak-Anweisung ist nur noch für Sous-vide-Steak
+gültig. Typecheck, Lint und 128 Tests bestanden. Draft PR #6, Branch
+`feat/production-gates-whatsapp`, jüngster Commit `4ed3ed66ff1eb149b6a9d82a921e77a0d4ab2065`;
+zugehörige Vercel-Preview ist READY. Production bleibt ungeändert.
+
+Neuer, gespeicherter Instagram-Reel-Plan `0a15c294-1038-479a-aefe-3e88069f6f3b`
+für ASIN `B0D9YQR9CT` ist redaktionell vorgeprüft und als Content-Plan
+freigegeben. 36-Sekunden-Drehbuch: echter Kürbis, Gesicht vorzeichnen, mit
+Schnitzwerkzeug Augen und Mund ausschneiden, leuchtende Halloween-Deko als
+emotionales Ergebnis. Faceless Storyboard ist vorbereitet, deutsche Stimme
+Mila Winter, kostenlose Quote 20 Credits (bei Abfrage 275 verfügbar, EUR-Wert
+unbekannt). Die Kostenanfrage wurde per WhatsApp einmal verschickt; der
+Produktionsstatus lautet `awaiting_whatsapp_approval`, Approval `pending`.
+**Keine neue Freigabe annehmen, bis eine Antwort auf genau diese WhatsApp im
+Webhook verarbeitet ist; der Webhook setzt den Reel-Auftrag dann automatisch
+fort. Nicht manuell parallel starten.** Faceless kann trotz erweitertem
+`masterStyle`/`globalNegativePrompt` visuelle Genauigkeit nicht garantieren.
+Nach fertigem MP4 ist eine gesonderte WhatsApp-Veröffentlichungsfreigabe nötig.
+Der frühere gescheiterte Providerauftrag bleibt fehlgeschlagen und wird nicht
+wiederholt.
+
+Die folgenden Checkpoints sind frühere Stände.
+
+## Reel-Test 26.09.2026: Faceless-Generierung fehlgeschlagen
+
+Der Nutzer hat einen Instagram-Reel-Test mit WhatsApp-Kostenfreigabe beauftragt
+und verlangt einen produktbezogenen Handlungsbogen mit Storytelling und Emotion.
+Der ältere Plan `cfa990ab-00ee-45cb-8a43-1e85a53c6636` ist zwar inzwischen
+inhaltlich freigegeben und als `needs_provider_quote` vorbereitet, hat aber
+einen generischen Sprechtext. Diesen Plan nicht für Video-Kosten freigeben.
+
+Der neue Instagram-Plan `dc31e5e2-ce68-43da-93b9-dcc4be21c007` wurde im
+aktuellen Preview erstellt, inhaltlich freigegeben und für Faceless Storyboard
+vorbereitet. Drehbuch: echter Kürbis im Vordergrund, Erwachsene schnitzen Augen
+und Mund, fertige Laterne, emotionale Auflösung und YAVOCOS als mögliche
+Werkzeugwahl ohne unbelegte Modellmerkmale. Sprecherin: Mila Winter (deutsch).
+Quote: 20 Faceless-Credits, vorher 275 verfügbar; EUR-Kosten und Provision
+unbekannt. Der Nutzer antwortete um 15:01 Berlin direkt auf die WhatsApp-
+Kostenanfrage mit `Freigeben`; der Webhook bestätigte die Freigabe und startete
+das Video **automatisch genau einmal** um 13:01:49 UTC. Provider-ID
+`6ab7c23dc48e59b4c2ff87e7`. Die zweite, zitierende WhatsApp-Antwort um
+15:03 Berlin ergab `no_pending_approval` und keinen zweiten Start.
+
+Um 13:03:58 UTC wurde der Auftrag `failed`. Geschützte, ausschließlich lesende
+Faceless-Statusabfrage: `Storyboard generated ZERO visual items for a 19s video —
+failing the job so the queue retries instead of shipping a black video`.
+Provider-Status auch später `failed`; keine Render-ID, MP4 oder Instagram-
+Veröffentlichung. `approval_requests.status='consumed'`; keine automatische
+erneute Produktion. Der lesende `/me`-Creditstand betrug später weiterhin 275;
+das beweist **keine** genaue Transaktion. Die offizielle Faceless-Dokumentation
+beschreibt Credits bei Erstellung und keine automatische Erstattung bei
+gescheiterter Generierung. Konto-Ledger/Support klären, bevor ein neuer Versuch
+mit neuer Kostenfreigabe erwogen wird. Nie auf Verdacht denselben Auftrag neu
+kaufen. Der neue Diagnoseknopf im Content Studio zeigt den Providerfehler ohne
+Schreibaufruf; Code zur Diagnose auf PR #6 und Preview deployed.
+
+Faceless erhält ausschließlich den Sprechtext und erzeugt eigene statische
+Bilder; die visuellen Szenen im Drehbuch lassen sich über diese API nicht einzeln
+erzwingen. Ein weiterer Versuch kann daher weder visuelle Produktgenauigkeit
+noch Funktion des Anbieters garantieren. Code-Commit für Storytelling
+`876b11ac3680251afcfcc3fcf393880e63189a2a`, Preview READY, Quality #117
+erfolgreich.
+
+Die folgenden Checkpoints sind frühere Stände.
+
+## Aktueller Stand: 26.09.2026, nach WhatsApp-Bildablehnung
+
+- PR #6 bleibt Draft auf `feat/production-gates-whatsapp`. Geprüfter Code-Stand
+  `626f1e006dd51f606caf545dc670e3ae3ff62893`, Quality #113 erfolgreich,
+  Preview `dpl_HkPmw3238zSLCNkbQiGhEnJth4Au` READY. Production läuft auf
+  altem `main`-Stand `d956518a71cd3658efb8524311bf314444f98272`;
+  der neue Tages-Cron ist dort noch nicht aktiv. `CRON_SECRET` ist inzwischen
+  für Preview und Production angelegt und nach Redeploy verfügbar.
+- Der WhatsApp-Intent-Parser über Replicate wurde mit einer echten Betreiber-
+  Nachricht bestätigt. Migrationen 001–013 sind in der über Vercel/Neon lesbaren
+  Projektdatenbank angewendet; die Abfrage zeigt 013 am 26.09. um 10:39:33 UTC.
+  Das ist kein Nachweis einer separaten künftigen Production-Migration.
+- Tagesjob `eb2a8423-6fce-4f3d-9e81-87835fafc5b1` für ASIN `B0D9YQR9CT`:
+  Inhalt freigegeben, aber die überarbeiteten Bilder verfehlten das Kürbisschnitzen.
+  Der Betreiber lehnte die letzte Facebook-Veröffentlichungsfreigabe ab.
+  `publication_requests` zeigt zuletzt `rejected`; kein Post für diesen Job.
+  Zwei Bildrevisionen wurden bereits verbraucht. Ein neuer Versuch braucht
+  einen neuen Auftrag und seine eigenen Medienkosten-/Publikationsfreigaben.
+- Das verbindliche Bildbriefing steht jetzt gemeinsam in
+  `lib/content/image-brief.ts` und wird im WhatsApp-Entwurf und bei der
+  Bilderzeugung verwendet. Für Kürbisschnitzsets verlangt es einen im
+  Vordergrund eindeutig erkennbaren Halloween-Kürbis, an dem ein Erwachsener
+  sichtbar schnitzt. Die Änderung ist in Preview, aber noch nicht durch ein
+  passendes neues Live-Bild bestätigt.
+- Der vorhandene Instagram-Plan `cfa990ab-00ee-45cb-8a43-1e85a53c6636`
+  steht laut lesender Datenbankabfrage auf `awaiting_approval`, ohne Zeile in
+  `production_runs`. Es gibt damit noch keine Videoquote oder Kostenfreigabe.
+  Kein Videoauftrag wurde gestartet.
+- Ein älterer Facebook-Job `07cf617e-cf3d-442e-99a4-234a9ddde249` hat
+  `published`, Meta-ID und Permalink sowie eine `publications`-Zeile.
+  Sein Produkt-Snapshot enthält jedoch keine ASIN und ist kein Nachweis des
+  aktuellen produktgebundenen Kürbisablaufs. Auch ein Instagram-Reel mit
+  Permalink ist noch nicht nachgewiesen.
+- Meta prüft die WhatsApp-Vorlage `content_entwurf` (German, Marketing).
+  Nach Genehmigung sind Name, Sprache und tatsächliche Kosten zu prüfen;
+  wiederkehrenden Vorlagenversand erst nach ausdrücklicher Kostenfreigabe
+  aktivieren. Freie Textantwort `Entwurf` ist implementiert; ein
+  interaktiver Vorlagenbutton wird vom Webhook derzeit nicht verarbeitet.
+
+Nächste Abnahme: neuer passender Facebook-Auftrag mit Bildprüfung und zwei
+getrennten WhatsApp-Freigaben, danach der vorhandene Reel-Plan mit ausdrücklicher
+Video-Kostenfreigabe, echtem Render und Instagram-Freigabe. Erst nach den
+Live-Belegen PR #6 mergen, Production-Migration und Webhook prüfen sowie den
+täglichen Ablauf dort kontrolliert in Betrieb nehmen. Kein manueller Status-
+Eingriff und keine automatische Wiederholung kostenpflichtiger Generierungen.
+
+Die älteren Abschnitte dokumentieren damalige Zwischenstände und Blocker.
+
+## Aktueller Checkpoint: vorhandener Replicate-Zugang statt Gateway
+
+Der Betreiber hat weiteres Gateway-Billing ausdrücklich beendet. Der WhatsApp-Parser
+verwendet nun `openai/gpt-4.1-nano` über den bereits konfigurierten `REPLICATE_API_TOKEN`.
+Kein neuer Provider-Account, keine neue Paketabhängigkeit. Live-Textinferenz muss nach
+Deployment mit einer echten eingehenden Betreiber-Nachricht bestätigt werden. Keine
+alten Message-IDs wieder abspielen und keine bezahlte Medienproduktion zum Parser-Test.
+
+Migration 013 ergänzt bestätigte Sprachbeispiele in bestehendem Postgres. Noch live
+anzuwenden; der Kernparser bleibt ohne diese Tabelle betriebsfähig. Details und Grenzen
+stehen in `WHATSAPP_INSTRUCTIONS.md`. Bestätigung erfolgt bei ausdrücklicher Freigabe
+des überarbeiteten Tagesplans; Korrekturen bleiben neue Datensätze.
+
+Hauptbetrieb weiterhin zuerst: aktuelle Kürbisrevision, danach menschliche Kosten-/
+Publikationsfreigaben und echte Facebook-/Instagram-E2E. Production-Rollout, Cron-Zugang
+und WhatsApp-Vorlage außerhalb des Servicefensters bleiben offen. Ein grüner Build ist
+kein Beleg für autonomen Tagesbetrieb. Die folgenden Gateway-Hinweise sind historisch.
+
+## Live-Fehler 26.09.2026, 11:31–11:32 Berlin
+
+Drei Betreiber-Nachrichten erhielten dieselbe Rückfrage. Read-only Diagnose über
+`/api/operations` bestätigt: alle drei `job_id=null`, `interpretation=null`,
+`status=clarify`, kein Antwortbezug; zwei offene Publications. Damit noch kein
+Modellaufruf für diese Nachrichten. Kein kostenpflichtiges Bild oder Posting.
+
+Korrektur: eindeutige Produktnennung/ASIN löst den bestehenden Auftrag auf;
+Folgeantworten behalten zeitlich begrenzten Dialogbezug. Eigene Rückfragen speichern
+ihre WhatsApp-ID; auch die Antwort darauf kann einen angebotenen Auftrag auswählen.
+Modellzugang liest den Vercel-Request-Token zusätzlich zur statischen Konfiguration.
+Technische Fehler werden getrennt von semantischer Unklarheit gemeldet.
+
+Externer Blocker im Vercel-Dashboard bestätigt: AI Gateway zeigt „Add a Card“ zur
+Freischaltung der 5 USD Startcredits; zusätzlich ist die Rechnungsadresse unvollständig.
+Keine Zahlungsdaten eingegeben, kein neuer Schlüssel erzeugt und keine Abrechnung
+aktiviert. Work-Credits sind davon getrennt. Live-Inferenz bleibt bis zur Aktivierung
+und einer tatsächlichen erfolgreichen Antwort unbestätigt.
+
+
+## Live-Checkpoint 26.09.2026, 09:21 UTC
+
+Preview `dpl_Cyxv1gXsPpzWGrwnScYH2jtEuSRo` / Code-Commit `ac494b4` READY;
+GitHub Quality #100 erfolgreich. Der geschützte Migrationsweg bestätigt HTTP 200:
+`applied: [012_whatsapp_instructions.sql]`, 001–011 ausschließlich `alreadyApplied`.
+Schemaaktivierung ist damit abgeschlossen. Ein echter neuer WhatsApp-Änderungstest
+und die anschließenden menschlichen Freigaben bleiben offen. Keine alte
+Nachrichten-ID wieder abspielen.
+
+## Zusatzauftrag 26.09.2026: WhatsApp-Intent-Parser
+
+Im bestehenden PR #6 ergänzt; Hauptauftrag und Produktionsfreigabe bleiben offen.
+Details: `docs/WHATSAPP_INSTRUCTIONS.md`. Typecheck, Lint, 112/112 Tests und Build
+bestanden. Modellantworten in Tests kontrolliert; echter Gateway-Aufruf und neue
+Betreiber-Anweisung nach Migration 012 noch ausstehend. Keine zusätzlichen
+Bild-/Video-Ausgaben für diese Parser-Tests.
+
+Der Tagesjob `eb2a8423-6fce-4f3d-9e81-87835fafc5b1` bewirbt das Kürbisschnitzset
+ASIN `B0D9YQR9CT`, Tracking-ID `alltaeglichle-21`. Die bereits bezahlte Bildproduktion
+und der Änderungswunsch sind historisch vorhanden; es liegt kein Nachweis einer
+passenden neuen Bildrevision oder Veröffentlichung für diesen Job vor. Alte
+WhatsApp-Message-IDs werden nicht wieder abgespielt. Nach Schemaaktivierung eine
+neue Anweisung direkt als Antwort auf die betreffende Freigabenachricht verwenden.
+
+Der separate Reel-Plan `cfa990ab-00ee-45cb-8a43-1e85a53c6636` ist weiterhin ohne
+neue Kosten-/Publikationsfreigabe. Kein neues Commerce-/Ads-System, kein simuliertes
+Shopping-Element. Strikte Amazon-Produktbindung aus Commit `44f592b` bleibt aktiv.
+Hobby-Scheduler, fehlendes CRON_SECRET, Tagesvorlage außerhalb des 24h-Fensters und
+Production-Env-Rollout bleiben separate bekannte Hauptauftrags-Blocker.
+
+Die nachfolgenden älteren Abschnitte sind historische Nachweise.
+
+Stand: 24. September 2026. Offener Draft-PR #6 auf
+`feat/production-gates-whatsapp`. Weder nach `main` gemergt noch für Production
+freigegeben.
+
+## Migration 006 live bestätigt (24.09., 08:31–08:32 UTC)
+
+Der Betreiber hat die bestehende geschützte Preview-Route aufgerufen. Die
+Runtime-Logs belegen auf `dpl_6L5vKhUvgx8f8mktPGFpfKcWAJqU`, Commit
+`bffa271f5919856c1b2a0017dfc3be7169b692ad`:
+
+- 08:31:54 UTC, HTTP 200: ausschließlich `006_daily_notification.sql` angewendet;
+  001–005 in `alreadyApplied`.
+- 08:32:10 UTC, HTTP 200: `applied: []`; 001–006 in `alreadyApplied`.
+- Vier weitere Aufrufe um 08:32:14, :23, :32 und :34 UTC ebenfalls HTTP 200,
+  ohne angewendete Migration. Keine erneute Ausführung der älteren SQL-Dateien.
+
+Damit sind Preview-Migration 006, Idempotenz und die Datenbankverbindung über
+den bestehenden Migrationsweg praktisch bestätigt. Eine Postgres-SSL-Warnung
+begleitete den ersten Aufruf; die Migration war erfolgreich. Kein manuelles
+SQL, kein Reset des Ledgers, kein eigener zusätzlicher Migrationsaufruf.
+Die früheren Aussagen „006 offen“ unten sind historisch und damit überholt.
+Facebook-/Faceless-E2E und Production bleiben offen. Für den Facebook-Test
+zuerst den geschützten Verlauf und offene Freigaben prüfen, dann den vorhandenen
+Tagesentwurf-Flow mit zwei getrennten WhatsApp-Freigaben verwenden.
+
+Die Browserprüfung des Content Studios lädt die Oberfläche und bestätigt
+`Postgres konfiguriert`. Der separate sichere Eingabedialog für den Button
+`Gespeicherten Verlauf laden` wurde anschließend automatisch abgelehnt, bevor
+eine Eingabeaufforderung oder Aktion erfolgte: Die allgemeine Beschriftung
+`Sign in to continue` stellt diese geschützte Leseabfrage als Anmeldung dar.
+Kein Code wurde eingegeben, kein Verlauf geladen. Diese neue Ablehnung betrifft
+keine Migration. Vor einem erneuten Versuch die konkrete sichere Code-Eingabe
+und ausschließlich lesende Verlaufsabfrage ausdrücklich bestätigen lassen;
+keinen Browser-/API-Ersatzweg verwenden. Facebook-/Faceless-Tests nicht gestartet.
+
+## Vercel-Zugriff wiederhergestellt (24.09., ca. 08:28 UTC)
+
+Die erneute Verbindung ist erfolgreich: Team `agentstudiots-boop` und Projekt
+`affiliate-reel-agent` sind über den Connector erreichbar. Der vorherige
+Scope-/403-Blocker ist damit behoben; die älteren Abschnitte unten sind historisch.
+Preview `dpl_4fH4vN9fPXbhdYYERG1w5qpfQxF7` ist `READY` und gehört zu
+PR-#6-Commit `d7ee14133508513185e826174e1230d113a63dce`.
+
+- Keine Fehler-/Warn-/Fatal-Logs für dieses Deployment im abgefragten
+  24-Stunden-Fenster. Zunächst keine Requests, danach ein eigener Webhook-GET:
+  ohne Verifizierung erwartungsgemäß HTTP 403 vom App-Handler. Dies beweist
+  Erreichbarkeit und Ablehnung, keinen erfolgreichen Meta-Handshake oder Empfang.
+- Projektweit zeigt die Fehleraggregation eine ältere Postgres-SSL-Warnung zu
+  `sslmode=require` auf einem früheren Deployment. Keine Konfiguration geändert.
+- Production ist weiterhin `READY` auf `main`-Commit `d956518a71cd3658efb8524311bf314444f98272`,
+  Deployment `dpl_EdFS8ZgeznxLrofXCTaabn9S6hm7`. Kein eigener Rollout erfolgt.
+- Weitere HTTP-Lesediagnosen über den Connector scheiterten teilweise an dessen
+  Deployment-Zugriff bzw. endeten im Vercel-SSO-Redirect. Daraus keinen App-Fehler
+  ableiten. Kein Browser-Ersatzweg für diese Connector-Probleme genutzt.
+- Umgebungsvariablen sind mit den aktuell angebotenen Connector-Funktionen nicht
+  abrufbar; das angebotene Build-Log-Werkzeug meldet serverseitig `Tool not found`.
+  Runtime-Log-Zugriff funktioniert. Tagesvorlage, Webhook-Ziel und DB-Zustand
+  bleiben praktisch zu bestätigen.
+
+Nächster Betreiberschritt: die geschützte Migrationsseite des PR-#6-Previews im
+eigenen Browser öffnen, Zugangscode dort eingeben und die Migration ausführen;
+anschließend mit demselben Code ein zweites Mal ausführen. Erwartet zunächst
+006, danach `Schema bereits aktuell` mit 001–006. Kein Code im Chat. Die zuvor
+automatisch abgelehnte Browser-Eingabe wurde nicht erneut versucht; kein
+Migrations-POST durch den Agenten. Danach die beiden `database_migration`-Events
+im aktuellen Deployment abgleichen und den kontrollierten E2E fortsetzen.
+
+## Neue Integrationsvorprüfung
+
+PR #8 des anderen Agenten ist inzwischen vorhanden. PR #6 (`324dc8c`) und
+PR #8 (`cd7d35a`) wurden ausschließlich in einer isolierten lokalen Arbeitskopie
+kombiniert: keine Merge-Konflikte, TypeScript/ESLint/50 Tests/Next.js-Build grün.
+Kein Remote-Merge und keine Änderungen an den fremden Feature-Dateien.
+Details und genaue SHAs: [INTEGRATION_REVIEW_PR8.md](INTEGRATION_REVIEW_PR8.md).
+PR #6 bleibt für den Nachweis von Migration 006 getrennt; PR #8 enthält zusätzlich
+007/008. Vercel-Zugriff erneut geprüft und weiterhin mit 403 blockiert.
+
+## Fortsetzung ohne Betreiber (nach `0e8484d`)
+
+Der Betreiber ist heute nicht verfügbar; keine neue Zugangseingabe oder echte
+WhatsApp-Freigabe anfordern. Morgen nach [PREVIEW_E2E_RUNBOOK.md](PREVIEW_E2E_RUNBOOK.md)
+fortsetzen. Die bestehenden Live-Blocker bleiben bestehen.
+
+- In `/api/production` einen reproduzierten Fehler behoben: Bei einer höheren
+  gemeldeten Credit-Belastung wurde bisher die bereits bestätigte Provider-ID
+  nicht gespeichert. Sie wird nun vor der Kostenwarnung gebunden. Der Claim
+  bleibt verbraucht, ein zweiter Kauf gesperrt; der Auftrag bleibt lesbar.
+  `faceless_credit_mismatch` protokolliert ausschließlich Job-ID und Creditwerte.
+- Sieben neue lokale Handler-Integrationstests nutzen den echten Route-Code,
+  echte Signaturprüfung/Repository-Logik und isoliertes PGlite. Provider,
+  Bild-/Nachrichtenversand sind simuliert; kein echter Meta-/Faceless-Zugriff.
+  Sie prüfen die zwei Publikationsfreigaben, parallele/erneute Zustellungen,
+  genau einen Kauf/Render/Post, unbekannte Ergebnisse, zu wenig Guthaben,
+  gestiegene Quote und Erhalt der bekannten Provider-ID bei Kostenabweichung.
+- TypeScript, ESLint, die vollständige Testsuite mit 47 Tests und Next.js-Build
+  sind erfolgreich. Der Build enthält alle sechs SQL-Migrationsdateien für die
+  geschützte Route. CI/Preview zum neuen Commit separat prüfen.
+  Keine Architekturänderung, kein Schemaeingriff und keine
+  Änderungen am Wochenbericht oder an der Bild-/Textrevision.
+
+## Verifikationsfortsetzung am 24.09.2026 (Ausgangscommit `37c8a406`)
+
+- Branch sauber und aktuell geladen; die vier Übergabedokumente gelesen.
+  GitHub Quality und Vercel-Commitstatus für `37c8a406` sind erfolgreich.
+  Zugehöriges Deployment: `85KqHvGET7iSUuKvkTzqAVmS68kd`.
+- TypeScript, ESLint, die damaligen 39 Tests und Next.js-Build erneut bestanden.
+  Ein ergänzender isolierter Upgrade-Test prüft nun einen bereits befüllten
+  Stand 001–005: ausschließlich 006 wird geladen, beim zweiten Aufruf nichts;
+  frühere Migrationseinträge, Tagesentwurf und WhatsApp-Ereignis bleiben erhalten.
+  Alle 40 Tests und ESLint sind mit dieser Ergänzung erfolgreich. Das ist ein
+  lokaler Nachweis, **kein** Nachweis einer Preview-Migration.
+- Aktueller PR-Preview im Browser geöffnet: Oberfläche lädt, Postgres wird als
+  konfiguriert angezeigt. Erneuter lesender Meta-Test meldet `connected`.
+  Die Migrationsseite meldet konfigurierte Datenbank und Zugangscode, verlangt
+  vor jedem POST aber den Content-Studio-Zugangscode. Dieser ist in der neuen
+  Sitzung nicht verfügbar; **kein Migrations-POST wurde ausgeführt**.
+- Vercel-Connector hat Zugriff auf `thorsten1988la-1943`, das Projekt liegt unter
+  `agentstudiots-boop`. Projekt-/Deploymentabfrage im richtigen Team wird mit
+  403 und der Aufforderung zur erneuten Autorisierung dieses Scopes abgewiesen.
+  Runtime-Logs, Live-Umgebungsvariablen und Production-Zustand sind deshalb
+  nicht bestätigt. Keine Zugangsdaten in Dokumentation aufnehmen.
+- Es wurden keine Jobs, WhatsApp-Nachrichten, Facebook-Posts oder Faceless-Käufe
+  ausgelöst. PR bleibt Draft; kein Merge und kein Production-Rollout.
+- Wochenbilanz und natürliche Bild-/Textrevision werden von einem anderen
+  Agenten separat bearbeitet. Hier wurden nur Verifikation und Übergabe ergänzt.
+
+Nächster notwendiger Betreiberschritt: Content-Studio-Zugangscode im sicheren
+Browser-Eingabedialog bereitstellen, nicht im Chat. Danach 006 über die bestehende
+geschützte Route anwenden und den zweiten POST separat bestätigen. Für spätere
+Runtime-Nachweise zusätzlich die Vercel-Verbindung für `agentstudiots-boop`
+autorisieren. Die erforderlichen echten WhatsApp-Freigaben bleiben beim Approver.
+
+Nachtrag: Die sichere Browser-Eingabe wurde vor Anzeige an den Betreiber durch
+die automatische Sicherheitsprüfung abgelehnt: Der als Anmeldung beschriftete
+Dialog hätte mit dem Zugangscode direkt eine Datenbankmigration abgesendet.
+Es wurde weder ein Code eingegeben noch ein POST ausgeführt. Vor einem neuen
+Versuch ist eine ausdrückliche Bestätigung dieser Datenbankaktion erforderlich;
+keinen alternativen oder ungeschützten Ausführungsweg verwenden.
+GitHub Quality und Vercel-Build des Verifikationscommits `fb9762f` sind ebenfalls
+erfolgreich (Deployment `NZYWAJTf5f4TMiP35XB2RrgWwPHA`).
+
+Für den Facebook-Test mit **zwei** WhatsApp-Freigaben den bestehenden Tagesentwurf-
+Flow nutzen: Die manuelle Content-Studio-Freigabe ist keine erste
+WhatsApp-Freigabe. Der tägliche Flow benötigt einen ausdrücklich autorisierten
+Cron-Aufruf und ein offenes Servicefenster; keine kostenpflichtige Vorlage
+ersatzweise aktivieren. Meta-Webhook-Ziel zum aktuellen Preview vor dem Versand
+prüfen. Noch kein neuer Tagesauftrag wurde ausgelöst.
+
+## Tatsächlich nachgewiesen
+
+- Der bestehende Content-Orchestrator mit Postgres, separaten Freigaben und
+  Faceless.so-Storyboard-Gate bleibt die Basis. Die ersten 15 Videos zählen nur
+  bei `production_runs.status='ready'` und müssen `FACELESS_STORYBOARD` nutzen.
+- Der Betreiber hat die Preview-Migrationen `001_memory.sql` bis
+  `005_publication_gate.sql` angewendet. Zwei weitere geschützte Aufrufe von
+  `/api/admin/migrate` meldeten alle fünf als `alreadyApplied`.
+- `BLOB_READ_WRITE_TOKEN` ist in Preview vorhanden. Nach Redeploy des richtigen
+  PR-Previews zeigte die lesende Meta-Diagnose `connected`: Systemnutzer,
+  Facebook-Seite und verknüpftes Instagram-Konto waren erreichbar. Ein
+  Meta-Schreibaufruf wurde dadurch noch nicht bewiesen.
+- Die bisherigen Preview-Builds bis `e722f62` und GitHub Quality waren erfolgreich.
+  Browserprüfung: Seite lädt, Postgres wird als konfiguriert angezeigt. Die
+  Veröffentlichungssperre erklärt inzwischen vor dem Klick, warum ein
+  gespeicherter Job keinen Facebook-Seitenpost ergeben kann.
+- Eine bereits geprüfte Änderung bindet eingehende signierte WhatsApp-Nachrichten
+  zusätzlich an `WHATSAPP_PHONE_NUMBER_ID` (oder die bestehende Schreibweise
+  `WHATTSAPP_PHONE_NUMBER_ID`). Die lokalen Prüfungen inklusive neuer
+  Tagesvorlage bestehen: TypeScript, ESLint, 39 Tests und Next.js-Build.
+  Den Preview-Build zur jüngsten Änderung separat abwarten.
+- Bisher wurde kein kostenpflichtiger Faceless-Auftrag und kein echter
+  Facebook-Post durch das System ausgelöst. Keine Secrets in GitHub schreiben.
+
+## Nächster kontrollierter Preview-Durchlauf
+
+1. Im aktuellen Preview einen neuen, zur **Facebook-Seite** passenden Bild-
+   oder Textplan mit dem tatsächlich gewünschten Produkt speichern und inhaltlich
+   freigeben. Alte Jobs enthalten unveränderliche Produkt-/Plattform-Snapshots;
+   ein anderes Produkt im Formular ändert den gespeicherten Job nicht.
+2. `Beitrag vorbereiten & WhatsApp-Freigabe anfragen` genau einmal auslösen.
+   Textgrafik, Bild-URL, Affiliate-Link und den gespeicherten Status prüfen.
+3. Ausschließlich vom festgelegten Approver auf **diese** WhatsApp antworten:
+   `Freigeben` oder einen natürlichen Änderungswunsch. Eine separate erste
+   Content-Freigabe darf niemals schon publizieren. Danach genau einen
+   Facebook-POST, Permalink und Postgres-Eintrag prüfen; Runtime-Logs ansehen.
+4. Einen Faceless.so-Videoablauf nur mit echter Quote, überprüften Credits und
+   ausdrücklicher WhatsApp-Freigabe einmalig durchführen. Unklare Ergebnisse
+   bleiben gesperrt; keine automatische Wiederholung oder neuer Render auf
+   Verdacht.
+5. Browser-E2E und Preview-Runtime-Fehler dokumentieren. Erst nach stabilem
+   Ergebnis PR #6 finalisieren, mergen, Production deployen, dort Migration
+   ausführen und Smoke-Test durchführen.
+
+## Noch offen / externe Entscheidung
+
+- Tägliche Entwürfe werden im Production-Cron vorbereitet. Für Benachrichtigungen
+  außerhalb des 24-Stunden-Fensters ist eine **deaktivierte** Meta-Vorlage ohne
+  Content-Freigabe vorbereitet. Erst `Entwurf` als Antwort sendet den ganzen
+  Entwurf im Servicefenster. Migration `006_daily_notification.sql` ist neu und
+  muss vor einem Preview-Durchlauf angewendet werden. Meta-Vorlage,
+  Genehmigung, Kategorie, wiederkehrende Gebühren und ausdrückliche Aktivierung
+  stehen aus; ohne sie speichert der Cron nur den Entwurf.
+- Das tatsächliche Faceless.so-Video-E2E und die Meta-Schreibberechtigung sind
+  noch nicht praktisch bestätigt. Es fehlt ein echter, bewusst freigegebener
+  Publishing-Durchlauf.
+- Natürliche Änderungen am Video laufen bereits über den Orchestrator. Bei
+  Bild-/Textpublikationen wird Änderungswunsch gespeichert und der alte Post
+  gesperrt; eine neue Bild-/Textrevision steht noch aus.
+- Instagram-Veröffentlichung und Wochenbericht erst nach stabilem
+  Produktions-/Publishing-Workflow ergänzen. Fehlende Klick-, Follower-,
+  Umsatz- oder Kostenwerte nicht erfinden.
+
+Technische Einzelheiten: [PRODUCTION_GATES.md](PRODUCTION_GATES.md),
+[DAILY_POSTS.md](DAILY_POSTS.md) und [VERIFICATION.md](VERIFICATION.md).

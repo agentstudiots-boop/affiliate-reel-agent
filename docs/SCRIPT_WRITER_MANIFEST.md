@@ -24,8 +24,9 @@ Verkaufsargumente entstehen aus einem nachvollziehbaren Anwendungsfall.
    geeignetes Zubehör, Kühlung, zusätzliches Gerät oder korrekte Anwendung.
 6. Einen Hauptnutzen für den Hook wählen und den Anwendungsfall visuell zeigen.
    Weitere Nutzen in passende Folgeszenen oder die Caption aufnehmen.
-7. CTA auf das echte Linkziel abstimmen: „Auswahl ansehen“ bei einer Suche,
-   Modellinformationen nur bei einer konkreten Produktseite versprechen.
+7. CTA ausschließlich auf genau eine verifizierte Amazon-Produktdetailseite
+   mit derselben ASIN abstimmen. Such-, Kategorie- und generische Seiten blockieren
+   Affiliate-Content mit `product_unresolved`; niemals als Fallback verwenden.
 
 ## Qualitätsprüfung vor Freigabe
 

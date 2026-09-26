@@ -1,6 +1,11 @@
 export type WorkflowStatus = "draft" | "generated" | "approved" | "published";
 
 export type Product = {
+  asin?: string;
+  productUrl?: string;
+  trackingId?: string;
+  productVerifiedAt?: string;
+  productVerifiedName?: string;
   name: string;
   sourceUrl: string;
   affiliateUrl: string;
@@ -21,6 +26,8 @@ export type ReelConcept = {
 };
 
 export type TrendCandidate = {
+  resolvedProduct?: Product;
+  resolutionError?: string;
   name: string;
   category: string;
   kind: "Dauerläufer" | "Saisontrend" | "Aktueller Trend";

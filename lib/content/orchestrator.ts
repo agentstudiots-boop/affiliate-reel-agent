@@ -1,20 +1,85 @@
 import type { LearningEvidence } from "../memory/schema";
-import { createAmazonAffiliateUrl } from "../amazon";
+import { bindAmazonProduct, requireProduct, PRODUCT_UNRESOLVED } from "../amazon";
 import { creativeAgent } from "./agents/creative";
 import { videoAgent } from "./agents/video";
 import { imageAgent } from "./agents/image";
 import { textAgent } from "./agents/text";
 import { marketingAgent } from "./agents/marketing";
+import { analyzeProductInspiration } from "./product-inspiration";
+import { classifyOpportunity, pumpkinCreativeIssues } from "./category";
+import { interpretVideoRevision } from "../whatsapp/video-revision";
+import { evaluateImageCreativeQuality } from "./creative-quality";
 import { createGenerator } from "./model";
 import { contentSchema, opportunitySchema, reviewSchema, type AgentName, type Content, type ContentJob, type Decision, type Idea, type JobEvent, type JobStatus, type Opportunity, type Review } from "./schema";
 import type { Generator } from "./agent";
 
 export const MAX_REVISIONS = 2;
+
+export async function reviseApprovedVideo(job: ContentJob, feedback: string, interpret = interpretVideoRevision): Promise<ContentJob> {
+  if (job.status !== "approved" || job.content?.format !== "video" || !job.decision || !job.ideas) throw new Error("Freigegebener Video-Plan fehlt.");
+  if (job.revisions >= MAX_REVISIONS) throw new Error("Maximal zwei Überarbeitungen erreicht.");
+  if (job.mode !== "reference") throw new Error("Für diesen Modus ist kein geprüfter Änderungs-Generator aktiv.");
+  const idea = job.ideas.find(item => item.id === job.decision!.ideaId);
+  if (!idea) throw new Error("Gewählte Idee fehlt.");
+  let draft: Content;
+  try { draft = contentSchema.parse(await videoAgent({ opportunity: job.opportunity, idea, inspiration: analyzeProductInspiration(job.opportunity), previous: job.content, changeRequest: feedback }, createGenerator({ mode: job.mode }))); }
+  catch (error) {
+    if (!(error instanceof Error) || !error.message.startsWith("Änderungswunsch im Referenzmodus nicht eindeutig umsetzbar.")) throw error;
+    const proposal = await interpret(job, feedback);
+    draft = contentSchema.parse(await videoAgent({ opportunity: job.opportunity, idea, inspiration: analyzeProductInspiration(job.opportunity), previous: job.content, changeRequest: feedback },
+      async (_agent, _instruction, _input, schema) => schema.parse(proposal)));
+  }
+  requireProduct(job.opportunity.product, JSON.stringify(draft));
+  const review = inspectContent(draft, job.decision);
+  review.issues.push(...pumpkinCreativeIssues(job.opportunity, draft));
+  if (review.issues.length) { review.passed = false; review.score = Math.min(40, review.score); }
+  if (!review.passed) throw new Error(`Überarbeitung verletzt redaktionelle Prüfung: ${review.issues.join(" ")}`);
+  const next = structuredClone(job);
+  next.revisions++;
+  next.content = draft;
+  next.review = review;
+  next.status = "awaiting_approval";
+  next.updatedAt = new Date().toISOString();
+  next.events.push({ sequence: next.events.length + 1, at: next.updatedAt, agent: "orchestrator", kind: "decision", message: `Änderungsauftrag an Video-Agent: ${feedback}` });
+  next.events.push({ sequence: next.events.length + 1, at: next.updatedAt, agent: "video", kind: "response", message: `Revision ${next.revisions} erstellt`, data: draft });
+  next.events.push({ sequence: next.events.length + 1, at: next.updatedAt, agent: "orchestrator", kind: "decision", message: "Überarbeiteter Plan benötigt erneut redaktionelle Freigabe." });
+  return next;
+}
 // Only this registry/orchestrator imports specialists. New agents can be registered here.
 const producers = { video: videoAgent, image: imageAgent, text: textAgent };
 
-export function selectIdea(ideas: Idea[], opportunity: Opportunity, learning?: LearningEvidence): Decision {
-  const eligible = opportunity.targetPlatform === "instagram" ? ideas.filter(i => i.format !== "text") : ideas;
+export async function reviseApprovedStaticContent(job: ContentJob, feedback: string): Promise<ContentJob> {
+  if (job.status !== "approved" || !job.content || job.content.format === "video" || !job.decision || !job.ideas) {
+    throw new Error("Freigegebener Bild- oder Text-Plan fehlt.");
+  }
+  if (job.revisions >= MAX_REVISIONS) throw new Error("Maximal zwei Überarbeitungen erreicht.");
+  if (job.mode !== "reference") throw new Error("Für diesen Modus ist kein geprüfter Änderungs-Generator aktiv.");
+  const idea = job.ideas.find(item => item.id === job.decision!.ideaId);
+  if (!idea) throw new Error("Gewählte Idee fehlt.");
+  const agent = job.content.format;
+  const producer = agent === "image" ? imageAgent : textAgent;
+  const draft = contentSchema.parse(await producer(
+    { opportunity: job.opportunity, idea, inspiration: analyzeProductInspiration(job.opportunity), previous: job.content, changeRequest: feedback },
+    createGenerator({ mode: job.mode }),
+  ));
+  const review = inspectContent(draft, job.decision);
+  if (!review.passed) throw new Error(`Überarbeitung verletzt redaktionelle Prüfung: ${review.issues.join(" ")}`);
+  const next = structuredClone(job);
+  next.revisions++;
+  next.content = draft;
+  next.review = review;
+  next.status = "awaiting_approval";
+  next.updatedAt = new Date().toISOString();
+  next.events.push({ sequence: next.events.length + 1, at: next.updatedAt, agent: "orchestrator", kind: "decision", message: `Änderungsauftrag an ${agent === "image" ? "Bild" : "Text"}-Agent: ${feedback}` });
+  next.events.push({ sequence: next.events.length + 1, at: next.updatedAt, agent, kind: "response", message: `Revision ${next.revisions} erstellt`, data: draft });
+  next.events.push({ sequence: next.events.length + 1, at: next.updatedAt, agent: "orchestrator", kind: "decision", message: "Überarbeiteter Plan benötigt erneut redaktionelle Freigabe; alte Veröffentlichungsfreigabe bleibt gesperrt." });
+  return next;
+}
+
+export function selectIdea(ideas: Idea[], opportunity: Opportunity, learning?: LearningEvidence, allowedFormats?: ReadonlyArray<Content["format"]>): Decision {
+  const eligible = ideas.filter(i => (opportunity.targetPlatform !== "instagram" || i.format !== "text")
+    && (!allowedFormats || allowedFormats.includes(i.format)));
+  if (!eligible.length) throw new Error("Für diesen Veröffentlichungsweg fehlt eine geeignete Formatidee.");
   const ranking = eligible.map(idea => {
     const s = idea.scores;
     const historyAdjustment = learning?.groups.find(g => g.format === idea.format)?.adjustment || 0;
@@ -26,7 +91,7 @@ export function selectIdea(ideas: Idea[], opportunity: Opportunity, learning?: L
   }).sort((a, b) => b.score - a.score || a.ideaId.localeCompare(b.ideaId));
   const selected = ideas.find(i => i.id === ranking[0].ideaId)!;
   return { ideaId: selected.id, format: selected.format, ranking,
-    reason: `${selected.rationale} Gewichtet nach Ziel (${opportunity.goal}) und Budget (${opportunity.budget}). ${learning?.summary || "Keine historischen Messwerte berücksichtigt."} Keine garantierte Conversion-Prognose.` };
+    reason: `${selected.rationale} Gewichtet nach Ziel (${opportunity.goal}) und Budget (${opportunity.budget}). ${allowedFormats ? `Veröffentlichungsweg erlaubt ${allowedFormats.join(", ")}. ` : ""}${learning?.summary || "Keine historischen Messwerte berücksichtigt."} Keine garantierte Conversion-Prognose.` };
 }
 
 export function inspectContent(content: Content, decision: Decision): Review {
@@ -37,21 +102,29 @@ export function inspectContent(content: Content, decision: Decision): Review {
     if (content.scenes.reduce((sum, scene) => sum + scene.durationSeconds, 0) !== content.durationSeconds) issues.push("Szenendauern passen nicht zur Gesamtlänge.");
     if (content.scenes.some(scene => scene.audio.split(/\s+/).length > scene.durationSeconds * 2.8)) issues.push("Dialog oder Voiceover ist für die Szenendauer zu lang.");
   }
-  if (content.format === "image" && ((content.layout === "single" && content.slides.length !== 1) || (content.layout === "carousel" && content.slides.length < 3))) issues.push("Slide-Anzahl passt nicht zum gewählten Bildformat.");
+  let imageQualityScore = 100;
+  if (content.format === "image") {
+    if ((content.layout === "single" && content.slides.length !== 1) || (content.layout === "carousel" && content.slides.length < 3)) {
+      issues.push("Slide-Anzahl passt nicht zum gewählten Bildformat.");
+    }
+    const creativeQuality = evaluateImageCreativeQuality(content);
+    imageQualityScore = creativeQuality.score;
+    issues.push(...creativeQuality.issues);
+  }
   // Only public copy; warnings/checks may legitimately quote prohibited claims.
   const copy = [content.hook, content.cta, content.format === "text" ? content.body : content.caption,
     ...(content.format === "video" ? content.scenes.map(s => s.audio) : content.format === "image" ? content.slides.map(s => s.copy) : [])].join(" ");
   if (/garantiert|immer perfekt|fünfmal länger|ich habe.{0,30}getestet/i.test(copy)) issues.push("Unbelegte Garantie oder erfundener persönlicher Test im Veröffentlichungstext.");
-  return { passed: issues.length === 0, score: issues.length ? 40 : 80, issues };
+  return { passed: issues.length === 0, score: issues.length ? Math.min(40, imageQualityScore) : Math.min(80, imageQualityScore), issues };
 }
 
 export async function runContentJob(raw: Opportunity, options: {
   mode?: "reference" | "ai"; signal?: AbortSignal; onUpdate?: (job: ContentJob) => void | Promise<void>;
   id?: string; loadLearning?: (opportunity: Opportunity) => Promise<LearningEvidence>;
+  allowedFormats?: ReadonlyArray<Content["format"]>;
   generate?: Generator; // Dependency injection for deterministic, cost-free contract tests.
 } = {}): Promise<ContentJob> {
-  const opportunity = opportunitySchema.parse(raw);
-  opportunity.product.affiliateUrl = createAmazonAffiliateUrl(opportunity.product.affiliateUrl || opportunity.product.sourceUrl);
+  const opportunity = classifyOpportunity(opportunitySchema.parse(raw));
   const now = new Date().toISOString();
   const job: ContentJob = { version: 1, id: options.id || crypto.randomUUID(), createdAt: now, updatedAt: now,
     status: "queued", mode: options.mode || "reference", opportunity, events: [], revisions: 0, modelCalls: 0, totalTokens: 0 };
@@ -70,17 +143,27 @@ export async function runContentJob(raw: Opportunity, options: {
     return output;
   };
   try {
+    opportunity.product = bindAmazonProduct(opportunity.product);
+    requireProduct(opportunity.product);
     await status("checking", "Opportunity, Linkziel und Briefing prüfen");
     const source = new URL(opportunity.product.sourceUrl);
     const affiliate = new URL(opportunity.product.affiliateUrl);
     if ([source, affiliate].some(url => url.protocol !== "https:" || url.username || url.password)) throw new Error("Bitte einen öffentlichen HTTPS-Produktlink ohne Zugangsdaten verwenden.");
-    await emit("orchestrator", "decision", source.pathname === "/s" ? "Suchauswahl erkannt: keine geprüften Eigenschaften eines einzelnen Modells behaupten." : "Produktlink ist keine Faktenprüfung; Modellangaben benötigen Nachweise.", { verifiedFactCount: opportunity.verifiedFacts.length, mode: job.mode });
+    const inspiration = analyzeProductInspiration(opportunity);
+    await emit("orchestrator", "decision", inspiration.sourceSummary, {
+      sourceKind: inspiration.sourceKind,
+      editorialMode: inspiration.editorialMode,
+      representation: inspiration.representation,
+      purchaseCriteria: inspiration.purchaseCriteria,
+      verifiedFactCount: opportunity.verifiedFacts.length,
+      mode: job.mode,
+    });
     await status("ideating", "Creative Agent entwickelt drei Formatideen");
-    job.ideas = (await creativeAgent(opportunity, generate)).ideas;
+    job.ideas = (await creativeAgent(opportunity, generate, inspiration)).ideas;
     await status("selecting", "Orchestrator bewertet Ideen und wählt das Format");
     const learning = options.loadLearning ? await options.loadLearning(opportunity) : undefined;
     if (learning) await emit("orchestrator", "decision", learning.summary, learning);
-    job.decision = selectIdea(job.ideas, opportunity, learning);
+    job.decision = selectIdea(job.ideas, opportunity, learning, options.allowedFormats);
     await emit("orchestrator", "decision", job.decision.reason, job.decision);
     const idea = job.ideas.find(i => i.id === job.decision!.ideaId)!;
     // Explicit bounded loop: first draft plus at most two revisions. No recursion or agent routing from model output.
@@ -88,18 +171,23 @@ export async function runContentJob(raw: Opportunity, options: {
       options.signal?.throwIfAborted();
       job.revisions = attempt;
       await status(attempt ? "revising" : "producing", attempt ? `Überarbeitung ${attempt} von ${MAX_REVISIONS}` : `${job.decision.format}-Agent beauftragt`);
-      job.content = contentSchema.parse(await producers[job.decision.format]({ opportunity, idea, feedback: job.review, previous: job.content }, generate));
+      job.content = contentSchema.parse(await producers[job.decision.format]({ opportunity, idea, inspiration, feedback: job.review, previous: job.content }, generate));
       await status("reviewing", "Orchestrator prüft Anwendung, Glaubwürdigkeit und Umsetzbarkeit");
       const structural = inspectContent(job.content, job.decision);
-      const semantic = job.mode === "ai" ? await generate("orchestrator", `Prüfe redaktionell streng: konkrete Alltagssituation, überzeugender Nutzen, Hook, glaubwürdige Aussagen, Modellnachweise, korrektes Zubehör, verständliche Geschichte, sprechbare Länge, Linkziel und CTA. Unbelegte konkrete Modellbehauptungen oder erfundene Erfahrungen führen zu passed=false. Keine Pflicht zu künstlichen Zusatznutzen. Gib konkrete Reparaturanweisungen; ab score 75 und ohne wesentliche Mängel bestanden.`, { opportunity, idea, content: job.content }, reviewSchema, () => structural) : structural;
+      structural.issues.push(...pumpkinCreativeIssues(opportunity, job.content));
+      if (structural.issues.length) { structural.passed = false; structural.score = Math.min(40, structural.score); }
+      const semantic = job.mode === "ai" ? await generate("orchestrator", `Prüfe redaktionell streng: konkrete Alltagssituation, überzeugender Nutzen, Hook, glaubwürdige Aussagen, Modellnachweise, korrektes Zubehör, verständliche Geschichte, sprechbare Länge, Linkziel und CTA. Unbelegte konkrete Modellbehauptungen oder erfundene Erfahrungen führen zu passed=false. Keine Pflicht zu künstlichen Zusatznutzen. Gib konkrete Reparaturanweisungen; ab score 75 und ohne wesentliche Mängel bestanden.`, { opportunity, inspiration, idea, content: job.content }, reviewSchema, () => structural) : structural;
       job.review = { passed: structural.passed && semantic.passed && semantic.score >= 75 && semantic.issues.length === 0,
         score: Math.min(structural.score, semantic.score), issues: [...structural.issues, ...semantic.issues].filter((v, i, a) => a.indexOf(v) === i) };
       await emit("orchestrator", "decision", job.review.passed ? "Entwurf für Marketingplanung geeignet; menschliche Freigabe bleibt offen." : "Entwurf benötigt Überarbeitung.", job.review);
       if (job.review.passed) break;
     }
     if (!job.review?.passed) { await status("needs_input", "Revisionslimit erreicht. Briefing oder Fakten ergänzen; kein Marketingauftrag."); return job; }
+    requireProduct(opportunity.product, JSON.stringify(job.content));
     await status("marketing", "Geprüften Entwurf an Marketing übergeben");
     job.marketing = await marketingAgent({ opportunity, content: job.content! }, generate);
+    const thematicIssues = pumpkinCreativeIssues(opportunity, job.content!, job.marketing);
+    if (thematicIssues.length) { job.review = { passed: false, score: 40, issues: thematicIssues }; await status("needs_input", thematicIssues.join(" ")); return job; }
     const platform = job.marketing.primary;
     const compatible = job.content!.format === "video" ? ["Instagram Reel", "Facebook Video"].includes(platform)
       : job.content!.format === "image" ? [job.content!.format === "image" && job.content!.layout === "carousel" ? "Instagram Carousel" : "Instagram Bild", "Facebook Post", "Gruppenbeitrag"].includes(platform)
@@ -111,8 +199,12 @@ export async function runContentJob(raw: Opportunity, options: {
   } catch (error) {
     const aborted = options.signal?.aborted;
     job.error = aborted ? "Planung unterbrochen. Kein automatischer Neustart." : error instanceof Error ? error.message : "Planung fehlgeschlagen.";
-    job.status = aborted ? "interrupted" : "failed";
+    job.status = aborted ? "interrupted" : job.error === PRODUCT_UNRESOLVED ? "needs_input" : "failed";
+    if (job.error === PRODUCT_UNRESOLVED) job.opportunity.product.affiliateUrl = "";
     await emit("orchestrator", "error", job.error);
   }
   return job;
 }
+
+// Structured operator instructions enter only through the central orchestrator.
+export { reviseStructured as reviseOperatorInstruction } from "./structured-revision";

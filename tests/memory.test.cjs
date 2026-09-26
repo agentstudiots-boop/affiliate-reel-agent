@@ -9,7 +9,7 @@ const {authorized}=require('../.test-build/lib/memory/auth');
 const {applyMigrations}=require('../.test-build/lib/memory/migrations');
 const {runContentJob}=require('../.test-build/lib/content/orchestrator');
 const {opportunitySchema}=require('../.test-build/lib/content/schema');
-const opportunity=opportunitySchema.parse({product:{name:'Vakuumierer',sourceUrl:'https://www.amazon.de/s?k=Vakuumierer',affiliateUrl:'',price:'',targetGroup:'Familien',benefits:'Vorräte vorbereiten',notes:''},useCase:'Oma staunt beim Familienessen über das Steak.',category:'kitchen',useCaseKey:'sous-vide',targetPlatform:'facebook'});
+const opportunity=opportunitySchema.parse({product:{productVerifiedAt:'2026-09-26T08:00:00.000Z', productVerifiedName:'Vakuumierer', name:'Vakuumierer',sourceUrl:'https://www.amazon.de/dp/B000000001',affiliateUrl:'',price:'',targetGroup:'Familien',benefits:'Vorräte vorbereiten',notes:''},useCase:'Oma staunt beim Familienessen über das Steak.',category:'kitchen',useCaseKey:'sous-vide',targetPlatform:'facebook'});
 const oldDate=new Date(Date.now()-40*86400000).toISOString();
 function metric(jobId,changes={}){return {jobId,platform:'facebook',status:'published',url:'https://www.facebook.com/example/posts/123',publishedAt:oldDate,windowDays:30,finalized:true,clicks:100,conversions:5,revenueCents:2000,costCents:500,source:'Manuell zugeordneter Testbericht',learning:'',expectedRevision:0,...changes};}
 
@@ -17,13 +17,18 @@ test('explicit migrations are transactional and idempotent',async()=>{
   const pg=new PGlite();
   const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
   try{
-    const migration=fs.readFileSync('db/migrations/001_memory.sql','utf8');
-    const first=await applyMigrations(db,()=>migration);
-    const second=await applyMigrations(db,()=>migration);
-    assert.deepEqual(first,{applied:['001_memory.sql'],alreadyApplied:[]});
-    assert.deepEqual(second,{applied:[],alreadyApplied:['001_memory.sql']});
+    const loader=name=>fs.readFileSync(`db/migrations/${name}`,'utf8');
+    const first=await applyMigrations(db,loader);
+    const second=await applyMigrations(db,loader);
+    assert.deepEqual(first,{applied:['001_memory.sql','002_production_gates.sql','003_faceless_so.sql','004_daily_drafts.sql','005_publication_gate.sql','006_daily_notification.sql','007_publication_revisions.sql','008_weekly_reports.sql','009_original_visual_attempts.sql','010_replicate_visual_provider.sql','011_instagram_reel_publications.sql', '012_whatsapp_instructions.sql', '013_operator_language_examples.sql', '014_content_approval_requests.sql', '015_runway_story.sql'],alreadyApplied:[]});
+    assert.deepEqual(second,{applied:[],alreadyApplied:['001_memory.sql','002_production_gates.sql','003_faceless_so.sql','004_daily_drafts.sql','005_publication_gate.sql','006_daily_notification.sql','007_publication_revisions.sql','008_weekly_reports.sql','009_original_visual_attempts.sql','010_replicate_visual_provider.sql','011_instagram_reel_publications.sql', '012_whatsapp_instructions.sql', '013_operator_language_examples.sql', '014_content_approval_requests.sql', '015_runway_story.sql']});
     const tables=await pg.query("SELECT tablename FROM pg_tables WHERE schemaname='public'");
     assert.ok(tables.rows.some(row=>row.tablename==='content_jobs'));
+    assert.ok(tables.rows.some(row=>row.tablename==='production_runs'));
+    assert.ok(tables.rows.some(row=>row.tablename==='approval_requests'));
+    assert.ok(tables.rows.some(row=>row.tablename==='daily_drafts'));
+    assert.ok(tables.rows.some(row=>row.tablename==='publication_requests'));
+    assert.ok(tables.rows.some(row=>row.tablename==='weekly_reports'));
   }finally{await pg.close();}
 });
 

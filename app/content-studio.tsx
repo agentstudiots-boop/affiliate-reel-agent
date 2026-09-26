@@ -1,8 +1,12 @@
 "use client";
 
+import { productIdentityError } from "@/lib/amazon";
 import { useEffect, useRef, useState } from "react";
 import type { LearningEvidence } from "@/lib/memory/schema";
 import { PerformanceEditor } from "@/app/performance-editor";
+import { ProductionGate } from "@/app/production-gate";
+import { PublicationGate } from "@/app/publication-gate";
+import { OperationsPanel } from "@/app/operations-panel";
 import type { Product } from "@/lib/types";
 import { parseJob } from "@/lib/content/history";
 import { opportunitySchema, terminalStatuses, type Content, type ContentJob, type JobStatus, type Opportunity } from "@/lib/content/schema";
@@ -13,7 +17,7 @@ const labels: Record<JobStatus, string> = {
   reviewing: "Qualität prüfen", revising: "Überarbeiten", marketing: "Marketing planen", awaiting_approval: "Freigabe offen", needs_input: "Klärung nötig", failed: "Fehlgeschlagen", interrupted: "Unterbrochen", approved: "Plan freigegeben",
 };
 
-export function ContentStudio({ product }: { product: Product }) {
+export function ContentStudio({ product, onFillReelTest }: { product: Product; onFillReelTest: () => void }) {
   const [useCase, setUseCase] = useState("");
   const [trend, setTrend] = useState("");
   const [goal, setGoal] = useState<Opportunity["goal"]>("conversion");
@@ -27,6 +31,7 @@ export function ContentStudio({ product }: { product: Product }) {
   const [category,setCategory] = useState<Opportunity["category"]>("general");
   const [useCaseKey,setUseCaseKey] = useState("general");
   const [targetPlatform,setTargetPlatform] = useState<Opportunity["targetPlatform"]>("any");
+  const [formatPreference,setFormatPreference] = useState<"automatic"|"video">("automatic");
   const [databaseReady,setDatabaseReady] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const job = jobs.find(j => j.id === selectedId) || jobs[0];
@@ -70,7 +75,7 @@ export function ContentStudio({ product }: { product: Product }) {
     const execute = async () => {
       const response = await fetch("/api/content", { method: "POST", signal: controller.signal,
         headers: { "Content-Type": "application/json", "x-content-password": password },
-        body: JSON.stringify({ requestId: crypto.randomUUID(), opportunity: parsed.data, mode: "reference" }) });
+        body: JSON.stringify({ requestId: crypto.randomUUID(), opportunity: parsed.data, mode: "reference", formatPreference: targetPlatform === "instagram" ? formatPreference : "automatic" }) });
       if (!response.ok) { const data = await response.json(); throw new Error(data.error || "Planung konnte nicht starten."); }
       if (!response.body) throw new Error("Keine Antwort vom Orchestrator erhalten.");
       const reader = response.body.getReader();
@@ -106,9 +111,9 @@ export function ContentStudio({ product }: { product: Product }) {
   async function approve() {
     if (!job || job.status !== "awaiting_approval") return;
     try {
-      const response=await fetch("/api/content/jobs",{method:"POST",headers:{"Content-Type":"application/json","x-content-password":password},body:JSON.stringify({action:"approve",jobId:job.id})});
+      const response=await fetch("/api/content/jobs",{method:"POST",headers:{"Content-Type":"application/json","x-content-password":password},body:JSON.stringify({action:"requestContentApproval",jobId:job.id})});
       const data=await response.json();if(!response.ok)throw new Error(data.error);
-      remember(parseJob(data.job));
+      setError("Inhaltsfreigabe per WhatsApp versendet. Antworte auf die Nachricht. Nach der Freigabe den gespeicherten Verlauf neu laden.");
     }catch(caught){setError(caught instanceof Error?caught.message:"Freigabe konnte nicht gespeichert werden.");}
   }
   function download() {
@@ -120,6 +125,11 @@ export function ContentStudio({ product }: { product: Product }) {
 
   return <section className="panel contentStudio" id="content-studio">
     <div className="panelTitle"><span>02</span><div><h2>Content-Planung</h2><p>Die überzeugendste Anwendung bestimmt das Format.</p></div></div>
+    <button type="button" className="ghost" onClick={() => {
+      onFillReelTest(); setUseCase("An einem kühlen Abend sitzt eine Person mit einer Tasse Tee auf dem Sofa und sucht eine passende Kuscheldecke.");
+      setGoal("conversion"); setBudget("quality"); setCategory("home_living"); setTargetPlatform("instagram"); setFormatPreference("video");
+      setUseCaseKey("kuscheldecke-reel-test");
+    }}>Kuscheldecken-Reeltest vorausfüllen · noch keine Kosten</button>
     <p className="agentHierarchy">Creative → Orchestrator → Video, Bild oder Text → Orchestrator → Marketing</p>
     <label>Konkrete Alltagssituation / Use Case<textarea value={useCase} maxLength={1600} onChange={e => setUseCase(e.target.value)} placeholder="Zum Beispiel: Beim Familienessen staunt Oma über das rosa Steak. Papa erklärt Vakuumierer, Sous-vide-Garer und das Anbraten." /></label>
     <label>Trend oder Anlass (optional)<input value={trend} maxLength={600} onChange={e => setTrend(e.target.value)} placeholder="Welcher Anlass macht die Idee gerade relevant?" /></label>
@@ -127,12 +137,14 @@ export function ContentStudio({ product }: { product: Product }) {
       <label>Ziel<select value={goal} onChange={e => setGoal(e.target.value as Opportunity["goal"])}><option value="conversion">Kaufinteresse</option><option value="education">Erklären & informieren</option><option value="community">Community & Austausch</option></select></label>
       <label>Produktionsbudget<select value={budget} onChange={e => setBudget(e.target.value as Opportunity["budget"])}><option value="low">Geringer Aufwand</option><option value="balanced">Ausgewogen</option><option value="quality">Wirkung priorisieren</option></select></label>
     </div>
-    <div className="two"><label>Produktkategorie<select value={category} onChange={e=>setCategory(e.target.value as Opportunity["category"])}><option value="general">Noch nicht eingeordnet</option><option value="kitchen">Küche</option><option value="household">Haushalt</option><option value="technology">Technik</option><option value="leisure">Freizeit</option></select></label>
+    <div className="two"><label>Produktkategorie<select value={category} onChange={e=>setCategory(e.target.value as Opportunity["category"])}><option value="general">Noch nicht eingeordnet</option><option value="kitchen">Küche</option><option value="household">Haushalt</option><option value="home_living">Home &amp; Living</option><option value="technology">Technik</option><option value="leisure">Freizeit</option></select></label>
     <label>Zielplattform<select value={targetPlatform} onChange={e=>setTargetPlatform(e.target.value as Opportunity["targetPlatform"])}><option value="any">Noch offen</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option></select></label></div>
+    {targetPlatform === "instagram" && <label>Formatwahl<select value={formatPreference} onChange={e=>setFormatPreference(e.target.value as "automatic"|"video")}><option value="automatic">Automatisch wählen</option><option value="video">Instagram Reel gezielt testen (Video)</option></select><small>Ein gezielter Test erzeugt einen Videoentwurf. Der gewählte Produzent darf erst nach gesonderter WhatsApp-Kostenfreigabe starten.</small></label>}
     <label>Anwendungsgruppe für ähnliche Fälle<input value={useCaseKey} onChange={e=>setUseCaseKey(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,"-"))} maxLength={80} placeholder="z. B. sous-vide oder vorratshaltung" /><small>Für vergleichbare Anwendungen denselben Begriff verwenden. „general“ aktiviert noch keinen historischen Vergleich.</small></label>
     <p className="muted">Tavily recherchiert aktuelle Trends und Produktquellen. Die Content-Planung arbeitet regelbasiert ohne generative Modellkosten.</p>
     <label>Zugangscode für Planung & Datenbank<input type="password" autoComplete="off" value={password} onChange={e => setPassword(e.target.value)} /><small>Der Code wird nicht im Browser gespeichert.</small></label>
     <p className={databaseReady ? "muted" : "error"}>{databaseReady ? "Postgres konfiguriert. Verlauf laden prüft die Verbindung." : "Postgres muss noch eingerichtet werden. Neue Jobs werden erst mit zentralem Speicher gestartet."}</p>
+    <OperationsPanel password={password} />
     <div className="contentActions"><button type="button" className="ghost" disabled={busy || !password || !databaseReady} onClick={()=>loadHistory()}>Gespeicherten Verlauf laden</button>{jobs.length >= 50 && <button type="button" className="ghost" disabled={busy} onClick={()=>loadHistory(true)}>Ältere Jobs laden</button>}</div>
     {error && <p role="alert" className="error">{error}</p>}
     <div className="contentActions"><button type="button" className="primary" disabled={!ready || busy || !databaseReady || !password} onClick={plan}>{busy ? "Orchestrator plant …" : "Ideen & passendes Format planen"}</button>{busy && <button type="button" className="ghost" onClick={() => abortRef.current?.abort()}>Stoppen</button>}</div>
@@ -141,9 +153,9 @@ export function ContentStudio({ product }: { product: Product }) {
     {job && <div className="contentJob">
       <div className="jobHeader"><strong aria-live="polite">{labels[job.status]}</strong><span>{job.mode === "ai" ? "Historische KI-Planung" : "Regelbasierter Entwurf"} · {job.revisions}/2 Überarbeitungen</span></div>
       <small>Job {job.id} · {job.modelCalls} externe Modellaufrufe</small>
-      <p><a href={job.opportunity.product.affiliateUrl} target="_blank" rel="sponsored noopener">Geplantes Affiliate-Linkziel prüfen ↗</a></p>
-      <p><b>Produkt:</b> {job.opportunity.product.name}<br /><b>Use Case:</b> {job.opportunity.useCase}</p>
-      {JSON.stringify({ ...job.opportunity.product, affiliateUrl: "" }) !== JSON.stringify({ ...product, affiliateUrl: "" }) && <p className="error">Dieser Job gehört zu einem früheren Produktstand. Änderungen oben sind noch nicht eingearbeitet.</p>}
+      {!productIdentityError(job.opportunity.product) && <p><a href={job.opportunity.product.affiliateUrl} target="_blank" rel="sponsored noopener">Geplantes Affiliate-Produktziel prüfen ↗</a></p>}
+      <p><b>Produkt:</b> {job.opportunity.product.name}<br /><b>ASIN:</b> {job.opportunity.product.asin || "nicht aufgelöst"}<br /><b>Use Case:</b> {job.opportunity.useCase}</p>
+      <p className="muted">Die Freigabe gilt für das hier gespeicherte Produkt und diese ASIN. Geänderte Produktangaben benötigen einen neuen Auftrag.</p>
       {job.error && <p className="error">{job.error}</p>}
       {job.ideas && <div className="ideaGrid">{job.ideas.map(idea => <article className={`ideaCard ${job.decision?.ideaId === idea.id ? "selectedIdea" : ""}`} key={idea.id}>
         <small>{formatLabels[idea.format]}{job.decision?.ideaId === idea.id ? " · ausgewählt" : ""}</small><h3>{idea.title}</h3><p>{idea.hook}</p><p>{idea.story}</p><small>{idea.rationale}</small>
@@ -154,8 +166,8 @@ export function ContentStudio({ product }: { product: Product }) {
       {job.content && <ContentPreview content={job.content} />}
       {job.review && <p className={job.review.passed ? "muted" : "error"}>{job.review.passed ? "Redaktionelle Vorprüfung bestanden – keine unabhängige Faktenprüfung." : `Überarbeiten: ${job.review.issues.join(" ")}`}</p>}
       {job.marketing && <div className="marketingPlan"><h3>Marketing: {job.marketing.primary}</h3><p>{job.marketing.rationale}</p><p><b>Zielgruppe:</b> {job.marketing.audience}</p><p>{job.marketing.adaptation}</p><p><b>Linkplatzierung:</b> {job.marketing.linkPlacement}</p><p>{job.marketing.conversionHypothesis}</p><p><b>Messen:</b> {job.marketing.metrics.join(" · ")}</p><ul>{job.marketing.publishingChecks.map(c => <li key={c}>{c}</li>)}</ul></div>}
-      <div className="contentActions">{job.status === "awaiting_approval" && <button type="button" className="primary" onClick={approve}>Content-Plan nach Prüfung freigeben</button>}<button type="button" className="ghost" onClick={download}>Job & Protokoll herunterladen</button></div>
-      {job.status === "approved" && <p className="success">Content-Plan freigegeben. Veröffentlichungsstatus und Messwerte separat erfassen.</p>}
+      <div className="contentActions">{job.status === "awaiting_approval" && <button type="button" className="primary" onClick={approve}>Inhalt per WhatsApp zur Freigabe senden</button>}<button type="button" className="ghost" onClick={download}>Job & Protokoll herunterladen</button></div>
+      {job.status === "approved" && <><p className="success">Content-Plan freigegeben. Kostenpflichtige Produktion und Veröffentlichung benötigen getrennte Freigaben.</p><ProductionGate job={job} password={password} onRevised={remember} />{job.content && job.content.format !== "video" && <PublicationGate key={job.id} job={job} password={password} />}</>}
       {terminalStatuses.includes(job.status) && <PerformanceEditor key={job.id} jobId={job.id} password={password} />}
       <details className="jobTrace"><summary>Entscheidungen & Agentenantworten ({job.events.length})</summary>{job.events.map(event => <article key={event.sequence}><small>{event.sequence} · {event.agent} · {new Date(event.at).toLocaleTimeString("de-DE")}</small><p>{event.message}</p>{event.data !== undefined && <details><summary>Strukturierte Antwort</summary><pre>{JSON.stringify(event.data, null, 2)}</pre></details>}</article>)}</details>
     </div>}
