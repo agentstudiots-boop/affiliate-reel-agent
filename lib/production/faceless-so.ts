@@ -15,6 +15,14 @@ export function narration(job: ContentJob) {
   return job.content.scenes.map(scene => scene.audio.trim()).join("\n\n");
 }
 
+export function facelessVisualDirection(job: ContentJob) {
+  if (!/kürbis.*schnitz|schnitz.*kürbis/i.test(job.opportunity.product.name)) return undefined;
+  return {
+    masterStyle: "Originale vertikale Halloween-Bastelszene. Ein großer echter orangefarbener Kürbis steht durchgehend im Vordergrund. Erwachsene Hände zeichnen ein Gesicht vor und schneiden mit einem kleinen neutralen Kürbisschnitzwerkzeug sichtbar Augen und Mund aus. Am Schluss leuchtet die fertige Kürbislaterne im Abendlicht. Glaubwürdige Materialien und Handlung; keine exakte Abbildung des verlinkten Markenmodells.",
+    globalNegativePrompt: "Keine Speisen, Backwaren, Pasta oder Pfanne. Keine Küchenmesser, Kinder, Markenlogos, Produktverpackungen, Shop-Oberflächen oder eingebrannte Schrift. Kein bloßes Dekor ohne sichtbar geschnitzten Kürbis.",
+  };
+}
+
 export function facelessClient(fetcher: typeof fetch = fetch) {
   async function call(path: string, options: { method?: "POST"; body?: unknown; idempotencyKey?: string } = {}) {
     const key = process.env.FACELESS_API_KEY;
@@ -55,9 +63,9 @@ export function facelessClient(fetcher: typeof fetch = fetch) {
       if (!germanVoices.length) throw new FacelessError("Keine deutschsprachige Stimme im Provider-Katalog gefunden.");
       return { credits: model.credits, balance: me.team.credits, voices: germanVoices.map(({ id, name }) => ({ id, name })) };
     },
-    async create(script: string, voiceId: string, name: string, idempotencyKey: string) {
+    async create(script: string, voiceId: string, name: string, idempotencyKey: string, visual?: ReturnType<typeof facelessVisualDirection>) {
       return z.object({ id: z.string().min(1), model: z.literal("storyboard"), creditsUsed: z.number().optional() }).parse(
-        await call("/videos", { method: "POST", idempotencyKey, body: { script, voiceId, model: "storyboard", name } }),
+        await call("/videos", { method: "POST", idempotencyKey, body: { script, voiceId, model: "storyboard", name, ...visual } }),
       );
     },
     async videoStatus(id: string) {
