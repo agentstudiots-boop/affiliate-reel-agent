@@ -114,9 +114,18 @@ test('combined pumpkin revision constrains the next image prompt',async()=>{
   const next=reviseOperatorInstruction(job,instruction('revise_both'));
   assert.match(next.content.caption,/^Werbung \| Welche Kürbislaterne/);
   const prompt=buildOriginalVisualPrompt(next);
-  assert.match(prompt,/mehrere kleine unmarkierte Kürbisschnitzwerkzeuge/);
-  assert.match(prompt,/Keine Speisen, keine Kücheninszenierung/);
-  assert.match(prompt,/ohne Funken/);
+  assert.match(prompt,/Mehrere kleine unmarkierte Kürbisschnitzwerkzeuge/);
+  assert.match(prompt,/HAUPTMOTIV – zwingend sofort erkennbar: Ein großer.*Halloween-Kürbis/);
+  assert.match(prompt,/erwachsene Person schnitzt gerade/);
+  assert.match(prompt,/Keine Kinder, keine Backwaren oder Teigfiguren/);
+});
+
+test('a new pumpkin plan starts with pumpkin carving as the dominant visible action',async()=>{
+  const job=await runContentJob(opportunity(),{allowedFormats:['image']});
+  assert.match(job.content.slides[0].visual,/Halloween-Kürbis mit eingeschnittenem Gesicht füllt den Vordergrund/);
+  const prompt=buildOriginalVisualPrompt(job);
+  assert.match(prompt,/Eine erwachsene Person schnitzt gerade/);
+  assert.match(prompt,/Kürbis und Schnitzhandlung müssen stärker auffallen/);
 });
 
 test('same WhatsApp message is claimed before LLM call: concurrent duplicate has one parse, revision and notice, no media',async t=>{
