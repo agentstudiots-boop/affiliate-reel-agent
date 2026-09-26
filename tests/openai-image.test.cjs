@@ -9,6 +9,7 @@ const { memoryRepository } = require('../.test-build/lib/memory/repository');
 const { publicationRepository } = require('../.test-build/lib/meta/publication-gate');
 const { runContentJob } = require('../.test-build/lib/content/orchestrator');
 const { opportunitySchema } = require('../.test-build/lib/content/schema');
+const { imageBrief } = require('../.test-build/lib/content/image-brief');
 
 function opportunity(sourceUrl = 'https://www.amazon.de/dp/B000000001', verifiedFacts = []) {
   return opportunitySchema.parse({
@@ -78,6 +79,18 @@ test('visual prompt stays categorical on search and excludes unverified model cl
   const verifiedPrompt = buildOriginalVisualPrompt(verified);
   assert.match(verifiedPrompt,/Einzige belegte konkrete Produkteigenschaften: Baumwolle laut Hersteller/);
   assert.match(verifiedPrompt,/Unbelegte Produktdetails .* nicht visuell behaupten/);
+});
+
+test('approval brief is drawn from the saved image plan and included verbatim in the generation prompt', async () => {
+  const job = await runContentJob(opportunity());
+  const brief = imageBrief(job);
+  assert.match(brief,/Motiv und Handlung:/);
+  assert.match(brief,/Alltag und Umgebung:/);
+  assert.match(brief,/Sichtbarer Produktbezug:.*Kuscheldecke/);
+  assert.match(brief,/Bildaufbau und Details:/);
+  assert.match(brief,/Grenzen: Keine Modellmerkmale/);
+  assert.ok(brief.length < 2200);
+  assert.ok(buildOriginalVisualPrompt(job).includes(brief));
 });
 
 test('one mocked generation and Blob upload precede a single publication request; duplicate claim cannot regenerate', async () => {
