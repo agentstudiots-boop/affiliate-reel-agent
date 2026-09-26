@@ -4,12 +4,14 @@ import type { Generator, ProductInspiration } from "../agent";
 export function creativeAgent(opportunity: Opportunity, generate: Generator, inspiration: ProductInspiration) {
   return generate("creative", `Entwickle drei unterschiedliche starke Werbeideen: je eine für Video, Bild/Carousel und Text.
 Jede Idee: konkrete Alltagssituation, emotionaler Hook, Handlung, Nutzen, ehrliche Grenzen und Formatbegründung.
+Prüfe zuerst die tatsächliche Produktfunktion. Ein Kürbisschnitzset für Halloween gehört zu Home & Living, Dekoration und Basteln: echter Kürbis, sichtbar geschnitzte Gesichtszüge, Laterne als Ergebnis. Keine Koch- oder Essensgeschichte und keine Küchenwerkzeuge für diesen Fall.
 Nutze die mitgelieferte Product-Inspiration nur als redaktionelle Inspirationsquelle. Bei Such-/Kategorie-Seiten kategorisch bleiben und kein konkretes Modell vortäuschen.
 Keine Händlerbilder, Amazon-Screenshots, Logos oder geschützten Shop-Layouts als Creative planen. Keine exakten Produkteigenschaften ohne verifiedFacts behaupten.
 Für Bild/Carousel ist eine echte visuelle Hauptidee Pflicht: Lifestyle, Anwendung, Vergleich oder redaktionelle Collage; keine reine Textkarte.
 Prüfe Humor, Überraschung und Storytelling, ohne diese künstlich zu erzwingen. Bewertungen 0–5 sind redaktionelle Einschätzungen, keine Performance-Daten.
 Berücksichtige Zielgruppe, Trend, Use Case, Budget und Ziel. Melde sinnvolle Zusatzprodukte mit Begründung und ob erforderlich.`, { opportunity, inspiration }, creativeSchema, () => {
     const vacuum = /vakuumier|vakuum.?versiegl/i.test(opportunity.product.name);
+    const pumpkin = /(?:kürbis|kuerbis|pumpkin).{0,40}(?:schnitz|carving)|(?:schnitz|carving).{0,40}(?:kürbis|kuerbis|pumpkin)/i.test(opportunity.product.name);
     const expert = /fach|technik|kompatib|vergleich|community|software|sicherheit/i.test(`${opportunity.useCase} ${opportunity.product.targetGroup}`);
     const storageFocus = /vorrat|haltbar|lager|meal.?prep|einkauf/i.test(opportunity.useCase) && !/steak|familienessen|sous.?vide/i.test(opportunity.useCase);
     const categorical = inspiration.editorialMode === "category";
@@ -29,11 +31,11 @@ Berücksichtige Zielgruppe, Trend, Use Case, Budget und Ziel. Melde sinnvolle Zu
     const criteria = inspiration.purchaseCriteria.slice(0, 3).join(", ");
     return { ideas: [
       { ...shared, id: "story", format: "video" as const,
-        title: vacuum ? "Oma glaubt es erst nach dem ersten Bissen" : "Der Aha-Moment im Alltag",
-        hook: vacuum ? "Das hast du doch nicht selbst gemacht!" : `So könnte ${inspiration.categoryLabel} in deinen Alltag passen.`,
+        title: vacuum ? "Oma glaubt es erst nach dem ersten Bissen" : pumpkin ? "Vom Kürbis zur leuchtenden Halloween-Deko" : "Der Aha-Moment im Alltag",
+        hook: vacuum ? "Das hast du doch nicht selbst gemacht!" : pumpkin ? "Erst ein Kürbis – dann leuchten Augen und Mund." : `So könnte ${inspiration.categoryLabel} in deinen Alltag passen.`,
         situation: vacuum ? "Die Familie sitzt beim Steakessen. Oma schneidet ein Stück an und schaut überrascht zu Papa." : opportunity.useCase,
-        story: vacuum ? "Omas überraschter Blick eröffnet die inszenierte Geschichte. Rückblende: Steak vakuumieren, Sous-vide-Wasserbad mit separatem Garer, auspacken und anbraten. Zurück am Tisch: saftiger rosa Anschnitt und Papas Erklärung." : `Zeige zuerst das gewünschte Ergebnis in dieser Situation: ${opportunity.useCase}. Danach die Anwendung und ihre Voraussetzungen nachvollziehbar demonstrieren, ohne ein konkretes Modell zu imitieren.`,
-        benefit: vacuum ? "Sous-vide-Vorbereitung zuhause wird als konkreter Schritt zum gemeinsamen Familienessen verständlich." : `Die Anwendung der Produktkategorie für ${opportunity.product.targetGroup} anschaulich machen.`,
+        story: vacuum ? "Omas überraschter Blick eröffnet die inszenierte Geschichte. Rückblende: Steak vakuumieren, Sous-vide-Wasserbad mit separatem Garer, auspacken und anbraten. Zurück am Tisch: saftiger rosa Anschnitt und Papas Erklärung." : pumpkin ? "Vorfreude am Basteltisch: Ein Erwachsener zeichnet Augen und Mund auf den echten Kürbis, schnitzt beides sichtbar mit einem Kürbisschnitzwerkzeug aus und zeigt stolz die leuchtende Halloweenlaterne. Das Schnitzset ist als mögliche Werkzeugwahl erkennbar; keine unbelegten Modellmerkmale." : `Zeige zuerst das gewünschte Ergebnis in dieser Situation: ${opportunity.useCase}. Danach die Anwendung und ihre Voraussetzungen nachvollziehbar demonstrieren, ohne ein konkretes Modell zu imitieren.`,
+        benefit: vacuum ? "Sous-vide-Vorbereitung zuhause wird als konkreter Schritt zum gemeinsamen Familienessen verständlich." : pumpkin ? "Die Arbeitsschritte machen das gemeinsame Basteln und das Ergebnis als Halloween-Deko anschaulich." : `Die Anwendung der Produktkategorie für ${opportunity.product.targetGroup} anschaulich machen.`,
         rationale: "Handlung und emotionales Ergebnis lassen sich in einer kurzen Geschichte zeigen.",
         scores: { audience: storageFocus ? 2 : 4, credibility: 3, demonstration: storageFocus ? 2 : vacuum ? 5 : 3, conversion: storageFocus ? 2 : 4, economy: 1 } },
       { ...shared, id: "guide", format: "image" as const,
