@@ -1,5 +1,28 @@
 # Work handoff
 
+## Zusatzauftrag 26.09.2026: WhatsApp-Intent-Parser
+
+Im bestehenden PR #6 ergänzt; Hauptauftrag und Produktionsfreigabe bleiben offen.
+Details: `docs/WHATSAPP_INSTRUCTIONS.md`. Typecheck, Lint, 112/112 Tests und Build
+bestanden. Modellantworten in Tests kontrolliert; echter Gateway-Aufruf und neue
+Betreiber-Anweisung nach Migration 012 noch ausstehend. Keine zusätzlichen
+Bild-/Video-Ausgaben für diese Parser-Tests.
+
+Der Tagesjob `eb2a8423-6fce-4f3d-9e81-87835fafc5b1` bewirbt das Kürbisschnitzset
+ASIN `B0D9YQR9CT`, Tracking-ID `alltaeglichle-21`. Die bereits bezahlte Bildproduktion
+und der Änderungswunsch sind historisch vorhanden; es liegt kein Nachweis einer
+passenden neuen Bildrevision oder Veröffentlichung für diesen Job vor. Alte
+WhatsApp-Message-IDs werden nicht wieder abgespielt. Nach Schemaaktivierung eine
+neue Anweisung direkt als Antwort auf die betreffende Freigabenachricht verwenden.
+
+Der separate Reel-Plan `cfa990ab-00ee-45cb-8a43-1e85a53c6636` ist weiterhin ohne
+neue Kosten-/Publikationsfreigabe. Kein neues Commerce-/Ads-System, kein simuliertes
+Shopping-Element. Strikte Amazon-Produktbindung aus Commit `44f592b` bleibt aktiv.
+Hobby-Scheduler, fehlendes CRON_SECRET, Tagesvorlage außerhalb des 24h-Fensters und
+Production-Env-Rollout bleiben separate bekannte Hauptauftrags-Blocker.
+
+Die nachfolgenden älteren Abschnitte sind historische Nachweise.
+
 Stand: 24. September 2026. Offener Draft-PR #6 auf
 `feat/production-gates-whatsapp`. Weder nach `main` gemergt noch für Production
 freigegeben.

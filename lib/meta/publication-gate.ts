@@ -1,3 +1,4 @@
+import {visualContextError, visualFingerprint} from "../content/visual-context";
 import { createHash } from "node:crypto";
 import { parseJob } from "../content/history";
 import { getDatabase, type Database } from "../memory/db";
@@ -79,7 +80,11 @@ export function publicationRepository(db: Database = getDatabase()) {
         const stored = await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE", [jobId]);
         if (!stored.rows[0]) throw new PublicationConflictError("Content-Job fehlt.");
         const job = parseJob(stored.rows[0].snapshot);
-        const { hash } = publicationContent(job);
+        const activeInstruction=await sql.query("SELECT 1 FROM whatsapp_instructions WHERE job_id=$1 AND status IN ('parsing','parsed') LIMIT 1",[jobId]);
+        if(activeInstruction.rows.length)throw new PublicationConflictError("instruction_in_progress");
+        const { hash, caption } = publicationContent(job);
+        const visualError=visualContextError(job);
+        if(visualError)throw new PublicationConflictError(visualError);
         const existing = await sql.query("SELECT * FROM publication_requests WHERE job_id=$1 AND platform='facebook' ORDER BY revision DESC LIMIT 1", [jobId]);
         if (existing.rows[0]) {
           if (existing.rows[0].content_hash === hash) {
@@ -89,6 +94,19 @@ export function publicationRepository(db: Database = getDatabase()) {
           if (!["changes_requested","rejected"].includes(String(existing.rows[0].status))) {
             throw new PublicationConflictError("Der Entwurf wurde verändert. Alte Veröffentlichungsfreigabe ist gesperrt.");
           }
+        }
+        const revision=job.events.map(e=>e.data).reverse().find((data): data is {kind:string;instruction:{intent:string};sourcePublicationId:string;sourceVisualFingerprint:string} => !!data && typeof data==='object' && 'kind' in data && data.kind==='semantic_revision');
+        if(revision?.instruction.intent==='revise_text'){
+          if(visualFingerprint(job)!==revision.sourceVisualFingerprint || existing.rows[0]?.id!==revision.sourcePublicationId)throw new PublicationConflictError("visual_reuse_mismatch");
+          const old=existing.rows[0];
+          const source=await sql.query("SELECT * FROM original_visual_attempts WHERE job_id=$1 AND content_hash=$2 AND status='media_ready'",[jobId,old.content_hash]);
+          const asset=source.rows[0];
+          if(!asset || asset.image_url!==old.image_url || !/^[a-f0-9]{64}$/.test(String(asset.sha256)))throw new PublicationConflictError("Verifiziertes bestehendes Bild fehlt. Keine neue Generation für Textrevision.");
+          const url=new URL(String(asset.image_url));
+          if(url.protocol!=='https:' || !url.hostname.endsWith('.public.blob.vercel-storage.com') || url.pathname!==`/generated/facebook/${jobId}/${asset.sha256}.png`)throw new PublicationConflictError("visual_reuse_mismatch");
+          await sql.query("INSERT INTO original_visual_attempts(job_id,content_hash,provider,model,status,media_ready_at,sha256,image_url,usage) VALUES($1,$2,$3,$4,'media_ready',now(),$5,$6,$7) ON CONFLICT DO NOTHING",[jobId,hash,asset.provider,asset.model,asset.sha256,asset.image_url,JSON.stringify({reusedFrom:old.id,newGeneration:false})]);
+          const made=await sql.query("INSERT INTO publication_requests(id,job_id,platform,status,caption,image_url,content_hash,approver_wa_id,revision) VALUES($1,$2,'facebook','pending',$3,$4,$5,$6,$7) RETURNING *",[crypto.randomUUID(),jobId,caption,asset.image_url,hash,old.approver_wa_id,Number(old.revision)+1]);
+          return {job,existing:publication(made.rows[0])};
         }
         const claimed = await sql.query(
           "INSERT INTO original_visual_attempts(job_id,content_hash,provider,model) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING RETURNING job_id",

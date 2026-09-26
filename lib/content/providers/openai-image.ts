@@ -1,3 +1,4 @@
+import {visualContextError} from "../visual-context";
 import { createHash } from "node:crypto";
 import { put } from "@vercel/blob";
 import type { ContentJob } from "../schema";
@@ -20,6 +21,8 @@ export function buildOriginalVisualPrompt(job: ContentJob): string {
   if (!job.content || job.content.format !== "image") throw new OriginalVisualError("Bildentwurf fehlt.");
   const issue = imageCreativePublicationError(job.content);
   if (issue) throw new OriginalVisualError(issue);
+  const contextError=visualContextError(job);
+  if(contextError)throw new OriginalVisualError(contextError);
   const { content, opportunity } = job;
   const concept = content.visualConcept!;
   const inspiration = analyzeProductInspiration(opportunity);
@@ -32,8 +35,8 @@ export function buildOriginalVisualPrompt(job: ContentJob): string {
   return [
     "Erzeuge genau EIN originelles, fotorealistisches Editorial-/Lifestyle-Hauptbild für einen Facebook-Post.",
     "Hochformat 4:5, klare Alltagssituation, natürliche Beleuchtung und realistische Materialien. Bildgeführt mit freier Fläche für später separat gesetzte Schrift. Keine Schrift ins Bild setzen.",
+    `Verbindliches Bildthema: ${content.slides[0].visual}. Produkt: ${opportunity.product.name}. ASIN: ${opportunity.product.asin || "offen"}.`,
     `Produktkategorie: ${category}. Nutzung: ${opportunity.useCase}. Zielgruppe: ${opportunity.product.targetGroup}.`,
-    `Redaktionelles Thema: ${content.title}; Hook: ${content.hook}; Produktintegration: ${content.productIntegration}.`,
     `Visual-Konzept (${concept.kind}): ${concept.mainIdea}; Alltag: ${concept.everydaySituation}; Produktbezug: ${concept.productRelation}.`,
     `Visual-Briefing des ersten Slides: ${content.slides[0].visual}; ${content.slides[0].prompt}.`,
     content.layout === "carousel" ? `Weitere Slides nur als Kontext für das EINZIGE Titelbild: ${content.slides.slice(1).map(s => s.visual).join("; ")}.` : "",

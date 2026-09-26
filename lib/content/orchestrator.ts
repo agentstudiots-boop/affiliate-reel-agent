@@ -189,3 +189,6 @@ export async function runContentJob(raw: Opportunity, options: {
   }
   return job;
 }
+
+// Structured operator instructions enter only through the central orchestrator.
+export { reviseStructured as reviseOperatorInstruction } from "./structured-revision";
