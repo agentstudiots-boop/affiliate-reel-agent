@@ -5,7 +5,7 @@ import { getRunwayClient, RUNWAY_DURATION_SECONDS, RUNWAY_ESTIMATED_CREDITS, RUN
 export function runwayPrompt(job: ContentJob) {
   if (job.status !== "approved" || job.content?.format !== "video" || job.content.durationSeconds !== 30) throw new Error("Ein freigegebenes 30-Sekunden-Drehbuch fehlt.");
   const outline = job.content.scenes.map((scene, i) => `${i + 1}. ${scene.visual} (${scene.durationSeconds} Sekunden). Erzählertext: ${scene.audio}`).join("\n");
-  return `Vertikales 30-Sekunden-Video als zusammenhängende Geschichte. Das Referenzbild zeigt nur die Atmosphäre und Ausgangssituation, nicht zwingend das beworbene Produkt. Geschichte und sichtbare Handlungen haben Vorrang vor einer Produktaufnahme. Hook: ${job.content.hook}. Trendkontext: ${job.opportunity.trend}. Kategorie: ${job.opportunity.category}. Gezeigte Anwendung: ${job.opportunity.useCase}. Produktrolle: ${job.content.productIntegration}. Zeige nur eine neutrale Produktkategorie, falls konkrete Modellmerkmale nicht belegt sind; keine erfundenen Eigenschaften, Markenlogos oder eingebrannte Schrift. Kinder dürfen beim Kürbisschnitzen zeichnen und ausschöpfen; Schneidwerkzeuge führt eine erwachsene Person. Sprich die deutschen Erzählertexte in Szenenfolge, sofern sprachlich möglich. Videobild, Szenenfolge und Sprache müssen vor Veröffentlichung kontrolliert werden.\n${outline}`.slice(0, 3800);
+  return `Vertikales 30-Sekunden-Video als zusammenhängende Geschichte. Ein optionales Referenzbild zeigt nur die Atmosphäre und Ausgangssituation, nicht zwingend das beworbene Produkt. Geschichte und sichtbare Handlungen haben Vorrang vor einer Produktaufnahme. Hook: ${job.content.hook}. Trendkontext: ${job.opportunity.trend}. Kategorie: ${job.opportunity.category}. Gezeigte Anwendung: ${job.opportunity.useCase}. Produktrolle: ${job.content.productIntegration}. Zeige nur eine neutrale Produktkategorie, falls konkrete Modellmerkmale nicht belegt sind; keine erfundenen Eigenschaften, Markenlogos oder eingebrannte Schrift. Kinder dürfen beim Kürbisschnitzen zeichnen und ausschöpfen; Schneidwerkzeuge führt eine erwachsene Person. Sprich die deutschen Erzählertexte in Szenenfolge, sofern sprachlich möglich. Videobild, Szenenfolge und Sprache müssen vor Veröffentlichung kontrolliert werden.\n${outline}`.slice(0, 3800);
 }
 
 export function runwaySceneBrief(job: ContentJob) {
@@ -28,7 +28,10 @@ export function runwayStoryClient(client = getRunwayClient()) {
     },
     async create(job: ContentJob, imageUrl: string) {
       // SDK retries are disabled. A lost POST response may already have spent credits.
-      const task = await client.imageToVideo.create({model:RUNWAY_MODEL, promptImage:[{uri:imageUrl}], promptText:runwayPrompt(job), ratio:RUNWAY_RATIO, duration:RUNWAY_DURATION_SECONDS, audio:true});
+      const shared = {model:RUNWAY_MODEL, promptText:runwayPrompt(job), ratio:RUNWAY_RATIO, duration:RUNWAY_DURATION_SECONDS, audio:true} as const;
+      const task = imageUrl
+        ? await client.imageToVideo.create({...shared,promptImage:[{uri:imageUrl}]})
+        : await client.textToVideo.create(shared);
       return { id: task.id };
     },
     async status(id: string) { return client.tasks.retrieve(id); },

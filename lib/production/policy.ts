@@ -32,7 +32,7 @@ export function chooseVideoProvider(successfulVideos: number, requested?: Produc
       forced: false,
       successfulVideos,
       target: FACELESS_LEARNING_TARGET,
-      reason: "Runway ist für 30-Sekunden-Storys vorgesehen; ein eigenes oder zur KI-Bearbeitung lizenziertes Szenenbild ist erforderlich.",
+      reason: "Runway ist für 30-Sekunden-Storys vorgesehen. Ein eigenes oder zur KI-Bearbeitung lizenziertes Szenenbild kann optional als Startbild dienen.",
     };
   }
   return {

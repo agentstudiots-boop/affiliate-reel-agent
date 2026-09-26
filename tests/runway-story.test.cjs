@@ -15,7 +15,7 @@ test('Amazon image links cannot be supplied to Runway and live balance is read w
   assert.equal(validLicensedRunwayImage('http://example.org/product.jpg'),false);
   assert.equal(validLicensedRunwayImage('https://example.org/product.jpg'),true);
   const calls=[];
-  const provider=runwayStoryClient({organization:{retrieve:async()=>{calls.push('balance');return {creditBalance:450};}},imageToVideo:{create:async input=>{calls.push(input);return {id:'runway-test'};}}});
+  const provider=runwayStoryClient({organization:{retrieve:async()=>{calls.push('balance');return {creditBalance:450};}},imageToVideo:{create:async input=>{calls.push(input);return {id:'runway-image'};}},textToVideo:{create:async input=>{calls.push(input);return {id:'runway-text'};}}});
   assert.deepEqual(await provider.quote(),{credits:300,balance:450,durationSeconds:30,model:'wan3',estimatedUsd:3});
   assert.deepEqual(calls,['balance']);
 });
@@ -38,7 +38,7 @@ test('Runway 30-second story requires fresh content and cost approvals and claim
   const prepared=await repo.prepareVideo(id,'runway');
   assert.equal(prepared.run.providerMode,'RUNWAY_SINGLE_CLIP');
   const script=job.content.scenes.map(scene=>scene.audio.trim()).join('\n\n');
-  const input={jobId:id,credits:300,balance:450,imageUrl:'https://example.org/own-product.jpg',rightsConfirmed:true,approverWaId:'491234',summary:'30 Sekunden, 300 Credits, Guthaben 450',script};
+  const input={jobId:id,credits:300,balance:450,imageUrl:'',rightsConfirmed:false,approverWaId:'491234',summary:'30 Sekunden, 300 Credits, Guthaben 450, Text-zu-Video',script};
   await assert.rejects(repo.createRunwayApproval({...input,imageUrl:'https://m.media-amazon.com/product.jpg'}),/Amazon-Bilder/);
   await assert.rejects(repo.createRunwayApproval({...input,balance:250}),/Guthaben/);
   const approval=await repo.createRunwayApproval(input);
@@ -49,9 +49,16 @@ test('Runway 30-second story requires fresh content and cost approvals and claim
   try { await repo.applyIncomingWhatsApp({id:'wamid.runway.approved',from:'491234',body:'Freigeben',replyToMessageId:'wamid.runway',payload:{}}); }
   finally { if(old===undefined) delete process.env.WHATSAPP_APPROVER_WA_ID; else process.env.WHATSAPP_APPROVER_WA_ID=old; }
   const claimed=await repo.claimRunwayCreation(id,300);
-  assert.equal(claimed.imageUrl,input.imageUrl);
+  assert.equal(claimed.imageUrl,'');
   assert.match(runwayPrompt(claimed.job),/Vakuumierer/);
-  assert.match(runwayPrompt(claimed.job),/Referenzbild zeigt nur die Atmosphäre/);
+  assert.match(runwayPrompt(claimed.job),/optionales Referenzbild zeigt nur die Atmosphäre/);
+  const calls=[];
+  const provider=runwayStoryClient({textToVideo:{create:async args=>{calls.push(args);return {id:'text-video'};}},imageToVideo:{create:async args=>{calls.push(args);return {id:'image-video'};}}});
+  assert.equal((await provider.create(claimed.job,'')).id,'text-video');
+  assert.equal(calls[0].duration,30);
+  assert.equal(calls[0].promptImage,undefined);
+  assert.equal((await provider.create(claimed.job,'https://example.org/licensed.png')).id,'image-video');
+  assert.equal(calls[1].promptImage[0].uri,'https://example.org/licensed.png');
   assert.match(runwaySceneBrief(claimed.job),/eigenständige|Eigenständige/);
   await assert.rejects(repo.claimRunwayCreation(id,300),/WhatsApp/);
 });

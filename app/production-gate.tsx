@@ -124,7 +124,7 @@ export function ProductionGate({ job, password, onRevised }: { job: ContentJob; 
       {run.status === "needs_provider_quote" && <button type="button" disabled={busy || !(run.providerMode === "RUNWAY_SINGLE_CLIP" ? status?.configuration.runwayApiKeyConfigured : status?.configuration.facelessApiKeyConfigured)} onClick={() => action("quoteVideo")}>Kosten und aktuelles Credit-Guthaben abrufen</button>}
       {quote && run.providerMode === "RUNWAY_SINGLE_CLIP" && run.status === "needs_provider_quote" && <div className="reviewBox">
         <p><b>30 Sekunden, 720p:</b> {quote.credits} Credits · verfügbar: {quote.balance} Credits · etwa ${(quote.credits / 100).toFixed(2)} vor Steuern (EUR-Betrag unbekannt).</p>
-        <p><b>Szenenbild:</b> Das Startbild soll Atmosphäre, Menschen und Handlung des Drehbuchs zeigen. Ein isoliertes Produktfoto ist dafür nicht erforderlich. Ein Bild aus der Internetsuche oder von Amazon darf nur mit passenden Bearbeitungsrechten an Runway gehen.</p>
+        <p><b>Startbild optional:</b> Ohne Bild erzeugt Runway die Szenen aus dem freigegebenen Drehbuch. Mit Bild soll es Atmosphäre, Menschen und Handlung zeigen. Ein Bild aus der Internetsuche oder von Amazon darf nur mit passenden Bearbeitungsrechten an Runway gehen.</p>
         <p><b>Briefing für ein eigenständiges Startbild:</b></p><p style={{whiteSpace:"pre-wrap"}}>{sceneBrief}</p>
         <label>HTTPS-Link zum eigenen/lizenzierten Szenenbild <input type="url" value={imageUrl} onChange={event=>{setImageUrl(event.target.value);setRightsConfirmed(false);}} placeholder="https://.../halloween-szene.png" /></label>
         <label>Oder eigenes/lizenziertes Szenenbild hochladen <input type="file" accept="image/jpeg,image/png,image/webp" onChange={event=>{setSelectedImage(event.target.files?.[0] || null);setImageUrl("");setRightsConfirmed(false);}} /></label>
@@ -133,7 +133,7 @@ export function ProductionGate({ job, password, onRevised }: { job: ContentJob; 
         {imageUrl && <p><a href={imageUrl} target="_blank" rel="noreferrer">Szenenbild vor der Kostenfreigabe ansehen</a></p>}
         <p><b>Vorgesehene Geschichte:</b></p><p style={{whiteSpace:"pre-wrap"}}>{script}</p>
         <p>KI kann Produktdetails und den gesprochenen Text verändern. Das fertige Video wird vor einem Instagram-Post getrennt geprüft und freigegeben.</p>
-        <button type="button" disabled={busy || !imageUrl || !rightsConfirmed || quote.balance < quote.credits || !status?.configuration.whatsappApprovalReady} onClick={() => action("requestApproval")}>Kosten und Guthaben per WhatsApp freigeben lassen</button>
+        <button type="button" disabled={busy || (!!imageUrl && !rightsConfirmed) || !!selectedImage || quote.balance < quote.credits || !status?.configuration.whatsappApprovalReady} onClick={() => action("requestApproval")}>Kosten und Guthaben per WhatsApp freigeben lassen</button>
       </div>}
       {quote && run.providerMode === "FACELESS_STORYBOARD" && run.status === "needs_provider_quote" && <div className="reviewBox">
         <p><b>Provider-Kosten:</b> {quote.credits} Credits · verfügbar: {quote.balance} Credits · EUR-Betrag unbekannt</p>
