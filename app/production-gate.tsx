@@ -34,6 +34,7 @@ export function ProductionGate({ job, password, onRevised }: { job: ContentJob; 
   const [quote, setQuote] = useState<{ credits: number; balance: number; voices: { id: string; name: string }[] } | null>(null);
   const [script, setScript] = useState("");
   const [voiceId, setVoiceId] = useState("");
+  const [revisionFeedback, setRevisionFeedback] = useState("");
 
   async function refresh(diagnostics = false) {
     const response = await fetch(`/api/production?jobId=${encodeURIComponent(job.id)}${diagnostics ? "&diagnostics=1" : ""}`, { headers: { "x-content-password": password }, cache: "no-store" });
@@ -52,17 +53,17 @@ export function ProductionGate({ job, password, onRevised }: { job: ContentJob; 
     return () => { active = false; };
   }, [job.id, job.status, job.content?.format, password]);
 
-  async function action(name: "quoteVideo" | "requestApproval" | "startVideo" | "pollVideo" | "reviseContent") {
+  async function action(name: "quoteVideo" | "requestApproval" | "startVideo" | "pollVideo" | "reviseContent" | "requestRevision") {
     setBusy(true); setError("");
     try {
       const response = await fetch("/api/production", {
         method: "POST", headers: { "Content-Type": "application/json", "x-content-password": password },
-        body: JSON.stringify({ action: name, jobId: job.id, ...(name === "requestApproval" ? { voiceId } : {}) }),
+        body: JSON.stringify({ action: name, jobId: job.id, ...(name === "requestApproval" ? { voiceId } : {}), ...(name === "requestRevision" ? { feedback: revisionFeedback } : {}) }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Aktion fehlgeschlagen; Zustand prüfen.");
       if (name === "quoteVideo") { setQuote(data.quote); setScript(data.script); setVoiceId(data.quote.voices[0]?.id || ""); }
-      else if (name === "reviseContent") onRevised?.(data.job);
+      else if (name === "reviseContent" || name === "requestRevision") onRevised?.(data.job);
       else await refresh();
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Aktion fehlgeschlagen."); }
     finally { setBusy(false); }
@@ -111,6 +112,7 @@ export function ProductionGate({ job, password, onRevised }: { job: ContentJob; 
         <button type="button" disabled={busy || !voiceId || quote.balance < quote.credits || !status?.configuration.whatsappApprovalReady} onClick={() => action("requestApproval")}>Quote per WhatsApp zur Freigabe senden</button>
       </div>}
       {run.status === "awaiting_whatsapp_approval" && <p>WhatsApp-Freigabe offen. Antworte auf die Nachricht; danach hier den Status neu laden.</p>}
+      {run.status === "awaiting_whatsapp_approval" && <div className="reviewBox"><label>Änderung am Videoentwurf<textarea value={revisionFeedback} maxLength={1200} onChange={event => setRevisionFeedback(event.target.value)} placeholder="Zum Beispiel: Kinder beim Kürbisschnitzen in die Geschichte einbeziehen." /></label><button type="button" disabled={busy || revisionFeedback.trim().length < 5} onClick={() => action("requestRevision")}>Alte Kostenfreigabe sperren und Videoentwurf ändern</button></div>}
       {run.status === "approved_for_spend" && <button type="button" className="primary" disabled={busy} onClick={() => action("startVideo")}>Freigegebenes Video einmalig erstellen – kostet {run.estimatedProviderCredits} Credits</button>}
       {run.status === "rendering" && <><p>Videostart wurde beansprucht. {run.providerJobId ? "Provider-Auftrag bestätigt." : "Provider-Ergebnis unklar: keinen zweiten kostenpflichtigen Start auslösen."}</p>{run.providerJobId && <button type="button" disabled={busy} onClick={() => action("pollVideo")}>Provider-Status abfragen / MP4 fertigstellen</button>}</>}
       {run.status === "failed" && <><p className="error">Der gestartete Provider-Auftrag ist fehlgeschlagen. Die tatsächliche Credit-Belastung im Provider-Konto prüfen; keine erneute Produktion ohne neue Kostenentscheidung starten.</p>{run.providerJobId && <button type="button" disabled={busy} onClick={() => refresh(true).catch(caught => setError(caught instanceof Error ? caught.message : "Provider-Fehler nicht lesbar"))}>Fehlerursache beim Provider lesen – keine Kosten</button>}{status?.providerDiagnostics && <p className="error">Provider-Status: {status.providerDiagnostics.status}. {status.providerDiagnostics.errorMessages?.join(" · ") || "Keine weitere Fehlerbeschreibung verfügbar."}</p>}</>}
