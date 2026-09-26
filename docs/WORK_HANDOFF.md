@@ -1,5 +1,35 @@
 # Work handoff
 
+## Aktuell 26.09.2026: neuer Kürbisschnitz-Reel-Plan
+
+Der Nutzer hat klargestellt: Kürbisschnitzen ist Home & Living/Deko/Basteln,
+keine Küche. Der Creative Agent legt den sichtbaren Schnitzvorgang, das Werkzeug
+und die fertige Deko-Laterne als Geschichte an; die Kategorie wird vor der
+Planung normalisiert. Die Prüfung blockiert fehlende Kürbis-/Schnitzmotive sowie
+Essensbegriffe in der öffentlichen Copy. Das zuvor pauschale „appetitlich“ im
+Marketing wurde ersetzt; die Steak-Anweisung ist nur noch für Sous-vide-Steak
+gültig. Typecheck, Lint und 128 Tests bestanden. Draft PR #6, Branch
+`feat/production-gates-whatsapp`, jüngster Commit `4ed3ed66ff1eb149b6a9d82a921e77a0d4ab2065`;
+zugehörige Vercel-Preview ist READY. Production bleibt ungeändert.
+
+Neuer, gespeicherter Instagram-Reel-Plan `0a15c294-1038-479a-aefe-3e88069f6f3b`
+für ASIN `B0D9YQR9CT` ist redaktionell vorgeprüft und als Content-Plan
+freigegeben. 36-Sekunden-Drehbuch: echter Kürbis, Gesicht vorzeichnen, mit
+Schnitzwerkzeug Augen und Mund ausschneiden, leuchtende Halloween-Deko als
+emotionales Ergebnis. Faceless Storyboard ist vorbereitet, deutsche Stimme
+Mila Winter, kostenlose Quote 20 Credits (bei Abfrage 275 verfügbar, EUR-Wert
+unbekannt). Die Kostenanfrage wurde per WhatsApp einmal verschickt; der
+Produktionsstatus lautet `awaiting_whatsapp_approval`, Approval `pending`.
+**Keine neue Freigabe annehmen, bis eine Antwort auf genau diese WhatsApp im
+Webhook verarbeitet ist; der Webhook setzt den Reel-Auftrag dann automatisch
+fort. Nicht manuell parallel starten.** Faceless kann trotz erweitertem
+`masterStyle`/`globalNegativePrompt` visuelle Genauigkeit nicht garantieren.
+Nach fertigem MP4 ist eine gesonderte WhatsApp-Veröffentlichungsfreigabe nötig.
+Der frühere gescheiterte Providerauftrag bleibt fehlgeschlagen und wird nicht
+wiederholt.
+
+Die folgenden Checkpoints sind frühere Stände.
+
 ## Reel-Test 26.09.2026: Faceless-Generierung fehlgeschlagen
 
 Der Nutzer hat einen Instagram-Reel-Test mit WhatsApp-Kostenfreigabe beauftragt
