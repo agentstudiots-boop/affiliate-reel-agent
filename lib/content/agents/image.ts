@@ -69,7 +69,7 @@ function reviseReferenceImage(brief: Brief) {
 export function imageAgent(brief: Brief, generate: Generator) {
   const inspiration = brief.inspiration;
   return generate("image", `Erstelle ein Einzelbild oder 3–7 zusammenhängende Carousel-Slides passend zum freigegebenen Konzept.
-Je Slide: Überschrift, knapper Text, konkrete Bildgestaltung, origineller Bildprompt und Alt-Text.
+Je Slide: Überschrift, knapper Text, konkrete Bildgestaltung, origineller Bildprompt und Alt-Text. Im Titelbildbriefing beschreibe als sichtbare Szene: wer oder was handelt, welche Tätigkeit stattfindet, wo sie stattfindet, welcher zur Produktkategorie passende Gegenstand dabei klar erkennbar ist, und welche relevanten Details oder Ergebnisse im Bild zu sehen sind. Der Bildprompt muss diese konkreten Elemente ebenfalls nennen, statt nur Stilwörter zu wiederholen. Für unbekannte Modellmerkmale nur generische, unmarkierte Gegenstände verwenden.
 Ein echtes visuelles Konzept ist Pflicht: Lifestyle-/Anwendungsszene, redaktioneller Vergleich oder eigenständige Collage. Keine reine Textkarte oder Symbolgrafik als Endprodukt.
 Nutze Product-Inspiration nur redaktionell. Keine Händlerbilder, Amazon-Screenshots, Logos, Shop-UI oder exakte Produktfoto-Nachbauten.
 Bei Such-/Kategorieseiten kategorisch bleiben. Konkrete Produkteigenschaften nur aus verifiedFacts übernehmen.
@@ -112,7 +112,7 @@ Keine Typografie in das generierte Bild verlangen; Schrift wird später im Layou
         copy,
         visual,
         alt: visual,
-        prompt: `Originelles redaktionelles Social-Media-Visual im Hochformat 4:5. ${visual} Hochwertiger Editorial-/Lifestyle-Look, glaubwürdige Materialien und Licht, klare visuelle Hauptaussage, ausreichend freie Fläche für später gesetzte kurze Redaktionstexte. Keine Logos, keine Shop-Oberfläche, keine eingebrannte Schrift, keine exakte Modellnachbildung und keine erfundenen Produkteigenschaften.`,
+        prompt: `Originelles redaktionelles Social-Media-Visual im Hochformat 4:5. Hauptmotiv und sichtbare Handlung: ${visual} Die neutrale, unmarkierte Produktkategorie ${inspiration.categoryLabel} ist bei der Anwendung klar erkennbar, nicht bloß im Hintergrund. Umgebung: ${idea.situation}. Bildkomposition mit Handlung und sichtbarem Ergebnis im Vordergrund, glaubwürdigen Materialien und natürlichem Licht; freie Fläche für später gesetzten Text. Keine Logos, keine Shop-Oberfläche, keine eingebrannte Schrift, keine exakte Modellnachbildung und keine erfundenen Produkteigenschaften.`,
       })),
       caption: readerCaption({ ...brief, inspiration }),
       cta: categoryMode ? "Optionen in der Auswahl ansehen und vergleichen." : "Produktdetails über den gekennzeichneten Link prüfen.",
