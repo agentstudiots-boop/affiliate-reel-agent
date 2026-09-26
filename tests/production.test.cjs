@@ -38,6 +38,7 @@ test('first 15 successful videos are forced to Faceless Storyboard',()=>{
 
 test('WhatsApp replies require explicit approval wording; free text becomes revision feedback',()=>{
   assert.deepEqual(classifyWhatsAppReply('Freigeben'),{intent:'approve',feedback:''});
+  assert.deepEqual(classifyWhatsAppReply('Freigegeben'),{intent:'approve',feedback:''});
   assert.deepEqual(classifyWhatsAppReply('OK, freigeben!'),{intent:'approve',feedback:''});
   assert.deepEqual(classifyWhatsAppReply('Ablehnen'),{intent:'reject',feedback:''});
   assert.deepEqual(classifyWhatsAppReply('Mach die erste Szene kürzer und den CTA ruhiger.'),{
