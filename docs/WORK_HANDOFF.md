@@ -1,5 +1,33 @@
 # Work handoff
 
+## Aktuell 26.09.2026: zweite Faceless-Generierung fehlgeschlagen
+
+Der Nutzer gab die neue WhatsApp-Kostenanfrage zum geänderten Kürbisschnitz-Reel
+frei. Der signierte Webhook verarbeitete `approve` und verbrauchte die Freigabe
+einmal; der Provider-Auftrag wurde bestätigt. Beim lesenden Statusabgleich war
+der Run `failed`: `Storyboard generated ZERO visual items for a 35s video —
+failing the job so the queue retries instead of shipping a black video`.
+Kein MP4, keine Instagram-Veröffentlichung. Die zweite Provider-Generierung
+scheiterte damit wie die erste trotz längerem Skript und visueller Vorgaben.
+**Keine weitere kostenpflichtige Faceless-Erstellung auf Verdacht.** Tatsächliche
+Credit-Belastung/Erstattung beim Provider anhand des Kontos prüfen; Ursache mit
+Provider klären oder alternativen Videoweg aufbauen. Die offiziellen API-Dokumente
+führen keine dokumentierte Lösung für null erzeugte Bilder auf.
+
+Für allgemeine natürliche Videoänderungen gab es zuvor nur wenige feste
+Formulierungen. Der Video-Orchestrator versucht diese weiter ohne Modellkosten;
+für andere Änderungen nutzt er den bestehenden Replicate-Sprachmodellzugang
+für genau einen strukturierten Videovorschlag. Der Vorschlag geht durch den
+Video-Agenten und durch Struktur-, Produkt- und Themenprüfung; bei Unsicherheit
+bleibt er gesperrt. Modellarbeit erfolgt außerhalb der DB-Transaktion; der
+gespeicherte Job wird vor dem Schreiben erneut auf Änderungen geprüft. Kein
+permanentes Fine-Tuning. Code in Draft PR #6 auf Branch
+`feat/production-gates-whatsapp`, letzter Fach-Commit
+`e024acbd48bbf199b2ef59a9e5dc899e25cd0556`; lokal Typecheck, Lint und
+132 Tests bestanden. Live-Modellrevision über WhatsApp noch nicht E2E geprüft.
+
+Die folgenden Checkpoints sind frühere Stände.
+
 ## Aktuell 26.09.2026: WhatsApp-Videoänderung übernommen
 
 Der Nutzer antwortete auf die Video-Kostenanfrage mit dem Wunsch, Kinder beim
