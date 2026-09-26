@@ -166,6 +166,13 @@ test('pumpkin reel tells a visible carving story with product context and no mod
   assert.match(revised.content.scenes[2].visual,/erwachsene Person schnitzt/);
   assert.match(revised.content.caption,/Kind zeichnet das Gesicht vor/);
   assert.deepEqual(pumpkinCreativeIssues(revised.opportunity,revised.content),[]);
+  const family=await runContentJob({...opportunity,useCase:'Ein Kind zeichnet ein Gesicht auf den Kürbis; eine erwachsene Person schnitzt, das Kind schöpft die Kerne aus.'},{allowedFormats:['video']});
+  assert.equal(family.review.passed,true,JSON.stringify(family.review));
+  assert.match(family.ideas.find(idea=>idea.format==='video').story,/Ein Kind zeichnet/);
+  assert.match(family.content.scenes[1].visual,/Kind zeichnet Augen und Mund/);
+  assert.match(family.content.scenes[2].visual,/erwachsene Person schnitzt/);
+  assert.match(family.content.caption,/Kind zeichnet das Gesicht vor/);
+  assert.equal(family.content.durationSeconds,30);
   const broader=await reviseApprovedVideo(job,'Bitte zeige zuerst die fertige Laterne und dann als Rückblende die Schnitzarbeit',async ()=>({
     ...job.content,scenes:[
       {...job.content.scenes[0],visual:'Die fertige leuchtende Kürbislaterne am Basteltisch. Dann Rückblende zum echten Kürbis und dem Vorzeichnen.'},
