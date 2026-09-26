@@ -1,5 +1,27 @@
 # Kontrollierter Live-Nachweis für PR #6
 
+## Aktualisierung 26.09.2026
+
+Die Projektdatenbank bestätigt Migrationen 001–013. Der Tages-Claim für den
+26.09. ist bereits mit Job `eb2a8423-6fce-4f3d-9e81-87835fafc5b1` belegt;
+dessen letzte Facebook-Freigabe wurde wegen des unpassenden Bildes abgelehnt.
+Keinen weiteren Cron-Aufruf für denselben Tag als neuen Auftrag interpretieren
+und weder Tagesdatum noch Datenbankstatus manuell ändern. Ein neuer
+produktgebundener Facebook-Durchlauf braucht einen neuen Auftrag, ein tatsächlich
+passendes Bild und zwei getrennte Freigaben. Ein alter veröffentlichter
+Facebook-Job ohne ASIN belegt diesen neuen Ablauf nicht.
+
+Für den Videodurchlauf den **vorhandenen** Instagram-Plan
+`cfa990ab-00ee-45cb-8a43-1e85a53c6636` prüfen: Er wartet auf
+Inhaltsfreigabe; es existiert noch kein `production_run`, keine Quote und
+keine Kostenfreigabe. Erst nach expliziter Freigabe und Quote einen
+Faceless-Kauf starten. Die Meta-Vorlage `content_entwurf` wird noch geprüft;
+keinen wiederkehrenden Versand ohne genehmigte Vorlage und ausdrückliche
+Kostenakzeptanz aktivieren. `CRON_SECRET` wurde vom Betreiber angelegt;
+Production läuft aber noch auf altem `main` ohne den neuen Cron.
+
+Die nachstehenden Schritte dokumentieren auch ältere Ausgangszustände.
+
 Stand: 24.09.2026. **Migration 006 ist live bestätigt**; Facebook- und
 Faceless-Durchlauf sind vorbereitet, aber noch nicht live ausgeführt.
 Eine lokale Simulation ersetzt keinen Meta-/Faceless-Nachweis. Wochenbericht
@@ -70,7 +92,7 @@ geforderten ersten WhatsApp-Nachweis auslassen.
 
 ## 4. Genau ein Faceless-Durchlauf
 
-1. Neuen Videojob planen, Inhalt prüfen und redaktionell freigeben. Den
+1. Vorhandenen Videojob prüfen, Inhalt prüfen und redaktionell freigeben. Den
    Produktionsweg vorbereiten: `FACELESS_STORYBOARD`, kein Runway-Fallback in
    der Lernphase. Nur erfolgreiche `ready`-Videos zählen bis 15.
 2. Live-Quote und verfügbaren Saldo lesen. Tatsächlich benötigte Credits,
