@@ -4,7 +4,7 @@ import { authorized } from "@/lib/memory/auth";
 import { databaseConfigured } from "@/lib/memory/db";
 import { chooseVideoProvider } from "@/lib/production/policy";
 import { ProductionConflictError, productionRepository } from "@/lib/production/repository";
-import { facelessClient, FacelessError, narration } from "@/lib/production/faceless-so";
+import { facelessClient, facelessVisualDirection, FacelessError, narration } from "@/lib/production/faceless-so";
 import { sendWhatsAppText, whatsappApprovalReady, whatsappConfig } from "@/lib/whatsapp/client";
 
 export const runtime = "nodejs";
@@ -87,7 +87,8 @@ export async function POST(request: Request) {
       if (quote.balance < quote.credits) throw new ProductionConflictError("Faceless.so-Credits reichen für diesen Auftrag nicht aus.");
       if (!quote.voices.some(voice => voice.id === input.voiceId)) throw new ProductionConflictError("Stimme ist nicht im aktuellen deutschen Faceless.so-Katalog.");
       const product = job.opportunity.product.name;
-      const summary = `Produkt: ${product}\nContent-Typ: Video\nProvider: Faceless.so Storyboard\nGeschätzte Kosten: ${quote.credits} Provider-Credits (EUR-Betrag unbekannt)\nErwartete Affiliate-Provision: unbekannt\nSprechtext:\n${narration(job)}`.slice(0, 3000);
+      const visual = facelessVisualDirection(job);
+      const summary = `Produkt: ${product}\nContent-Typ: Video\nProvider: Faceless.so Storyboard\nGeschätzte Kosten: ${quote.credits} Provider-Credits (EUR-Betrag unbekannt)\nErwartete Affiliate-Provision: unbekannt\nSprechtext:\n${narration(job)}${visual ? `\n\nBildvorgabe:\n${visual.masterStyle}\nAusschlüsse: ${visual.globalNegativePrompt}` : ""}`.slice(0, 3000);
       const approval = await repo.createRenderApproval({ jobId: input.jobId, estimatedCostCents: null, estimatedProviderCredits: quote.credits, estimatedCommissionCents: null, summary, approverWaId: process.env.WHATSAPP_APPROVER_WA_ID!.replace(/\D/g, ""), script: narration(job), voiceId: input.voiceId });
       // Claim before the outbound request: an ambiguous network result must not send a second approval.
       await repo.claimWhatsAppSend(approval.id);
