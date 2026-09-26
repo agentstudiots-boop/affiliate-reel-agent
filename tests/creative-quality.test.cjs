@@ -133,6 +133,25 @@ test('text and reel use the same grounded category copy and spoken lines fit the
   assert.ok(video.scenes.every(scene=>scene.audio.split(/\s+/).length<=scene.durationSeconds*2.8));
 });
 
+test('pumpkin reel tells a visible carving story with product context and no model claims',async()=>{
+  const opportunity=opportunitySchema.parse({
+    product:{productVerifiedAt:'2026-09-26T08:00:00.000Z',productVerifiedName:'YAVOCOS Halloween Kürbis Schnitzset',name:'YAVOCOS Halloween Kürbis Schnitzset',sourceUrl:'https://www.amazon.de/dp/B0D9YQR9CT',affiliateUrl:'',price:'',targetGroup:'Erwachsene Halloween-Fans',benefits:'Werkzeuge für die Kürbislaterne vor dem Kauf prüfen.',notes:'Keine Produkteigenschaften erfinden.'},
+    useCase:'Eine erwachsene Person schnitzt aus einem echten Kürbis eine Laterne.',category:'household',targetPlatform:'instagram',budget:'quality',verifiedFacts:[]
+  });
+  const job=await runContentJob(opportunity,{allowedFormats:['video']});
+  assert.equal(job.content.format,'video');
+  assert.equal(job.review.passed,true,JSON.stringify(job.review));
+  const visuals=job.content.scenes.map(scene=>scene.visual).join(' ');
+  const voice=job.content.scenes.map(scene=>scene.audio).join(' ');
+  assert.match(visuals,/erwachsene.*(?:Augenöffnung|Mundöffnung)/i);
+  assert.match(visuals,/echten Kürbis/i);
+  assert.match(voice,/Kürbisschnitzwerkzeug/);
+  assert.match(voice,/Laterne/);
+  assert.match(voice,/YAVOCOS/);
+  assert.doesNotMatch(voice,/garantiert|professionell|Edelstahl|sicher für Kinder/i);
+  assert.ok(job.content.scenes.every(scene=>scene.audio.split(/\s+/).length<=scene.durationSeconds*2.5));
+});
+
 test('missing image provider cannot silently fall back to the typographic card',()=>{
   const previous={replicate:process.env.REPLICATE_API_TOKEN,openai:process.env.OPENAI_API_KEY};
   try {
