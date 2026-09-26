@@ -1,8 +1,8 @@
-import { resolveAmazonProduct } from "@/lib/product-resolver";
+import { resolveAmazonProduct, reuseRecentProductIdentity } from "@/lib/product-resolver";
 import { z } from "zod";
 import { opportunitySchema } from "@/lib/content/schema";
 import { runContentJob } from "@/lib/orchestrator";
-import { databaseConfigured } from "@/lib/memory/db";
+import { databaseConfigured, getDatabase } from "@/lib/memory/db";
 import { authorized } from "@/lib/memory/auth";
 import { ConflictError, memoryRepository } from "@/lib/memory/repository";
 import { requestContentApproval } from "@/lib/whatsapp/content-approval";
@@ -27,10 +27,13 @@ export async function POST(request: Request) {
   } catch { return Response.json({ error: "Bitte Produkt, Link, Zielgruppe und konkreten Use Case vollständig eintragen." }, { status: 400 }); }
   try { input.opportunity.product = await resolveAmazonProduct(input.opportunity.product); }
   catch {
-    // Persist a blocked job through the existing job identity and event stream.
-    input.opportunity.product.productVerifiedAt = undefined;
-    input.opportunity.product.productVerifiedName = undefined;
-    input.opportunity.product.affiliateUrl = "";
+    try { input.opportunity.product = await reuseRecentProductIdentity(input.opportunity.product,getDatabase()); }
+    catch {
+      // Persist a blocked job through the existing job identity and event stream.
+      input.opportunity.product.productVerifiedAt = undefined;
+      input.opportunity.product.productVerifiedName = undefined;
+      input.opportunity.product.affiliateUrl = "";
+    }
   }
   const repo = memoryRepository();
   try { await repo.claim(input.requestId,input.opportunity,input.mode); }

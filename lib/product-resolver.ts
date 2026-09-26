@@ -1,6 +1,9 @@
 import { amazonProduct, bindAmazonProduct, PRODUCT_UNRESOLVED } from "./amazon";
 import { tavilySearch } from "./tavily";
 import type { Product } from "./types";
+import type { Database } from "./memory/db";
+import { parseJob } from "./content/history";
+import { requireProduct } from "./amazon";
 
 // Exact Amazon result URL + its indexed title establish identity only, never features/prices.
 // Evidence is generated on the server; client timestamps and names are not trusted.
@@ -21,6 +24,29 @@ export async function resolveAmazonProduct(product: Product, search = tavilySear
   if (!words.length || !words.every(word => name.toLocaleLowerCase("de-DE").includes(word))) throw new Error(PRODUCT_UNRESOLVED);
   return bindAmazonProduct({ ...product, name, productVerifiedName: name,
     productVerifiedAt: new Date().toISOString(), asin: source.asin, productUrl: source.productUrl });
+}
+
+// A recent server-verified title for this exact ASIN survives intermittent search failures.
+// Reuse neither model claims nor prices; the prior proof must still pass identity checks.
+export async function reuseRecentProductIdentity(product: Product, db: Pick<Database,"query">): Promise<Product> {
+  const source=amazonProduct(product.sourceUrl);
+  if (!source) throw new Error(PRODUCT_UNRESOLVED);
+  bindAmazonProduct(product);
+  const rows=await db.query("SELECT snapshot FROM content_jobs WHERE created_at > now() - interval '24 hours' ORDER BY created_at DESC LIMIT 100");
+  const words=product.name.toLocaleLowerCase("de-DE").match(/[\p{L}\p{N}]{4,}/gu) || [];
+  if (!words.length) throw new Error(PRODUCT_UNRESOLVED);
+  for(const row of rows.rows) {
+    try {
+      const prior=parseJob(row.snapshot).opportunity.product;
+      requireProduct(prior);
+      if (prior.asin!==source.asin || prior.sourceUrl!==source.productUrl || !prior.productVerifiedAt
+        || Date.now()-Date.parse(prior.productVerifiedAt)>24*60*60*1000
+        || !words.every(word=>prior.name.toLocaleLowerCase("de-DE").includes(word))) continue;
+      return bindAmazonProduct({...product,name:prior.name,productVerifiedName:prior.name,productVerifiedAt:prior.productVerifiedAt,
+        asin:source.asin,productUrl:source.productUrl});
+    } catch { /* A malformed old job is not identity evidence. */ }
+  }
+  throw new Error(PRODUCT_UNRESOLVED);
 }
 
 export async function findAmazonProduct(categoryName: string, query: string, targetGroup: string, search = tavilySearch) {

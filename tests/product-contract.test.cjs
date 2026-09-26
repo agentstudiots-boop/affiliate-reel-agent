@@ -2,7 +2,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {PGlite}=require('@electric-sql/pglite');
 const {amazonProduct,createAmazonAffiliateUrl,bindAmazonProduct,productIdentityError}=require('../.test-build/lib/amazon');
-const {resolveAmazonProduct,findAmazonProduct}=require('../.test-build/lib/product-resolver');
+const {resolveAmazonProduct,findAmazonProduct,reuseRecentProductIdentity}=require('../.test-build/lib/product-resolver');
 const {runContentJob}=require('../.test-build/lib/content/orchestrator');
 const {opportunitySchema}=require('../.test-build/lib/content/schema');
 const {memoryRepository}=require('../.test-build/lib/memory/repository');
@@ -40,6 +40,16 @@ test('ASIN, affiliate link, name and verification evidence cannot refer to diffe
   assert.throws(()=>product({affiliateUrl:'https://www.amazon.de/dp/B000000002'}),/product_unresolved/);
   assert.throws(()=>product({asin:'B000000002'}),/product_unresolved/);
   for(const changes of [{asin:'B000000002'},{name:'Anderes Produkt'},{productVerifiedAt:undefined},{affiliateUrl:source+'?tag=wrong-21'},{affiliateUrl:'https://www.amazon.de/s?k=Kuscheldecke'}])assert.equal(productIdentityError({...product(),...changes}),'product_unresolved');
+});
+
+test('recent verified identity for the exact ASIN survives a search outage but cannot cross products',async()=>{
+  const old=await runContentJob(opportunity(product()));
+  const db={query:async()=>({rows:[{snapshot:old}]})};
+  const match=await reuseRecentProductIdentity({...product(),name:'Kuscheldecke Modell'},db);
+  assert.equal(match.name,product().name);
+  assert.equal(match.productVerifiedAt,product().productVerifiedAt);
+  await assert.rejects(reuseRecentProductIdentity({...product(),name:'Andere Decke'},db),/product_unresolved/);
+  await assert.rejects(reuseRecentProductIdentity({...product(),sourceUrl:'https://www.amazon.de/dp/B000000002',affiliateUrl:'',asin:undefined,productUrl:undefined},db),/product_unresolved/);
 });
 
 test('unresolved content is saved as needs_input with no affiliate link and no specialist or approval',async t=>{
