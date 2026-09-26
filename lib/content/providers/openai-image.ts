@@ -4,6 +4,7 @@ import { put } from "@vercel/blob";
 import type { ContentJob } from "../schema";
 import { analyzeProductInspiration } from "../product-inspiration";
 import { imageCreativePublicationError } from "../creative-quality";
+import { imageBrief } from "../image-brief";
 import type { OriginalVisualAsset, OriginalVisualProvider } from "../image-provider";
 
 export const DEFAULT_OPENAI_IMAGE_MODEL = "gpt-image-2.5-flare";
@@ -32,15 +33,13 @@ export function buildOriginalVisualPrompt(job: ContentJob): string {
   const verified = inspiration.representation === "verified_product_context"
     ? opportunity.verifiedFacts.map(item => item.claim) : [];
   const category = inspiration.categoryLabel;
-  const pumpkinCarving = /kürbis.*schnitz|schnitz.*kürbis/i.test(opportunity.product.name);
   return [
     "Erzeuge genau EIN originelles, fotorealistisches Editorial-/Lifestyle-Hauptbild für einen Facebook-Post.",
     "Hochformat 4:5, klare Alltagssituation, natürliche Beleuchtung und realistische Materialien. Bildgeführt mit freier Fläche für später separat gesetzte Schrift. Keine Schrift ins Bild setzen.",
     `Verbindliches Bildthema: ${content.slides[0].visual}. Produkt: ${opportunity.product.name}. ASIN: ${opportunity.product.asin || "offen"}.`,
     `Produktkategorie: ${category}. Nutzung: ${opportunity.useCase}. Zielgruppe: ${opportunity.product.targetGroup}.`,
     `Visual-Konzept (${concept.kind}): ${concept.mainIdea}; Alltag: ${concept.everydaySituation}; Produktbezug: ${concept.productRelation}.`,
-    `Visual-Briefing des ersten Slides: ${content.slides[0].visual}; ${content.slides[0].prompt}.`,
-    pumpkinCarving ? "Für dieses Kürbisschnitzmotiv: ruhige Bastelszene an einem einfachen Arbeitstisch, mehrere kleine unmarkierte Kürbisschnitzwerkzeuge sichtbar neben dem Kürbis, Kürbiskerne und Schalenreste auf dem Tisch, fertige geschnitzte Laternen im Hintergrund. Die Werkzeuge schneiden ohne Funken. Keine Speisen, keine Kücheninszenierung, keine Servierplatte und kein großes Küchenmesser als Hauptmotiv. Keine exakte Abbildung oder Ausstattung des beworbenen Modells behaupten." : "",
+    `Verbindliches, gespeichertes Bildbriefing:\n${imageBrief(job)}`,
     content.layout === "carousel" ? `Weitere Slides nur als Kontext für das EINZIGE Titelbild: ${content.slides.slice(1).map(s => s.visual).join("; ")}.` : "",
     verified.length ? `Einzige belegte konkrete Produkteigenschaften: ${verified.join("; ")}. Auch damit keine exakte Modellabbildung ohne freigegebene Bildreferenz vortäuschen.` : "Keine belegten Modellmerkmale vorhanden: neutraler, markenfreier Kategorie-Look; keine konkreten Eigenschaften darstellen.",
     ["search", "category"].includes(inspiration.sourceKind) ? "Die Quelle ist eine Such- oder Kategorieseite: nur die Kategorie visualisieren; kein einzelnes Modell nachahmen und keine Suchergebnisse rekonstruieren." : "",
