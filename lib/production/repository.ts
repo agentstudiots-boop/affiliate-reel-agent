@@ -173,7 +173,7 @@ export function productionRepository(db: Database = getDatabase()) {
     },
 
     async createRunwayApproval(input: {jobId: string; credits: number; balance: number; imageUrl: string; rightsConfirmed: boolean; approverWaId: string; summary: string; script: string}) {
-      if (!input.rightsConfirmed || !validLicensedRunwayImage(input.imageUrl)) throw new ProductionConflictError("Eigenes oder ausdrücklich lizenziertes Produktbild als HTTPS-Bilddatei erforderlich; Amazon-Bilder können nicht übernommen werden.");
+      if (!input.rightsConfirmed || !validLicensedRunwayImage(input.imageUrl)) throw new ProductionConflictError("Eigenes oder ausdrücklich zur KI-Bearbeitung lizenziertes Szenenbild als HTTPS-Bilddatei erforderlich; Amazon-Bilder können nicht übernommen werden.");
       if (input.credits !== 300 || input.balance < input.credits) throw new ProductionConflictError("Runway-Quote oder Guthaben unzureichend; keine Kostenfreigabe angefordert.");
       return db.transaction(async sql => {
         const rows = await sql.query("SELECT * FROM production_runs WHERE job_id=$1 AND provider_mode='RUNWAY_SINGLE_CLIP' AND status='needs_provider_quote' FOR UPDATE", [input.jobId]);
@@ -208,14 +208,14 @@ export function productionRepository(db: Database = getDatabase()) {
           AND r.provider_request_attempted_at IS NULL AND r.estimated_provider_credits >= $2
           AND r.runway_image_rights_confirmed=true AND r.runway_image_url IS NOT NULL
           AND a.kind='render' AND a.status='approved' AND a.whatsapp_message_id IS NOT NULL FOR UPDATE OF r`,[jobId,credits]);
-        if (!rows.rows[0]) throw new ProductionConflictError("Eindeutige WhatsApp-Kostenfreigabe und gültiges Produktbild fehlen.");
+        if (!rows.rows[0]) throw new ProductionConflictError("Eindeutige WhatsApp-Kostenfreigabe und gültiges Szenenbild fehlen.");
         const stored = await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE",[jobId]);
         if (!stored.rows[0]) throw new ProductionConflictError("Produktauftrag fehlt.");
         const job = parseJob(stored.rows[0].snapshot);
         requireJobProduct(job);
         if (job.status !== "approved" || job.content?.format !== "video" || job.content.durationSeconds !== 30 || job.content.scenes.map(s => s.audio.trim()).join("\n\n") !== rows.rows[0].provider_script || !await hasContentApproval(job,sql)) throw new ProductionConflictError("Produkt oder freigegebenes Drehbuch geändert.");
         const imageUrl = String(rows.rows[0].runway_image_url);
-        if (!validLicensedRunwayImage(imageUrl)) throw new ProductionConflictError("Produktbild ist nicht als lizenziertes HTTPS-Bild verwendbar.");
+        if (!validLicensedRunwayImage(imageUrl)) throw new ProductionConflictError("Szenenbild ist nicht als lizenziertes HTTPS-Bild verwendbar.");
         const claimed=await sql.query("UPDATE production_runs SET status='rendering',provider_request_key=$2,provider_request_attempted_at=now(),updated_at=now() WHERE id=$1 AND status='approved_for_spend' RETURNING *",[rows.rows[0].id,crypto.randomUUID()]);
         await sql.query("UPDATE approval_requests SET status='consumed' WHERE production_run_id=$1 AND kind='render' AND status='approved'",[rows.rows[0].id]);
         return {run:mapRun(claimed.rows[0]),job,imageUrl};

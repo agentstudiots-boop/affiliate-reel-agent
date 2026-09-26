@@ -21,7 +21,7 @@ export function contentApprovalMessage(job: ContentJob) {
       ? `Bildbriefing:\n${content.slides.map((slide,index)=>`${index+1}. ${slide.visual}; Prompt: ${slide.prompt}; Text: ${slide.copy}`).join("\n")}`
       : `Beitrag:\n${content.body}`;
   const next=content.format==="video"
-    ? "Erst danach kann eine separate WhatsApp-Kostenfreigabe für Faceless folgen. Die Veröffentlichung benötigt später eine weitere Freigabe."
+    ? "Erst danach kann eine separate WhatsApp-Kostenfreigabe für den ausgewählten Videoproduzenten folgen. Die Veröffentlichung benötigt später eine weitere Freigabe."
     : content.format==="image"
       ? "Erst danach kann die Bildproduktion gesondert im Content Studio angefordert werden. Die Veröffentlichung benötigt später eine weitere WhatsApp-Freigabe."
       : "Die spätere Veröffentlichung benötigt eine eigene WhatsApp-Freigabe.";

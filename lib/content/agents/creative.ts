@@ -4,6 +4,7 @@ import type { Generator, ProductInspiration } from "../agent";
 export function creativeAgent(opportunity: Opportunity, generate: Generator, inspiration: ProductInspiration) {
   return generate("creative", `Entwickle drei unterschiedliche starke Werbeideen: je eine für Video, Bild/Carousel und Text.
 Jede Idee: konkrete Alltagssituation, emotionaler Hook, Handlung, Nutzen, ehrliche Grenzen und Formatbegründung.
+Für Video: leite aus dem Trend und dem Anwendungsfall eine passende Atmosphäre und eine konkrete Ausgangsszene ab. Familienmomente, Abenteuer oder Jahreszeit nur verwenden, wenn sie zur Handlung passen. Das visuelle Startbild soll den Einstieg in die Geschichte zeigen, nicht zwingend eine isolierte Produktaufnahme. Suchergebnisse liefern Anregungen, aber keine pauschalen Bildnutzungsrechte.
 Prüfe zuerst die tatsächliche Produktfunktion. Ein Kürbisschnitzset für Halloween gehört zu Home & Living, Dekoration und Basteln: echter Kürbis, sichtbar geschnitzte Gesichtszüge, Laterne als Ergebnis. Keine Koch- oder Essensgeschichte und keine Küchenwerkzeuge für diesen Fall.
 Nutze die mitgelieferte Product-Inspiration nur als redaktionelle Inspirationsquelle. Bei Such-/Kategorie-Seiten kategorisch bleiben und kein konkretes Modell vortäuschen.
 Keine Händlerbilder, Amazon-Screenshots, Logos oder geschützten Shop-Layouts als Creative planen. Keine exakten Produkteigenschaften ohne verifiedFacts behaupten.

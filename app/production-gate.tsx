@@ -34,6 +34,7 @@ export function ProductionGate({ job, password, onRevised }: { job: ContentJob; 
   const [error, setError] = useState("");
   const [quote, setQuote] = useState<{ credits: number; balance: number; voices: { id: string; name: string }[] } | null>(null);
   const [script, setScript] = useState("");
+  const [sceneBrief, setSceneBrief] = useState("");
   const [voiceId, setVoiceId] = useState("");
   const [revisionFeedback, setRevisionFeedback] = useState("");
   const [preferredProvider,setPreferredProvider] = useState<"runway"|"faceless_video">("runway");
@@ -67,7 +68,7 @@ export function ProductionGate({ job, password, onRevised }: { job: ContentJob; 
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Aktion fehlgeschlagen; Zustand prüfen.");
-      if (name === "quoteVideo") { setQuote(data.quote); setScript(data.script); setVoiceId(data.quote.voices?.[0]?.id || ""); }
+      if (name === "quoteVideo") { setQuote(data.quote); setScript(data.script); setSceneBrief(data.sceneBrief || ""); setVoiceId(data.quote.voices?.[0]?.id || ""); }
       else if (name === "reviseContent" || name === "requestRevision") onRevised?.(data.job);
       else await refresh();
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Aktion fehlgeschlagen."); }
@@ -123,11 +124,13 @@ export function ProductionGate({ job, password, onRevised }: { job: ContentJob; 
       {run.status === "needs_provider_quote" && <button type="button" disabled={busy || !(run.providerMode === "RUNWAY_SINGLE_CLIP" ? status?.configuration.runwayApiKeyConfigured : status?.configuration.facelessApiKeyConfigured)} onClick={() => action("quoteVideo")}>Kosten und aktuelles Credit-Guthaben abrufen</button>}
       {quote && run.providerMode === "RUNWAY_SINGLE_CLIP" && run.status === "needs_provider_quote" && <div className="reviewBox">
         <p><b>30 Sekunden, 720p:</b> {quote.credits} Credits · verfügbar: {quote.balance} Credits · etwa ${(quote.credits / 100).toFixed(2)} vor Steuern (EUR-Betrag unbekannt).</p>
-        <p><b>Produktbild:</b> Der Amazon-Link dient zur Produktzuordnung. Amazon-Bilder dürfen nicht automatisch kopiert und zur Videogenerierung übertragen werden. Verwende ein eigenes Foto oder ein ausdrücklich zur Bearbeitung lizenziertes Bild.</p>
-        <label>HTTPS-Link zum eigenen/lizenzierten Produktfoto <input type="url" value={imageUrl} onChange={event=>{setImageUrl(event.target.value);setRightsConfirmed(false);}} placeholder="https://.../produktfoto.jpg" /></label>
-        <label>Oder eigenes/lizenziertes Produktfoto hochladen <input type="file" accept="image/jpeg,image/png,image/webp" onChange={event=>{setSelectedImage(event.target.files?.[0] || null);setImageUrl("");setRightsConfirmed(false);}} /></label>
+        <p><b>Szenenbild:</b> Das Startbild soll Atmosphäre, Menschen und Handlung des Drehbuchs zeigen. Ein isoliertes Produktfoto ist dafür nicht erforderlich. Ein Bild aus der Internetsuche oder von Amazon darf nur mit passenden Bearbeitungsrechten an Runway gehen.</p>
+        <p><b>Briefing für ein eigenständiges Startbild:</b></p><p style={{whiteSpace:"pre-wrap"}}>{sceneBrief}</p>
+        <label>HTTPS-Link zum eigenen/lizenzierten Szenenbild <input type="url" value={imageUrl} onChange={event=>{setImageUrl(event.target.value);setRightsConfirmed(false);}} placeholder="https://.../halloween-szene.png" /></label>
+        <label>Oder eigenes/lizenziertes Szenenbild hochladen <input type="file" accept="image/jpeg,image/png,image/webp" onChange={event=>{setSelectedImage(event.target.files?.[0] || null);setImageUrl("");setRightsConfirmed(false);}} /></label>
         <label><input type="checkbox" checked={rightsConfirmed} onChange={event=>setRightsConfirmed(event.target.checked)} /> Ich darf dieses Bild an Runway übertragen und für das Video bearbeiten lassen.</label>
-        {selectedImage && <button type="button" disabled={busy || !rightsConfirmed} onClick={uploadOwnImage}>Produktfoto hochladen</button>}
+        {selectedImage && <button type="button" disabled={busy || !rightsConfirmed} onClick={uploadOwnImage}>Szenenbild hochladen</button>}
+        {imageUrl && <p><a href={imageUrl} target="_blank" rel="noreferrer">Szenenbild vor der Kostenfreigabe ansehen</a></p>}
         <p><b>Vorgesehene Geschichte:</b></p><p style={{whiteSpace:"pre-wrap"}}>{script}</p>
         <p>KI kann Produktdetails und den gesprochenen Text verändern. Das fertige Video wird vor einem Instagram-Post getrennt geprüft und freigegeben.</p>
         <button type="button" disabled={busy || !imageUrl || !rightsConfirmed || quote.balance < quote.credits || !status?.configuration.whatsappApprovalReady} onClick={() => action("requestApproval")}>Kosten und Guthaben per WhatsApp freigeben lassen</button>

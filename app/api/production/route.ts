@@ -7,7 +7,7 @@ import { ProductionConflictError, productionRepository } from "@/lib/production/
 import { facelessClient, facelessVisualDirection, FacelessError, narration } from "@/lib/production/faceless-so";
 import { sendWhatsAppText, whatsappApprovalReady, whatsappConfig } from "@/lib/whatsapp/client";
 import { requestContentApproval } from "@/lib/whatsapp/content-approval";
-import { runwayStoryClient, runwayPrompt } from "@/lib/production/runway-story";
+import { runwayStoryClient, runwayPrompt, runwaySceneBrief } from "@/lib/production/runway-story";
 import { productionProviderSchema } from "@/lib/production/schema";
 
 export const runtime = "nodejs";
@@ -94,7 +94,7 @@ export async function POST(request: Request) {
         if (run.status !== "needs_provider_quote") throw new ProductionConflictError("Quote nur vor WhatsApp-Freigabe abrufen.");
         const job = await repo.approvedJob(input.jobId);
         if (job.content?.format !== "video" || job.content.durationSeconds !== 30) throw new ProductionConflictError("Zuerst einen 30-Sekunden-Content-Plan freigeben.");
-        return Response.json({quote:await runwayStoryClient().quote(),script:runwayPrompt(job)},{headers:{"Cache-Control":"no-store"}});
+        return Response.json({quote:await runwayStoryClient().quote(),script:runwayPrompt(job),sceneBrief:runwaySceneBrief(job)},{headers:{"Cache-Control":"no-store"}});
       }
       if (input.action === "requestApproval") {
         if (!whatsappApprovalReady()) throw new ProductionConflictError("WhatsApp-Freigabe ist noch nicht eingerichtet.");
@@ -102,7 +102,7 @@ export async function POST(request: Request) {
         const quote=await runwayStoryClient().quote();
         const imageUrl=input.imageUrl || "";
         const script=job.content?.format === "video" ? job.content.scenes.map(scene=>scene.audio.trim()).join("\n\n") : "";
-        const summary=`Produkt: ${job.opportunity.product.name}\nASIN: ${job.opportunity.product.asin}\nContent-Typ: 30-Sekunden-Video\nProvider: Runway WAN 3 (720p, Audio)\nGeschätzte Kosten: ${quote.credits} Runway-Credits (ca. $${quote.estimatedUsd.toFixed(2)} vor Steuern; EUR-Betrag unbekannt)\nAktuelles Runway-Guthaben: ${quote.balance} Credits\nBild mit bestätigten Nutzungsrechten: ${imageUrl}\nErwartete Affiliate-Provision: unbekannt\nSprechtext und Szenen:\n${runwayPrompt(job)}`.slice(0,3000);
+        const summary=`Produkt: ${job.opportunity.product.name}\nASIN: ${job.opportunity.product.asin}\nContent-Typ: 30-Sekunden-Video\nProvider: Runway WAN 3 (720p, Audio)\nGeschätzte Kosten: ${quote.credits} Runway-Credits (ca. $${quote.estimatedUsd.toFixed(2)} vor Steuern; EUR-Betrag unbekannt)\nAktuelles Runway-Guthaben: ${quote.balance} Credits\nLizenziertes Szenenbild: ${imageUrl}\nErwartete Affiliate-Provision: unbekannt\nSprechtext und Szenen:\n${runwayPrompt(job)}`.slice(0,3000);
         const approval=await repo.createRunwayApproval({jobId:input.jobId,credits:quote.credits,balance:quote.balance,imageUrl,rightsConfirmed:input.rightsConfirmed===true,approverWaId:process.env.WHATSAPP_APPROVER_WA_ID!.replace(/\D/g,""),summary,script});
         await repo.claimWhatsAppSend(approval.id);
         const messageId=await sendWhatsAppText(`${summary}\n\nAntworte auf DIESE Nachricht mit „Freigeben“ für genau einen kostenpflichtigen Runway-Videostart. „Ablehnen“ stoppt ihn; Änderungen bitte als Text senden.`);

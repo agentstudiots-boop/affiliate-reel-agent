@@ -5,7 +5,18 @@ import { getRunwayClient, RUNWAY_DURATION_SECONDS, RUNWAY_ESTIMATED_CREDITS, RUN
 export function runwayPrompt(job: ContentJob) {
   if (job.status !== "approved" || job.content?.format !== "video" || job.content.durationSeconds !== 30) throw new Error("Ein freigegebenes 30-Sekunden-Drehbuch fehlt.");
   const outline = job.content.scenes.map((scene, i) => `${i + 1}. ${scene.visual} (${scene.durationSeconds} Sekunden). Erzählertext: ${scene.audio}`).join("\n");
-  return `Vertikales 30-Sekunden-Produktvideo als zusammenhängende Geschichte. Produkt: ${job.opportunity.product.name}. Kategorie: ${job.opportunity.category}. Gezeigte Anwendung: ${job.opportunity.useCase}. Verwende das Referenzbild als visuelle Orientierung für das Produkt; keine erfundenen Eigenschaften, Markenlogos oder eingebrannte Schrift. Jede Szene zeigt Produkt und Handlungen klar. Sprich die deutschen Erzählertexte in Szenenfolge, sofern sprachlich möglich; Inhalt und Bild müssen vor Veröffentlichung kontrolliert werden.\n${outline}`.slice(0, 3800);
+  return `Vertikales 30-Sekunden-Video als zusammenhängende Geschichte. Das Referenzbild zeigt nur die Atmosphäre und Ausgangssituation, nicht zwingend das beworbene Produkt. Geschichte und sichtbare Handlungen haben Vorrang vor einer Produktaufnahme. Hook: ${job.content.hook}. Trendkontext: ${job.opportunity.trend}. Kategorie: ${job.opportunity.category}. Gezeigte Anwendung: ${job.opportunity.useCase}. Produktrolle: ${job.content.productIntegration}. Zeige nur eine neutrale Produktkategorie, falls konkrete Modellmerkmale nicht belegt sind; keine erfundenen Eigenschaften, Markenlogos oder eingebrannte Schrift. Kinder dürfen beim Kürbisschnitzen zeichnen und ausschöpfen; Schneidwerkzeuge führt eine erwachsene Person. Sprich die deutschen Erzählertexte in Szenenfolge, sofern sprachlich möglich. Videobild, Szenenfolge und Sprache müssen vor Veröffentlichung kontrolliert werden.\n${outline}`.slice(0, 3800);
+}
+
+export function runwaySceneBrief(job: ContentJob) {
+  if (job.status !== "approved" || job.content?.format !== "video" || job.content.durationSeconds !== 30) throw new Error("Ein freigegebenes 30-Sekunden-Drehbuch fehlt.");
+  const pumpkin = /(?:kürbis|kuerbis|pumpkin).{0,40}(?:schnitz|carving)|(?:schnitz|carving).{0,40}(?:kürbis|kuerbis|pumpkin)/i.test(job.opportunity.product.name);
+  return [
+    `Eigenständige, fotorealistische Hochformat-Szene als Startbild für die freigegebene Videogeschichte: ${job.content.hook}`,
+    `Ausgangsszene: ${job.content.scenes[0]?.visual}. Trend und Jahreszeit: ${job.opportunity.trend}.`,
+    pumpkin ? "Halloween-Bastelabend mit erkennbarem echten orangefarbenen Kürbis als Hauptmotiv, herbstlicher Atmosphäre und menschlicher Vorfreude. Neutrale kleine Schnitzwerkzeuge nur als Teil der Handlung. Ein Kind darf ein Gesicht vorzeichnen; eine erwachsene Person führt scharfe Werkzeuge." : `Alltagssituation und Anwendung: ${job.opportunity.useCase}. Ein menschlicher Moment und die Umgebung stehen im Mittelpunkt.`,
+    "Kein Amazon- oder Händlerfoto kopieren oder als Vorlage benutzen. Keine Markenlogos, Verpackungen, eingebrannten Texte oder erfundenen Modellmerkmale. Dieses Bild ist ein Story-Startbild und kein Beleg für die konkrete Ausführung des verlinkten Produkts.",
+  ].join("\n");
 }
 
 export function runwayStoryClient(client = getRunwayClient()) {

@@ -4,7 +4,7 @@ const {PGlite}=require('@electric-sql/pglite');
 const {applyMigrations}=require('../.test-build/lib/memory/migrations');
 const {memoryRepository}=require('../.test-build/lib/memory/repository');
 const {productionRepository,validLicensedRunwayImage}=require('../.test-build/lib/production/repository');
-const {runwayStoryClient,runwayPrompt}=require('../.test-build/lib/production/runway-story');
+const {runwayStoryClient,runwayPrompt,runwaySceneBrief}=require('../.test-build/lib/production/runway-story');
 const {contentFingerprint}=require('../.test-build/lib/whatsapp/content-approval');
 const {runContentJob}=require('../.test-build/lib/content/orchestrator');
 const {opportunitySchema}=require('../.test-build/lib/content/schema');
@@ -51,5 +51,16 @@ test('Runway 30-second story requires fresh content and cost approvals and claim
   const claimed=await repo.claimRunwayCreation(id,300);
   assert.equal(claimed.imageUrl,input.imageUrl);
   assert.match(runwayPrompt(claimed.job),/Vakuumierer/);
+  assert.match(runwayPrompt(claimed.job),/Referenzbild zeigt nur die Atmosphäre/);
+  assert.match(runwaySceneBrief(claimed.job),/eigenständige|Eigenständige/);
   await assert.rejects(repo.claimRunwayCreation(id,300),/WhatsApp/);
+});
+
+test('Halloween scene brief keeps the pumpkin and family action central without copying product photos',()=>{
+  const job={status:'approved',opportunity:{product:{name:'Halloween Kürbis Schnitzset'},trend:'Herbst und Halloween',useCase:'Familie gestaltet eine Halloweenlaterne'},content:{format:'video',durationSeconds:30,hook:'Die Laterne leuchtet gleich',scenes:[{visual:'Ein Kind zeichnet ein Gesicht auf einen echten Kürbis',durationSeconds:5,audio:'Heute wird geschnitzt'}],productIntegration:'Erwachsene schnitzen; Kinder zeichnen'}};
+  const brief=runwaySceneBrief(job);
+  assert.match(brief,/Kürbis als Hauptmotiv/);
+  assert.match(brief,/erwachsene Person führt scharfe Werkzeuge/);
+  assert.match(brief,/Kein Amazon- oder Händlerfoto kopieren/);
+  assert.match(runwayPrompt(job),/Trendkontext: Herbst und Halloween/);
 });
