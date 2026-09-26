@@ -6,7 +6,7 @@ import { imageAgent } from "./agents/image";
 import { textAgent } from "./agents/text";
 import { marketingAgent } from "./agents/marketing";
 import { analyzeProductInspiration } from "./product-inspiration";
-import { classifyOpportunity } from "./category";
+import { classifyOpportunity, pumpkinCreativeIssues } from "./category";
 import { evaluateImageCreativeQuality } from "./creative-quality";
 import { createGenerator } from "./model";
 import { contentSchema, opportunitySchema, reviewSchema, type AgentName, type Content, type ContentJob, type Decision, type Idea, type JobEvent, type JobStatus, type Opportunity, type Review } from "./schema";
@@ -163,6 +163,8 @@ export async function runContentJob(raw: Opportunity, options: {
       job.content = contentSchema.parse(await producers[job.decision.format]({ opportunity, idea, inspiration, feedback: job.review, previous: job.content }, generate));
       await status("reviewing", "Orchestrator prüft Anwendung, Glaubwürdigkeit und Umsetzbarkeit");
       const structural = inspectContent(job.content, job.decision);
+      structural.issues.push(...pumpkinCreativeIssues(opportunity, job.content));
+      if (structural.issues.length) { structural.passed = false; structural.score = Math.min(40, structural.score); }
       const semantic = job.mode === "ai" ? await generate("orchestrator", `Prüfe redaktionell streng: konkrete Alltagssituation, überzeugender Nutzen, Hook, glaubwürdige Aussagen, Modellnachweise, korrektes Zubehör, verständliche Geschichte, sprechbare Länge, Linkziel und CTA. Unbelegte konkrete Modellbehauptungen oder erfundene Erfahrungen führen zu passed=false. Keine Pflicht zu künstlichen Zusatznutzen. Gib konkrete Reparaturanweisungen; ab score 75 und ohne wesentliche Mängel bestanden.`, { opportunity, inspiration, idea, content: job.content }, reviewSchema, () => structural) : structural;
       job.review = { passed: structural.passed && semantic.passed && semantic.score >= 75 && semantic.issues.length === 0,
         score: Math.min(structural.score, semantic.score), issues: [...structural.issues, ...semantic.issues].filter((v, i, a) => a.indexOf(v) === i) };
@@ -173,6 +175,8 @@ export async function runContentJob(raw: Opportunity, options: {
     requireProduct(opportunity.product, JSON.stringify(job.content));
     await status("marketing", "Geprüften Entwurf an Marketing übergeben");
     job.marketing = await marketingAgent({ opportunity, content: job.content! }, generate);
+    const thematicIssues = pumpkinCreativeIssues(opportunity, job.content!, job.marketing);
+    if (thematicIssues.length) { job.review = { passed: false, score: 40, issues: thematicIssues }; await status("needs_input", thematicIssues.join(" ")); return job; }
     const platform = job.marketing.primary;
     const compatible = job.content!.format === "video" ? ["Instagram Reel", "Facebook Video"].includes(platform)
       : job.content!.format === "image" ? [job.content!.format === "image" && job.content!.layout === "carousel" ? "Instagram Carousel" : "Instagram Bild", "Facebook Post", "Gruppenbeitrag"].includes(platform)
