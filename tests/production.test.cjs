@@ -23,13 +23,14 @@ const opportunity=opportunitySchema.parse({
   targetPlatform:'facebook'
 });
 
-test('first 15 successful videos are forced to Faceless Storyboard',()=>{
+test('Runway is selectable from the beginning and Faceless remains available',()=>{
   for(let count=0;count<FACELESS_LEARNING_TARGET;count++){
     const decision=chooseVideoProvider(count,'runway');
-    assert.equal(decision.provider,'faceless_video');
-    assert.equal(decision.mode,'FACELESS_STORYBOARD');
-    assert.equal(decision.forced,true);
+    assert.equal(decision.provider,'runway');
+    assert.equal(decision.mode,'RUNWAY_SINGLE_CLIP');
+    assert.equal(decision.forced,false);
   }
+  assert.equal(chooseVideoProvider(0,'faceless_video').provider,'faceless_video');
   const after=chooseVideoProvider(FACELESS_LEARNING_TARGET,'runway');
   assert.equal(after.provider,'runway');
   assert.equal(after.mode,'RUNWAY_SINGLE_CLIP');

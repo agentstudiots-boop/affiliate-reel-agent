@@ -76,7 +76,7 @@ async function fixture(t) {
   await approveContent(db,memory,id);
   async function post(action, password = env.CONTENT_STUDIO_PASSWORD) {
     const response = await route.POST(new Request('https://local.test/api/production', { method: 'POST',
-      headers: { 'x-content-password': password }, body: JSON.stringify({ action, jobId: id, voiceId: 'de-test' }) }));
+      headers: { 'x-content-password': password }, body: JSON.stringify({ action, jobId: id, voiceId: 'de-test', provider: 'faceless_video' }) }));
     return { status: response.status, data: await response.json() };
   }
   async function approve() {

@@ -6,10 +6,12 @@ import { getDatabase, type Database } from "../memory/db";
 
 export class InstagramReelConflict extends Error {}
 
-export function validReelVideoUrl(value: string) {
+export function validReelVideoUrl(value: string, mode: "FACELESS_STORYBOARD" | "RUNWAY_SINGLE_CLIP" = "FACELESS_STORYBOARD") {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && !url.username && !url.password && url.hostname === "exports.faceless.so" && url.pathname.endsWith(".mp4");
+    return url.protocol === "https:" && !url.username && !url.password && url.pathname.endsWith(".mp4")
+      && (mode === "FACELESS_STORYBOARD" ? url.hostname === "exports.faceless.so"
+        : /^[a-z0-9-]+\.public\.blob\.vercel-storage\.com$/.test(url.hostname) && url.pathname.startsWith("/reels/"));
   } catch { return false; }
 }
 
@@ -61,8 +63,8 @@ export function instagramReelRepository(db: Database = getDatabase()) {
           throw new InstagramReelConflict("Nur ein freigegebener Instagram-Reel-Plan kann veröffentlicht werden.");
         }
         const videoUrl = String(row.output_url || "");
-        if (row.status !== "ready" || row.provider_mode !== "FACELESS_STORYBOARD" || !validReelVideoUrl(videoUrl)) {
-          throw new InstagramReelConflict("Fertiges öffentliches Faceless-MP4 fehlt oder hat eine ungeprüfte URL.");
+        if (row.status !== "ready" || !["FACELESS_STORYBOARD","RUNWAY_SINGLE_CLIP"].includes(String(row.provider_mode)) || !validReelVideoUrl(videoUrl,String(row.provider_mode) as "FACELESS_STORYBOARD" | "RUNWAY_SINGLE_CLIP")) {
+          throw new InstagramReelConflict("Fertiges öffentliches MP4 des gewählten Produzenten fehlt oder hat eine ungeprüfte URL.");
         }
         const { caption, hash } = reelPublication(job, videoUrl);
         const previous = await sql.query("SELECT * FROM publication_requests WHERE job_id=$1 AND platform='instagram' ORDER BY revision DESC LIMIT 1 FOR UPDATE", [jobId]);

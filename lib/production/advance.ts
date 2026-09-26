@@ -1,10 +1,31 @@
 import { productionRepository, ProductionConflictError } from "./repository";
 import { facelessClient, facelessVisualDirection, FacelessError } from "./faceless-so";
+import { runwayStoryClient } from "./runway-story";
 
 // UI and automatic continuation use the same persistent one-attempt gates.
 export async function advanceVideo(jobId: string, action: "startVideo" | "pollVideo",
   repo = productionRepository(), provider = facelessClient()) {
   const run = await repo.getByJobId(jobId);
+  if (run?.providerMode === "RUNWAY_SINGLE_CLIP") {
+    const runway = runwayStoryClient();
+    if (action === "startVideo") {
+      if (run.status !== "approved_for_spend") throw new ProductionConflictError("Runway-Kostenfreigabe fehlt.");
+      const quote = await runway.quote();
+      if (quote.balance < quote.credits) throw new ProductionConflictError("Runway-Guthaben reicht für 30 Sekunden nicht aus.");
+      const claimed = await repo.claimRunwayCreation(jobId, quote.credits);
+      // A transport error after this POST is ambiguous; never create another task automatically.
+      const created = await runway.create(claimed.job,claimed.imageUrl);
+      return { run: await repo.bindProviderJob(claimed.run.id,created.id) };
+    }
+    if (run.status !== "rendering" || !run.providerJobId) throw new ProductionConflictError("Runway-Auftrag unklar; keinen zweiten kostenpflichtigen Auftrag starten.");
+    const task = await runway.status(run.providerJobId);
+    if (task.status === "FAILED" || task.status === "CANCELLED") { await repo.markFailed(run.id); return {stage:"failed",errors:["Runway konnte das Video nicht fertigstellen."]}; }
+    if (task.status !== "SUCCEEDED") return {stage:task.status.toLowerCase()};
+    if (!task.output[0]) throw new ProductionConflictError("Runway meldet Erfolg ohne MP4. Anbieterstatus prüfen.");
+    // Archive the temporary provider URL before Instagram receives a permanent asset.
+    const outputUrl = await runway.archive(run.providerJobId,task.output[0]);
+    return {stage:"ready",run:await repo.markReady(run.id,outputUrl)};
+  }
   if (!run || run.providerMode !== "FACELESS_STORYBOARD") throw new ProductionConflictError("Vorbereiteter Faceless-Lauf fehlt.");
   if (action === "startVideo") {
     if (run.status !== "approved_for_spend") throw new ProductionConflictError("Keine gespeicherte WhatsApp-Freigabe für diesen Videostart.");

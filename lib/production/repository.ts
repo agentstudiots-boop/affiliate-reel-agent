@@ -8,6 +8,19 @@ import { approvalRequestSchema, productionRunSchema, type ApprovalRequest, type 
 import { classifyWhatsAppReply } from "../whatsapp/intent";
 import { reviseApprovedVideo } from "../content/orchestrator";
 import { hasContentApproval } from "../whatsapp/content-approval";
+import type { ProductionProvider } from "./schema";
+
+export function validLicensedRunwayImage(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password
+      && !/^(localhost|127\.|10\.|192\.168\.|169\.254\.|0\.|\[?::1\]?)/i.test(url.hostname)
+      && !url.hostname.endsWith(".internal") && !url.hostname.endsWith(".local")
+      && !/(^|\.)(amazon\.[a-z.]+|ssl-images-amazon\.com|images-amazon\.com|media-amazon\.com|amazonaws\.com)$/i.test(url.hostname)
+      && !url.hostname.endsWith(".amazon.com") && !url.hostname.endsWith(".amazon.de")
+      && /\.(png|jpe?g|webp)$/i.test(url.pathname);
+  } catch { return false; }
+}
 
 export class ProductionConflictError extends Error {}
 
@@ -83,7 +96,7 @@ export function productionRepository(db: Database = getDatabase()) {
       return result.rows[0] ? mapApproval(result.rows[0]) : null;
     },
 
-    async prepareVideo(jobId: string) {
+    async prepareVideo(jobId: string, provider: ProductionProvider = "faceless_video") {
       return db.transaction(async sql => {
         const jobResult = await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE", [jobId]);
         if (!jobResult.rows.length) throw new ProductionConflictError("Content-Job nicht gefunden.");
@@ -96,7 +109,7 @@ export function productionRepository(db: Database = getDatabase()) {
         const existing = await sql.query("SELECT * FROM production_runs WHERE job_id=$1", [jobId]);
         const count = await sql.query("SELECT count(*) AS n FROM production_runs WHERE content_type='video' AND status='ready'");
         const successfulVideos = Number(count.rows[0]?.n || 0);
-        const decision = chooseVideoProvider(successfulVideos);
+        const decision = chooseVideoProvider(successfulVideos, provider);
         if (existing.rows[0]) return { run: mapRun(existing.rows[0]), decision };
 
         const id = crypto.randomUUID();
@@ -156,6 +169,56 @@ export function productionRepository(db: Database = getDatabase()) {
           [run.id, input.estimatedCostCents, input.estimatedProviderCredits, input.script, input.voiceId],
         );
         return mapApproval(result.rows[0]);
+      });
+    },
+
+    async createRunwayApproval(input: {jobId: string; credits: number; balance: number; imageUrl: string; rightsConfirmed: boolean; approverWaId: string; summary: string; script: string}) {
+      if (!input.rightsConfirmed || !validLicensedRunwayImage(input.imageUrl)) throw new ProductionConflictError("Eigenes oder ausdrücklich lizenziertes Produktbild als HTTPS-Bilddatei erforderlich; Amazon-Bilder können nicht übernommen werden.");
+      if (input.credits !== 300 || input.balance < input.credits) throw new ProductionConflictError("Runway-Quote oder Guthaben unzureichend; keine Kostenfreigabe angefordert.");
+      return db.transaction(async sql => {
+        const rows = await sql.query("SELECT * FROM production_runs WHERE job_id=$1 AND provider_mode='RUNWAY_SINGLE_CLIP' AND status='needs_provider_quote' FOR UPDATE", [input.jobId]);
+        if (!rows.rows[0]) throw new ProductionConflictError("Neuen Runway-Lauf zuerst vorbereiten.");
+        const run = rows.rows[0];
+        const stored = await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE", [input.jobId]);
+        if (!stored.rows[0]) throw new ProductionConflictError("Content-Job fehlt.");
+        const job = parseJob(stored.rows[0].snapshot);
+        requireJobProduct(job);
+        if (job.status !== "approved" || job.content?.format !== "video" || job.content.durationSeconds !== 30) throw new ProductionConflictError("Runway benötigt derzeit ein exakt 30 Sekunden langes freigegebenes Drehbuch.");
+        if (!await hasContentApproval(job, sql)) throw new ProductionConflictError("WhatsApp-Inhaltsfreigabe fehlt.");
+        if (job.content.scenes.map(scene => scene.audio.trim()).join("\n\n") !== input.script) throw new ProductionConflictError("Drehbuch seit der Quote geändert.");
+        const existing = await sql.query("SELECT * FROM approval_requests WHERE production_run_id=$1 AND kind='render' AND status='pending'", [run.id]);
+        if (existing.rows[0]) return mapApproval(existing.rows[0]);
+        const id = crypto.randomUUID();
+        const created = await sql.query(`INSERT INTO approval_requests(id,production_run_id,job_id,kind,status,approval_token,estimated_cost_cents,estimated_commission_cents,summary,approver_wa_id)
+          VALUES($1,$2,$3,'render','pending',$4,NULL,NULL,$5,$6) RETURNING *`, [id,run.id,input.jobId,randomBytes(18).toString("base64url"),input.summary,input.approverWaId]);
+        await sql.query("UPDATE production_runs SET status='awaiting_whatsapp_approval',estimated_provider_credits=$2,provider_script=$3,runway_image_url=$4,runway_image_rights_confirmed=true,updated_at=now() WHERE id=$1", [run.id,input.credits,input.script,input.imageUrl]);
+        return mapApproval(created.rows[0]);
+      });
+    },
+
+    async runwayInput(jobId: string) {
+      const rows = await db.query("SELECT runway_image_url,runway_image_rights_confirmed FROM production_runs WHERE job_id=$1",[jobId]);
+      return rows.rows[0] ? { imageUrl: String(rows.rows[0].runway_image_url || ""), rightsConfirmed: rows.rows[0].runway_image_rights_confirmed === true } : null;
+    },
+
+    async claimRunwayCreation(jobId: string, credits: number) {
+      return db.transaction(async sql => {
+        const rows = await sql.query(`SELECT r.* FROM production_runs r JOIN approval_requests a ON a.production_run_id=r.id
+          WHERE r.job_id=$1 AND r.provider_mode='RUNWAY_SINGLE_CLIP' AND r.status='approved_for_spend'
+          AND r.provider_request_attempted_at IS NULL AND r.estimated_provider_credits >= $2
+          AND r.runway_image_rights_confirmed=true AND r.runway_image_url IS NOT NULL
+          AND a.kind='render' AND a.status='approved' AND a.whatsapp_message_id IS NOT NULL FOR UPDATE OF r`,[jobId,credits]);
+        if (!rows.rows[0]) throw new ProductionConflictError("Eindeutige WhatsApp-Kostenfreigabe und gültiges Produktbild fehlen.");
+        const stored = await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE",[jobId]);
+        if (!stored.rows[0]) throw new ProductionConflictError("Produktauftrag fehlt.");
+        const job = parseJob(stored.rows[0].snapshot);
+        requireJobProduct(job);
+        if (job.status !== "approved" || job.content?.format !== "video" || job.content.durationSeconds !== 30 || job.content.scenes.map(s => s.audio.trim()).join("\n\n") !== rows.rows[0].provider_script || !await hasContentApproval(job,sql)) throw new ProductionConflictError("Produkt oder freigegebenes Drehbuch geändert.");
+        const imageUrl = String(rows.rows[0].runway_image_url);
+        if (!validLicensedRunwayImage(imageUrl)) throw new ProductionConflictError("Produktbild ist nicht als lizenziertes HTTPS-Bild verwendbar.");
+        const claimed=await sql.query("UPDATE production_runs SET status='rendering',provider_request_key=$2,provider_request_attempted_at=now(),updated_at=now() WHERE id=$1 AND status='approved_for_spend' RETURNING *",[rows.rows[0].id,crypto.randomUUID()]);
+        await sql.query("UPDATE approval_requests SET status='consumed' WHERE production_run_id=$1 AND kind='render' AND status='approved'",[rows.rows[0].id]);
+        return {run:mapRun(claimed.rows[0]),job,imageUrl};
       });
     },
 

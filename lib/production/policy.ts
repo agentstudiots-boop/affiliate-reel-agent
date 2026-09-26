@@ -15,24 +15,24 @@ export function chooseVideoProvider(successfulVideos: number, requested?: Produc
   if (!Number.isInteger(successfulVideos) || successfulVideos < 0) {
     throw new Error("Ungültige Anzahl erfolgreicher Produktionen.");
   }
-  if (successfulVideos < FACELESS_LEARNING_TARGET) {
+  if (requested === "faceless_video") {
     return {
       provider: "faceless_video",
       mode: "FACELESS_STORYBOARD",
-      forced: true,
+      forced: false,
       successfulVideos,
       target: FACELESS_LEARNING_TARGET,
-      reason: `Lernphase: Die ersten ${FACELESS_LEARNING_TARGET} erfolgreich abgeschlossenen Videos werden zwingend mit Faceless Storyboard produziert.`,
+      reason: "Faceless ist als zweiter Kanal verfügbar. Vor jeder Produktion sind Inhalt und Kosten separat freizugeben.",
     };
   }
-  if (requested === "runway") {
+  if (requested === "runway" || !requested) {
     return {
       provider: "runway",
       mode: "RUNWAY_SINGLE_CLIP",
       forced: false,
       successfulVideos,
       target: FACELESS_LEARNING_TARGET,
-      reason: "Die Faceless-Lernphase ist abgeschlossen; Runway darf für geeignete Einzelclips gewählt werden.",
+      reason: "Runway ist für 30-Sekunden-Storys vorgesehen; ein eigenes Produktbild mit Nutzungsrecht ist erforderlich.",
     };
   }
   return {
@@ -41,6 +41,6 @@ export function chooseVideoProvider(successfulVideos: number, requested?: Produc
     forced: false,
     successfulVideos,
     target: FACELESS_LEARNING_TARGET,
-    reason: "Die Faceless-Lernphase ist abgeschlossen; Faceless bleibt der Standard, bis Performance-Daten einen anderen Renderer begründen.",
+    reason: "Faceless bleibt als zweiter Kanal verfügbar.",
   };
 }

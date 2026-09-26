@@ -15,6 +15,7 @@ type StatusResponse = {
   learningPolicy: VideoProviderDecision;
   configuration: {
     facelessApiKeyConfigured: boolean;
+    runwayApiKeyConfigured?: boolean;
     facelessApiContractVerified: boolean;
     whatsappApprovalReady: boolean;
     spendLocked: boolean;
@@ -24,7 +25,7 @@ type StatusResponse = {
 
 const modeLabel = {
   FACELESS_STORYBOARD: "Faceless Storyboard",
-  RUNWAY_SINGLE_CLIP: "Runway Einzelclip",
+  RUNWAY_SINGLE_CLIP: "Runway 30-Sekunden-Story",
 } as const;
 
 export function ProductionGate({ job, password, onRevised }: { job: ContentJob; password: string; onRevised?: (job: ContentJob) => void }) {
@@ -35,6 +36,10 @@ export function ProductionGate({ job, password, onRevised }: { job: ContentJob; 
   const [script, setScript] = useState("");
   const [voiceId, setVoiceId] = useState("");
   const [revisionFeedback, setRevisionFeedback] = useState("");
+  const [preferredProvider,setPreferredProvider] = useState<"runway"|"faceless_video">("runway");
+  const [imageUrl,setImageUrl] = useState("");
+  const [rightsConfirmed,setRightsConfirmed] = useState(false);
+  const [selectedImage,setSelectedImage] = useState<File | null>(null);
 
   async function refresh(diagnostics = false) {
     const response = await fetch(`/api/production?jobId=${encodeURIComponent(job.id)}${diagnostics ? "&diagnostics=1" : ""}`, { headers: { "x-content-password": password }, cache: "no-store" });
@@ -58,11 +63,11 @@ export function ProductionGate({ job, password, onRevised }: { job: ContentJob; 
     try {
       const response = await fetch("/api/production", {
         method: "POST", headers: { "Content-Type": "application/json", "x-content-password": password },
-        body: JSON.stringify({ action: name, jobId: job.id, ...(name === "requestApproval" ? { voiceId } : {}), ...(name === "requestRevision" ? { feedback: revisionFeedback } : {}) }),
+        body: JSON.stringify({ action: name, jobId: job.id, ...(name === "requestApproval" ? { voiceId, imageUrl, rightsConfirmed } : {}), ...(name === "requestRevision" ? { feedback: revisionFeedback } : {}) }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Aktion fehlgeschlagen; Zustand prüfen.");
-      if (name === "quoteVideo") { setQuote(data.quote); setScript(data.script); setVoiceId(data.quote.voices[0]?.id || ""); }
+      if (name === "quoteVideo") { setQuote(data.quote); setScript(data.script); setVoiceId(data.quote.voices?.[0]?.id || ""); }
       else if (name === "reviseContent" || name === "requestRevision") onRevised?.(data.job);
       else await refresh();
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Aktion fehlgeschlagen."); }
@@ -75,7 +80,7 @@ export function ProductionGate({ job, password, onRevised }: { job: ContentJob; 
       const response = await fetch("/api/production", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-content-password": password },
-        body: JSON.stringify({ action: "prepareVideo", jobId: job.id }),
+        body: JSON.stringify({ action: "prepareVideo", jobId: job.id, provider: preferredProvider }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Produktionsweg konnte nicht vorbereitet werden.");
@@ -89,6 +94,19 @@ export function ProductionGate({ job, password, onRevised }: { job: ContentJob; 
     } finally { setBusy(false); }
   }
 
+  async function uploadOwnImage() {
+    if (!selectedImage || !rightsConfirmed) return;
+    setBusy(true);setError("");
+    try {
+      const form=new FormData(); form.set("file",selectedImage); form.set("rightsConfirmed","true");
+      const response=await fetch("/api/assets/upload",{method:"POST",headers:{"x-content-password":password},body:form});
+      const data=await response.json();
+      if(!response.ok) throw new Error(data.error || "Bild konnte nicht hochgeladen werden.");
+      setImageUrl(data.url);
+    }catch(caught){setError(caught instanceof Error ? caught.message : "Bild konnte nicht hochgeladen werden.");}
+    finally{setBusy(false);}
+  }
+
   if (job.status !== "approved" || job.content?.format !== "video") return null;
   const policy = status?.learningPolicy;
   const run = status?.run;
@@ -96,14 +114,25 @@ export function ProductionGate({ job, password, onRevised }: { job: ContentJob; 
   return <section className="productionGate">
     <h3>Produktionsfreigabe</h3>
     <p>Der freigegebene Content-Plan ist der Ausgangspunkt. Ein kostenpflichtiger Renderer darf erst nach Kostenangebot und ausdrücklicher WhatsApp-Freigabe gestartet werden.</p>
-    {policy && <div className="reviewBox"><strong>Renderer-Regel: {policy.successfulVideos}/{policy.target} erfolgreiche Lernvideos</strong><p>{policy.reason}</p></div>}
-    {!run && <button type="button" className="primary" disabled={busy || !password} onClick={prepare}>{busy ? "Produktionsweg wird vorbereitet …" : "Produktionsweg vorbereiten – noch keine Kosten"}</button>}
+    {policy && <div className="reviewBox"><strong>Videoproduzent</strong><p>{policy.reason}</p></div>}
+    {!run && <><label>Produzent <select value={preferredProvider} onChange={event=>setPreferredProvider(event.target.value as "runway"|"faceless_video")}><option value="runway">Runway · 30-Sekunden-Story</option><option value="faceless_video">Faceless · Storyboard</option></select></label><button type="button" className="primary" disabled={busy || !password} onClick={prepare}>{busy ? "Produktionsweg wird vorbereitet …" : "Produktionsweg vorbereiten – noch keine Kosten"}</button></>}
     {run && <div className="marketingPlan">
       <p><b>Vorgesehener Renderer:</b> {modeLabel[run.providerMode]}</p>
       <p><b>Status:</b> {run.status === "needs_provider_quote" ? "Provider-Angebot / Kostenquote fehlt" : run.status}</p>
       {run.revisionRequest && <p><b>Änderungswunsch:</b> {run.revisionRequest}</p>}
-      {run.status === "needs_provider_quote" && <button type="button" disabled={busy || !status?.configuration.facelessApiKeyConfigured} onClick={() => action("quoteVideo")}>Kostenlose Faceless.so-Quote abrufen</button>}
-      {quote && run.status === "needs_provider_quote" && <div className="reviewBox">
+      {run.status === "needs_provider_quote" && <button type="button" disabled={busy || !(run.providerMode === "RUNWAY_SINGLE_CLIP" ? status?.configuration.runwayApiKeyConfigured : status?.configuration.facelessApiKeyConfigured)} onClick={() => action("quoteVideo")}>Kosten und aktuelles Credit-Guthaben abrufen</button>}
+      {quote && run.providerMode === "RUNWAY_SINGLE_CLIP" && run.status === "needs_provider_quote" && <div className="reviewBox">
+        <p><b>30 Sekunden, 720p:</b> {quote.credits} Credits · verfügbar: {quote.balance} Credits · etwa ${(quote.credits / 100).toFixed(2)} vor Steuern (EUR-Betrag unbekannt).</p>
+        <p><b>Produktbild:</b> Der Amazon-Link dient zur Produktzuordnung. Amazon-Bilder dürfen nicht automatisch kopiert und zur Videogenerierung übertragen werden. Verwende ein eigenes Foto oder ein ausdrücklich zur Bearbeitung lizenziertes Bild.</p>
+        <label>HTTPS-Link zum eigenen/lizenzierten Produktfoto <input type="url" value={imageUrl} onChange={event=>{setImageUrl(event.target.value);setRightsConfirmed(false);}} placeholder="https://.../produktfoto.jpg" /></label>
+        <label>Oder eigenes/lizenziertes Produktfoto hochladen <input type="file" accept="image/jpeg,image/png,image/webp" onChange={event=>{setSelectedImage(event.target.files?.[0] || null);setImageUrl("");setRightsConfirmed(false);}} /></label>
+        <label><input type="checkbox" checked={rightsConfirmed} onChange={event=>setRightsConfirmed(event.target.checked)} /> Ich darf dieses Bild an Runway übertragen und für das Video bearbeiten lassen.</label>
+        {selectedImage && <button type="button" disabled={busy || !rightsConfirmed} onClick={uploadOwnImage}>Produktfoto hochladen</button>}
+        <p><b>Vorgesehene Geschichte:</b></p><p style={{whiteSpace:"pre-wrap"}}>{script}</p>
+        <p>KI kann Produktdetails und den gesprochenen Text verändern. Das fertige Video wird vor einem Instagram-Post getrennt geprüft und freigegeben.</p>
+        <button type="button" disabled={busy || !imageUrl || !rightsConfirmed || quote.balance < quote.credits || !status?.configuration.whatsappApprovalReady} onClick={() => action("requestApproval")}>Kosten und Guthaben per WhatsApp freigeben lassen</button>
+      </div>}
+      {quote && run.providerMode === "FACELESS_STORYBOARD" && run.status === "needs_provider_quote" && <div className="reviewBox">
         <p><b>Provider-Kosten:</b> {quote.credits} Credits · verfügbar: {quote.balance} Credits · EUR-Betrag unbekannt</p>
         <p><b>Erwartete Affiliate-Provision:</b> unbekannt</p>
         <p><b>Sprechtext:</b></p><p style={{ whiteSpace: "pre-wrap" }}>{script}</p>

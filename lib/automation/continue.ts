@@ -9,7 +9,7 @@ import { advanceInstagram } from "../meta/advance-instagram";
 export async function continueReel(jobId: string) {
   const production = productionRepository();
   let run = await production.getByJobId(jobId);
-  if (!run || run.providerMode !== "FACELESS_STORYBOARD") return;
+  if (!run || !["FACELESS_STORYBOARD","RUNWAY_SINGLE_CLIP"].includes(run.providerMode)) return;
   if (run.status === "approved_for_spend") await advanceVideo(jobId, "startVideo");
   else if (run.status === "rendering" && run.providerJobId) await advanceVideo(jobId, "pollVideo");
   run = await production.getByJobId(jobId);
@@ -28,7 +28,7 @@ export async function continuePendingReels(db: Database = getDatabase(), advance
   const jobs = await db.query(`SELECT r.job_id FROM production_runs r JOIN content_jobs j ON j.id=r.job_id
     LEFT JOIN LATERAL (SELECT status,whatsapp_send_attempted_at,permalink FROM publication_requests
       WHERE job_id=r.job_id AND platform='instagram' ORDER BY revision DESC LIMIT 1) p ON true
-    WHERE r.provider_mode='FACELESS_STORYBOARD' AND j.status='approved'
+    WHERE r.provider_mode IN ('FACELESS_STORYBOARD','RUNWAY_SINGLE_CLIP') AND j.status='approved'
       AND j.snapshot->'opportunity'->>'targetPlatform'='instagram'
       AND (r.status='approved_for_spend' OR (r.status='rendering' AND r.provider_job_id IS NOT NULL)
         OR (r.status='ready' AND (p.status IS NULL
