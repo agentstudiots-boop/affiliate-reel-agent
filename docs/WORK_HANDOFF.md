@@ -1,5 +1,38 @@
 # Work handoff
 
+## Aktuell 26.09.2026: WhatsApp-Videoänderung übernommen
+
+Der Nutzer antwortete auf die Video-Kostenanfrage mit dem Wunsch, Kinder beim
+Kürbisschnitzen einzubeziehen. Die alte WhatsApp-Instruktionsroute ordnete nur
+Bild/Text/Facebook-Aufträge zu und quittierte die zitierte Antwort irreführend
+mit „keine eindeutig zuordenbare offene Freigabe“. Diese alte eingehende
+Nachricht blieb als unzugeordnet gespeichert und wurde nicht erneut abgespielt.
+
+Die Route leitet künftig Antworten auf eine offene Video-Kostenanfrage an die
+Produktionsfreigabe weiter. Ein Änderungswunsch sperrt die bisherige Quote,
+erstellt einen überarbeiteten Content-Plan und verlangt eine neue Freigabe.
+Zusätzlich kann derselbe Schritt im Content Studio sicher angestoßen werden.
+Code auf Draft PR #6, Branch `feat/production-gates-whatsapp`, Commit
+`4ea10f0c43c3a60cbc02330b8814183483cd9f12`, Preview READY; Typecheck,
+Lint und 131 Tests bestehen. Production ist weiterhin nicht aktualisiert.
+
+Der bereits unzugeordnete Änderungswunsch wurde über den geschützten
+Content-Studio-Weg in **denselben** Job `0a15c294-1038-479a-aefe-3e88069f6f3b`
+übernommen: ein Kind zeichnet das Gesicht und hilft mit einem Löffel beim
+Ausschöpfen, eine erwachsene Person führt das Schnitzwerkzeug, danach freuen
+sich beide über die leuchtende Kürbislaterne. Der alte Approval-Status ist
+`changes_requested`, der Plan wurde nochmals geprüft und freigegeben. Eine
+neue kostenlose Quote betrug wieder 20 Faceless-Credits (275 angezeigt,
+EUR-Wert unbekannt); Stimme Mila Winter. Die **neue** WhatsApp-Kostenfreigabe
+ist gesendet und hat Status `pending`, Produktionsstatus
+`awaiting_whatsapp_approval`. Noch kein neues kostenpflichtiges Video und kein
+Instagram-Post. Nur eine Antwort auf die **neue** WhatsApp darf die einmalige
+Produktion freigeben. Der Provider erzeugt eigene statische Bilder; die
+konkreten Bilder sind trotz visueller Vorgaben nicht garantiert. Die spätere
+Veröffentlichung braucht eine separate WhatsApp-Freigabe.
+
+Die folgenden Checkpoints sind frühere Stände.
+
 ## Aktuell 26.09.2026: neuer Kürbisschnitz-Reel-Plan
 
 Der Nutzer hat klargestellt: Kürbisschnitzen ist Home & Living/Deko/Basteln,
