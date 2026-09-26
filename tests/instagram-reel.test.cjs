@@ -11,14 +11,15 @@ const { instagramReelRepository } = require('../.test-build/lib/meta/instagram-r
 const { productionRepository } = require('../.test-build/lib/production/repository');
 const connection = require('../.test-build/lib/meta/connection');
 const { instagramGraph } = require('../.test-build/lib/meta/instagram-publisher');
+const { recoverRunwayPreflightIncident } = require('../.test-build/lib/automation/continue');
 
-async function fixture(t) {
+async function fixture(t, options={}) {
   const pg = new PGlite();
   t.after(() => pg.close());
   const db = { query: (q,v) => pg.query(q,v), exec: q => pg.exec(q),
     transaction: fn => pg.transaction(tx => fn({ query: (q,v) => tx.query(q,v), exec: q => tx.exec(q) })) };
   await applyMigrations(db);
-  const id = crypto.randomUUID();
+  const id = options.id || crypto.randomUUID();
   const opportunity = opportunitySchema.parse({
     product: { productVerifiedAt:'2026-09-26T08:00:00.000Z', productVerifiedName:'Kuscheldecke', name: 'Kuscheldecke', sourceUrl: 'https://www.amazon.de/dp/B000000001',affiliateUrl:'',price:'',targetGroup:'Haushalte', benefits:'Größe und Material vergleichen',notes:'' },
     useCase:'Ein kühler Herbstabend auf dem Sofa mit einer Tasse Tee.',category:'home_living',targetPlatform:'instagram',budget:'quality'
@@ -29,8 +30,8 @@ async function fixture(t) {
   assert.equal(planned.status,'awaiting_approval',planned.error);
   assert.equal(planned.marketing.primary,'Instagram Reel');
   await approveContent(db,memory,id);
-  const video = 'https://exports.faceless.so/renders/abc123/123.mp4';
-  await pg.query("INSERT INTO production_runs(id,job_id,content_type,provider,provider_mode,status,output_url) VALUES($1,$2,'video','faceless_video','FACELESS_STORYBOARD','ready',$3)", [crypto.randomUUID(),id,video]);
+  const video = options.video || 'https://exports.faceless.so/renders/abc123/123.mp4';
+  await pg.query("INSERT INTO production_runs(id,job_id,content_type,provider,provider_mode,status,output_url) VALUES($1,$2,'video',$3,$4,'ready',$5)", [crypto.randomUUID(),id,options.mode==='RUNWAY_SINGLE_CLIP'?'runway':'faceless_video',options.mode||'FACELESS_STORYBOARD',video]);
   const repo = instagramReelRepository(db);
   return {pg,db,id,repo,video};
 }
@@ -89,6 +90,25 @@ test('route rejects unauthenticated requests and never retries a Graph POST when
   assert.equal(createCalls,1);
 });
 
+test('only the documented Runway URL preflight incident can resume its already approved post',async t=>{
+  const id='9ede14e4-4b2d-4da2-9709-21e74dcc7772';
+  const video='https://k6pclvml1podnlqd.public.blob.vercel-storage.com/reels/9d13618a-5268-44e3-b073-95b755700238.mp4';
+  const f=await fixture(t,{id,video,mode:'RUNWAY_SINGLE_CLIP'});
+  const request=await f.repo.prepare(id,'4912345678');
+  await f.repo.claimWhatsAppSend(request.id);
+  await f.repo.bindMessage(request.id,'wamid.incident');
+  await f.pg.query("UPDATE publication_requests SET status='approved',decided_at=now() WHERE id=$1",[request.id]);
+  await f.repo.claimContainer(request.id);
+  await f.repo.markUnknown(request.id);
+  await f.pg.query("UPDATE publication_requests SET publish_attempted_at='2026-09-26T20:37:34Z' WHERE id=$1",[request.id]);
+  assert.equal(await recoverRunwayPreflightIncident(f.db),1);
+  assert.equal((await f.repo.get(id)).status,'approved');
+  assert.equal((await f.pg.query('SELECT publish_attempted_at FROM publication_requests WHERE id=$1',[request.id])).rows[0].publish_attempted_at,null);
+  assert.equal(await recoverRunwayPreflightIncident(f.db),0);
+  await f.pg.query("UPDATE publication_requests SET status='unknown',publish_attempted_at='2026-09-26T20:37:34Z',instagram_container_id='123' WHERE id=$1",[request.id]);
+  assert.equal(await recoverRunwayPreflightIncident(f.db),0,'an existing Instagram container must remain locked');
+});
+
 test('Instagram Graph client sends REELS container and media_publish with bearer token only',async t=>{
   t.mock.method(connection,'cachedMetaConnection',async()=>({status:'connected',publishingReadCheck:true,resolved:{pageId:'123',instagramId:'456'}}));
   t.mock.method(connection,'metaConfig',()=>({token:'private-system-token',version:'v25.0'}));
@@ -103,13 +123,14 @@ test('Instagram Graph client sends REELS container and media_publish with bearer
   const graph=await instagramGraph(transport);
   const id=await graph.create('https://exports.faceless.so/renders/abc/123.mp4','Werbung | Eine Decke fürs Sofa.');
   assert.equal(id,'777');
+  assert.equal(await graph.create('https://k6pclvml1podnlqd.public.blob.vercel-storage.com/reels/9d13618a-5268-44e3-b073-95b755700238.mp4','Werbung | Ein Kürbis wird geschnitzt.'),'777');
   assert.equal(await graph.status(id),'FINISHED');
   assert.equal(await graph.publish(id),'789');
   assert.equal(await graph.permalink('789'),'https://www.instagram.com/reel/xyz/');
-  assert.equal(calls.filter(call=>call.method==='POST').length,2);
+  assert.equal(calls.filter(call=>call.method==='POST').length,3);
   assert.match(calls[0].body,/media_type=REELS/);
   assert.match(calls[0].body,/share_to_feed=false/);
-  assert.match(calls[2].body,/creation_id=777/);
+  assert.match(calls[3].body,/creation_id=777/);
   assert.ok(calls.every(call=>call.authorization==='Bearer private-page-token'));
   assert.ok(calls.every(call=>!call.search.includes('token')));
 });

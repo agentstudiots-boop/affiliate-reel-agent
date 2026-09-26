@@ -2,8 +2,26 @@ import { getDatabase, type Database } from "../memory/db";
 import { productionRepository, ProductionConflictError } from "../production/repository";
 import { advanceVideo } from "../production/advance";
 import { instagramReelRepository, InstagramReelConflict } from "../meta/instagram-reel";
+import { InstagramPublishFailure } from "../meta/instagram-publisher";
 import { advanceInstagram } from "../meta/advance-instagram";
 import { requestVideoCostApproval } from "../production/request-cost-approval";
+
+// On 26 September at 20:37 UTC the Runway publication below was claimed and
+// rejected by a local Faceless-only URL check before any Instagram POST.
+// Reopen only this exact, approved incident; all other unknown writes stay locked.
+export async function recoverRunwayPreflightIncident(db: Database = getDatabase()) {
+  const result = await db.query(`UPDATE publication_requests p
+    SET status='approved',publish_attempted_at=NULL,updated_at=now()
+    FROM production_runs r
+    WHERE p.job_id=$1 AND p.platform='instagram' AND p.status='unknown'
+      AND p.publish_attempted_at >= $2 AND p.publish_attempted_at < $3
+      AND p.instagram_container_id IS NULL AND p.instagram_media_publish_attempted_at IS NULL AND p.meta_post_id IS NULL
+      AND p.whatsapp_message_id IS NOT NULL AND p.decided_at IS NOT NULL
+      AND r.job_id=p.job_id AND r.provider_mode='RUNWAY_SINGLE_CLIP' AND r.status='ready' AND r.output_url=p.video_url
+    RETURNING p.id`,['9ede14e4-4b2d-4da2-9709-21e74dcc7772','2026-09-26T20:37:00Z','2026-09-26T20:38:00Z']);
+  if(result.rows.length)console.info(JSON.stringify({event:'runway_preflight_recovered',jobId:'9ede14e4-4b2d-4da2-9709-21e74dcc7772'}));
+  return result.rows.length;
+}
 
 // Only saved, explicit approvals can reach a write. Unknown writes are never
 // candidates; rendering GETs always use the already persisted provider ID.
@@ -26,6 +44,7 @@ export async function continueReel(jobId: string) {
 }
 
 export async function continuePendingReels(db: Database = getDatabase(), advance = continueReel) {
+  await recoverRunwayPreflightIncident(db);
   // Recover a previously approved plan that has never reached the quote stage.
   // This includes approvals processed before WhatsApp-only continuation shipped.
   const unprepared=await db.query(`SELECT j.id FROM content_jobs j
@@ -58,7 +77,8 @@ export async function continuePendingReels(db: Database = getDatabase(), advance
     catch (error) {
       blocked++;
       console.warn(JSON.stringify({ event: "reel_continuation_blocked", jobId,
-        reason: error instanceof ProductionConflictError || error instanceof InstagramReelConflict ? "gate_or_concurrent_claim" : "provider_or_storage" }));
+        reason: error instanceof ProductionConflictError || error instanceof InstagramReelConflict ? "gate_or_concurrent_claim" : "provider_or_storage",
+        ...(error instanceof InstagramPublishFailure ? {phase:error.phase,detail:error.detail,httpStatus:error.httpStatus,code:error.code,subcode:error.subcode} : {}) }));
     }
   }
   return { considered: jobs.rows.length, advanced, blocked };

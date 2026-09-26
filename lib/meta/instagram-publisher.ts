@@ -41,7 +41,8 @@ export async function instagramGraph(transport: typeof fetch = fetch) {
   const version = config.version || "v25.0";
   return {
     async create(videoUrl: string, caption: string) {
-      if (!validReelVideoUrl(videoUrl) || !caption.startsWith("Werbung |") || caption.length > 2200) {
+      if (!(validReelVideoUrl(videoUrl, "FACELESS_STORYBOARD") || validReelVideoUrl(videoUrl, "RUNWAY_SINGLE_CLIP"))
+        || !caption.startsWith("Werbung |") || caption.length > 2200) {
         throw new InstagramPublishFailure("container","invalid_media_or_caption");
       }
       const result = await graph(`${instagramId}/media`,token.token,version,transport,"container",
