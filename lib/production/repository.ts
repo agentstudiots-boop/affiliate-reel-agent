@@ -1,3 +1,4 @@
+import { confirmLanguageExample } from "../whatsapp/language-memory";
 import { requireJobProduct } from "../content/product-contract";
 import { randomBytes } from "node:crypto";
 import { parseJob } from "../content/history";
@@ -250,6 +251,7 @@ export function productionRepository(db: Database = getDatabase()) {
             const job = parseJob(stored.rows[0].snapshot);
         requireJobProduct(job);
             if (job.status !== "awaiting_approval") throw new ProductionConflictError("Tagesentwurf wurde bereits verändert.");
+            await confirmLanguageExample(sql,job,input.from,input.id);
             job.status = "approved"; job.updatedAt = new Date().toISOString();
             const event = { sequence: job.events.length+1, at: job.updatedAt, agent: "orchestrator" as const,
               kind: "decision" as const, message: "Content-Plan nach eindeutiger WhatsApp-Freigabe genehmigt; separate Veröffentlichungsfreigabe folgt." };

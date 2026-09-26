@@ -2,7 +2,7 @@ import { getDatabase, type Database } from "../memory/db";
 import { imageProviderStatus } from "../content/image-provider";
 import { dailyNotificationTemplateConfigured, weeklyNotificationTemplateConfigured, whatsappApprovalReady } from "../whatsapp/client";
 
-export async function getOperationsSnapshot(db: Database = getDatabase(), requestOidcAvailable=false) {
+export async function getOperationsSnapshot(db: Database = getDatabase()) {
   const [days, posts, reports] = await Promise.all([
     db.query(`SELECT d.day::text AS day, d.job_id::text AS job_id, d.status,
         j.snapshot->'opportunity'->'product'->>'name' AS product,
@@ -38,8 +38,9 @@ export async function getOperationsSnapshot(db: Database = getDatabase(), reques
   const pending=await db.query(`SELECT
     (SELECT count(*)::int FROM approval_requests WHERE status='pending' AND whatsapp_message_id IS NOT NULL) AS production,
     (SELECT count(*)::int FROM publication_requests WHERE status IN ('pending','changes_requested') AND whatsapp_message_id IS NOT NULL) AS publications`);
+  const memoryReady=!!(await db.query("SELECT to_regclass('public.operator_language_examples') AS name")).rows[0]?.name;
   // Read-only, bounded operational diagnostics; never log tokens or message text.
-  console.info(JSON.stringify({event:'whatsapp_instruction_diagnostics',gatewayAuthConfigured:requestOidcAvailable||!!(process.env.AI_GATEWAY_API_KEY?.trim()||process.env.VERCEL_OIDC_TOKEN?.trim()),instructions:instructions.rows,pending:pending.rows[0]}));
+  console.info(JSON.stringify({event:'whatsapp_instruction_diagnostics',languageMemoryReady:memoryReady,parserProvider:"replicate",parserConfigured:!!process.env.REPLICATE_API_TOKEN?.trim(),instructions:instructions.rows,pending:pending.rows[0]}));
   const provider = imageProviderStatus();
   return {
     environment: process.env.VERCEL_ENV === "production" ? "production" : "preview_or_local",

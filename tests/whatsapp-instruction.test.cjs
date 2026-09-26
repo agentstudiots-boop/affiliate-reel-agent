@@ -44,22 +44,25 @@ async function fixture(t,{asset=false}={}){
 
 for(const [body,intent] of [
   ['Mach ein neues Bild mit Halloween-Kürbissen','revise_image'],
+  ['neues passendes Bild','revise_image'],
+  ['Das Bild passt nicht, mach Halloween-Deko','revise_image'],
+  ['weniger werblich','revise_text'],
   ['Der Text ist zu werblich','revise_text'],
   ['Hook kürzer und neues Bild','revise_both'],
   ['Mach es anders','clarify'],
 ])test(`structured parser transport: ${body} → ${intent}`,async t=>{
   const job=await runContentJob(opportunity(),{allowedFormats:['image']});
-  const old=process.env.AI_GATEWAY_API_KEY;process.env.AI_GATEWAY_API_KEY='test-only';
-  t.after(()=>{if(old===undefined)delete process.env.AI_GATEWAY_API_KEY;else process.env.AI_GATEWAY_API_KEY=old;});
+  const old=process.env.REPLICATE_API_TOKEN;process.env.REPLICATE_API_TOKEN='test-only';
+  t.after(()=>{if(old===undefined)delete process.env.REPLICATE_API_TOKEN;else process.env.REPLICATE_API_TOKEN=old;});
   let calls=0;
   const result=await interpretInstruction(body,job,async(url,init)=>{
-    calls++;assert.equal(url,'https://ai-gateway.vercel.sh/v1/chat/completions');
-    const request=JSON.parse(init.body);assert.equal(request.model,INSTRUCTION_MODEL);assert.equal(request.tools,undefined);
-    assert.equal(request.response_format.json_schema.strict,true);assert.equal(request.response_format.json_schema.schema.additionalProperties,false);
-    const input=JSON.parse(request.messages[1].content);assert.equal(input.operator_message,body);assert.equal(input.context.content_id,job.id);
+    calls++;assert.equal(url,`https://api.replicate.com/v1/models/${INSTRUCTION_MODEL}/predictions`);
+    const request=JSON.parse(init.body);assert.equal(request.input.max_completion_tokens,1200);assert.equal(request.tools,undefined);
+    assert.match(request.input.system_prompt,/additionalProperties/);assert.equal(request.input.temperature,0);
+    const input=JSON.parse(request.input.prompt);assert.equal(input.operator_message,body);assert.equal(input.context.content_id,job.id);
     assert.equal(input.context.product.asin,'B0D9YQR9CT');assert.equal(input.context.product.name,job.opportunity.product.name);
     assert.deepEqual(input.context.current_content,job.content);assert.ok(input.context.current_creative);assert.equal(input.context.status,job.status);
-    return Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify(intent==='clarify'?clarification():instruction(intent))}}]});
+    return Response.json({id:'prediction12345',status:'succeeded',output:[JSON.stringify(intent==='clarify'?clarification():instruction(intent))]});
   });
   assert.equal(calls,1);assert.equal(result.intent,intent);assert.equal(result.publish_requested,false);
   assert.equal(result.requires_new_generation,['revise_image','revise_both'].includes(intent));
@@ -79,10 +82,10 @@ test('invalid, uncertain, product-changing or publishing model output cannot aut
 });
 
 test('provider failures stay technical errors with a single attempt',async t=>{
-  const old=process.env.AI_GATEWAY_API_KEY;process.env.AI_GATEWAY_API_KEY='test-only';
-  t.after(()=>{if(old===undefined)delete process.env.AI_GATEWAY_API_KEY;else process.env.AI_GATEWAY_API_KEY=old;});
+  const old=process.env.REPLICATE_API_TOKEN;process.env.REPLICATE_API_TOKEN='test-only';
+  t.after(()=>{if(old===undefined)delete process.env.REPLICATE_API_TOKEN;else process.env.REPLICATE_API_TOKEN=old;});
   const job=await runContentJob(opportunity());
-  for(const response of [new Response('{}',{status:429}),Response.json({choices:[{finish_reason:'stop',message:{content:'not json'}}]})]){
+  for(const response of [new Response('{}',{status:429}),Response.json({id:'prediction12345',status:'succeeded',output:['not json']})]){
     let calls=0;await assert.rejects(interpretInstruction('Mach ein Bild',job,async()=>{calls++;return response;}),/parser_unavailable/);
     assert.equal(calls,1);
   }
@@ -181,13 +184,13 @@ test('two open products: explicit Halloween context and follow-up choose the pum
   assert.equal(resolveInstructionTarget('Neues Bild',candidates,[{body:'anderer Auftrag',job_id:crypto.randomUUID()},{body:'Halloween-Kürbisse'}],false),null);
 });
 
-test('Vercel request token works without static environment credential and never enters model input',async t=>{
-  const saved={AI_GATEWAY_API_KEY:process.env.AI_GATEWAY_API_KEY,VERCEL_OIDC_TOKEN:process.env.VERCEL_OIDC_TOKEN};
-  delete process.env.AI_GATEWAY_API_KEY;delete process.env.VERCEL_OIDC_TOKEN;
-  t.after(()=>{for(const [key,value]of Object.entries(saved)){if(value===undefined)delete process.env[key];else process.env[key]=value;}});
+test('existing Replicate credential is used without Gateway and never enters model input',async t=>{
+  const saved=process.env.REPLICATE_API_TOKEN;process.env.REPLICATE_API_TOKEN='existing-test-token';
+  t.after(()=>{if(saved===undefined)delete process.env.REPLICATE_API_TOKEN;else process.env.REPLICATE_API_TOKEN=saved;});
   const job=await runContentJob(opportunity());let calls=0;
-  const result=await interpretInstruction('Neues Bild',job,async(_url,init)=>{calls++;assert.equal(init.headers.Authorization,'Bearer request-test-token');assert.ok(!init.body.includes('request-test-token'));return Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify(instruction('revise_image'))}}]});},'request-test-token');
+  const result=await interpretInstruction('Neues Bild',job,async(url,init)=>{calls++;assert.match(url,/api.replicate.com/);assert.equal(init.headers.Authorization,'Bearer existing-test-token');assert.ok(!init.body.includes('existing-test-token'));return Response.json({id:'prediction12345',status:'succeeded',output:[JSON.stringify(instruction('revise_image'))]});});
   assert.equal(result.intent,'revise_image');assert.equal(calls,1);
+  delete process.env.REPLICATE_API_TOKEN;
   await assert.rejects(interpretInstruction('Neues Bild',job),/parser_auth_missing/);
 });
 
@@ -211,4 +214,54 @@ test('answering an ambiguous clarification with the product name resolves that n
   await f.process(message('chosen','Das Halloween-Kürbisschnitzset','wamid.notice'),async()=>instruction('revise_image'));
   assert.equal((await f.snapshot()).revisions,1);
   assert.equal((await f.db.query('SELECT snapshot FROM content_jobs WHERE id=$1',[otherId])).rows[0].snapshot.revisions,0);
+});
+
+
+test('language memory is empty until explicit plan approval, then bounded examples enter the next parse',async t=>{
+  const {loadLanguageExamples}=require('../.test-build/lib/whatsapp/language-memory');
+  const f=await fixture(t);let supplied;
+  await f.process(message('learn-image','neues passendes Bild'),async(_body,_job,_fetch,examples)=>{supplied=examples;return instruction('revise_image');});
+  assert.deepEqual(supplied,[]);
+  assert.equal((await f.db.query('SELECT * FROM operator_language_examples')).rows.length,0);
+  await f.db.query("UPDATE daily_drafts SET whatsapp_message_id='wamid.revised' WHERE job_id=$1",[f.id]);
+  const approval=await productionRepository(f.db).applyIncomingWhatsApp(message('confirm-image','Freigeben','wamid.revised'));
+  assert.equal(approval.intent,'approve');
+  const rows=(await f.db.query('SELECT * FROM operator_language_examples')).rows;
+  assert.equal(rows.length,1);assert.equal(rows[0].confirmed,true);assert.equal(rows[0].content_id,f.id);
+  const examples=await loadLanguageExamples(f.db,'491234','neues passendes Bild',await f.snapshot());
+  assert.equal(examples[0].intent,'revise_image');assert.ok(!JSON.stringify(examples).includes(scene));
+  assert.deepEqual(await loadLanguageExamples(f.db,'different-operator','neues passendes Bild',await f.snapshot()),[]);
+  const old=process.env.REPLICATE_API_TOKEN;process.env.REPLICATE_API_TOKEN='test-only';t.after(()=>{if(old===undefined)delete process.env.REPLICATE_API_TOKEN;else process.env.REPLICATE_API_TOKEN=old;});
+  await interpretInstruction('neues passendes Bild',await f.snapshot(),async(_url,init)=>{
+    const input=JSON.parse(JSON.parse(init.body).input.prompt);
+    assert.deepEqual(input.confirmed_language_examples,examples);assert.equal(input.history,undefined);assert.equal(input.context.content_id,f.id);
+    assert.ok(!init.body.includes('confirm-image'));return Response.json({id:'prediction12345',status:'succeeded',output:[JSON.stringify(instruction('revise_image'))]});
+  },examples);
+});
+
+test('operator correction becomes a separate higher-ranked example only after confirmation; old example stays intact',async t=>{
+  const {confirmLanguageExample,loadLanguageExamples}=require('../.test-build/lib/whatsapp/language-memory');
+  const f=await fixture(t,{asset:true});await f.db.query('DELETE FROM daily_drafts WHERE job_id=$1',[f.id]);
+  const long=await f.snapshot();long.content.hook='Welche kreative Kürbislaterne mit welchem Gesicht möchtest du dieses Jahr vor deiner Haustür aufstellen?';await f.db.query('UPDATE content_jobs SET snapshot=$2 WHERE id=$1',[f.id,JSON.stringify(long)]);
+  await f.process(message('original','mach das knackiger'),async()=>instruction('revise_text'));
+  await f.db.query("INSERT INTO whatsapp_events(message_id,wa_id,body,payload) VALUES('confirm-old','491234','Freigeben','{}')");
+  await confirmLanguageExample(f.db,await f.snapshot(),'491234','confirm-old');
+  const before=(await f.db.query('SELECT * FROM operator_language_examples')).rows[0];
+  await f.process(message('correction','Nein, ich meinte einen kürzeren Hook','wamid.notice'),async()=>instruction('revise_text',{text_operations:['shorten_hook']}));
+  assert.equal((await f.db.query("SELECT status,error_code FROM whatsapp_instructions WHERE message_id='correction'")).rows[0].status,'applied',JSON.stringify((await f.db.query("SELECT status,error_code FROM whatsapp_instructions WHERE message_id='correction'")).rows));
+  assert.equal((await f.db.query('SELECT * FROM operator_language_examples')).rows.length,1);
+  await f.db.query("INSERT INTO whatsapp_events(message_id,wa_id,body,payload) VALUES('confirm-new','491234','Freigeben','{}')");
+  await confirmLanguageExample(f.db,await f.snapshot(),'491234','confirm-new');
+  await confirmLanguageExample(f.db,await f.snapshot(),'491234','confirm-new');
+  const rows=(await f.db.query('SELECT * FROM operator_language_examples')).rows;
+  assert.equal(rows.length,3);assert.deepEqual(rows.find(row=>row.id===before.id),before);
+  const examples=await loadLanguageExamples(f.db,'491234','mach das knackiger',await f.snapshot());
+  assert.equal(examples[0].operator_message,'mach das knackiger');assert.equal(examples[0].corrected,true);assert.deepEqual(examples[0].text_operations,['shorten_hook']);assert.ok(examples.length<=5);
+});
+
+test('language memory absent before migration does not block core parsing',async t=>{
+  const {loadLanguageExamples}=require('../.test-build/lib/whatsapp/language-memory');
+  const f=await fixture(t);await f.db.query('DROP TABLE operator_language_examples');
+  assert.deepEqual(await loadLanguageExamples(f.db,'491234','neues Bild',f.job),[]);
+  await f.process(message('no-memory'),async()=>instruction('revise_image'));assert.equal((await f.snapshot()).revisions,1);
 });

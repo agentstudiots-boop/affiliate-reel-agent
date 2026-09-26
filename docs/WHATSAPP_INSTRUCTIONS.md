@@ -26,21 +26,28 @@ getrennte Veröffentlichungsfreigabe behalten ihre jeweilige Bedeutung.
 
 ## Modell und Kosten
 
-Ein begrenzter Chat-Completions-Aufruf über den vorhandenen Vercel-Stack / AI Gateway,
-Modell `openai/gpt-5.4-mini`. Keine neue SDK- oder Provider-Paketabhängigkeit. Authentisierung
-mit `AI_GATEWAY_API_KEY` oder dem von Vercel pro Request bereitgestellten
-`x-vercel-oidc-token`; `VERCEL_OIDC_TOKEN` bleibt für Build/lokale Ausführung unterstützt.
-Gateway-Zugang, Modellverfügbarkeit und Guthaben müssen im Zielprojekt funktionieren.
-Eine Konfiguration ist kein Nachweis eines erfolgreichen Live-Modellaufrufs.
+Ein begrenzter Textaufruf über den bereits vorhandenen Replicate-Zugang,
+Modell `openai/gpt-4.1-nano`, `REPLICATE_API_TOKEN`. Keine zusätzliche Abhängigkeit,
+kein neues Konto, kein Gateway- oder Google-Billing und kein Provider-Fallback.
+Die konkrete Textmodell-Verfügbarkeit muss live bestätigt werden; ein vorhandener
+Token oder früherer Bildaufruf beweist das noch nicht.
 
-Strict JSON Schema, zusätzliche Schlüssel verboten, Confidence mindestens 0,85,
-maximal 4.000 Zeichen Betreibertext / 22.000 Zeichen Kontext und 1.200 Ausgabetoken,
-20 Sekunden Timeout. Keine Tools, Retries, Provider-Fallbacks oder Dauerschleifen.
+Offizielles Schema: https://replicate.com/openai/gpt-4.1-nano/api/schema
+Der Replicate-Endpunkt unterstützt `system_prompt`, `prompt`, `temperature` und
+`max_completion_tokens`, aber kein `response_format` für serverseitig erzwungenes
+JSON Schema. Deshalb fordert der Systemprompt das vollständige Schema; die Anwendung
+akzeptiert ausschließlich ein JSON-Objekt, das die strikte Zod-Prüfung besteht.
+Markdown, zusätzliche Felder oder ungültige Daten können keine Aktion auslösen.
+
+Confidence mindestens 0,85, maximal 4.000 Zeichen Betreibertext / 22.000 Zeichen
+Kontext und 1.200 Ausgabetoken, Temperatur 0. Genau ein POST je Nachricht;
+`Prefer: wait=20`, serverseitig `Cancel-After: 40s`, anschließend höchstens acht
+GET-Statusabfragen derselben Prediction. Keine zweite Inferenz bei Fehler/Timeout. Keine Tools.
 Der Parser darf nur Absicht, Anweisungen und erlaubte Textoperationen zurückgeben;
 er hat keine Veröffentlichungs-, Bild-, Video- oder Produktauswahlwerkzeuge.
 
-Fehlende Authentisierung, unvollständige/ungültige Ausgabe, geringe Sicherheit oder
-Widerspruch führen zu `clarify`. Dieselbe eingegangene Nachricht wird auch nach
+Technische Fehler werden getrennt als `parser_*` protokolliert. Geringe Sicherheit,
+Schemafehler oder Widersprüche führen zu einer Rückfrage ohne Aktion. Dieselbe eingegangene Nachricht wird auch nach
 Timeout/Abbruch nicht erneut interpretiert. Nach fünf Minuten kann eine neue
 Betreibernachricht einen abgebrochenen Vorgang klären. Unklare Nachrichten- oder
 Versandergebnisse werden nicht automatisch wiederholt.
@@ -129,3 +136,38 @@ benannt und mit festem Fehlercode gespeichert, nicht als unklare Betreiberanweis
 Offizielle Laufzeit-Authentisierung: https://vercel.com/docs/oidc/reference
 Tests ergänzen zwei offene Produkte, kurze Folgeantworten, Kontextwechsel,
 Request-Token ohne statische Umgebungsvariable und Rückfragen mit technischem Fehler.
+
+
+## Bestätigtes Sprachgedächtnis (Migration 013)
+
+`operator_language_examples` speichert nur kurze, ausdrücklich bestätigte Beispiele
+in derselben Postgres-Datenbank. Kein Fine-Tuning und kein Export nach GitHub.
+Ein erfolgreich angewendeter Änderungswunsch ist noch kein Lernbeispiel. Erst die
+eindeutige WhatsApp-Freigabe des überarbeiteten Tagesplans bestätigt die letzte
+strukturierte Revision in derselben Transaktion. Zwischenzeitliche andere Änderungen
+verhindern die Übernahme einer alten Interpretation. Die bestehenden Kosten- und
+Publikationsgates bleiben unverändert. UI-Freigaben lernen vorerst keine Beispiele.
+
+Gespeichert werden Betreiber, ursprüngliche Message-ID, Bestätigungs-ID, kurze
+Formulierung, validierte Interpretation, bestehende `content_id`, Produktname/ASIN
+und Zeitstempel. Nur Nachrichten bis 1.000 Zeichen werden übernommen. Keine komplette
+WhatsApp-Historie, keine Zugangsdaten. Die bestehende operative Ereignistabelle bleibt
+unverändert und ist kein ungefilterter Lernspeicher.
+
+Eine ausdrücklich als Korrektur formulierte Antwort (z. B. „Nein, ich meinte …“) auf
+die zugeordnete Rückmeldung verknüpft das ursprüngliche Beispiel. Erst nach Freigabe
+wird die Korrektur als neuer höher gewichteter Datensatz gespeichert; alte Daten werden
+nicht überschrieben. Derzeit gilt dies für direkte Antworten auf Parser-Rückmeldungen,
+nicht für beliebige unzugeordnete Aussagen über frühere Gespräche.
+
+Vor der Interpretation werden höchstens 80 bestätigte Beispiele desselben Betreibers
+lokal nach Wortüberlappung, Produktbezug und Korrekturpriorität sortiert. Höchstens fünf
+unterschiedliche Formulierungen gehen an das Modell. Der Few-Shot-Kontext enthält
+nur Formulierung, Intent und Textoperationen; alte Bildbriefings, IDs und Produktdaten
+werden daraus entfernt. Bei weniger passenden Beispielen werden keine erfunden.
+„Freigabe“ bleibt ein exakter bestehender Gate-Befehl; gelernte Beispiele können die
+Liste zulässiger Freigabebefehle nicht erweitern.
+
+Bis Migration 013 angewendet ist, bleibt das Sprachgedächtnis leer und der Kernparser
+arbeitet ohne Beispiele. Keine automatische Migration im Webhook. Migration über
+`/api/admin/migrate`; bestehende Migrationen werden nicht wiederholt.

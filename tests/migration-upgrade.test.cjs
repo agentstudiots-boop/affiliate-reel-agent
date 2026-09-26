@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const { PGlite } = require('@electric-sql/pglite');
 const { applyMigrations } = require('../.test-build/lib/memory/migrations');
 
-test('006–012 upgrade populated 001–005 once without replaying or changing prior migrations', async () => {
+test('006–013 upgrade populated 001–005 once without replaying or changing prior migrations', async () => {
   const pg = new PGlite();
   const db = {
     query: (query, values) => pg.query(query, values),
@@ -32,12 +32,12 @@ test('006–012 upgrade populated 001–005 once without replaying or changing p
     const trackedLoader = name => { loaded.push(name); return load(name); };
 
     assert.deepEqual(await applyMigrations(db, trackedLoader), {
-      applied: ['006_daily_notification.sql', '007_publication_revisions.sql', '008_weekly_reports.sql', '009_original_visual_attempts.sql', '010_replicate_visual_provider.sql', '011_instagram_reel_publications.sql', '012_whatsapp_instructions.sql'], alreadyApplied: previous,
+      applied: ['006_daily_notification.sql', '007_publication_revisions.sql', '008_weekly_reports.sql', '009_original_visual_attempts.sql', '010_replicate_visual_provider.sql', '011_instagram_reel_publications.sql', '012_whatsapp_instructions.sql', '013_operator_language_examples.sql'], alreadyApplied: previous,
     });
     assert.deepEqual(await applyMigrations(db, trackedLoader), {
-      applied: [], alreadyApplied: [...previous, '006_daily_notification.sql', '007_publication_revisions.sql', '008_weekly_reports.sql', '009_original_visual_attempts.sql', '010_replicate_visual_provider.sql', '011_instagram_reel_publications.sql', '012_whatsapp_instructions.sql'],
+      applied: [], alreadyApplied: [...previous, '006_daily_notification.sql', '007_publication_revisions.sql', '008_weekly_reports.sql', '009_original_visual_attempts.sql', '010_replicate_visual_provider.sql', '011_instagram_reel_publications.sql', '012_whatsapp_instructions.sql', '013_operator_language_examples.sql'],
     });
-    assert.deepEqual(loaded, ['006_daily_notification.sql', '007_publication_revisions.sql', '008_weekly_reports.sql', '009_original_visual_attempts.sql', '010_replicate_visual_provider.sql', '011_instagram_reel_publications.sql', '012_whatsapp_instructions.sql'], 'existing migration SQL must never be replayed');
+    assert.deepEqual(loaded, ['006_daily_notification.sql', '007_publication_revisions.sql', '008_weekly_reports.sql', '009_original_visual_attempts.sql', '010_replicate_visual_provider.sql', '011_instagram_reel_publications.sql', '012_whatsapp_instructions.sql', '013_operator_language_examples.sql'], 'existing migration SQL must never be replayed');
     assert.deepEqual((await pg.query('SELECT * FROM schema_migrations ORDER BY name')).rows.slice(0, 5), before);
     assert.deepEqual((await pg.query('SELECT * FROM daily_drafts')).rows[0], {
       ...draft, notification_send_attempted_at: null, notification_message_id: null,

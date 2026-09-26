@@ -1,5 +1,23 @@
 # Work handoff
 
+## Aktueller Checkpoint: vorhandener Replicate-Zugang statt Gateway
+
+Der Betreiber hat weiteres Gateway-Billing ausdrücklich beendet. Der WhatsApp-Parser
+verwendet nun `openai/gpt-4.1-nano` über den bereits konfigurierten `REPLICATE_API_TOKEN`.
+Kein neuer Provider-Account, keine neue Paketabhängigkeit. Live-Textinferenz muss nach
+Deployment mit einer echten eingehenden Betreiber-Nachricht bestätigt werden. Keine
+alten Message-IDs wieder abspielen und keine bezahlte Medienproduktion zum Parser-Test.
+
+Migration 013 ergänzt bestätigte Sprachbeispiele in bestehendem Postgres. Noch live
+anzuwenden; der Kernparser bleibt ohne diese Tabelle betriebsfähig. Details und Grenzen
+stehen in `WHATSAPP_INSTRUCTIONS.md`. Bestätigung erfolgt bei ausdrücklicher Freigabe
+des überarbeiteten Tagesplans; Korrekturen bleiben neue Datensätze.
+
+Hauptbetrieb weiterhin zuerst: aktuelle Kürbisrevision, danach menschliche Kosten-/
+Publikationsfreigaben und echte Facebook-/Instagram-E2E. Production-Rollout, Cron-Zugang
+und WhatsApp-Vorlage außerhalb des Servicefensters bleiben offen. Ein grüner Build ist
+kein Beleg für autonomen Tagesbetrieb. Die folgenden Gateway-Hinweise sind historisch.
+
 ## Live-Fehler 26.09.2026, 11:31–11:32 Berlin
 
 Drei Betreiber-Nachrichten erhielten dieselbe Rückfrage. Read-only Diagnose über

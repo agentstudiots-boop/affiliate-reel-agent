@@ -5,6 +5,7 @@ import {reviseOperatorInstruction,inspectContent} from "../content/orchestrator"
 import {visualFingerprint} from "../content/visual-context";
 import {interpretInstruction,validateInstruction,clarification,InstructionParserError,type Instruction} from "./instruction";
 import {resolveInstructionTarget} from "./instruction-target";
+import {loadLanguageExamples} from "./language-memory";
 import {classifyWhatsAppReply} from "./intent";
 import {sendWhatsAppText} from "./client";
 
@@ -49,6 +50,10 @@ export async function processOperatorInstruction(input:OperatorMessage,
     const busy=row?await sql.query("SELECT 1 FROM whatsapp_instructions WHERE job_id=$1 AND status IN ('parsing','parsed') LIMIT 1",[row.id]):{rows:[]};
     const job=row&&!busy.rows.length?parseJob(row.snapshot):null;
     await sql.query("INSERT INTO whatsapp_instructions(message_id,job_id,publication_id,context_hash,status,error_code,interpretation) VALUES($1,$2,$3,$4,$5,$6,$7)",[input.id,job?.id||null,job?row!.publication_id:null,job?hash(job):null,job?'parsing':'clarify',job?null:busy.rows.length?'instruction_busy':'target_unresolved',JSON.stringify({routing:{candidate_job_ids:targets.rows.map(row=>row.id)}})]);
+    if(job && input.replyToMessageId && /^(nein[,\s]|ich meinte|korrektur:)/i.test(input.body.trim())) {
+      const previous=await sql.query("SELECT message_id FROM whatsapp_instructions WHERE job_id=$1 AND interpretation->>'notice_message_id'=$2 ORDER BY created_at DESC LIMIT 1",[job.id,input.replyToMessageId]);
+      if(previous.rows[0])await sql.query("UPDATE whatsapp_instructions SET interpretation=jsonb_set(interpretation,'{correction_source_message_id}',to_jsonb($2::text)) WHERE message_id=$1",[input.id,previous.rows[0].message_id]);
+    }
     if(job&&row?.publication_id){
       const held=await sql.query("UPDATE publication_requests SET status='changes_requested',feedback=$2,updated_at=now() WHERE id=$1 AND status IN ('pending','changes_requested','rejected') AND publish_attempted_at IS NULL RETURNING id",[row.publication_id,input.body]);
       if(!held.rows.length)throw Error('stale_instruction_context');
@@ -64,7 +69,7 @@ export async function processOperatorInstruction(input:OperatorMessage,
   let instruction:Instruction=clarification();
   let parserFailure:string|null=null;
   if(claim.job){
-    try{instruction=validateInstruction(await interpret(input.body,claim.job),input.body);}catch(error){instruction=clarification();parserFailure=error instanceof InstructionParserError?error.message:"parser_unavailable";}
+    try{const examples=await loadLanguageExamples(db,trusted,input.body,claim.job);instruction=validateInstruction(await interpret(input.body,claim.job,fetch,examples),input.body);}catch(error){instruction=clarification();parserFailure=error instanceof InstructionParserError?error.message:"parser_unavailable";}
     await db.query("UPDATE whatsapp_instructions SET status='parsed',interpretation=jsonb_set(COALESCE(interpretation,'{}'),'{instruction}',$2::jsonb),updated_at=now() WHERE message_id=$1 AND status='parsing'",[input.id,JSON.stringify(instruction)]);
   }
   let notice=claim.job?clarifyText:claim.targetNotice,dailyJobId:string|null=null;
