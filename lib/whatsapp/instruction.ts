@@ -14,6 +14,10 @@ export type Instruction = z.infer<typeof instructionSchema>;
 export const clarification = (): Instruction => ({intent:"clarify",confidence:0,keep_product:true,keep_content_id:true,
   image_instruction:null,text_instruction:null,product_instruction:null,requires_new_generation:false,
   requires_new_approval:true,publish_requested:false,product_context_matches:false,text_operations:[]});
+export class InstructionParserError extends Error {}
+export function instructionGatewayToken(requestToken?:string|null) {
+  return process.env.AI_GATEWAY_API_KEY?.trim() || requestToken?.trim() || process.env.VERCEL_OIDC_TOKEN?.trim() || null;
+}
 export const INSTRUCTION_MODEL = "openai/gpt-5.4-mini";
 
 export function instructionContext(job: ContentJob) {
@@ -39,13 +43,14 @@ export function validateInstruction(raw: unknown, body: string): Instruction {
 }
 
 // Exactly one inference, no tools, no SDK retries/fallback, bounded input/output.
-export async function interpretInstruction(body: string, job: ContentJob, request: typeof fetch = fetch): Promise<Instruction> {
+export async function interpretInstruction(body: string, job: ContentJob, request: typeof fetch = fetch, requestToken?:string|null): Promise<Instruction> {
   const literal=classifyWhatsAppReply(body);
   if (literal.intent !== "changes_requested") return {...clarification(),intent:literal.intent,confidence:1,product_context_matches:true};
-  const token=process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN;
-  if (!token || body.length>4000) return clarification();
+  const token=instructionGatewayToken(requestToken);
+  if (!token) throw new InstructionParserError("parser_auth_missing");
+  if (body.length>4000) return clarification();
   const input=JSON.stringify({operator_message:body,context:instructionContext(job)});
-  if (input.length>22000) return clarification();
+  if (input.length>22000) throw new InstructionParserError("parser_context_too_large");
   try {
     const response=await request("https://ai-gateway.vercel.sh/v1/chat/completions",{
       method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},redirect:"error",signal:AbortSignal.timeout(20000),
@@ -55,9 +60,16 @@ export async function interpretInstruction(body: string, job: ContentJob, reques
           {role:"user",content:input}],
       }),
     });
-    if(!response.ok) {console.warn(JSON.stringify({event:"instruction_parser_unavailable",httpStatus:response.status}));return clarification();}
+    if(!response.ok) {
+      console.warn(JSON.stringify({event:"instruction_parser_unavailable",httpStatus:response.status}));
+      throw new InstructionParserError(response.status===402?'parser_billing_required':[401,403].includes(response.status)?'parser_auth_rejected':'parser_unavailable');
+    }
     const output=await response.json();
     if(output.choices?.[0]?.finish_reason!=="stop")return clarification();
     return validateInstruction(JSON.parse(output.choices[0].message.content),body);
-  } catch {console.warn(JSON.stringify({event:"instruction_parser_unavailable",reason:"invalid_or_unknown_response"}));return clarification();}
+  } catch(error) {
+    if(error instanceof InstructionParserError)throw error;
+    console.warn(JSON.stringify({event:"instruction_parser_unavailable",reason:"invalid_or_unknown_response"}));
+    throw new InstructionParserError('parser_unavailable');
+  }
 }

@@ -28,7 +28,8 @@ getrennte Veröffentlichungsfreigabe behalten ihre jeweilige Bedeutung.
 
 Ein begrenzter Chat-Completions-Aufruf über den vorhandenen Vercel-Stack / AI Gateway,
 Modell `openai/gpt-5.4-mini`. Keine neue SDK- oder Provider-Paketabhängigkeit. Authentisierung
-mit `AI_GATEWAY_API_KEY` oder dem von Vercel bereitgestellten `VERCEL_OIDC_TOKEN`.
+mit `AI_GATEWAY_API_KEY` oder dem von Vercel pro Request bereitgestellten
+`x-vercel-oidc-token`; `VERCEL_OIDC_TOKEN` bleibt für Build/lokale Ausführung unterstützt.
 Gateway-Zugang, Modellverfügbarkeit und Guthaben müssen im Zielprojekt funktionieren.
 Eine Konfiguration ist kein Nachweis eines erfolgreichen Live-Modellaufrufs.
 
@@ -102,3 +103,29 @@ Idempotenz, blockierte alte Freigaben, keine direkte Medien-/Publikationsaktion,
 Produktänderungssperre, falsche Motive, Bildwiederverwendung und erneute Freigabe.
 Sie sind kein Live-Benchmark der Modellklassifikation. Ein Live-Test bleibt bis zu
 Schemaaktivierung und einer echten neuen Betreiber-Nachricht offen.
+
+
+## Korrektur nach Live-Rückmeldungen um 11:31–11:32 Uhr
+
+Drei Nachrichten wurden ohne Antwortbezug bei zwei offenen Veröffentlichungsanfragen
+als `clarify` gespeichert, noch bevor ein Modell aufgerufen wurde. Die identische
+Rückfrage vermischte fehlende Auftragszuordnung mit Verständnisproblemen.
+
+Jetzt kann eine eindeutige ASIN, Job-ID oder unterscheidbare Produktnennung unter
+den bestehenden offenen Jobs den Bezug festlegen. Kurze Folgeantworten nutzen den
+zugeordneten Dialog desselben Betreibers (höchstens 30 Minuten / zwölf Nachrichten).
+Mehrere genannte Produkte bleiben mehrdeutig. Es wird niemals einfach der neueste
+Job gewählt. Antworten auf neu versendete Rückfragen behalten ebenfalls den Jobbezug.
+
+Die bereits vorhandene JSONB-Spalte `interpretation` speichert nun eine Hülle mit
+`instruction` (streng validierte Modellantwort), `routing` und `notice_message_id`.
+Alte flache Interpretationen bleiben lesbar; keine neue Migration oder Content-ID.
+
+Der Gateway-Token wird im signaturgeprüften Webhook zusätzlich aus dem aktuellen
+Vercel-Request gelesen. Tokens gelangen weder in Jobs noch in Logs oder Modellkontext.
+Fehlender Zugang, Abrechnungsprobleme und Providerfehler werden als technische Fehler
+benannt und mit festem Fehlercode gespeichert, nicht als unklare Betreiberanweisung.
+
+Offizielle Laufzeit-Authentisierung: https://vercel.com/docs/oidc/reference
+Tests ergänzen zwei offene Produkte, kurze Folgeantworten, Kontextwechsel,
+Request-Token ohne statische Umgebungsvariable und Rückfragen mit technischem Fehler.

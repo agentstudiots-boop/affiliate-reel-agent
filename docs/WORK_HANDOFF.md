@@ -1,5 +1,25 @@
 # Work handoff
 
+## Live-Fehler 26.09.2026, 11:31–11:32 Berlin
+
+Drei Betreiber-Nachrichten erhielten dieselbe Rückfrage. Read-only Diagnose über
+`/api/operations` bestätigt: alle drei `job_id=null`, `interpretation=null`,
+`status=clarify`, kein Antwortbezug; zwei offene Publications. Damit noch kein
+Modellaufruf für diese Nachrichten. Kein kostenpflichtiges Bild oder Posting.
+
+Korrektur: eindeutige Produktnennung/ASIN löst den bestehenden Auftrag auf;
+Folgeantworten behalten zeitlich begrenzten Dialogbezug. Eigene Rückfragen speichern
+ihre WhatsApp-ID; auch die Antwort darauf kann einen angebotenen Auftrag auswählen.
+Modellzugang liest den Vercel-Request-Token zusätzlich zur statischen Konfiguration.
+Technische Fehler werden getrennt von semantischer Unklarheit gemeldet.
+
+Externer Blocker im Vercel-Dashboard bestätigt: AI Gateway zeigt „Add a Card“ zur
+Freischaltung der 5 USD Startcredits; zusätzlich ist die Rechnungsadresse unvollständig.
+Keine Zahlungsdaten eingegeben, kein neuer Schlüssel erzeugt und keine Abrechnung
+aktiviert. Work-Credits sind davon getrennt. Live-Inferenz bleibt bis zur Aktivierung
+und einer tatsächlichen erfolgreichen Antwort unbestätigt.
+
+
 ## Live-Checkpoint 26.09.2026, 09:21 UTC
 
 Preview `dpl_Cyxv1gXsPpzWGrwnScYH2jtEuSRo` / Code-Commit `ac494b4` READY;

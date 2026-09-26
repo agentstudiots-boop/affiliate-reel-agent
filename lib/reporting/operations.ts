@@ -2,7 +2,7 @@ import { getDatabase, type Database } from "../memory/db";
 import { imageProviderStatus } from "../content/image-provider";
 import { dailyNotificationTemplateConfigured, weeklyNotificationTemplateConfigured, whatsappApprovalReady } from "../whatsapp/client";
 
-export async function getOperationsSnapshot(db: Database = getDatabase()) {
+export async function getOperationsSnapshot(db: Database = getDatabase(), requestOidcAvailable=false) {
   const [days, posts, reports] = await Promise.all([
     db.query(`SELECT d.day::text AS day, d.job_id::text AS job_id, d.status,
         j.snapshot->'opportunity'->'product'->>'name' AS product,
@@ -31,15 +31,15 @@ export async function getOperationsSnapshot(db: Database = getDatabase()) {
       WHERE p.status='published' ORDER BY p.published_at DESC LIMIT 20`),
     db.query("SELECT week_start::text AS week_start,status,report_text,metrics FROM weekly_reports ORDER BY week_start DESC LIMIT 1"),
   ]);
-  const instructions=await db.query(`SELECT i.job_id,i.status,i.error_code,i.interpretation->>'intent' AS intent,
-    i.interpretation->>'confidence' AS confidence,e.reply_to_message_id IS NOT NULL AS replied,
+  const instructions=await db.query(`SELECT i.job_id,i.status,i.error_code,COALESCE(i.interpretation->'instruction'->>'intent',i.interpretation->>'intent') AS intent,
+    COALESCE(i.interpretation->'instruction'->>'confidence',i.interpretation->>'confidence') AS confidence,e.reply_to_message_id IS NOT NULL AS replied,
     length(e.body) AS message_length,i.created_at FROM whatsapp_instructions i
     JOIN whatsapp_events e ON e.message_id=i.message_id ORDER BY i.created_at DESC LIMIT 6`);
   const pending=await db.query(`SELECT
     (SELECT count(*)::int FROM approval_requests WHERE status='pending' AND whatsapp_message_id IS NOT NULL) AS production,
     (SELECT count(*)::int FROM publication_requests WHERE status IN ('pending','changes_requested') AND whatsapp_message_id IS NOT NULL) AS publications`);
   // Read-only, bounded operational diagnostics; never log tokens or message text.
-  console.info(JSON.stringify({event:'whatsapp_instruction_diagnostics',gatewayAuthConfigured:!!(process.env.AI_GATEWAY_API_KEY||process.env.VERCEL_OIDC_TOKEN),instructions:instructions.rows,pending:pending.rows[0]}));
+  console.info(JSON.stringify({event:'whatsapp_instruction_diagnostics',gatewayAuthConfigured:requestOidcAvailable||!!(process.env.AI_GATEWAY_API_KEY?.trim()||process.env.VERCEL_OIDC_TOKEN?.trim()),instructions:instructions.rows,pending:pending.rows[0]}));
   const provider = imageProviderStatus();
   return {
     environment: process.env.VERCEL_ENV === "production" ? "production" : "preview_or_local",

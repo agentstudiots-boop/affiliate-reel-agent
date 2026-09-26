@@ -78,13 +78,13 @@ test('invalid, uncertain, product-changing or publishing model output cannot aut
   assert.equal(validateInstruction(instruction('revise_text',{requires_new_generation:true}),'Text natürlicher').requires_new_generation,false);
 });
 
-test('invalid model response and HTTP failure get one attempt and clarify',async t=>{
+test('provider failures stay technical errors with a single attempt',async t=>{
   const old=process.env.AI_GATEWAY_API_KEY;process.env.AI_GATEWAY_API_KEY='test-only';
   t.after(()=>{if(old===undefined)delete process.env.AI_GATEWAY_API_KEY;else process.env.AI_GATEWAY_API_KEY=old;});
   const job=await runContentJob(opportunity());
-  for(const response of [new Response('{}',{status:429}),Response.json({choices:[{finish_reason:'length',message:{content:'{}'}}]}),Response.json({choices:[{finish_reason:'stop',message:{content:'not json'}}]})]){
-    let calls=0;const result=await interpretInstruction('Mach ein Bild',job,async()=>{calls++;return response;});
-    assert.equal(result.intent,'clarify');assert.equal(calls,1);
+  for(const response of [new Response('{}',{status:429}),Response.json({choices:[{finish_reason:'stop',message:{content:'not json'}}]})]){
+    let calls=0;await assert.rejects(interpretInstruction('Mach ein Bild',job,async()=>{calls++;return response;}),/parser_unavailable/);
+    assert.equal(calls,1);
   }
 });
 
@@ -168,4 +168,47 @@ test('signed natural-language webhook only revises and requests review; no publi
   const request=()=>new Request('https://local.test/api/whatsapp/webhook',{method:'POST',headers:{'x-hub-signature-256':`sha256=${createHmac('sha256',env.META_APP_SECRET).update(payload).digest('hex')}`},body:payload});
   assert.equal((await route.POST(request())).status,200);assert.equal((await route.POST(request())).status,200);
   assert.equal(parses,1);assert.equal(paid,0);assert.equal(published,0);assert.equal((await f.snapshot()).status,'awaiting_approval');assert.equal((await f.publication.get(f.id)).status,'changes_requested');
+});
+
+test('two open products: explicit Halloween context and follow-up choose the pumpkin job, no newest-job guessing',async()=>{
+  const {resolveInstructionTarget}=require('../.test-build/lib/whatsapp/instruction-target');
+  const pumpkin=await runContentJob(opportunity());const blanket=structuredClone(pumpkin);blanket.id=crypto.randomUUID();blanket.opportunity.product.name='Kuscheldecke';blanket.opportunity.product.asin='B000000001';
+  const candidates=[{id:blanket.id,job:blanket},{id:pumpkin.id,job:pumpkin}];
+  assert.equal(resolveInstructionTarget('Das Bild passt nicht. Neues mit Halloween-Kürbissen',candidates,[],false),pumpkin.id);
+  assert.equal(resolveInstructionTarget('Ja ein neues passendes Bild',candidates,[{body:'Neues Bild'},{body:'Ein Bild mit Halloween-Kürbissen'}],false),pumpkin.id);
+  assert.equal(resolveInstructionTarget('Neues Bild',candidates,[],false),null);
+  assert.equal(resolveInstructionTarget('Kuscheldecke statt Halloween-Kürbisse',candidates,[],false),null);
+  assert.equal(resolveInstructionTarget('Neues Bild',candidates,[{body:'anderer Auftrag',job_id:crypto.randomUUID()},{body:'Halloween-Kürbisse'}],false),null);
+});
+
+test('Vercel request token works without static environment credential and never enters model input',async t=>{
+  const saved={AI_GATEWAY_API_KEY:process.env.AI_GATEWAY_API_KEY,VERCEL_OIDC_TOKEN:process.env.VERCEL_OIDC_TOKEN};
+  delete process.env.AI_GATEWAY_API_KEY;delete process.env.VERCEL_OIDC_TOKEN;
+  t.after(()=>{for(const [key,value]of Object.entries(saved)){if(value===undefined)delete process.env[key];else process.env[key]=value;}});
+  const job=await runContentJob(opportunity());let calls=0;
+  const result=await interpretInstruction('Neues Bild',job,async(_url,init)=>{calls++;assert.equal(init.headers.Authorization,'Bearer request-test-token');assert.ok(!init.body.includes('request-test-token'));return Response.json({choices:[{finish_reason:'stop',message:{content:JSON.stringify(instruction('revise_image'))}}]});},'request-test-token');
+  assert.equal(result.intent,'revise_image');assert.equal(calls,1);
+  await assert.rejects(interpretInstruction('Neues Bild',job),/parser_auth_missing/);
+});
+
+test('technical failure tells operator the real issue and replying to that notice keeps the same job',async t=>{
+  const {InstructionParserError}=require('../.test-build/lib/whatsapp/instruction');const f=await fixture(t);
+  await f.process(message('technical'),async()=>{throw new InstructionParserError('parser_auth_missing');});
+  assert.match(f.sends[0],/technischer Fehler/);assert.doesNotMatch(f.sends[0],/Meinst du/);
+  assert.equal((await f.db.query('SELECT error_code FROM whatsapp_instructions')).rows[0].error_code,'parser_auth_missing');
+  await f.process(message('follow-up','Ja, neues Bild','wamid.notice'),async()=>instruction('revise_image'));
+  assert.equal((await f.snapshot()).revisions,1);assert.equal((await f.snapshot()).id,f.id);assert.equal(f.approvals.length,1);
+});
+
+test('answering an ambiguous clarification with the product name resolves that notice without quoting the original approval',async t=>{
+  const f=await fixture(t);const other=opportunity();const otherId=crypto.randomUUID();
+  Object.assign(other.product,{name:'Kuscheldecke',productVerifiedName:'Kuscheldecke',asin:'B000000001',sourceUrl:'https://www.amazon.de/dp/B000000001',productUrl:'https://www.amazon.de/dp/B000000001',affiliateUrl:'https://www.amazon.de/dp/B000000001?tag=alltaeglichle-21'});
+  other.useCase='Eine Kuscheldecke auf dem Sofa an einem kühlen Herbstabend verwenden.';
+  await f.memory.claim(otherId,other,'reference');await runContentJob(other,{id:otherId,allowedFormats:['image'],onUpdate:f.memory.save});
+  await f.db.query("INSERT INTO daily_drafts(day,job_id,status,whatsapp_message_id) VALUES('2026-09-25',$1,'awaiting_approval','wamid.other')",[otherId]);
+  await f.process(message('ambiguous','Neues Bild',null),async()=>{throw Error('must not infer before resolving target');});
+  assert.match(f.sends[0],/Welchen Auftrag/);assert.match(f.sends[0],/Kuscheldecke/);
+  await f.process(message('chosen','Das Halloween-Kürbisschnitzset','wamid.notice'),async()=>instruction('revise_image'));
+  assert.equal((await f.snapshot()).revisions,1);
+  assert.equal((await f.db.query('SELECT snapshot FROM content_jobs WHERE id=$1',[otherId])).rows[0].snapshot.revisions,0);
 });

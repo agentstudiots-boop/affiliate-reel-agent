@@ -1,3 +1,4 @@
+import { interpretInstruction } from "@/lib/whatsapp/instruction";
 import { processOperatorInstruction } from "@/lib/whatsapp/process-instruction";
 import { after } from "next/server";
 import { continuePendingReels } from "@/lib/automation/continue";
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
   let failed = false;
   for (const message of messages) {
     try {
-      if (await processOperatorInstruction({ ...message, payload }, { sendApproval: sendDailyApproval })) continue;
+      if (await processOperatorInstruction({ ...message, payload }, { sendApproval: sendDailyApproval, interpret: (body,job)=>interpretInstruction(body,job,fetch,request.headers.get("x-vercel-oidc-token")) })) continue;
       const result = await repo.applyIncomingWhatsApp({ ...message, payload });
       console.info(JSON.stringify({ event: "whatsapp_approval_message", messageId: message.id, handled: result.handled, reason: "reason" in result ? result.reason : undefined, intent: "intent" in result ? result.intent : undefined }));
       if (result.handled && "weeklyReportWeekStart" in result && typeof result.weeklyReportWeekStart === "string") {
