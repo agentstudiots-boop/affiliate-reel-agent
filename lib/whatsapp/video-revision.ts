@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { ContentJob } from "../content/schema";
 import { videoSchema } from "../content/schema";
-import { INSTRUCTION_MODEL, InstructionParserError } from "./instruction";
+import { INSTRUCTION_MODEL, InstructionParserError, predictionText } from "./instruction";
 
 const responseSchema = z.object({
   intent: z.enum(["revise_video", "change_product", "clarify"]),
@@ -28,19 +28,25 @@ export async function interpretVideoRevision(job: ContentJob, feedback: string, 
         prompt: input,
       } }),
     });
-    if (!response.ok) throw new InstructionParserError(response.status === 402 ? "parser_billing_required" : [401,403].includes(response.status) ? "parser_auth_rejected" : "parser_unavailable");
+    if (!response.ok) {
+      console.warn(JSON.stringify({event:"video_parser_http_error",httpStatus:response.status}));
+      throw new InstructionParserError(response.status === 402 ? "parser_billing_required" : [401,403].includes(response.status) ? "parser_auth_rejected" : "parser_unavailable");
+    }
     let prediction = await response.json();
     const id = prediction.id;
     if (typeof id !== "string" || !/^[a-z0-9]{12,64}$/.test(id)) throw new InstructionParserError("parser_unavailable");
     for (let i = 0; ["starting", "processing"].includes(prediction.status) && i < 8; i++) {
       await new Promise(resolve => setTimeout(resolve, 1000));
       const poll = await request(`https://api.replicate.com/v1/predictions/${id}`, { headers: { Authorization: `Bearer ${token}` }, redirect: "error", signal: AbortSignal.timeout(5000) });
-      if (!poll.ok) throw new InstructionParserError("parser_unavailable");
+      if (!poll.ok) {console.warn(JSON.stringify({event:"video_parser_poll_error",httpStatus:poll.status}));throw new InstructionParserError("parser_unavailable");}
       prediction = await poll.json();
       if (prediction.id !== id) throw new InstructionParserError("parser_unavailable");
     }
-    if (prediction.status !== "succeeded" || !Array.isArray(prediction.output) || !prediction.output.every((part:unknown) => typeof part === "string")) throw new InstructionParserError("parser_unavailable");
-    const output = prediction.output.join("");
+    const output=predictionText(prediction.output);
+    if (prediction.status !== "succeeded" || output===null) {
+      console.warn(JSON.stringify({event:"video_parser_result_unavailable",status:prediction.status,outputType:typeof prediction.output}));
+      throw new InstructionParserError("parser_unavailable");
+    }
     if (output.length > 18000) throw new InstructionParserError("parser_unavailable");
     const result = responseSchema.parse(JSON.parse(output));
     if (result.intent === "change_product") throw new Error("Für ein anderes Produkt ist ein neuer Auftrag nötig.");

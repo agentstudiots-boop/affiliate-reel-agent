@@ -177,8 +177,11 @@ test('pumpkin reel tells a visible carving story with product context and no mod
   assert.equal(family.content.durationSeconds,30);
   const natural=await reviseApprovedVideo(job,'Der Begleittext passt nicht erkennbar klingt nach System intern');
   assert.equal(natural.status,'awaiting_approval');
-  assert.match(natural.content.caption,/Werbung \| Ein echter Kürbis/);
+  assert.match(natural.content.caption,/Werbung \| Ein Kürbis wird zur Halloweenlaterne/);
   assert.doesNotMatch(natural.content.caption,/Produktname, ASIN und Produktlink stehen im Beitragstext/);
+  const plain=await reviseApprovedVideo(job,'Der Begleittext ist unpassend formuliert',async()=>{throw Error('Kein externer Parser nötig');});
+  assert.notEqual(plain.content.caption,job.content.caption);
+  assert.match(plain.content.caption,/Kürbis wird zur Halloweenlaterne/);
   const broader=await reviseApprovedVideo(job,'Bitte zeige zuerst die fertige Laterne und dann als Rückblende die Schnitzarbeit',async ()=>({
     ...job.content,scenes:[
       {...job.content.scenes[0],visual:'Die fertige leuchtende Kürbislaterne am Basteltisch. Dann Rückblende zum echten Kürbis und dem Vorzeichnen.'},

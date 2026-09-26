@@ -3,7 +3,7 @@ import { authorized } from "@/lib/memory/auth";
 import { databaseConfigured, getDatabase } from "@/lib/memory/db";
 import { ConflictError, memoryRepository } from "@/lib/memory/repository";
 import { performanceSchema } from "@/lib/memory/schema";
-import { requestContentApproval } from "@/lib/whatsapp/content-approval";
+import { requestContentApproval, resumeFailedVideoCorrection } from "@/lib/whatsapp/content-approval";
 export const runtime = "nodejs";
 function guard(request: Request) {
   if (!authorized(request)) return Response.json({ error: "Zugangscode erforderlich." }, { status: 401 });
@@ -30,6 +30,7 @@ export async function GET(request: Request) {
 }
 const mutation = z.discriminatedUnion("action",[
   z.object({ action:z.literal("requestContentApproval"), jobId:z.string().uuid() }),
+  z.object({ action:z.literal("resumeFailedVideoCorrection"), jobId:z.string().uuid() }),
   z.object({ action:z.literal("performance"), data:performanceSchema }),
 ]);
 export async function POST(request: Request) {
@@ -39,7 +40,9 @@ export async function POST(request: Request) {
     if (raw.length > 12000) return Response.json({ error:"Eingabe zu groß." },{status:413});
     const input=mutation.parse(JSON.parse(raw));
     const repo=memoryRepository();
-    return Response.json(input.action === "requestContentApproval" ? { approval:await requestContentApproval(input.jobId) } : { result:await repo.recordPerformance(input.data) });
+    return Response.json(input.action === "requestContentApproval" ? { approval:await requestContentApproval(input.jobId) }
+      : input.action === "resumeFailedVideoCorrection" ? await resumeFailedVideoCorrection(input.jobId)
+      : { result:await repo.recordPerformance(input.data) });
   } catch(error) {
     const known=error instanceof Error && /^(Eine Inhaltsfreigabe ist bereits offen\.|WhatsApp-Servicefenster geschlossen\.|Der vollständige Entwurf ist für eine WhatsApp-Nachricht zu lang\.)/.test(error.message);
     return Response.json({error:error instanceof z.ZodError ? error.issues.map(i=>i.message).join(" ") : error instanceof ConflictError || known ? (error as Error).message : "Speichern fehlgeschlagen. Keine Änderung bestätigt."},

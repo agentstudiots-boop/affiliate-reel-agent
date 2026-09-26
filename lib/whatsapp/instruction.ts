@@ -15,7 +15,12 @@ export const clarification = (): Instruction => ({intent:"clarify",confidence:0,
   image_instruction:null,text_instruction:null,product_instruction:null,requires_new_generation:false,
   requires_new_approval:true,publish_requested:false,product_context_matches:false,text_operations:[]});
 export class InstructionParserError extends Error {}
-export const INSTRUCTION_MODEL = "openai/gpt-4.1-nano";
+export const INSTRUCTION_MODEL = "openai/gpt-4.1";
+export function predictionText(output:unknown):string|null {
+  if(typeof output==="string")return output;
+  if(Array.isArray(output)&&output.every(part=>typeof part==="string"))return output.join("");
+  return null;
+}
 export type LanguageExample = {operator_message:string; intent:Instruction["intent"]; text_operations:Instruction["text_operations"]; corrected:boolean};
 export function instructionParserConfigured() { return !!process.env.REPLICATE_API_TOKEN?.trim(); }
 
@@ -73,8 +78,8 @@ export async function interpretInstruction(body: string, job: ContentJob, reques
       prediction=await poll.json();
       if(prediction.id!==id)throw new InstructionParserError('parser_unavailable');
     }
-    if(prediction.status!=="succeeded" || !Array.isArray(prediction.output) || !prediction.output.every((part:unknown)=>typeof part==='string'))throw new InstructionParserError('parser_unavailable');
-    const output=prediction.output.join('');
+    const output=predictionText(prediction.output);
+    if(prediction.status!=="succeeded" || output===null)throw new InstructionParserError('parser_unavailable');
     if(output.length>10000)throw new InstructionParserError('parser_unavailable');
     const result=validateInstruction(JSON.parse(output),body);
     console.info(JSON.stringify({event:'instruction_parser_result',provider:'replicate',model:INSTRUCTION_MODEL,intent:result.intent,confidence:result.confidence}));

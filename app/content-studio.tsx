@@ -124,6 +124,14 @@ export function ContentStudio({ product, onFillReelTest }: { product: Product; o
     if(!response.ok)throw Error(data.error||"Freigabestatus nicht erreichbar.");
     setApprovalDelivery(data.approval?{jobId:job.id,...data.approval}:{jobId:job.id,status:"none",delivered:false});
   }
+  async function resumeCorrection() {
+    if(!job)return;
+    const response=await fetch("/api/content/jobs",{method:"POST",headers:{"Content-Type":"application/json","x-content-password":password},body:JSON.stringify({action:"resumeFailedVideoCorrection",jobId:job.id})});
+    const data=await response.json();
+    if(!response.ok)throw Error(data.error||"Korrektur konnte nicht übernommen werden.");
+    remember(parseJob(data.job));
+    setError(data.approvalSent?"Deine WhatsApp-Korrektur ist eingearbeitet. Der neue Entwurf wurde zur Inhaltsfreigabe gesendet.":`Korrektur gespeichert; WhatsApp-Versand offen: ${data.reason}`);
+  }
   function download() {
     if (!job) return;
     const url = URL.createObjectURL(new Blob([JSON.stringify(job, null, 2)], { type: "application/json" }));
@@ -174,7 +182,7 @@ export function ContentStudio({ product, onFillReelTest }: { product: Product; o
       {job.content && <ContentPreview content={job.content} />}
       {job.review && <p className={job.review.passed ? "muted" : "error"}>{job.review.passed ? "Redaktionelle Vorprüfung bestanden – keine unabhängige Faktenprüfung." : `Überarbeiten: ${job.review.issues.join(" ")}`}</p>}
       {job.marketing && <div className="marketingPlan"><h3>Marketing: {job.marketing.primary}</h3><p>{job.marketing.rationale}</p><p><b>Zielgruppe:</b> {job.marketing.audience}</p><p>{job.marketing.adaptation}</p><p><b>Linkplatzierung:</b> {job.marketing.linkPlacement}</p><p>{job.marketing.conversionHypothesis}</p><p><b>Messen:</b> {job.marketing.metrics.join(" · ")}</p><ul>{job.marketing.publishingChecks.map(c => <li key={c}>{c}</li>)}</ul></div>}
-      <div className="contentActions">{job.status === "awaiting_approval" && <><button type="button" className="primary" onClick={approve}>Inhalt per WhatsApp zur Freigabe senden</button><button type="button" className="ghost" onClick={()=>checkApproval().catch(caught=>setError(caught instanceof Error?caught.message:"Freigabestatus nicht erreichbar."))}>WhatsApp-Freigabestatus prüfen</button></>}<button type="button" className="ghost" onClick={download}>Job & Protokoll herunterladen</button></div>
+      <div className="contentActions">{job.status === "awaiting_approval" && <><button type="button" className="primary" onClick={approve}>Inhalt per WhatsApp zur Freigabe senden</button><button type="button" className="ghost" onClick={()=>checkApproval().catch(caught=>setError(caught instanceof Error?caught.message:"Freigabestatus nicht erreichbar."))}>WhatsApp-Freigabestatus prüfen</button>{approvalDelivery?.jobId===job.id&&approvalDelivery.status==="changes_requested"&&job.content?.format==="video"&&<button type="button" className="ghost" onClick={()=>resumeCorrection().catch(caught=>setError(caught instanceof Error?caught.message:"Korrektur nicht verfügbar."))}>Gespeicherte WhatsApp-Korrektur bearbeiten</button>}</>}<button type="button" className="ghost" onClick={download}>Job & Protokoll herunterladen</button></div>
       {approvalDelivery?.jobId===job.id && <p role="status">Inhaltsfreigabe: {approvalDelivery.status==="none"?"noch nicht angefordert":approvalDelivery.delivered?`${approvalDelivery.status} · WhatsApp-Nachrichten-ID gespeichert`:`${approvalDelivery.status} · Versand nicht bestätigt; nicht erneut senden`}</p>}
       {job.status === "approved" && <><p className="success">Content-Plan freigegeben. Kostenpflichtige Produktion und Veröffentlichung benötigen getrennte Freigaben.</p><ProductionGate job={job} password={password} onRevised={remember} />{job.content && job.content.format !== "video" && <PublicationGate key={job.id} job={job} password={password} />}</>}
       {terminalStatuses.includes(job.status) && <PerformanceEditor key={job.id} jobId={job.id} password={password} />}

@@ -157,6 +157,30 @@ export async function handleContentApproval(input:Incoming) {
   return true;
 }
 
+// Resume a safely recorded WhatsApp correction if the optional language provider
+// failed after the original approval was locked. No producer can start here.
+export async function resumeFailedVideoCorrection(jobId:string) {
+  const db=getDatabase();
+  const rows=await db.query("SELECT id,job_id,content_hash,feedback FROM content_approval_requests WHERE job_id=$1 AND status='changes_requested' AND whatsapp_message_id IS NOT NULL ORDER BY created_at DESC LIMIT 1",[jobId]);
+  if(!rows.rows[0])throw Error("Kein gespeicherter WhatsApp-Änderungswunsch für diesen Auftrag.");
+  const request=rows.rows[0];
+  const feedback=String(request.feedback || "");
+  const stored=await db.query("SELECT snapshot FROM content_jobs WHERE id=$1",[jobId]);
+  if(!stored.rows[0])throw Error("Content-Auftrag fehlt.");
+  const original=parseJob(stored.rows[0].snapshot);
+  if(original.status!=="awaiting_approval"||original.content?.format!=="video"||contentFingerprint(original)!==request.content_hash)throw Error("WhatsApp-Änderungswunsch ist nicht mehr aktuell.");
+  const revised=await reviseApprovedVideo({...original,status:"approved"},feedback);
+  await db.transaction(async sql=>{
+    const pending=await sql.query("SELECT id,feedback FROM content_approval_requests WHERE id=$1 AND status='changes_requested' FOR UPDATE",[request.id]);
+    const current=await sql.query("SELECT snapshot,event_sequence FROM content_jobs WHERE id=$1 FOR UPDATE",[jobId]);
+    if(!pending.rows[0]||!current.rows[0]||pending.rows[0].feedback!==feedback||contentFingerprint(parseJob(current.rows[0].snapshot))!==request.content_hash)throw Error("Entwurf oder Änderungswunsch inzwischen verändert.");
+    await sql.query("UPDATE content_jobs SET status='awaiting_approval',snapshot=$2,event_sequence=$3,updated_at=$4 WHERE id=$1",[jobId,JSON.stringify(revised),revised.events.length,revised.updatedAt]);
+    for(const event of revised.events.filter(e=>e.sequence>Number(current.rows[0].event_sequence)))await sql.query("INSERT INTO job_events(job_id,sequence,agent,kind,occurred_at,payload) VALUES($1,$2,$3,$4,$5,$6)",[jobId,event.sequence,event.agent,event.kind,event.at,JSON.stringify(event)]);
+  });
+  try {await requestContentApproval(jobId);return {job:revised,approvalSent:true};}
+  catch(error){return {job:revised,approvalSent:false,reason:error instanceof Error?error.message:"Versand unklar."};}
+}
+
 export async function hasContentApproval(job:ContentJob, sql:Sql=getDatabase()) {
   const record=await sql.query("SELECT 1 FROM content_approval_requests WHERE job_id=$1 AND status='approved' AND content_hash=$2 AND whatsapp_message_id IS NOT NULL LIMIT 1",[job.id,contentFingerprint(job)]);
   if(record.rows.length)return true;

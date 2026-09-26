@@ -2,7 +2,13 @@ const { approveContent } = require('./helpers/approve-content.cjs');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {PGlite}=require('@electric-sql/pglite');
-const {interpretInstruction,validateInstruction,clarification,INSTRUCTION_MODEL}=require('../.test-build/lib/whatsapp/instruction');
+const {interpretInstruction,validateInstruction,clarification,INSTRUCTION_MODEL,predictionText}=require('../.test-build/lib/whatsapp/instruction');
+test('strong pretrained parser accepts both documented text output shapes',()=>{
+  assert.equal(INSTRUCTION_MODEL,'openai/gpt-4.1');
+  assert.equal(predictionText('plain JSON'),'plain JSON');
+  assert.equal(predictionText(['plain ','JSON']),'plain JSON');
+  assert.equal(predictionText({unexpected:true}),null);
+});
 const {processOperatorInstruction}=require('../.test-build/lib/whatsapp/process-instruction');
 const {runContentJob,reviseOperatorInstruction}=require('../.test-build/lib/content/orchestrator');
 const {visualContextError,visualFingerprint}=require('../.test-build/lib/content/visual-context');

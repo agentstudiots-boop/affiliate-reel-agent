@@ -15,6 +15,7 @@ const opportunity = {
 
 test('ordinary German copy feedback reaches the right agent across post formats',async()=>{
   assert.equal(asksForNaturalCopy('Der Begleittext passt nicht erkennbar klingt nach System intern'),true);
+  assert.equal(asksForNaturalCopy('Der Begleittext ist unpassend formuliert'),true);
   assert.equal(asksForNaturalCopy('Die Bildhandlung passt nicht zum Kürbis'),false);
   for(const [format,changes] of [['video',{targetPlatform:'instagram',budget:'quality'}],['image',{budget:'low'}],['text',{goal:'community'}]]){
     const job=await runContentJob({...opportunity,...changes},{allowedFormats:[format]});
