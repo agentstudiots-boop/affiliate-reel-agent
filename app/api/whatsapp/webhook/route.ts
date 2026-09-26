@@ -70,6 +70,17 @@ export async function POST(request: Request) {
         try { await requestFacebookApproval(result.dailyJobId); }
         catch { console.error(JSON.stringify({event:"daily_publication_preparation_unknown",jobId:result.dailyJobId})); }
       }
+      if (result.handled && "productionRunId" in result && result.intent === "changes_requested" && "jobId" in result && typeof result.jobId === "string") {
+        try {
+          const revised = await repo.reviseRequestedVideo(result.jobId);
+          try { await sendWhatsAppText(`Videoänderung für ${revised.opportunity.product.name} übernommen. Der überarbeitete Content-Plan muss erneut geprüft und freigegeben werden. Die alte Kostenfreigabe ist ungültig; es wurde nichts produziert oder veröffentlicht.`); }
+          catch { console.error(JSON.stringify({ event: "video_revision_notice_unknown", jobId: result.jobId })); }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Änderung nicht umsetzbar.";
+          try { await sendWhatsAppText(`Änderungswunsch gespeichert; Video noch nicht geändert: ${message}. Im Content Studio prüfen. Keine Produktion oder Veröffentlichung.`); }
+          catch { console.error(JSON.stringify({ event: "video_revision_clarification_unknown", jobId: result.jobId })); }
+        }
+      }
       if (result.handled && "publicationId" in result && typeof result.publicationId === "string" && result.intent === "changes_requested" && result.platform === "facebook") {
         const publicationRepo = publicationRepository();
         try {
