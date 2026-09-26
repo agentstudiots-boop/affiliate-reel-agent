@@ -187,17 +187,24 @@ export function productionRepository(db: Database = getDatabase()) {
     },
 
     async reviseRequestedVideo(jobId: string) {
+      const current = await db.query(`SELECT r.revision_request,j.snapshot,j.event_sequence FROM production_runs r
+        JOIN content_jobs j ON j.id=r.job_id WHERE r.job_id=$1 AND r.status='changes_requested'`,[jobId]);
+      if (!current.rows[0]) throw new ProductionConflictError("Kein offener Änderungsauftrag für diesen Produktionsjob.");
+      const original = parseJob(current.rows[0].snapshot);
+      const feedback = String(current.rows[0].revision_request);
+      let revised;
+      try { revised = await reviseApprovedVideo(original, feedback); }
+      catch (error) { throw new ProductionConflictError(error instanceof Error ? error.message : "Änderung nicht umsetzbar."); }
       return db.transaction(async sql => {
         const run = await sql.query("SELECT * FROM production_runs WHERE job_id=$1 AND status='changes_requested' FOR UPDATE", [jobId]);
         if (!run.rows[0]) throw new ProductionConflictError("Kein offener Änderungsauftrag für diesen Produktionsjob.");
         const stored = await sql.query("SELECT snapshot,event_sequence FROM content_jobs WHERE id=$1 FOR UPDATE", [jobId]);
         if (!stored.rows[0]) throw new ProductionConflictError("Content-Job fehlt.");
-        const original = parseJob(stored.rows[0].snapshot);
-        let revised;
-        try { revised = await reviseApprovedVideo(original, String(run.rows[0].revision_request)); }
-        catch (error) { throw new ProductionConflictError(error instanceof Error ? error.message : "Änderung nicht umsetzbar."); }
+        if (String(run.rows[0].revision_request) !== feedback || JSON.stringify(parseJob(stored.rows[0].snapshot)) !== JSON.stringify(original)) {
+          throw new ProductionConflictError("Änderungsauftrag wurde inzwischen geändert. Bitte aktuellen Stand laden.");
+        }
         const previousSequence = Number(stored.rows[0].event_sequence);
-        if (previousSequence !== original.events.length) throw new ProductionConflictError("Content-Protokoll wurde zwischenzeitlich geändert.");
+        if (previousSequence !== original.events.length || previousSequence !== Number(current.rows[0].event_sequence)) throw new ProductionConflictError("Content-Protokoll wurde zwischenzeitlich geändert.");
         await sql.query("UPDATE content_jobs SET status='awaiting_approval',snapshot=$2,event_sequence=$3,updated_at=$4 WHERE id=$1", [jobId, JSON.stringify(revised), revised.events.length, revised.updatedAt]);
         for (const event of revised.events.filter(item => item.sequence > previousSequence)) {
           await sql.query("INSERT INTO job_events(job_id,sequence,agent,kind,occurred_at,payload) VALUES($1,$2,$3,$4,$5,$6)", [jobId, event.sequence, event.agent, event.kind, event.at, JSON.stringify(event)]);
