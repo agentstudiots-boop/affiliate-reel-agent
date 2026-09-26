@@ -165,6 +165,15 @@ test('pumpkin reel tells a visible carving story with product context and no mod
   assert.match(revised.content.scenes[2].visual,/erwachsene Person schnitzt/);
   assert.match(revised.content.caption,/Kind zeichnet das Gesicht vor/);
   assert.deepEqual(pumpkinCreativeIssues(revised.opportunity,revised.content),[]);
+  const broader=await reviseApprovedVideo(job,'Bitte zeige zuerst die fertige Laterne und dann als Rückblende die Schnitzarbeit',async ()=>({
+    ...job.content,scenes:[
+      {...job.content.scenes[0],visual:'Die fertige leuchtende Kürbislaterne am Basteltisch. Dann Rückblende zum echten Kürbis und dem Vorzeichnen.'},
+      ...job.content.scenes.slice(1),
+    ],
+  }));
+  assert.equal(broader.status,'awaiting_approval');
+  assert.match(broader.content.scenes[0].visual,/Rückblende/);
+  assert.ok(broader.events.some(event=>event.agent==='video' && event.message==='Revision 1 erstellt'));
 });
 
 test('missing image provider cannot silently fall back to the typographic card',()=>{
