@@ -64,9 +64,29 @@ test('WhatsApp approves the exact finished script before any video production ca
   assert.equal(pending.rows.length,1);
   assert.equal((await handleContentApproval({id:'wamid.old',from:'491234',body:'Freigeben',replyToMessageId:first.messageId,payload:{}})),true);
   await assert.rejects(repo.prepareVideo(id),/freigegeben/);
-  assert.equal((await handleContentApproval({id:'wamid.new',from:'491234',body:'Freigeben',replyToMessageId:pending.rows[0].whatsapp_message_id,payload:{}})),true);
+  const corrections=[
+    'Der Begleittext klingt maschinell, bitte menschlicher schreiben.',
+    'Mach die erste Szene kürzer.',
+    'CTA weniger werblich formulieren.',
+  ];
+  let currentMessageId=pending.rows[0].whatsapp_message_id;
+  for(const [index,feedback] of corrections.entries()){
+    assert.equal(await handleContentApproval({id:`wamid.change.${index}`,from:'491234',body:feedback,replyToMessageId:currentMessageId,payload:{}}),true);
+    const next=(await memory.list()).find(job=>job.id===id);
+    assert.equal(next.status,'awaiting_approval');
+    assert.equal(next.revisions,index+2);
+    assert.equal(await hasContentApproval(next,db),false);
+    await assert.rejects(repo.prepareVideo(id),/freigegeben/);
+    const active=await db.query("SELECT whatsapp_message_id FROM content_approval_requests WHERE job_id=$1 AND status='pending'",[id]);
+    assert.equal(active.rows.length,1);
+    assert.notEqual(active.rows[0].whatsapp_message_id,currentMessageId);
+    currentMessageId=active.rows[0].whatsapp_message_id;
+  }
+  assert.equal(await handleContentApproval({id:'wamid.old-again',from:'491234',body:'Freigabe',replyToMessageId:first.messageId,payload:{}}),true);
+  assert.equal(await handleContentApproval({id:'wamid.latest',from:'491234',body:'Freigabe',replyToMessageId:currentMessageId,payload:{}}),true);
   const approved=(await memory.list()).find(job=>job.id===id);
   assert.equal(approved.status,'approved');
+  assert.equal(approved.revisions,4);
   assert.equal(await hasContentApproval(approved,db),true);
   assert.equal((await repo.prepareVideo(id)).run.status,'needs_provider_quote');
   assert.equal((await db.query('SELECT count(*)::int AS n FROM production_runs')).rows[0].n,1);

@@ -223,6 +223,8 @@ test('WhatsApp change request is revised by orchestrator and needs fresh editori
     await assert.rejects(production.reviseRequestedVideo(id),/Kein offener/);
     const raw=await pg.query('SELECT count(*) AS n FROM job_events WHERE job_id=$1',[id]);
     assert.equal(Number(raw.rows[0].n),revised.events.length+1);
-    await assert.rejects(reviseApprovedVideo({...revised,status:'approved',revisions:2},'Mach die erste Szene kürzer.'),/Maximal zwei/);
+    const further=await reviseApprovedVideo({...revised,status:'approved',revisions:2},'Der Begleittext klingt maschinell, bitte menschlicher.');
+    assert.equal(further.revisions,3);
+    assert.equal(further.status,'awaiting_approval');
   }finally{if(old===undefined)delete process.env.WHATSAPP_APPROVER_WA_ID;else process.env.WHATSAPP_APPROVER_WA_ID=old;await pg.close();}
 });

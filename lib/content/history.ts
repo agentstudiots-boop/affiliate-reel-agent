@@ -6,11 +6,11 @@ const statuses = ["queued", "checking", "ideating", "selecting", "producing", "r
 const storedJobSchema = z.object({
   version: z.literal(1), id: z.string().uuid(), createdAt: z.string(), updatedAt: z.string(), status: z.enum(statuses),
   mode: z.enum(["reference", "ai"]), opportunity: opportunitySchema,
-  events: z.array(z.object({ sequence: z.number(), at: z.string(), agent: z.enum(["creative", "video", "image", "text", "marketing", "orchestrator"]), kind: z.enum(["status", "response", "decision", "error"]), message: z.string(), data: z.unknown().optional() })).max(100),
+  events: z.array(z.object({ sequence: z.number(), at: z.string(), agent: z.enum(["creative", "video", "image", "text", "marketing", "orchestrator"]), kind: z.enum(["status", "response", "decision", "error"]), message: z.string(), data: z.unknown().optional() })),
   ideas: z.array(ideaSchema).max(4).optional(),
   decision: z.object({ ideaId: z.string(), format: z.enum(["video", "image", "text"]), reason: z.string(), ranking: z.array(z.object({ ideaId: z.string(), score: z.number(), rationale: z.string() })).max(4) }).optional(),
   content: contentSchema.optional(), review: reviewSchema.optional(), marketing: marketingSchema.optional(),
-  revisions: z.number().int().min(0).max(2), modelCalls: z.number().int().min(0).max(8), totalTokens: z.number().min(0), error: z.string().optional(),
+  revisions: z.number().int().min(0), modelCalls: z.number().int().min(0).max(8), totalTokens: z.number().min(0), error: z.string().optional(),
 });
 export function parseJob(value: unknown): ContentJob { return storedJobSchema.parse(value); }
 export function restoreHistory(raw: string | null): ContentJob[] {

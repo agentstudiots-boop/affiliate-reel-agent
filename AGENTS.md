@@ -24,7 +24,7 @@ vollständig autonomen Produktanalysten.
 
 Die neue Planung liegt in `lib/content/`. Nur der Orchestrator importiert
 Spezialagenten. Keine direkten Agentenaufrufe, Tools oder rekursiven Schleifen
-in Spezialisten. Verträge validieren, maximal zwei Revisionen, acht Modellaufrufe.
+in Spezialisten. Verträge validieren, maximal zwei automatische Entwurfsrevisionen und acht Modellaufrufe je Planung. Betreiber-Korrekturen während der Inhaltsfreigabe bleiben bis zur ausdrücklichen Freigabe möglich und benötigen jeweils eine neue Freigabenachricht.
 Referenzmodus und KI-Modus in Oberfläche und Dokumentation klar unterscheiden.
 Content-Freigabe startet keine Medienproduktion oder Veröffentlichung.
 Jobs und Entscheidungen protokollieren; Secrets niemals in Jobdaten speichern.

@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 const requestSchema = z.object({ requestId: z.string().uuid(), opportunity: opportunitySchema, mode: z.literal("reference").default("reference"), formatPreference: z.enum(["automatic","video"]).default("automatic") });
 export function GET() {
-  return Response.json({ databaseConfigured: databaseConfigured(), planningMode: "reference", researchProvider: "tavily", maxRevisions: 2, maxModelCalls: 0 }, { headers: { "Cache-Control": "no-store" } });
+  return Response.json({ databaseConfigured: databaseConfigured(), planningMode: "reference", researchProvider: "tavily", maxAutomaticRevisions: 2, operatorRevisions: "until_approval", maxModelCalls: 0 }, { headers: { "Cache-Control": "no-store" } });
 }
 export async function POST(request: Request) {
   if (!authorized(request)) return Response.json({ error: "Zugangscode für den zentralen Speicher erforderlich." }, { status: 401 });

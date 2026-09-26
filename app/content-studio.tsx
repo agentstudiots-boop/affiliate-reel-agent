@@ -176,7 +176,7 @@ export function ContentStudio({ product, onFillReelTest }: { product: Product; o
     <p className="muted">Dieser Auftrag erstellt einen Content-Plan. Medienproduktion und Veröffentlichung werden dadurch nicht gestartet.</p>
     {jobs.length > 0 && <label>Job-Verlauf<select disabled={busy} value={job?.id || ""} onChange={e => setSelectedId(e.target.value)}>{jobs.map(item => <option key={item.id} value={item.id}>{item.opportunity.product.name} · {labels[item.status]} · {new Date(item.createdAt).toLocaleString("de-DE")}</option>)}</select></label>}
     {job && <div className="contentJob">
-      <div className="jobHeader"><strong aria-live="polite">{labels[job.status]}</strong><span>{job.mode === "ai" ? "Historische KI-Planung" : "Regelbasierter Entwurf"} · {job.revisions}/2 Überarbeitungen</span></div>
+      <div className="jobHeader"><strong aria-live="polite">{labels[job.status]}</strong><span>{job.mode === "ai" ? "Historische KI-Planung" : "Regelbasierter Entwurf"} · {job.revisions} Überarbeitungen</span></div>
       <small>Job {job.id} · {job.modelCalls} externe Modellaufrufe</small>
       {!productIdentityError(job.opportunity.product) && <p><a href={job.opportunity.product.affiliateUrl} target="_blank" rel="sponsored noopener">Geplantes Affiliate-Produktziel prüfen ↗</a></p>}
       <p><b>Produkt:</b> {job.opportunity.product.name}<br /><b>ASIN:</b> {job.opportunity.product.asin || "nicht aufgelöst"}<br /><b>Use Case:</b> {job.opportunity.useCase}</p>

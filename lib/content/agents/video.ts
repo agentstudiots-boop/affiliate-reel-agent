@@ -41,6 +41,9 @@ function reviseReferenceVideo(brief: Brief) {
   }
   if (/erste szene kürzer|szene 1 kürzer/.test(request)) {
     next.scenes[0].durationSeconds = Math.max(2, next.scenes[0].durationSeconds - 2);
+    if (/kürbis.*schnitz|schnitz.*kürbis/i.test(brief.opportunity.product.name)) {
+      next.scenes[0].audio = "Heute entsteht aus diesem Kürbis eine Halloweenlaterne.";
+    }
     applied = true;
   }
   if (/cta.{0,25}weniger werblich|weniger werblich.{0,25}cta/.test(request)) {

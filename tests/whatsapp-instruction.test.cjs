@@ -104,6 +104,8 @@ test('revision retains content identity, product, ASIN and affiliate; all stale 
   job.content.slides.forEach(slide=>Object.assign(slide,{visual:'Pasta',prompt:'Pfanne',alt:'Nudeln'}));
   const next=reviseOperatorInstruction(job,instruction('revise_image'));
   assert.equal(next.id,job.id);assert.deepEqual(next.opportunity.product,job.opportunity.product);assert.equal(next.status,'awaiting_approval');assert.equal(next.revisions,job.revisions+1);
+  const later=reviseOperatorInstruction({...next,revisions:2},instruction('revise_text'));
+  assert.equal(later.revisions,3);assert.equal(later.status,'awaiting_approval');
   assert.doesNotMatch(JSON.stringify(next.content),/Pasta|Pfanne|Nudeln/);assert.equal(visualContextError(next),null);
   const prompt=buildOriginalVisualPrompt(next);assert.match(prompt,/Halloween-Kürbisse/);assert.match(prompt,/B0D9YQR9CT/);assert.doesNotMatch(prompt,/Pasta|Pfanne|Nudeln/);
   assert.match(job.content.slides[0].prompt,/Pfanne/,'source snapshot stays immutable');

@@ -6,7 +6,7 @@ import {visualContextError} from "./visual-context";
 // Pure revision: no providers, publications, URLs or mutable product identity.
 export function reviseStructured(job:ContentJob, instruction:Instruction):ContentJob {
   requireJobProduct(job);
-  if(!["approved","awaiting_approval"].includes(job.status) || job.content?.format!=="image" || job.revisions>=2)throw Error("revision_not_available");
+  if(!["approved","awaiting_approval"].includes(job.status) || job.content?.format!=="image")throw Error("revision_not_available");
   if(!["revise_image","revise_text","revise_both"].includes(instruction.intent)||!instruction.keep_product||!instruction.keep_content_id||instruction.publish_requested)throw Error("instruction_not_safe");
   const next=structuredClone(job),content=next.content!;
   if(content.format!=="image")throw Error("image_plan_required");

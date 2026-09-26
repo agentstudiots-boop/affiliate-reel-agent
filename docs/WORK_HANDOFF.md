@@ -1,5 +1,25 @@
 # Work handoff
 
+## Inhaltsfreigabe: Betreiberkorrekturen bis zur Freigabe
+
+Die Grenze von zwei Revisionen gilt nur für die automatische Qualitätsrunde bei
+der ersten Planung. Während einer offenen Inhaltsfreigabe kann der Betreiber den
+gespeicherten Entwurf wiederholt ändern lassen. `content_jobs.revisions` zählt
+weiter, ohne bei zwei zu sperren; das Speicherschema akzeptiert ältere und neue
+Zählerstände. Jede erfolgreiche Korrektur sperrt den alten Inhaltsfingerabdruck,
+sendet genau eine neue WhatsApp-Inhaltsfreigabe und lässt Medienkosten sowie
+Veröffentlichung gesperrt. Nur eine ausdrückliche Antwort „Freigabe“ auf die
+aktuelle Fassung genehmigt den Inhalt; bisheriges „Freigeben“ bleibt als explizite
+Freigabe kompatibel. Antworten auf überholte Nachrichten starten keine Arbeit.
+Technische oder redaktionell unklare Änderungswünsche bleiben gesperrt und
+erfordern eine Präzisierung. Kein zusätzlicher Medienkauf ist mit dieser Änderung
+verbunden; Modellinterpretationen können eigene Providerkosten auslösen.
+
+Der lokale Integrationstest führt vier aufeinanderfolgende WhatsApp-Korrekturen
+am selben Reel durch, prüft nach jeder die Produktionssperre und bestätigt die
+Freigabe erst für die letzte Fassung. Ein echter WhatsApp-/Preview-Durchlauf und
+ein Deployment sind dadurch nicht ersetzt.
+
 ## Aktuell 26.09.2026: Inhaltsfreigabe vor Produzenten
 
 Für manuell geplante Video-, Bild- und Textaufträge wird der vollständige

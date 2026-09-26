@@ -28,6 +28,11 @@ test('ordinary German copy feedback reaches the right agent across post formats'
     assert.equal(revised.content.format,format);
     assert.equal(revised.review.passed,true,JSON.stringify(revised.review));
     assert.equal(revised.opportunity.product.asin,job.opportunity.product.asin);
+    if(format!=='video'){
+      const further=await reviseApprovedStaticContent({...revised,status:'approved',revisions:2},format==='text'?'CTA sachlicher formulieren':'CTA weniger werblich formulieren');
+      assert.equal(further.revisions,3);
+      assert.equal(further.status,'awaiting_approval');
+    }
   }
 });
 

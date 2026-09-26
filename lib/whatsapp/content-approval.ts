@@ -25,7 +25,7 @@ export function contentApprovalMessage(job: ContentJob) {
     : content.format==="image"
       ? "Erst danach kann die Bildproduktion gesondert im Content Studio angefordert werden. Die Veröffentlichung benötigt später eine weitere WhatsApp-Freigabe."
       : "Die spätere Veröffentlichung benötigt eine eigene WhatsApp-Freigabe.";
-  const message=`Inhaltsfreigabe · ${content.format} · ${job.opportunity.targetPlatform}\nProdukt: ${job.opportunity.product.name}\nASIN: ${job.opportunity.product.asin}\nTitel: ${content.title}\n${detail}\n${content.format==="text"?"":`Begleittext: ${content.caption}\n`}CTA: ${content.cta}\n${content.disclosure}\n\nAntworte auf DIESE Nachricht mit „Freigeben“, um genau diesen Inhalt zu genehmigen. Ein Änderungswunsch als Text geht zuerst an den zuständigen Agenten und kommt erneut zur Inhaltsfreigabe. „Ablehnen“ stoppt den Auftrag. ${next}`;
+  const message=`Inhaltsfreigabe · ${content.format} · ${job.opportunity.targetPlatform}\nProdukt: ${job.opportunity.product.name}\nASIN: ${job.opportunity.product.asin}\nTitel: ${content.title}\n${detail}\n${content.format==="text"?"":`Begleittext: ${content.caption}\n`}CTA: ${content.cta}\n${content.disclosure}\n\nAntworte auf DIESE Nachricht mit „Freigabe“, um genau diese Fassung zu genehmigen. Du kannst beliebig oft Änderungen als Text anfordern; jede neue Fassung kommt erneut zur Inhaltsfreigabe. „Ablehnen“ stoppt den Auftrag. ${next}`;
   if (message.length>3900) throw Error("Der vollständige Entwurf ist für eine WhatsApp-Nachricht zu lang. Im Content Studio kürzen, bevor eine Freigabe angefragt wird.");
   return message;
 }
@@ -79,6 +79,15 @@ export async function handleContentApproval(input:Incoming) {
   }
   const request=match.rows[0];
   const decision=classifyWhatsAppReply(input.body);
+  if(request.status==='changes_requested') {
+    const latest=await db.query("SELECT 1 FROM content_approval_requests WHERE job_id=$1 AND status='pending' LIMIT 1",[request.job_id]);
+    const stored=await db.query("SELECT snapshot FROM content_jobs WHERE id=$1",[request.job_id]);
+    if(latest.rows.length || !stored.rows[0] || contentFingerprint(parseJob(stored.rows[0].snapshot))!==request.content_hash) {
+      const once=await db.query("INSERT INTO whatsapp_events(message_id,wa_id,reply_to_message_id,body,payload) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING RETURNING message_id",[input.id,input.from,input.replyToMessageId,input.body,JSON.stringify(input.payload)]);
+      if(once.rows.length)await sendWhatsAppText("Diese Inhaltsfreigabe ist überholt. Bitte antworte auf die neueste Freigabenachricht. Es wurde nichts produziert oder veröffentlicht.");
+      return true;
+    }
+  }
   if(request.status==='changes_requested' && decision.intent!=='changes_requested') {
     const once=await db.query("INSERT INTO whatsapp_events(message_id,wa_id,reply_to_message_id,body,payload) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING RETURNING message_id",[input.id,input.from,input.replyToMessageId,input.body,JSON.stringify(input.payload)]);
     if(once.rows.length)await sendWhatsAppText("Diese alte Inhaltsfreigabe ist nach deinem Änderungswunsch gesperrt. Bitte antworte mit einem konkreten Änderungswunsch oder auf die neue Freigabenachricht. Keine Produktion gestartet.");

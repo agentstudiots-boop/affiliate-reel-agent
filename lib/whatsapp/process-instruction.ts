@@ -126,7 +126,7 @@ export async function processOperatorInstruction(input:OperatorMessage,
       const code=error instanceof Error && allowed.includes(error.message)?error.message:'instruction_unclear';
       if(code.startsWith('parser_'))notice='Deine Anweisung wurde gespeichert, aber der Sprachmodell-Zugang funktioniert momentan nicht. Das ist ein technischer Fehler; du musst die Anweisung nicht anders formulieren. Es wurde nichts produziert oder veröffentlicht.';
       if(code==='visual_context_mismatch')notice='Das Bildbriefing passt nicht zum bestehenden Produkt. Bitte beschreibe dessen Anwendung. Es wurde kein Bild erzeugt und nichts veröffentlicht.';
-      if(code==='revision_not_available')notice='Diese Revision ist im aktuellen Zustand oder innerhalb des bestehenden Revisionslimits nicht möglich. Bitte den Auftrag im Content Studio prüfen. Es wurde nichts produziert oder veröffentlicht.';
+      if(code==='revision_not_available')notice='Diese Revision ist im aktuellen Auftragszustand nicht möglich. Bitte den Auftrag im Content Studio prüfen. Es wurde nichts produziert oder veröffentlicht.';
       await db.query("UPDATE whatsapp_instructions SET status='clarify',error_code=$2,updated_at=now() WHERE message_id=$1 AND status='parsed'",[input.id,code]);
     }
   }

@@ -17,7 +17,6 @@ export const MAX_REVISIONS = 2;
 
 export async function reviseApprovedVideo(job: ContentJob, feedback: string, interpret = interpretVideoRevision): Promise<ContentJob> {
   if (job.status !== "approved" || job.content?.format !== "video" || !job.decision || !job.ideas) throw new Error("Freigegebener Video-Plan fehlt.");
-  if (job.revisions >= MAX_REVISIONS) throw new Error("Maximal zwei Überarbeitungen erreicht.");
   if (job.mode !== "reference") throw new Error("Für diesen Modus ist kein geprüfter Änderungs-Generator aktiv.");
   const idea = job.ideas.find(item => item.id === job.decision!.ideaId);
   if (!idea) throw new Error("Gewählte Idee fehlt.");
@@ -52,7 +51,6 @@ export async function reviseApprovedStaticContent(job: ContentJob, feedback: str
   if (job.status !== "approved" || !job.content || job.content.format === "video" || !job.decision || !job.ideas) {
     throw new Error("Freigegebener Bild- oder Text-Plan fehlt.");
   }
-  if (job.revisions >= MAX_REVISIONS) throw new Error("Maximal zwei Überarbeitungen erreicht.");
   if (job.mode !== "reference") throw new Error("Für diesen Modus ist kein geprüfter Änderungs-Generator aktiv.");
   const idea = job.ideas.find(item => item.id === job.decision!.ideaId);
   if (!idea) throw new Error("Gewählte Idee fehlt.");
