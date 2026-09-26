@@ -20,7 +20,12 @@ export function contentApprovalMessage(job: ContentJob) {
     : content.format==="image"
       ? `Bildbriefing:\n${content.slides.map((slide,index)=>`${index+1}. ${slide.visual}; Prompt: ${slide.prompt}; Text: ${slide.copy}`).join("\n")}`
       : `Beitrag:\n${content.body}`;
-  const message=`Inhaltsfreigabe · ${content.format} · ${job.opportunity.targetPlatform}\nProdukt: ${job.opportunity.product.name}\nASIN: ${job.opportunity.product.asin}\nTitel: ${content.title}\n${detail}\n${content.format==="text"?"":`Begleittext: ${content.caption}\n`}CTA: ${content.cta}\n${content.disclosure}\n\nAntworte auf DIESE Nachricht mit „Freigeben“, um genau diesen Inhalt zu genehmigen. Ein Änderungswunsch als Text geht zuerst an den zuständigen Agenten und kommt erneut zur Inhaltsfreigabe. „Ablehnen“ stoppt den Auftrag. Erst danach kann eine separate Freigabe für Medienkosten und später für die Veröffentlichung folgen.`;
+  const next=content.format==="video"
+    ? "Erst danach kann eine separate WhatsApp-Kostenfreigabe für Faceless folgen. Die Veröffentlichung benötigt später eine weitere Freigabe."
+    : content.format==="image"
+      ? "Erst danach kann die Bildproduktion gesondert im Content Studio angefordert werden. Die Veröffentlichung benötigt später eine weitere WhatsApp-Freigabe."
+      : "Die spätere Veröffentlichung benötigt eine eigene WhatsApp-Freigabe.";
+  const message=`Inhaltsfreigabe · ${content.format} · ${job.opportunity.targetPlatform}\nProdukt: ${job.opportunity.product.name}\nASIN: ${job.opportunity.product.asin}\nTitel: ${content.title}\n${detail}\n${content.format==="text"?"":`Begleittext: ${content.caption}\n`}CTA: ${content.cta}\n${content.disclosure}\n\nAntworte auf DIESE Nachricht mit „Freigeben“, um genau diesen Inhalt zu genehmigen. Ein Änderungswunsch als Text geht zuerst an den zuständigen Agenten und kommt erneut zur Inhaltsfreigabe. „Ablehnen“ stoppt den Auftrag. ${next}`;
   if (message.length>3900) throw Error("Der vollständige Entwurf ist für eine WhatsApp-Nachricht zu lang. Im Content Studio kürzen, bevor eine Freigabe angefragt wird.");
   return message;
 }

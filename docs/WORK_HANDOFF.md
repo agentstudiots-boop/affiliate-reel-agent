@@ -21,7 +21,10 @@ Freigabe gesperrt und es wird nach Präzisierung gefragt.
 WhatsApp-Inhaltsfingerabdruck; Facebook-Bildgenerierung und Text-Postvorbereitung
 prüfen ihn ebenso. Tagesentwürfe behalten die bisherige WhatsApp-Inhaltsfreigabe
 über `daily_drafts.content_approved`. Danach bleiben Produktionskosten und
-Veröffentlichung separate Freigaben. Migration
+Veröffentlichung separate Schritte: Für Video kommt eine eigene
+WhatsApp-Kostenfreigabe; bei manuell geplanten Bildern muss nach Inhaltsfreigabe
+die Bildproduktion im geschützten Studio angefordert werden; der Tagesentwurf
+bündelt Bildkosten schon in seiner ersten WhatsApp-Freigabe. Migration
 `014_content_approval_requests.sql` vor Einsatz ausführen. Lokaler Typecheck
 und alle 133 Tests waren grün. Keine neue kostenpflichtige Faceless-Erstellung
 für die beiden gescheiterten Runs; beide scheiterten nach dem akzeptierten
