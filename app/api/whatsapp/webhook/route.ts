@@ -1,3 +1,5 @@
+import { after } from "next/server";
+import { continuePendingReels } from "@/lib/automation/continue";
 import { productionRepository } from "@/lib/production/repository";
 import { publicationRepository } from "@/lib/meta/publication-gate";
 import { FacebookPublishFailure, publishFacebookPhoto } from "@/lib/meta/publisher";
@@ -8,6 +10,7 @@ import { deliverWeeklyReport } from "@/lib/reporting/weekly";
 import { extractIncomingWhatsAppMessages, verifyMetaWebhookSignature, verifyWhatsAppChallenge } from "@/lib/whatsapp/security";
 
 export const runtime = "nodejs";
+export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
 export function GET(request: Request) {
@@ -40,6 +43,10 @@ export async function POST(request: Request) {
     console.error(JSON.stringify({ event: "whatsapp_database_unavailable" }));
     return new Response("Storage unavailable", { status: 503, headers: { "Cache-Control": "no-store" } });
   }
+  after(async () => {
+    try { await continuePendingReels(); }
+    catch { console.error(JSON.stringify({ event: "reel_continuation_unavailable" })); }
+  });
   let failed = false;
   for (const message of messages) {
     try {

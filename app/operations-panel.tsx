@@ -40,10 +40,22 @@ export function OperationsPanel({ password }: { password: string }) {
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Tageslauf nicht abrufbar."); }
     finally { setLoading(false); }
   }
+  async function run(action: "daily" | "continue") {
+    setLoading(true); setError("");
+    try {
+      const response = await fetch("/api/operations", { method: "POST", headers: { "Content-Type": "application/json", "x-content-password": password }, body: JSON.stringify({ action }) });
+      const result = await response.json();
+      if (!response.ok || result.status === "failed") throw new Error(result.error || "Tageslauf fehlgeschlagen; gespeicherten Status prüfen.");
+      await refresh();
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "Ablauf nicht bestätigt."); }
+    finally { setLoading(false); }
+  }
   return <section className="reviewBox">
     <h3>Tageslauf &amp; Ergebnisse</h3>
     <p>Hier siehst du, ob der Tagesentwurf, beide Freigaben und eine Veröffentlichung wirklich stattgefunden haben. Zahlen erscheinen nur, wenn eine Messung eingetragen ist.</p>
     <button type="button" className="ghost" disabled={!password || loading} onClick={refresh}>{loading ? "Lade …" : "Aktuellen Stand laden"}</button>
+    <button type="button" className="ghost" disabled={!password || loading} onClick={() => run("daily")}>Heutigen Tageslauf starten</button>
+    <button type="button" className="ghost" disabled={!password || loading} onClick={() => run("continue")}>Freigegebene Reels fortsetzen</button>
     {error && <p role="alert" className="error">{error}</p>}
     {data && <>
       <p><strong>Umgebung:</strong> {data.environment === "production" ? "Production" : "Preview / lokal – kein automatischer Vercel-Cronlauf"}</p>

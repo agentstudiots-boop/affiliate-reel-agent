@@ -1,3 +1,4 @@
+import { imageProviderStatus } from "@/lib/content/image-provider";
 import { runContentJob, runProductScout } from "@/lib/orchestrator";
 import { getDatabase } from "@/lib/memory/db";
 import { memoryRepository } from "@/lib/memory/repository";
@@ -29,14 +30,14 @@ export async function sendDailyApproval(jobId: string) {
   );
   if (!claimed.rows.length) return false;
   const summary = job.content?.format === "text" ? job.content.body : job.content?.format === "image" ? job.content.caption : "Videoentwurf";
-  const messageId = await sendWhatsAppText(`Content-Freigabe · Tagesentwurf ${new Date(String(claimed.rows[0].day)).toISOString().slice(0, 10)}\nProdukt: ${job.opportunity.product.name}\nFormat: ${job.content?.format || "unbekannt"} · Facebook\n\n${(summary || "").slice(0, 1100)}\n\nSuchauswahl, kein geprüftes Einzelprodukt. Antworte auf DIESE Nachricht mit „Freigeben“, um den Content-Plan freizugeben. Danach kommt eine ZWEITE WhatsApp für die Veröffentlichung. „Ablehnen“ stoppt den Auftrag, Änderungswünsche bitte als Text. Noch kein Post ist online.`);
+  const messageId = await sendWhatsAppText(`Content-Freigabe · Tagesentwurf ${new Date(String(claimed.rows[0].day)).toISOString().slice(0, 10)}\nProdukt: ${job.opportunity.product.name}\nFormat: ${job.content?.format || "unbekannt"} · Facebook\n\n${(summary || "").slice(0, 1100)}\n\nSuchauswahl, kein geprüftes Einzelprodukt. Antworte auf DIESE Nachricht mit „Freigeben“, um den Content-Plan und eine einmalige kostenpflichtige Bildgenerierung freizugeben (Bildprovider: ${imageProviderStatus().provider || "nicht eingerichtet"}, EUR-Kosten nicht vorab bestätigt). Danach kommt eine ZWEITE WhatsApp für die Veröffentlichung. „Ablehnen“ stoppt den Auftrag, Änderungswünsche bitte als Text. Noch kein Post ist online.`);
   await db.query("UPDATE daily_drafts SET whatsapp_message_id=$2,updated_at=now() WHERE job_id=$1 AND status='awaiting_approval'", [jobId, messageId]);
   return true;
 }
 
 // Cron runs in Production only. The date claim happens before any external search
 // so a retried invocation cannot buy another search or send another message.
-export async function createDailyDraft(day = new Date().toISOString().slice(0, 10)) {
+export async function createDailyDraft(day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date())) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error("Ungültiger Tag.");
   const db = getDatabase();
   const jobId = crypto.randomUUID();

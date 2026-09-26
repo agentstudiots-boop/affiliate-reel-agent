@@ -38,6 +38,7 @@ async function fixture(t) {
   const writes = [], sends = [];
   const state = { unknown: false };
   const route = loadRoute('app/api/whatsapp/webhook/route.ts', {
+    'next/server': { after: () => {} },
     '@/lib/production/repository': { productionRepository: () => inbound },
     '@/lib/meta/publication-gate': { publicationRepository: () => publication },
     '@/lib/daily/draft': { sendDailyApproval: async () => { throw new Error('Unexpected notification path'); } },

@@ -24,6 +24,7 @@
     "lib/meta/**/*.ts",
     "lib/production/**/*.ts",
     "lib/whatsapp/**/*.ts",
-    "lib/reporting/**/*.ts"
+    "lib/reporting/**/*.ts",
+    "lib/automation/**/*.ts"
   ]
 }

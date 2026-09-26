@@ -124,6 +124,7 @@ test('signed approval for Instagram never invokes the Facebook publisher; the Re
   await f.repo.bindMessage(pub.id,'wamid.reel');
   let facebookCalls=0,creates=0,publishes=0;
   const webhook=loadRoute('app/api/whatsapp/webhook/route.ts',{
+    'next/server': { after: () => {} },
     '@/lib/production/repository':{productionRepository:()=>productionRepository(f.db)},
     '@/lib/daily/draft':{sendDailyApproval:async()=>{throw Error('Unexpected daily flow')}},
     '@/lib/meta/request-publication':{requestFacebookApproval:async()=>{throw Error('Unexpected Facebook approval')}},
