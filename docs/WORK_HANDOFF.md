@@ -1,5 +1,53 @@
 # Work handoff
 
+## Aktueller Stand: 26.09.2026, nach WhatsApp-Bildablehnung
+
+- PR #6 bleibt Draft auf `feat/production-gates-whatsapp`. Geprüfter Code-Stand
+  `626f1e006dd51f606caf545dc670e3ae3ff62893`, Quality #113 erfolgreich,
+  Preview `dpl_HkPmw3238zSLCNkbQiGhEnJth4Au` READY. Production läuft auf
+  altem `main`-Stand `d956518a71cd3658efb8524311bf314444f98272`;
+  der neue Tages-Cron ist dort noch nicht aktiv. `CRON_SECRET` ist inzwischen
+  für Preview und Production angelegt und nach Redeploy verfügbar.
+- Der WhatsApp-Intent-Parser über Replicate wurde mit einer echten Betreiber-
+  Nachricht bestätigt. Migrationen 001–013 sind in der über Vercel/Neon lesbaren
+  Projektdatenbank angewendet; die Abfrage zeigt 013 am 26.09. um 10:39:33 UTC.
+  Das ist kein Nachweis einer separaten künftigen Production-Migration.
+- Tagesjob `eb2a8423-6fce-4f3d-9e81-87835fafc5b1` für ASIN `B0D9YQR9CT`:
+  Inhalt freigegeben, aber die überarbeiteten Bilder verfehlten das Kürbisschnitzen.
+  Der Betreiber lehnte die letzte Facebook-Veröffentlichungsfreigabe ab.
+  `publication_requests` zeigt zuletzt `rejected`; kein Post für diesen Job.
+  Zwei Bildrevisionen wurden bereits verbraucht. Ein neuer Versuch braucht
+  einen neuen Auftrag und seine eigenen Medienkosten-/Publikationsfreigaben.
+- Das verbindliche Bildbriefing steht jetzt gemeinsam in
+  `lib/content/image-brief.ts` und wird im WhatsApp-Entwurf und bei der
+  Bilderzeugung verwendet. Für Kürbisschnitzsets verlangt es einen im
+  Vordergrund eindeutig erkennbaren Halloween-Kürbis, an dem ein Erwachsener
+  sichtbar schnitzt. Die Änderung ist in Preview, aber noch nicht durch ein
+  passendes neues Live-Bild bestätigt.
+- Der vorhandene Instagram-Plan `cfa990ab-00ee-45cb-8a43-1e85a53c6636`
+  steht laut lesender Datenbankabfrage auf `awaiting_approval`, ohne Zeile in
+  `production_runs`. Es gibt damit noch keine Videoquote oder Kostenfreigabe.
+  Kein Videoauftrag wurde gestartet.
+- Ein älterer Facebook-Job `07cf617e-cf3d-442e-99a4-234a9ddde249` hat
+  `published`, Meta-ID und Permalink sowie eine `publications`-Zeile.
+  Sein Produkt-Snapshot enthält jedoch keine ASIN und ist kein Nachweis des
+  aktuellen produktgebundenen Kürbisablaufs. Auch ein Instagram-Reel mit
+  Permalink ist noch nicht nachgewiesen.
+- Meta prüft die WhatsApp-Vorlage `content_entwurf` (German, Marketing).
+  Nach Genehmigung sind Name, Sprache und tatsächliche Kosten zu prüfen;
+  wiederkehrenden Vorlagenversand erst nach ausdrücklicher Kostenfreigabe
+  aktivieren. Freie Textantwort `Entwurf` ist implementiert; ein
+  interaktiver Vorlagenbutton wird vom Webhook derzeit nicht verarbeitet.
+
+Nächste Abnahme: neuer passender Facebook-Auftrag mit Bildprüfung und zwei
+getrennten WhatsApp-Freigaben, danach der vorhandene Reel-Plan mit ausdrücklicher
+Video-Kostenfreigabe, echtem Render und Instagram-Freigabe. Erst nach den
+Live-Belegen PR #6 mergen, Production-Migration und Webhook prüfen sowie den
+täglichen Ablauf dort kontrolliert in Betrieb nehmen. Kein manueller Status-
+Eingriff und keine automatische Wiederholung kostenpflichtiger Generierungen.
+
+Die älteren Abschnitte dokumentieren damalige Zwischenstände und Blocker.
+
 ## Aktueller Checkpoint: vorhandener Replicate-Zugang statt Gateway
 
 Der Betreiber hat weiteres Gateway-Billing ausdrücklich beendet. Der WhatsApp-Parser
