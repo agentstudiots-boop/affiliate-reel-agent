@@ -23,7 +23,7 @@ async function setup(){
   const pg=new PGlite();for(const name of fs.readdirSync('db/migrations').filter(n=>n.endsWith('.sql')).sort())await pg.exec(fs.readFileSync(`db/migrations/${name}`,'utf8'));
   const db=dbAdapter(pg),memory=memoryRepository(db),repo=publicationRepository(db);
   async function job(){
-    const input=opportunitySchema.parse({product:{name:'Kuscheldecke',sourceUrl:'https://www.amazon.de/s?k=Kuscheldecke',affiliateUrl:'https://www.amazon.de/s?k=Kuscheldecke',price:'',targetGroup:'Haushalte',benefits:'Material und Größe vergleichen',notes:''},useCase:'Ruhiger Abend mit einer Decke auf dem Sofa.',targetPlatform:'facebook',budget:'low'});
+    const input=opportunitySchema.parse({product:{productVerifiedAt:'2026-09-26T08:00:00.000Z', productVerifiedName:'Kuscheldecke', name:'Kuscheldecke',sourceUrl:'https://www.amazon.de/dp/B000000001',affiliateUrl:'https://www.amazon.de/dp/B000000001',price:'',targetGroup:'Haushalte',benefits:'Material und Größe vergleichen',notes:''},useCase:'Ruhiger Abend mit einer Decke auf dem Sofa.',targetPlatform:'facebook',budget:'low'});
     const jobId=crypto.randomUUID();await memory.claim(jobId,input,'reference');await runContentJob(input,{id:jobId,onUpdate:memory.save,loadLearning:memory.learn});return memory.approve(jobId);
   }
   return {pg,repo,job};

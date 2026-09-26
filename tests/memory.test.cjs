@@ -9,7 +9,7 @@ const {authorized}=require('../.test-build/lib/memory/auth');
 const {applyMigrations}=require('../.test-build/lib/memory/migrations');
 const {runContentJob}=require('../.test-build/lib/content/orchestrator');
 const {opportunitySchema}=require('../.test-build/lib/content/schema');
-const opportunity=opportunitySchema.parse({product:{name:'Vakuumierer',sourceUrl:'https://www.amazon.de/s?k=Vakuumierer',affiliateUrl:'',price:'',targetGroup:'Familien',benefits:'Vorräte vorbereiten',notes:''},useCase:'Oma staunt beim Familienessen über das Steak.',category:'kitchen',useCaseKey:'sous-vide',targetPlatform:'facebook'});
+const opportunity=opportunitySchema.parse({product:{productVerifiedAt:'2026-09-26T08:00:00.000Z', productVerifiedName:'Vakuumierer', name:'Vakuumierer',sourceUrl:'https://www.amazon.de/dp/B000000001',affiliateUrl:'',price:'',targetGroup:'Familien',benefits:'Vorräte vorbereiten',notes:''},useCase:'Oma staunt beim Familienessen über das Steak.',category:'kitchen',useCaseKey:'sous-vide',targetPlatform:'facebook'});
 const oldDate=new Date(Date.now()-40*86400000).toISOString();
 function metric(jobId,changes={}){return {jobId,platform:'facebook',status:'published',url:'https://www.facebook.com/example/posts/123',publishedAt:oldDate,windowDays:30,finalized:true,clicks:100,conversions:5,revenueCents:2000,costCents:500,source:'Manuell zugeordneter Testbericht',learning:'',expectedRevision:0,...changes};}
 

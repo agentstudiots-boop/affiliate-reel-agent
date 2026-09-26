@@ -1,3 +1,4 @@
+import { resolveAmazonProduct } from "@/lib/product-resolver";
 import { z } from "zod";
 import { opportunitySchema } from "@/lib/content/schema";
 import { runContentJob } from "@/lib/orchestrator";
@@ -23,6 +24,13 @@ export async function POST(request: Request) {
       return Response.json({ error: "Ein gezielter Reel-Test braucht die Zielplattform Instagram." }, { status: 400 });
     }
   } catch { return Response.json({ error: "Bitte Produkt, Link, Zielgruppe und konkreten Use Case vollständig eintragen." }, { status: 400 }); }
+  try { input.opportunity.product = await resolveAmazonProduct(input.opportunity.product); }
+  catch {
+    // Persist a blocked job through the existing job identity and event stream.
+    input.opportunity.product.productVerifiedAt = undefined;
+    input.opportunity.product.productVerifiedName = undefined;
+    input.opportunity.product.affiliateUrl = "";
+  }
   const repo = memoryRepository();
   try { await repo.claim(input.requestId,input.opportunity,input.mode); }
   catch (error) { return Response.json({ error: error instanceof ConflictError ? error.message : "Postgres ist nicht erreichbar oder die Migration fehlt. Kein Modellaufruf gestartet." }, { status: error instanceof ConflictError ? 409 : 503 }); }

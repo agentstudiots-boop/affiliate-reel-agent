@@ -1,3 +1,4 @@
+const {bindAmazonProduct}=require('../.test-build/lib/amazon');
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -62,20 +63,20 @@ test('internal briefing text cannot pass as a public image caption',()=>{
   assert.match(result.issues.join(' '),/interne Prüfhinweise/);
 });
 
-test('search result source stays categorical and produces an original carousel brief',async()=>{
+test('a resolved product without model facts produces an original illustrative carousel brief',async()=>{
   const opportunity=opportunitySchema.parse({
-    product:{name:'Kuscheldecke',sourceUrl:'https://www.amazon.de/s?k=Kuscheldecke',affiliateUrl:'',price:'',targetGroup:'Haushalte',benefits:'Größe und Material vergleichen',notes:''},
+    product:{productVerifiedAt:'2026-09-26T08:00:00.000Z', productVerifiedName:'Kuscheldecke', name:'Kuscheldecke',sourceUrl:'https://www.amazon.de/dp/B000000001',affiliateUrl:'',price:'',targetGroup:'Haushalte',benefits:'Größe und Material vergleichen',notes:''},
     useCase:'An einem kühlen Herbstabend liegt eine neutrale Kuscheldecke auf dem Sofa. Eine Person sitzt mit Tee im warmen Licht.',category:'home_living',targetPlatform:'facebook',budget:'low'
   });
   const job=await runContentJob(opportunity);
   assert.equal(job.content.format,'image');
-  assert.equal(job.content.visualConcept.sourceKind,'search');
+  assert.equal(job.content.visualConcept.sourceKind,'product');
   assert.equal(job.content.visualConcept.representation,'generic_category');
   assert.equal(job.content.layout,'carousel');
   assert.equal(job.opportunity.category,'home_living');
   assert.match(job.content.caption,/Feierabend, Tee.*Größe, Material und Pflege/);
   assert.doesNotMatch(job.content.caption,/Kuscheldecke für An einem|redaktionelle Übersicht|neutral/i);
-  assert.match(job.content.cta,/Auswahl ansehen/);
+  assert.match(job.content.cta,/Produktdetails/);
   assert.doesNotMatch([job.content.title,job.content.hook,job.content.caption,...job.content.slides.map(s=>s.copy)].join(' '),/beste(?:r|s)?\b/i);
   assert.doesNotMatch(job.content.slides.map(s=>s.prompt).join(' '),/Amazon[-\s]?(?:UI|Screenshot|Bild)/i);
   assert.equal(job.review.passed,true,JSON.stringify(job.review));
@@ -83,7 +84,7 @@ test('search result source stays categorical and produces an original carousel b
 
 test('single product page does not turn unverified benefits into model claims',async()=>{
   const opportunity=opportunitySchema.parse({
-    product:{name:'Kuscheldecke Modell X',sourceUrl:'https://www.amazon.de/dp/B000000001',affiliateUrl:'',price:'',targetGroup:'Haushalte',benefits:'angeblich wasserdicht und selbstheizend',notes:''},
+    product:{productVerifiedAt:'2026-09-26T08:00:00.000Z', productVerifiedName:'Kuscheldecke Modell X', name:'Kuscheldecke Modell X',sourceUrl:'https://www.amazon.de/dp/B000000001',affiliateUrl:'',price:'',targetGroup:'Haushalte',benefits:'angeblich wasserdicht und selbstheizend',notes:''},
     useCase:'Eine Decke für einen ruhigen Abend auf dem Sofa auswählen.',targetPlatform:'facebook',budget:'low',verifiedFacts:[]
   });
   const job=await runContentJob(opportunity);
@@ -97,7 +98,7 @@ test('single product page does not turn unverified benefits into model claims',a
 
 test('reference copy changes with the situation and distinguishes electric from ordinary blankets',async()=>{
   const ordinary=opportunitySchema.parse({
-    product:{name:'Kuscheldecke',sourceUrl:'https://www.amazon.de/s?k=Kuscheldecke',affiliateUrl:'',price:'',targetGroup:'Haushalte',benefits:'Kriterien vergleichen',notes:''},
+    product:{productVerifiedAt:'2026-09-26T08:00:00.000Z', productVerifiedName:'Kuscheldecke', name:'Kuscheldecke',sourceUrl:'https://www.amazon.de/dp/B000000001',affiliateUrl:'',price:'',targetGroup:'Haushalte',benefits:'Kriterien vergleichen',notes:''},
     useCase:'Auf dem Sofa eine Decke mit einer Tasse Tee für einen ruhigen Abend auswählen.',category:'home_living',targetPlatform:'facebook',budget:'low'
   });
   const sofa=await runContentJob(ordinary);
@@ -106,7 +107,7 @@ test('reference copy changes with the situation and distinguishes electric from 
   assert.match(bed.content.caption,/Abends im Bett/);
   assert.doesNotMatch(bed.content.caption,/Tee|Sofa/);
 
-  const heated=opportunitySchema.parse({...ordinary,product:{...ordinary.product,name:'Heizdecke',sourceUrl:'https://www.amazon.de/s?k=Heizdecke'},useCase:'Für kühle Abende zu Hause eine Heizdecke auswählen.'});
+  const heated=opportunitySchema.parse({...ordinary,product:{...ordinary.product,name:'Heizdecke',productVerifiedName:'Heizdecke',sourceUrl:'https://www.amazon.de/dp/B000000001'},useCase:'Für kühle Abende zu Hause eine Heizdecke auswählen.'});
   const inspiration=analyzeProductInspiration(heated);
   assert.equal(inspiration.categoryLabel,'Heizdecke');
   assert.match(inspiration.purchaseCriteria.join(' '),/sicheren Nutzung/);
@@ -117,7 +118,7 @@ test('reference copy changes with the situation and distinguishes electric from 
 
 test('text and reel use the same grounded category copy and spoken lines fit their scenes',async()=>{
   const opportunity=opportunitySchema.parse({
-    product:{name:'Aufbewahrungsbox',sourceUrl:'https://www.amazon.de/s?k=Aufbewahrungsbox',affiliateUrl:'',price:'',targetGroup:'Haushalte',benefits:'Kriterien vergleichen',notes:''},
+    product:{productVerifiedAt:'2026-09-26T08:00:00.000Z', productVerifiedName:'Aufbewahrungsbox', name:'Aufbewahrungsbox',sourceUrl:'https://www.amazon.de/dp/B000000001',affiliateUrl:'',price:'',targetGroup:'Haushalte',benefits:'Kriterien vergleichen',notes:''},
     useCase:'Kleinteile zu Hause geordnet aufbewahren, ohne viel Platz zu verlieren.',category:'household',targetPlatform:'facebook',budget:'low'
   });
   const job=await runContentJob(opportunity);
@@ -149,9 +150,10 @@ test('missing image provider cannot silently fall back to the typographic card',
 
 test('publication eligibility rejects a legacy weak image before a publication request can be created',()=>{
   const opportunity=opportunitySchema.parse({
-    product:{name:'Kuscheldecke',sourceUrl:'https://www.amazon.de/s?k=Kuscheldecke',affiliateUrl:'https://www.amazon.de/s?k=Kuscheldecke',price:'',targetGroup:'Haushalte',benefits:'vergleichen',notes:''},
+    product:{productVerifiedAt:'2026-09-26T08:00:00.000Z', productVerifiedName:'Kuscheldecke', name:'Kuscheldecke',sourceUrl:'https://www.amazon.de/dp/B000000001',affiliateUrl:'https://www.amazon.de/dp/B000000001',price:'',targetGroup:'Haushalte',benefits:'vergleichen',notes:''},
     useCase:'Ein kühler Herbstabend auf dem Sofa mit einer Decke.',targetPlatform:'facebook'
   });
+  opportunity.product=bindAmazonProduct(opportunity.product);
   const weak=baseImage({
     visualConcept:undefined,
     layout:'single',
@@ -175,12 +177,13 @@ test('creative quality gate prevents creation of a publication request in the da
       await pg.exec(fs.readFileSync(`db/migrations/${file}`,'utf8'));
     }
     const opportunity=opportunitySchema.parse({
-      product:{name:'Kuscheldecke',sourceUrl:'https://www.amazon.de/s?k=Kuscheldecke',affiliateUrl:'https://www.amazon.de/s?k=Kuscheldecke',price:'',targetGroup:'Haushalte',benefits:'Größe und Material vergleichen',notes:''},
+      product:{productVerifiedAt:'2026-09-26T08:00:00.000Z', productVerifiedName:'Kuscheldecke', name:'Kuscheldecke',sourceUrl:'https://www.amazon.de/dp/B000000001',affiliateUrl:'https://www.amazon.de/dp/B000000001',price:'',targetGroup:'Haushalte',benefits:'Größe und Material vergleichen',notes:''},
       useCase:'Ein kühler Herbstabend auf dem Sofa mit einer Decke.',targetPlatform:'facebook',budget:'low'
     });
     const id=crypto.randomUUID();
     await memoryRepository(db).claim(id,opportunity,'reference');
     const now=new Date().toISOString();
+    opportunity.product=bindAmazonProduct(opportunity.product);
     const weakJob={
       version:1,id,createdAt:now,updatedAt:now,status:'approved',mode:'reference',opportunity,events:[],revisions:0,modelCalls:0,totalTokens:0,
       content:baseImage({

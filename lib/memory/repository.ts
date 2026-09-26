@@ -1,3 +1,5 @@
+import { requireJobProduct } from "../content/product-contract";
+import { bindAmazonProduct } from "../amazon";
 import { createHash } from "node:crypto";
 import type { ContentJob, Opportunity } from "../content/schema";
 import { parseJob } from "../content/history";
@@ -17,6 +19,7 @@ export function productId(source: string) {
 export function memoryRepository(db: Database = getDatabase()) {
   return {
     async claim(id: string, opportunity: Opportunity, mode: "reference"|"ai") {
+      try { opportunity = { ...opportunity, product: bindAmazonProduct(opportunity.product) }; } catch { /* Unresolved jobs are persisted blocked, never approved. */ }
       const now = new Date().toISOString();
       const job: ContentJob = { version: 1, id, createdAt: now, updatedAt: now, status: "queued", mode, opportunity, events: [], revisions: 0, modelCalls: 0, totalTokens: 0 };
       await db.transaction(async sql => {
@@ -31,8 +34,13 @@ export function memoryRepository(db: Database = getDatabase()) {
     },
     async save(job: ContentJob) {
       await db.transaction(async sql => {
-        const locked = await sql.query("SELECT event_sequence FROM content_jobs WHERE id=$1 FOR UPDATE",[job.id]);
+        const locked = await sql.query("SELECT event_sequence,snapshot FROM content_jobs WHERE id=$1 FOR UPDATE",[job.id]);
         if (!locked.rows.length) throw new Error("Job fehlt in Postgres.");
+        const previous = parseJob(locked.rows[0].snapshot).opportunity.product;
+        // Link clearing is permitted for blocked jobs; rebinding an existing job is not.
+        const identity = (p: typeof previous) => JSON.stringify([p.name,p.sourceUrl,p.asin,p.productUrl,p.trackingId,p.productVerifiedAt,p.productVerifiedName]);
+        if (identity(previous) !== identity(job.opportunity.product)) throw new ConflictError("product_unresolved: Produktidentität dieses Jobs darf nicht verändert werden.");
+        if (job.status === "awaiting_approval" || job.status === "approved") requireJobProduct(job);
         const sequence = job.events.at(-1)?.sequence || 0;
         if (Number(locked.rows[0].event_sequence) >= sequence) return;
         const agents = [...new Set(job.events.map(e => e.agent))];
@@ -70,6 +78,7 @@ export function memoryRepository(db: Database = getDatabase()) {
         const result = await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE",[id]);
         if (!result.rows.length) throw new ConflictError("Job nicht gefunden.");
         const job = parseJob(result.rows[0].snapshot);
+        requireJobProduct(job);
         if (job.status === "approved") return job;
         if (job.status !== "awaiting_approval") throw new ConflictError("Dieser Job ist noch nicht zur Freigabe bereit.");
         job.status = "approved"; job.updatedAt = new Date().toISOString();

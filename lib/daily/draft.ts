@@ -1,3 +1,4 @@
+import { requireProduct } from "@/lib/amazon";
 import { imageProviderStatus } from "@/lib/content/image-provider";
 import { runContentJob, runProductScout } from "@/lib/orchestrator";
 import { getDatabase } from "@/lib/memory/db";
@@ -18,6 +19,7 @@ export async function sendDailyApproval(jobId: string) {
   if (!record.rows[0]) return false;
   const job = parseJob(record.rows[0].snapshot);
   if (job.status !== "awaiting_approval") return false;
+  requireProduct(job.opportunity.product, JSON.stringify(job.content));
   const recent = await db.query(
     "SELECT 1 FROM whatsapp_events WHERE wa_id=$1 AND received_at>now()-interval '24 hours' LIMIT 1",
     [(process.env.WHATSAPP_APPROVER_WA_ID || "").replace(/\D/g, "")],
@@ -30,7 +32,7 @@ export async function sendDailyApproval(jobId: string) {
   );
   if (!claimed.rows.length) return false;
   const summary = job.content?.format === "text" ? job.content.body : job.content?.format === "image" ? job.content.caption : "Videoentwurf";
-  const messageId = await sendWhatsAppText(`Content-Freigabe · Tagesentwurf ${new Date(String(claimed.rows[0].day)).toISOString().slice(0, 10)}\nProdukt: ${job.opportunity.product.name}\nFormat: ${job.content?.format || "unbekannt"} · Facebook\n\n${(summary || "").slice(0, 1100)}\n\nSuchauswahl, kein geprüftes Einzelprodukt. Antworte auf DIESE Nachricht mit „Freigeben“, um den Content-Plan und eine einmalige kostenpflichtige Bildgenerierung freizugeben (Bildprovider: ${imageProviderStatus().provider || "nicht eingerichtet"}, EUR-Kosten nicht vorab bestätigt). Danach kommt eine ZWEITE WhatsApp für die Veröffentlichung. „Ablehnen“ stoppt den Auftrag, Änderungswünsche bitte als Text. Noch kein Post ist online.`);
+  const messageId = await sendWhatsAppText(`Content-Freigabe · Tagesentwurf ${new Date(String(claimed.rows[0].day)).toISOString().slice(0, 10)}\nProdukt: ${job.opportunity.product.name}\nFormat: ${job.content?.format || "unbekannt"} · Facebook\n\n${(summary || "").slice(0, 1100)}\n\nASIN: ${job.opportunity.product.asin}\nProduktlink: ${job.opportunity.product.affiliateUrl}\n Antworte auf DIESE Nachricht mit „Freigeben“, um den Content-Plan und eine einmalige kostenpflichtige Bildgenerierung freizugeben (Bildprovider: ${imageProviderStatus().provider || "nicht eingerichtet"}, EUR-Kosten nicht vorab bestätigt). Danach kommt eine ZWEITE WhatsApp für die Veröffentlichung. „Ablehnen“ stoppt den Auftrag, Änderungswünsche bitte als Text. Noch kein Post ist online.`);
   await db.query("UPDATE daily_drafts SET whatsapp_message_id=$2,updated_at=now() WHERE job_id=$1 AND status='awaiting_approval'", [jobId, messageId]);
   return true;
 }
@@ -49,17 +51,16 @@ export async function createDailyDraft(day = new Intl.DateTimeFormat("en-CA", { 
 
   try {
     const report = await runProductScout();
-    // The scout offers search categories, not verified individual products.
-    // Pick one seasonal candidate; all model-specific properties remain open.
+    // A seasonal idea becomes affiliate content only after exact product resolution.
     const candidates = report.candidates.filter(candidate => candidate.kind === "Saisontrend");
     if (!candidates.length) throw new Error("Kein saisonaler Kandidat verfügbar.");
-    const candidate = candidates[new Date(`${day}T00:00:00Z`).getUTCDate() % candidates.length];
+    const resolved = candidates.filter(candidate => candidate.resolvedProduct);
+    const pool = resolved.length ? resolved : candidates;
+    const candidate = pool[new Date(`${day}T00:00:00Z`).getUTCDate() % pool.length];
     await db.query("UPDATE daily_drafts SET status='planning',scout_report=$2,updated_at=now() WHERE day=$1", [day, JSON.stringify(report)]);
     const opportunity: Opportunity = {
-      product: { name: candidate.name, sourceUrl: candidate.amazonUrl, affiliateUrl: candidate.affiliateUrl,
-        price: "", targetGroup: candidate.targetGroup,
-        benefits: "Produktidee für einen Alltagseinsatz; Eignung und Eigenschaften am konkreten Modell prüfen.",
-        notes: `Suchauswahl statt konkretem Produkt. Noch zu prüfen: ${candidate.benefitsToVerify.join(", ")}.` },
+      product: candidate.resolvedProduct || { name: candidate.name, sourceUrl: "https://www.amazon.de/", affiliateUrl: "",
+        price: "", targetGroup: candidate.targetGroup, benefits: "Konkretes Produkt noch nicht aufgelöst.", notes: "product_unresolved" },
       category: candidate.category === "Wohnen" ? "home_living" : "household", useCaseKey: "seasonal-product-guide", targetPlatform: "facebook",
       useCase: candidate.reelIdea, trend: candidate.whyNow, goal: "education", budget: "low", verifiedFacts: [],
     };
@@ -97,7 +98,7 @@ export async function createDailyDraft(day = new Intl.DateTimeFormat("en-CA", { 
         return { status, jobId, whatsapp: "notification_sent" as const };
       }
     }
-    return { status, jobId };
+    return { status, jobId, ...(job.error ? { error: job.error } : {}) };
   } catch {
     // Preserve the one-time claim. Ambiguous network outcomes must not retry.
     await db.query("UPDATE daily_drafts SET status='failed',updated_at=now() WHERE day=$1", [day]);

@@ -16,8 +16,8 @@ test('daily cron produces one saved image brief, requires a WhatsApp window, and
     '@/lib/orchestrator':{
       runContentJob:require('../.test-build/lib/content/orchestrator').runContentJob,
       runProductScout:async()=>{scouts++;return {candidates:[{
-        kind:'Saisontrend',name:'Kuscheldecke',amazonUrl:'https://www.amazon.de/s?k=Kuscheldecke',
-        affiliateUrl:'https://www.amazon.de/s?k=Kuscheldecke&tag=alltaeglichle-21',
+        resolvedProduct:{name:'Kuscheldecke',productVerifiedName:'Kuscheldecke',productVerifiedAt:'2026-09-26T08:00:00.000Z',sourceUrl:'https://www.amazon.de/dp/B000000001',affiliateUrl:'',price:'',targetGroup:'Haushalte',benefits:'Eigenschaften vor Kauf prüfen',notes:''}, kind:'Saisontrend',name:'Kuscheldecke',amazonUrl:'https://www.amazon.de/dp/B000000001',
+        affiliateUrl:'https://www.amazon.de/dp/B000000001',
         targetGroup:'Haushalte',reelIdea:'Eine Kuscheldecke am Abend auf dem Sofa vergleichen.',
         whyNow:'Herbst',benefitsToVerify:['Material','Größe'],
       }]};},

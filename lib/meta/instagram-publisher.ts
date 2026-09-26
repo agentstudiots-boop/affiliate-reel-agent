@@ -1,6 +1,14 @@
 import { cachedMetaConnection, metaConfig, pagePublishingToken } from "./connection";
 import { validReelVideoUrl } from "./instagram-reel";
 
+// No documented arbitrary external CTA in this Facebook Login organic Reels flow.
+// Product tagging requires separate eligible catalog IDs/permissions, not an Amazon URL.
+export const ORGANIC_REEL_CAPABILITIES = Object.freeze({ externalShoppingButton: false });
+export function organicReelPayload(videoUrl: string, caption: string, shoppingUrl?: string) {
+  if (shoppingUrl) throw new InstagramPublishFailure("container", "external_shopping_cta_unsupported");
+  return new URLSearchParams({ media_type: "REELS", video_url: videoUrl, caption, share_to_feed: "false" });
+}
+
 export class InstagramPublishFailure extends Error {
   constructor(public phase: "connection" | "container" | "status" | "publish" | "permalink", public detail: string,
     public httpStatus = 0, public code = 0, public subcode = 0) { super("Instagram Graph API did not confirm the requested operation"); }
@@ -37,7 +45,7 @@ export async function instagramGraph(transport: typeof fetch = fetch) {
         throw new InstagramPublishFailure("container","invalid_media_or_caption");
       }
       const result = await graph(`${instagramId}/media`,token.token,version,transport,"container",
-        new URLSearchParams({ media_type: "REELS", video_url: videoUrl, caption, share_to_feed: "false" }));
+        organicReelPayload(videoUrl, caption));
       if (!/^\d+$/.test(result.id || "")) throw new InstagramPublishFailure("container","missing_container_id");
       return result.id!;
     },

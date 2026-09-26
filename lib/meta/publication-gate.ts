@@ -231,9 +231,15 @@ export function publicationRepository(db: Database = getDatabase()) {
       });
     },
     async claimPublish(id: string) {
-      const result = await db.query("UPDATE publication_requests SET status='publishing',publish_attempted_at=now(),updated_at=now() WHERE id=$1 AND status='approved' AND whatsapp_message_id IS NOT NULL AND publish_attempted_at IS NULL AND image_url IS NOT NULL AND image_url NOT LIKE '%/social-cards/%' RETURNING *", [id]);
+      return db.transaction(async sql => {
+      const stored = await sql.query("SELECT j.snapshot,p.content_hash,p.caption FROM publication_requests p JOIN content_jobs j ON j.id=p.job_id WHERE p.id=$1 AND p.platform='facebook' FOR UPDATE OF p,j", [id]);
+      if (!stored.rows[0]) throw new PublicationConflictError("product_unresolved");
+      const current = publicationContent(parseJob(stored.rows[0].snapshot));
+      if (current.hash !== stored.rows[0].content_hash || current.caption !== stored.rows[0].caption) throw new PublicationConflictError("product_unresolved: Freigegebenes Produkt oder Caption geändert.");
+      const result = await sql.query("UPDATE publication_requests SET status='publishing',publish_attempted_at=now(),updated_at=now() WHERE id=$1 AND status='approved' AND whatsapp_message_id IS NOT NULL AND publish_attempted_at IS NULL AND image_url IS NOT NULL AND image_url NOT LIKE '%/social-cards/%' RETURNING *", [id]);
       if (!result.rows[0]) throw new PublicationConflictError("Veröffentlichung nicht freigegeben oder bereits versucht.");
       return publication(result.rows[0]);
+      });
     },
     async markUnknown(id: string) {
       await db.query("UPDATE publication_requests SET status='unknown',updated_at=now() WHERE id=$1 AND status='publishing'", [id]);

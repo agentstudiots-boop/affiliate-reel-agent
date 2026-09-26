@@ -26,7 +26,7 @@ async function fixture(t) {
   const memory = memoryRepository(db), publication = publicationModule.publicationRepository(db);
   const inbound = productionModule.productionRepository(db), id = crypto.randomUUID();
   const opportunity = opportunitySchema.parse({
-    product: { name: 'Kuscheldecke', sourceUrl: 'https://www.amazon.de/s?k=Kuscheldecke', affiliateUrl: 'https://www.amazon.de/s?k=Kuscheldecke',
+    product: { productVerifiedAt:'2026-09-26T08:00:00.000Z', productVerifiedName:'Kuscheldecke', name: 'Kuscheldecke', sourceUrl: 'https://www.amazon.de/dp/B000000001', affiliateUrl: 'https://www.amazon.de/dp/B000000001',
       price: '', targetGroup: 'Haushalte', benefits: 'Größe und Material vergleichen', notes: '' },
     useCase: 'Ein kühler Herbstabend auf dem Sofa mit einer Decke.', targetPlatform: 'facebook', budget: 'low',
   });

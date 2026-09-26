@@ -24,7 +24,7 @@ async function fixture(t) {
   process.env.WHATSAPP_APPROVER_WA_ID='4912345678';
   t.after(()=>{if(old===undefined)delete process.env.WHATSAPP_APPROVER_WA_ID;else process.env.WHATSAPP_APPROVER_WA_ID=old;});
   const id=crypto.randomUUID(), memory=memoryRepository(db);
-  const opportunity=opportunitySchema.parse({product:{name:'Kuscheldecke',sourceUrl:'https://www.amazon.de/s?k=Kuscheldecke',affiliateUrl:'',price:'',targetGroup:'Haushalte',benefits:'Größe und Material vergleichen',notes:''},useCase:'Ein kühler Herbstabend auf dem Sofa mit einer Tasse Tee.',category:'home_living',targetPlatform:'instagram',budget:'quality'});
+  const opportunity=opportunitySchema.parse({product:{productVerifiedAt:'2026-09-26T08:00:00.000Z', productVerifiedName:'Kuscheldecke', name:'Kuscheldecke',sourceUrl:'https://www.amazon.de/dp/B000000001',affiliateUrl:'',price:'',targetGroup:'Haushalte',benefits:'Größe und Material vergleichen',notes:''},useCase:'Ein kühler Herbstabend auf dem Sofa mit einer Tasse Tee.',category:'home_living',targetPlatform:'instagram',budget:'quality'});
   await memory.claim(id,opportunity,'reference');
   await runContentJob(opportunity,{id,allowedFormats:['video'],onUpdate:memory.save});
   const job=await memory.approve(id);

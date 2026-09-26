@@ -15,7 +15,7 @@ const {reviseApprovedVideo}=require('../.test-build/lib/content/orchestrator');
 const {opportunitySchema}=require('../.test-build/lib/content/schema');
 
 const opportunity=opportunitySchema.parse({
-  product:{name:'Vakuumierer',sourceUrl:'https://www.amazon.de/s?k=Vakuumierer',affiliateUrl:'',price:'',targetGroup:'Familien',benefits:'Vorräte vorbereiten',notes:''},
+  product:{productVerifiedAt:'2026-09-26T08:00:00.000Z', productVerifiedName:'Vakuumierer', name:'Vakuumierer',sourceUrl:'https://www.amazon.de/dp/B000000001',affiliateUrl:'',price:'',targetGroup:'Familien',benefits:'Vorräte vorbereiten',notes:''},
   useCase:'Oma staunt beim Familienessen über das Steak.',
   category:'kitchen',
   useCaseKey:'sous-vide',

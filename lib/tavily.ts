@@ -40,6 +40,7 @@ export async function tavilySearch({
       ...(timeRange ? { time_range: timeRange } : {}),
     }),
     cache: "no-store",
+    signal: AbortSignal.timeout(15000),
   });
 
   const data = (await response.json()) as TavilyResponse;

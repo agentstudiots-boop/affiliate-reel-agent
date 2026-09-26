@@ -1,3 +1,4 @@
+import { requireJobProduct } from "../content/product-contract";
 import { randomBytes } from "node:crypto";
 import { parseJob } from "../content/history";
 import { getDatabase, type Database } from "../memory/db";
@@ -70,6 +71,7 @@ export function productionRepository(db: Database = getDatabase()) {
       const result = await db.query("SELECT snapshot FROM content_jobs WHERE id=$1", [jobId]);
       if (!result.rows[0]) throw new ProductionConflictError("Content-Job nicht gefunden.");
       const job = parseJob(result.rows[0].snapshot);
+        requireJobProduct(job);
       if (job.status !== "approved" || job.content?.format !== "video") throw new ProductionConflictError("Freigegebener Video-Plan fehlt.");
       return job;
     },
@@ -84,6 +86,7 @@ export function productionRepository(db: Database = getDatabase()) {
         const jobResult = await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE", [jobId]);
         if (!jobResult.rows.length) throw new ProductionConflictError("Content-Job nicht gefunden.");
         const job = parseJob(jobResult.rows[0].snapshot);
+        requireJobProduct(job);
         if (job.status !== "approved") throw new ProductionConflictError("Vor Medienproduktion muss der Content-Plan gespeichert freigegeben sein.");
         if (job.content?.format !== "video") throw new ProductionConflictError("Dieser Produktionsweg ist derzeit nur für freigegebene Video-Pläne vorgesehen.");
 
@@ -126,6 +129,7 @@ export function productionRepository(db: Database = getDatabase()) {
         const jobResult = await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE", [input.jobId]);
         if (!jobResult.rows[0]) throw new ProductionConflictError("Content-Job nicht gefunden.");
         const job = parseJob(jobResult.rows[0].snapshot);
+        requireJobProduct(job);
         if (job.status !== "approved" || job.content?.format !== "video") throw new ProductionConflictError("Freigegebener Video-Plan fehlt.");
         if (job.content.scenes.map(scene => scene.audio.trim()).join("\n\n") !== input.script) {
           throw new ProductionConflictError("Der Entwurf wurde seit der Quote geändert.");
@@ -244,6 +248,7 @@ export function productionRepository(db: Database = getDatabase()) {
             const stored = await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE", [daily.job_id]);
             if (!stored.rows[0]) throw new ProductionConflictError("Tages-Content-Job fehlt.");
             const job = parseJob(stored.rows[0].snapshot);
+        requireJobProduct(job);
             if (job.status !== "awaiting_approval") throw new ProductionConflictError("Tagesentwurf wurde bereits verändert.");
             job.status = "approved"; job.updatedAt = new Date().toISOString();
             const event = { sequence: job.events.length+1, at: job.updatedAt, agent: "orchestrator" as const,
@@ -260,6 +265,11 @@ export function productionRepository(db: Database = getDatabase()) {
         if (publicationResult.rows[0]) {
           const publication = publicationResult.rows[0];
           const decision = classifyWhatsAppReply(input.body);
+          if (decision.intent === "approve") {
+            const stored = await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE", [publication.job_id]);
+            if (!stored.rows[0]) throw new ProductionConflictError("product_unresolved");
+            requireJobProduct(parseJob(stored.rows[0].snapshot));
+          }
           const status = decision.intent === "approve" ? "approved" : decision.intent === "reject" ? "rejected" : "changes_requested";
           await sql.query("UPDATE publication_requests SET status=$2,feedback=$3,decided_at=now(),updated_at=now() WHERE id=$1", [publication.id,status,decision.feedback]);
           await sql.query("UPDATE whatsapp_events SET intent=$2,approval_request_id=NULL WHERE message_id=$1", [input.id,decision.intent]);
@@ -269,6 +279,11 @@ export function productionRepository(db: Database = getDatabase()) {
 
         const approval = mapApproval(approvalResult.rows[0]);
         const decision = classifyWhatsAppReply(input.body);
+        if (decision.intent === "approve") {
+          const stored = await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE", [approval.jobId]);
+          if (!stored.rows[0]) throw new ProductionConflictError("product_unresolved");
+          requireJobProduct(parseJob(stored.rows[0].snapshot));
+        }
         const approvalStatus = decision.intent === "approve" ? "approved" : decision.intent === "reject" ? "rejected" : "changes_requested";
         const runStatus = decision.intent === "approve" ? "approved_for_spend" : decision.intent === "reject" ? "cancelled" : "changes_requested";
         if (approval.kind !== "render") return { handled: false as const, reason: "unsupported_approval_kind" as const };
@@ -299,6 +314,11 @@ export function productionRepository(db: Database = getDatabase()) {
            FOR UPDATE OF r`, [jobId, maxCredits],
         );
         if (!result.rows[0]) throw new ProductionConflictError("Bezahlten Videostart ohne eindeutige WhatsApp-Freigabe oder bei geänderter Quote verweigert.");
+        const stored = await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE", [jobId]);
+        if (!stored.rows[0]) throw new ProductionConflictError("product_unresolved");
+        const job = parseJob(stored.rows[0].snapshot);
+        requireJobProduct(job);
+        if (job.status !== "approved" || job.content?.format !== "video" || job.content.scenes.map(s => s.audio.trim()).join("\n\n") !== result.rows[0].provider_script) throw new ProductionConflictError("Produkt oder Drehbuch geändert.");
         const key = crypto.randomUUID();
         const claimed = await sql.query(
           "UPDATE production_runs SET status='rendering',provider_request_key=$2,provider_request_attempted_at=now(),updated_at=now() WHERE id=$1 AND status='approved_for_spend' RETURNING *",

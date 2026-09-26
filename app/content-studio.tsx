@@ -1,5 +1,6 @@
 "use client";
 
+import { productIdentityError } from "@/lib/amazon";
 import { useEffect, useRef, useState } from "react";
 import type { LearningEvidence } from "@/lib/memory/schema";
 import { PerformanceEditor } from "@/app/performance-editor";
@@ -152,9 +153,9 @@ export function ContentStudio({ product, onFillReelTest }: { product: Product; o
     {job && <div className="contentJob">
       <div className="jobHeader"><strong aria-live="polite">{labels[job.status]}</strong><span>{job.mode === "ai" ? "Historische KI-Planung" : "Regelbasierter Entwurf"} · {job.revisions}/2 Überarbeitungen</span></div>
       <small>Job {job.id} · {job.modelCalls} externe Modellaufrufe</small>
-      <p><a href={job.opportunity.product.affiliateUrl} target="_blank" rel="sponsored noopener">Geplantes Affiliate-Linkziel prüfen ↗</a></p>
-      <p><b>Produkt:</b> {job.opportunity.product.name}<br /><b>Use Case:</b> {job.opportunity.useCase}</p>
-      {JSON.stringify({ ...job.opportunity.product, affiliateUrl: "" }) !== JSON.stringify({ ...product, affiliateUrl: "" }) && <p className="error">Dieser Job gehört zu einem früheren Produktstand. Änderungen oben sind noch nicht eingearbeitet.</p>}
+      {!productIdentityError(job.opportunity.product) && <p><a href={job.opportunity.product.affiliateUrl} target="_blank" rel="sponsored noopener">Geplantes Affiliate-Produktziel prüfen ↗</a></p>}
+      <p><b>Produkt:</b> {job.opportunity.product.name}<br /><b>ASIN:</b> {job.opportunity.product.asin || "nicht aufgelöst"}<br /><b>Use Case:</b> {job.opportunity.useCase}</p>
+      <p className="muted">Die Freigabe gilt für das hier gespeicherte Produkt und diese ASIN. Geänderte Produktangaben benötigen einen neuen Auftrag.</p>
       {job.error && <p className="error">{job.error}</p>}
       {job.ideas && <div className="ideaGrid">{job.ideas.map(idea => <article className={`ideaCard ${job.decision?.ideaId === idea.id ? "selectedIdea" : ""}`} key={idea.id}>
         <small>{formatLabels[idea.format]}{job.decision?.ideaId === idea.id ? " · ausgewählt" : ""}</small><h3>{idea.title}</h3><p>{idea.hook}</p><p>{idea.story}</p><small>{idea.rationale}</small>

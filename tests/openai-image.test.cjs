@@ -10,9 +10,9 @@ const { publicationRepository } = require('../.test-build/lib/meta/publication-g
 const { runContentJob } = require('../.test-build/lib/content/orchestrator');
 const { opportunitySchema } = require('../.test-build/lib/content/schema');
 
-function opportunity(sourceUrl = 'https://www.amazon.de/s?k=Kuscheldecke', verifiedFacts = []) {
+function opportunity(sourceUrl = 'https://www.amazon.de/dp/B000000001', verifiedFacts = []) {
   return opportunitySchema.parse({
-    product: { name: sourceUrl.includes('/dp/') ? 'Kuscheldecke Modell X' : 'Kuscheldecke', sourceUrl,
+    product: { name: 'Kuscheldecke Modell X', productVerifiedName: 'Kuscheldecke Modell X', productVerifiedAt: '2026-09-26T08:00:00.000Z', sourceUrl,
       affiliateUrl: sourceUrl, price: '', targetGroup: 'Haushalte', benefits: 'angeblich wasserdicht und selbstheizend', notes: '' },
     useCase: 'Ein ruhiger Herbstabend mit einer Kuscheldecke auf dem Sofa.', targetPlatform: 'facebook', budget: 'low', verifiedFacts,
   });
@@ -69,7 +69,7 @@ test('missing key is fail-closed, configured key selects OpenAI without calling 
 test('visual prompt stays categorical on search and excludes unverified model claims', async () => {
   const search = await runContentJob(opportunity());
   const prompt = buildOriginalVisualPrompt(search);
-  assert.match(prompt,/nur die Kategorie visualisieren/);
+  assert.match(prompt,/neutraler, markenfreier Kategorie-Look/);
   assert.match(prompt,/keine konkreten Eigenschaften/);
   assert.match(prompt,/Amazon- oder Händlerbranding/);
   const product = await runContentJob(opportunity('https://www.amazon.de/dp/B000000001'));

@@ -1,5 +1,6 @@
 "use client";
 
+import { amazonProduct } from "@/lib/amazon";
 import { useEffect, useState } from "react";
 import { ContentStudio } from "@/app/content-studio";
 import { MetaConnection } from "@/app/meta-connection";
@@ -59,7 +60,7 @@ export default function Home() {
     setProductReview(null);
     setState((current) => ({
       ...current,
-      product: { ...current.product, [field]: value },
+      product: { ...current.product, [field]: value, affiliateUrl: "", productVerifiedAt: undefined, productVerifiedName: undefined, asin: undefined, productUrl: undefined, trackingId: undefined },
       conceptProduct: current.concept ? current.conceptProduct || current.product : undefined,
       status: current.concept ? current.status : "draft",
       updatedAt: new Date().toISOString(),
@@ -100,7 +101,7 @@ export default function Home() {
       ...current,
       product: {
         ...emptyProduct,
-        name: typedReview.normalizedName,
+        name: candidate.resolvedProduct?.name || candidate.name,
         sourceUrl: candidate.amazonUrl,
         affiliateUrl: candidate.affiliateUrl,
         price: "Aktueller Preis siehe Amazon",
@@ -178,8 +179,8 @@ export default function Home() {
             <p>{candidate.whyNow}</p>
             <small>{candidate.season} · {candidate.category}</small>
             <div className="trendActions">
-              <a href={candidate.amazonUrl} target="_blank" rel="noopener">Bei Amazon prüfen ↗</a>
-              <button type="button" disabled={verifying} onClick={() => chooseTrend(candidate)}>{verifying ? "Prüfung läuft …" : "Prüfen & übernehmen"}</button>
+              {candidate.amazonUrl && <a href={candidate.amazonUrl} target="_blank" rel="noopener">Bei Amazon prüfen ↗</a>}
+              <button type="button" disabled={verifying || !candidate.amazonUrl} onClick={() => chooseTrend(candidate)}>{verifying ? "Prüfung läuft …" : "Prüfen & übernehmen"}</button>
             </div>
           </article>)}</div>
           {trendReport.sources.length > 0 && <details className="sources"><summary>Recherchequellen anzeigen</summary>{trendReport.sources.map((source) => <a key={source.url} href={source.url} target="_blank" rel="noopener">{source.title || source.url}</a>)}</details>}
@@ -191,8 +192,8 @@ export default function Home() {
           <div className="panelTitle"><span>01</span><div><h2>Produkt erfassen</h2><p>Nur belegbare Angaben eintragen.</p></div></div>
           <label>Produktname<input required value={state.product.name} onChange={(e) => updateProduct("name", e.target.value)} placeholder="z. B. Microplane Premium Classic" /></label>
           <div className="two">
-            <label>Amazon-Produkt oder Suchauswahl<input required type="url" value={state.product.sourceUrl} onChange={(e) => updateProduct("sourceUrl", e.target.value)} placeholder="https://www.amazon.de/…" /></label>
-            <label>Affiliate-Link (automatisch)<input type="url" value={state.product.affiliateUrl} onChange={(e) => updateProduct("affiliateUrl", e.target.value)} placeholder="Wird aus der Produktseite erzeugt" /></label>
+            <label>Amazon-Produktdetailseite (eine ASIN)<input required type="url" value={state.product.sourceUrl} onChange={(e) => updateProduct("sourceUrl", e.target.value)} placeholder="https://www.amazon.de/…" /></label>
+            <label>Affiliate-Link (automatisch)<input type="url" value={state.product.affiliateUrl} readOnly placeholder="Wird aus der Produktseite erzeugt" /></label>
           </div>
           <div className="two">
             <label>Preis<input value={state.product.price} onChange={(e) => updateProduct("price", e.target.value)} placeholder="z. B. 24,90 €" /></label>
@@ -209,10 +210,10 @@ export default function Home() {
         <ContentStudio product={state.product} onFillReelTest={() => {
           setProductReview(null);
           setState(current => ({ ...current, product: {
-            name: "Kuscheldecke", sourceUrl: "https://www.amazon.de/s?k=Kuscheldecke", affiliateUrl: "", price: "",
+            name: "Kuscheldecke", sourceUrl: "", affiliateUrl: "", price: "",
             targetGroup: "Menschen, die eine Decke für ruhige Abende zu Hause suchen",
             benefits: "Größe, Material und Pflege als Kaufkriterien vergleichen",
-            notes: "Suchauswahl, keine verifizierten Eigenschaften eines einzelnen Modells.",
+            notes: "Konkrete Amazon-Produktdetailseite vor der Planung eintragen; keine Modellmerkmale verifiziert.",
           }, updatedAt: new Date().toISOString() }));
         }} />
       </section>
@@ -236,7 +237,7 @@ export default function Home() {
           <label>Provision (€)<input value={state.revenue} onChange={(e) => patch({ revenue: e.target.value })} /></label>
           <div className="rate"><small>Conversion</small><strong>{state.clicks ? ((state.sales / state.clicks) * 100).toFixed(1) : "0.0"}%</strong></div>
         </div>
-        {state.product.affiliateUrl && <a className="track" href={state.product.affiliateUrl} target="_blank" rel="sponsored noopener" onClick={() => patch({ clicks: state.clicks + 1 })}>Affiliate-Link testen ↗</a>}
+        {amazonProduct(state.product.affiliateUrl) && <a className="track" href={state.product.affiliateUrl} target="_blank" rel="sponsored noopener" onClick={() => patch({ clicks: state.clicks + 1 })}>Affiliate-Link testen ↗</a>}
       </section>
 
       <footer>Postgres als zentraler Lernspeicher · Content vor Veröffentlichung prüfen · Werbung klar kennzeichnen</footer>

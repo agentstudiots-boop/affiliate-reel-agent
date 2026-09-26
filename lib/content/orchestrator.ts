@@ -1,5 +1,5 @@
 import type { LearningEvidence } from "../memory/schema";
-import { createAmazonAffiliateUrl } from "../amazon";
+import { bindAmazonProduct, requireProduct, PRODUCT_UNRESOLVED } from "../amazon";
 import { creativeAgent } from "./agents/creative";
 import { videoAgent } from "./agents/video";
 import { imageAgent } from "./agents/image";
@@ -113,7 +113,6 @@ export async function runContentJob(raw: Opportunity, options: {
   generate?: Generator; // Dependency injection for deterministic, cost-free contract tests.
 } = {}): Promise<ContentJob> {
   const opportunity = opportunitySchema.parse(raw);
-  opportunity.product.affiliateUrl = createAmazonAffiliateUrl(opportunity.product.affiliateUrl || opportunity.product.sourceUrl);
   const now = new Date().toISOString();
   const job: ContentJob = { version: 1, id: options.id || crypto.randomUUID(), createdAt: now, updatedAt: now,
     status: "queued", mode: options.mode || "reference", opportunity, events: [], revisions: 0, modelCalls: 0, totalTokens: 0 };
@@ -132,6 +131,8 @@ export async function runContentJob(raw: Opportunity, options: {
     return output;
   };
   try {
+    opportunity.product = bindAmazonProduct(opportunity.product);
+    requireProduct(opportunity.product);
     await status("checking", "Opportunity, Linkziel und Briefing prüfen");
     const source = new URL(opportunity.product.sourceUrl);
     const affiliate = new URL(opportunity.product.affiliateUrl);
@@ -168,6 +169,7 @@ export async function runContentJob(raw: Opportunity, options: {
       if (job.review.passed) break;
     }
     if (!job.review?.passed) { await status("needs_input", "Revisionslimit erreicht. Briefing oder Fakten ergänzen; kein Marketingauftrag."); return job; }
+    requireProduct(opportunity.product, JSON.stringify(job.content));
     await status("marketing", "Geprüften Entwurf an Marketing übergeben");
     job.marketing = await marketingAgent({ opportunity, content: job.content! }, generate);
     const platform = job.marketing.primary;
@@ -181,7 +183,8 @@ export async function runContentJob(raw: Opportunity, options: {
   } catch (error) {
     const aborted = options.signal?.aborted;
     job.error = aborted ? "Planung unterbrochen. Kein automatischer Neustart." : error instanceof Error ? error.message : "Planung fehlgeschlagen.";
-    job.status = aborted ? "interrupted" : "failed";
+    job.status = aborted ? "interrupted" : job.error === PRODUCT_UNRESOLVED ? "needs_input" : "failed";
+    if (job.error === PRODUCT_UNRESOLVED) job.opportunity.product.affiliateUrl = "";
     await emit("orchestrator", "error", job.error);
   }
   return job;

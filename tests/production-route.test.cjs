@@ -59,7 +59,7 @@ async function fixture(t) {
   });
   const memory = memoryRepository(db), id = crypto.randomUUID();
   const opportunity = opportunitySchema.parse({
-    product: { name: 'Vakuumierer', sourceUrl: 'https://www.amazon.de/s?k=Vakuumierer', affiliateUrl: '', price: '', targetGroup: 'Familien', benefits: 'Vorräte vorbereiten', notes: '' },
+    product: { productVerifiedAt:'2026-09-26T08:00:00.000Z', productVerifiedName:'Vakuumierer', name: 'Vakuumierer', sourceUrl: 'https://www.amazon.de/dp/B000000001', affiliateUrl: '', price: '', targetGroup: 'Familien', benefits: 'Vorräte vorbereiten', notes: '' },
     useCase: 'Oma staunt beim Familienessen über das Steak.', category: 'kitchen', useCaseKey: 'sous-vide', targetPlatform: 'facebook',
   });
   await memory.claim(id, opportunity, 'reference');

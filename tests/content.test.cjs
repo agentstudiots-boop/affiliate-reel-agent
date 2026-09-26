@@ -7,7 +7,7 @@ const { createGenerator } = require('../.test-build/lib/content/model');
 const { creativeSchema } = require('../.test-build/lib/content/schema');
 const { z } = require('zod');
 const opportunity = {
-  product: { name: 'Vakuumiergerät für Lebensmittel', sourceUrl: 'https://www.amazon.de/s?k=Vakuumierer', affiliateUrl: '', price: '', targetGroup: 'Familien und Hobbyköche', benefits: 'Portionieren und Sous-vide vorbereiten', notes: 'Zusätzlicher Garer notwendig' },
+  product: { productVerifiedAt:'2026-09-26T08:00:00.000Z', productVerifiedName:'Vakuumiergerät für Lebensmittel', name: 'Vakuumiergerät für Lebensmittel', sourceUrl: 'https://www.amazon.de/dp/B000000001', affiliateUrl: '', price: '', targetGroup: 'Familien und Hobbyköche', benefits: 'Portionieren und Sous-vide vorbereiten', notes: 'Zusätzlicher Garer notwendig' },
   useCase: 'Oma staunt beim Familienessen über das Steak. Papa erklärt die Zubereitung.',
   trend: '', goal: 'conversion', budget: 'balanced', verifiedFacts: [],
 };
@@ -38,7 +38,7 @@ test('routes video, carousel and text by objective and economics without calling
 test('a home and living reel does not call blankets devices in its spoken CTA', async () => {
   const job = await runContentJob({
     ...opportunity,
-    product: { name: 'Kuscheldecke', sourceUrl: 'https://www.amazon.de/s?k=Kuscheldecke', affiliateUrl: '', price: '', targetGroup: 'Menschen für ruhige Abende zu Hause', benefits: 'Größe, Material und Pflege vergleichen', notes: 'Suchauswahl ohne Angaben zu einem einzelnen Modell' },
+    product: { productVerifiedAt:'2026-09-26T08:00:00.000Z', productVerifiedName:'Kuscheldecke', name: 'Kuscheldecke', sourceUrl: 'https://www.amazon.de/dp/B000000001', affiliateUrl: '', price: '', targetGroup: 'Menschen für ruhige Abende zu Hause', benefits: 'Größe, Material und Pflege vergleichen', notes: 'Suchauswahl ohne Angaben zu einem einzelnen Modell' },
     useCase: 'Feierabend mit Tee und einer Decke auf dem Sofa.',
     category: 'home_living', targetPlatform: 'instagram', budget: 'quality',
   }, { allowedFormats: ['video'] });
@@ -46,7 +46,7 @@ test('a home and living reel does not call blankets devices in its spoken CTA', 
   assert.equal(job.content.format, 'video');
   assert.match(job.content.scenes[0].audio, /^Feierabend, Tee in der Hand/);
   assert.match(job.content.scenes[1].audio, /einwickeln oder eher leicht/);
-  assert.match(job.content.scenes.at(-1).audio, /Welche Decke passt zu dir\?.*Beitragstext/);
+  assert.match(job.content.scenes.at(-1).audio, /Produktname, ASIN und Produktlink.*Beitragstext/);
   assert.doesNotMatch(job.content.scenes.at(-1).audio, /Geräte/);
   assert.doesNotMatch(job.content.scenes[0].audio, /^Werbung\b/);
   assert.match(job.content.caption, /^Werbung \|/);
@@ -153,7 +153,7 @@ test('removed generative transport fails closed without a network request', asyn
 });
 
 test('technical explanation can beat video even for conversion; storage brief favors carousel', async () => {
-  const technical = await runContentJob({ ...opportunity, product: { ...opportunity.product, name: 'Netzwerkswitch', targetGroup: 'IT-Fachleute' }, useCase: 'Fachliche Kaufberatung zur Kompatibilität von Netzwerkgeräten.' });
+  const technical = await runContentJob({ ...opportunity, product: { ...opportunity.product, name: 'Netzwerkswitch', productVerifiedName: 'Netzwerkswitch', targetGroup: 'IT-Fachleute' }, useCase: 'Fachliche Kaufberatung zur Kompatibilität von Netzwerkgeräten.' });
   assert.equal(technical.content.format, 'text');
   assert.equal(technical.status, 'awaiting_approval');
   const storage = await runContentJob({ ...opportunity, useCase: 'Nach dem Einkauf Vorräte portionsweise vorbereiten und passend lagern.' });

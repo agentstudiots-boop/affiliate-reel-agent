@@ -1,3 +1,5 @@
+import { requireJobProduct } from "../content/product-contract";
+import type { ContentJob } from "../content/schema";
 import { createHash, randomUUID } from "node:crypto";
 import { parseJob } from "../content/history";
 import { getDatabase, type Database } from "../memory/db";
@@ -9,6 +11,24 @@ export function validReelVideoUrl(value: string) {
     const url = new URL(value);
     return url.protocol === "https:" && !url.username && !url.password && url.hostname === "exports.faceless.so" && url.pathname.endsWith(".mp4");
   } catch { return false; }
+}
+
+function reelPublication(job: ContentJob, videoUrl: string) {
+  requireJobProduct(job);
+  if (job.status !== "approved" || job.content?.format !== "video" || job.opportunity.targetPlatform !== "instagram" || job.marketing?.primary !== "Instagram Reel") throw new InstagramReelConflict("Freigegebener Instagram-Reel-Plan fehlt.");
+  const product = job.opportunity.product;
+  const caption = `${job.content.caption}\n\n${product.name} · ASIN ${product.asin}\nAffiliate-Produktlink (als Text): ${product.affiliateUrl}`;
+  if (caption.length > 2200) throw new InstagramReelConflict("Reel-Text ist für Instagram zu lang.");
+  const hash = createHash("sha256").update(JSON.stringify({ jobId: job.id, videoUrl, content: job.content, caption })).digest("hex");
+  return { caption, hash };
+}
+
+async function checkPublication(sql: Pick<Database, "query">, id: string) {
+  const rows = await sql.query("SELECT j.snapshot,p.content_hash,p.caption,p.video_url FROM publication_requests p JOIN content_jobs j ON j.id=p.job_id WHERE p.id=$1 AND p.platform='instagram' FOR UPDATE OF p,j", [id]);
+  if (!rows.rows[0]) throw new InstagramReelConflict("product_unresolved");
+  const row = rows.rows[0];
+  const current = reelPublication(parseJob(row.snapshot), String(row.video_url));
+  if (current.hash !== row.content_hash || current.caption !== row.caption) throw new InstagramReelConflict("product_unresolved: Reel oder CTA geändert.");
 }
 
 function map(row: Record<string, unknown>) {
@@ -44,13 +64,7 @@ export function instagramReelRepository(db: Database = getDatabase()) {
         if (row.status !== "ready" || row.provider_mode !== "FACELESS_STORYBOARD" || !validReelVideoUrl(videoUrl)) {
           throw new InstagramReelConflict("Fertiges öffentliches Faceless-MP4 fehlt oder hat eine ungeprüfte URL.");
         }
-        let link: URL;
-        try { link = new URL(job.opportunity.product.affiliateUrl); }
-        catch { throw new InstagramReelConflict("Affiliate-Link fehlt."); }
-        if (link.protocol !== "https:" || link.username || link.password) throw new InstagramReelConflict("Affiliate-Link ist ungültig.");
-        const caption = `${job.content.caption}\n\n${job.opportunity.product.name} ansehen: ${link.href}`;
-        if (caption.length > 2200) throw new InstagramReelConflict("Reel-Text ist für Instagram zu lang.");
-        const hash = createHash("sha256").update(JSON.stringify({ jobId, videoUrl, content: job.content, caption })).digest("hex");
+        const { caption, hash } = reelPublication(job, videoUrl);
         const previous = await sql.query("SELECT * FROM publication_requests WHERE job_id=$1 AND platform='instagram' ORDER BY revision DESC LIMIT 1 FOR UPDATE", [jobId]);
         if (previous.rows[0]) {
           if (previous.rows[0].content_hash !== hash) throw new InstagramReelConflict("Video oder Text hat sich geändert. Alten Veröffentlichungsversuch nicht wiederverwenden.");
@@ -75,13 +89,16 @@ export function instagramReelRepository(db: Database = getDatabase()) {
       return map(result.rows[0]);
     },
     async claimContainer(id: string) {
-      const result = await db.query(`UPDATE publication_requests p SET status='publishing',publish_attempted_at=now(),updated_at=now()
+      return db.transaction(async sql => {
+      await checkPublication(sql, id);
+      const result = await sql.query(`UPDATE publication_requests p SET status='publishing',publish_attempted_at=now(),updated_at=now()
         WHERE p.id=$1 AND p.platform='instagram' AND p.status='approved' AND p.whatsapp_message_id IS NOT NULL
           AND p.publish_attempted_at IS NULL AND p.video_url IS NOT NULL
           AND EXISTS (SELECT 1 FROM production_runs r WHERE r.job_id=p.job_id AND r.status='ready' AND r.output_url=p.video_url)
         RETURNING *`, [id]);
       if (!result.rows[0]) throw new InstagramReelConflict("Reel nicht freigegeben oder Container bereits angefordert.");
       return map(result.rows[0]);
+      });
     },
     async bindContainer(id: string, containerId: string) {
       const result = await db.query("UPDATE publication_requests SET status='processing',instagram_container_id=$2,updated_at=now() WHERE id=$1 AND platform='instagram' AND status='publishing' AND instagram_container_id IS NULL AND instagram_media_publish_attempted_at IS NULL RETURNING *", [id,containerId]);
@@ -89,9 +106,12 @@ export function instagramReelRepository(db: Database = getDatabase()) {
       return map(result.rows[0]);
     },
     async claimMediaPublish(id: string) {
-      const result = await db.query("UPDATE publication_requests SET status='publishing',instagram_media_publish_attempted_at=now(),updated_at=now() WHERE id=$1 AND platform='instagram' AND status='processing' AND instagram_container_id IS NOT NULL AND instagram_media_publish_attempted_at IS NULL AND whatsapp_message_id IS NOT NULL AND decided_at IS NOT NULL RETURNING *", [id]);
+      return db.transaction(async sql => {
+      await checkPublication(sql, id);
+      const result = await sql.query("UPDATE publication_requests SET status='publishing',instagram_media_publish_attempted_at=now(),updated_at=now() WHERE id=$1 AND platform='instagram' AND status='processing' AND instagram_container_id IS NOT NULL AND instagram_media_publish_attempted_at IS NULL AND whatsapp_message_id IS NOT NULL AND decided_at IS NOT NULL RETURNING *", [id]);
       if (!result.rows[0]) throw new InstagramReelConflict("Reel bereits veröffentlicht oder Veröffentlichungsversuch unklar.");
       return map(result.rows[0]);
+      });
     },
     async markUnknown(id: string) {
       await db.query("UPDATE publication_requests SET status='unknown',updated_at=now() WHERE id=$1 AND platform='instagram' AND status IN ('publishing','processing')", [id]);

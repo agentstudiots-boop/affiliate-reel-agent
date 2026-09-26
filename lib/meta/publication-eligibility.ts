@@ -1,7 +1,10 @@
+import { jobProductError } from "../content/product-contract";
 import type { ContentJob } from "../content/schema";
 import { imageCreativePublicationError } from "../content/creative-quality";
 
 export function facebookPagePublicationError(job: ContentJob): string | null {
+  const productError = jobProductError(job);
+  if (productError) return productError;
   if (job.status !== "approved") return "Dieser Content-Plan ist noch nicht freigegeben.";
   if (!job.content || !["image", "text"].includes(job.content.format)) return "Für diesen Job liegt kein freigegebener Bild- oder Textentwurf vor.";
   if (job.content.format === "image") {

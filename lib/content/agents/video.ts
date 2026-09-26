@@ -43,12 +43,9 @@ Pro Szene konkrete visuelle Handlung, sprechbarer Dialog/Voiceover und Einblendu
     if (brief.changeRequest) return reviseReferenceVideo(brief);
     const { idea, opportunity } = brief;
     const vacuum = /vakuumier|vakuum.?versiegl/i.test(opportunity.product.name);
-    const blanket = /kuscheldecke|wohndecke|fleecedecke/i.test(opportunity.product.name);
     const copy = readerCopy(brief);
-    const cta = new URL(opportunity.product.sourceUrl).pathname === "/s"
-      ? vacuum ? "Passende Geräte in der verlinkten Auswahl ansehen."
-        : blanket && opportunity.targetPlatform === "instagram" ? "Welche Decke passt zu dir? Die Auswahl steht im Beitragstext."
-          : "Vergleiche die Angaben in der verlinkten Auswahl."
+    const cta = opportunity.targetPlatform === "instagram"
+      ? "Produktname, ASIN und Produktlink stehen im Beitragstext."
       : "Eignung und Details beim verlinkten Produkt prüfen.";
     const scenes = vacuum ? [
       { durationSeconds: 5, visual: "Inszenierte Werbeszene am Familientisch: Oma schneidet das gebräunte Steak an. Nahaufnahme: rosa Kern, saftige Schnittfläche, Kräuterbutter schmilzt. Ihr überraschter Blick zu Papa.", audio: "Oma: Das hast du doch nicht selbst gemacht!", overlay: "Werbung · inszenierte Szene" },
@@ -57,7 +54,7 @@ Pro Szene konkrete visuelle Handlung, sprechbarer Dialog/Voiceover und Einblendu
       { durationSeconds: 6, visual: "Verschlossenen Beutel mit Steak ins Wasserbad mit separatem Sous-vide-Garer geben. Schnitt kennzeichnet Zeitablauf; keine erfundenen Einstellungen zeigen.", audio: "Gegart wird anschließend im temperierten Wasserbad, mit einem separaten Garer.", overlay: "2 · Wasserbad + passendes Garprogramm" },
       { durationSeconds: 6, visual: "Nach dem Garen auspacken, trocken tupfen, in heißer Pfanne kurz anbraten. Bräunende Kruste, hörbares Brutzeln. Keine rohe und fertige Zubereitung vermischen.", audio: "Danach auspacken, trocken tupfen und für die Kruste kurz anbraten.", overlay: "3 · Die Kruste kommt aus der Pfanne" },
       { durationSeconds: 5, visual: "Zurück am Familientisch. Warmes Licht, rosa Anschnitt groß im Bild. Oma nimmt einen Bissen und nickt lächelnd.", audio: "Oma: Dann komm ich nächste Woche wieder!", overlay: "Eine Idee fürs nächste Familienessen" },
-      { durationSeconds: 5, visual: "Produktübersicht mit beiden getrennten Geräten, passenden Beuteln und fertigem Teller. CTA im Schnitt ergänzen.", audio: cta, overlay: "Auswahl ansehen · Affiliate-Link" },
+      { durationSeconds: 5, visual: "Produktübersicht mit beiden getrennten Geräten, passenden Beuteln und fertigem Teller. CTA im Schnitt ergänzen.", audio: cta, overlay: "Produktdetails · Affiliate-Link" },
     ] : [
       { durationSeconds: 5, visual: `Konkrete Ausgangssituation zeigen: ${idea.situation}`, audio: copy.spoken[0], overlay: "Werbung · Anwendungsidee" },
       { durationSeconds: 7, visual: `Anwendung inszenieren: ${idea.useCase}. Keine unbestätigten Funktionen als Tatsache zeigen.`, audio: copy.spoken[1], overlay: "Anwendung im Alltag" },
