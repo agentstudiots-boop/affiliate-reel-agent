@@ -4,10 +4,16 @@ import type { IncomingWhatsAppMessage } from "./security";
 import { amazonProduct } from "../amazon";
 import { createHash } from "node:crypto";
 
-// Exact command, not a conversational guess: a reply always remains a correction
-// or decision for the message it references.
+// Only standalone, unambiguous requests start a new search. Replies always
+// remain corrections or decisions for the message they reference.
 export function imagePostCommand(body: string) {
-  const match = body.trim().match(/^bildpost(?:\s+(.*))?$/i);
+  const text = body.trim().replace(/[.!?]+$/, "").replace(/\s+/g, " ");
+  if (/^(?:bitte )?(?:(?:starte|mach|mache) )?(?:eine )?neue (?:artikel|produkt|trend)suche$/i.test(text)
+    || /^(?:bitte )?(?:suche|such|finde) (?:mir )?(?:einen neuen artikel|ein neues produkt)$/i.test(text)
+    || /^(?:bitte )?(?:einen neuen artikel|ein neues produkt) suchen$/i.test(text)) {
+    return { product: undefined, invalid: false };
+  }
+  const match = text.match(/^bildpost(?:\s+(.*))?$/i);
   if (!match) return null;
   if (!match[1]) return { product: undefined, invalid: false };
   const arg = match[1].trim();

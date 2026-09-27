@@ -21,6 +21,9 @@ export function pumpkinCreativeIssues(opportunity: Opportunity, content: Content
   if (/\b(?:appetitlich\w*|koch(?:en|t|st|end)?|garen|ess(?:en|bar)|speise|rezept|mahlzeit|kulinarisch\w*)\b/i.test(publicCopy)) {
     issues.push("Kürbisschnitzen darf nicht als Kochen oder Essen dargestellt werden.");
   }
+  if (/deinem anwendungsfall|beim einrichten|raum und (?:deinen )?alltag|material, maße und pflege/i.test(publicCopy)) {
+    issues.push("Der Begleittext muss die Halloween-Kürbislaterne und das Schnitzen beschreiben statt allgemeine Wohnraumtipps.");
+  }
   if (content.format !== "text" && !/kürbis|kuerbis|pumpkin/i.test(story)) issues.push("Echter Kürbis muss das Hauptmotiv sein.");
   if (content.format !== "text" && !/schnitz|carv/i.test(story)) issues.push("Der Schnitzvorgang muss sichtbar beschrieben werden.");
   return issues;

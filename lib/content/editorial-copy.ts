@@ -1,4 +1,5 @@
 import type { Brief } from "./agent";
+import { isPumpkinCarvingProduct } from "./category";
 
 // Reference mode has no language model. These sentences are deliberately grounded
 // in the category and the supplied situation, without claiming first-hand use.
@@ -44,6 +45,13 @@ export function readerCopy(brief: Brief) {
     advice: "Dafür brauchst du passende Beutel; Vakuumieren ersetzt weder Kühlung noch Hygiene. Für Sous-vide ist zusätzlich ein temperiertes Wasserbad nötig.",
     question: "Würdest du eher Vorräte portionieren oder Sous-vide vorbereiten?",
     spoken: ["Ein Einkauf, mehrere Portionen für später.", "Mit passenden Beuteln verschließen und beschriften.", "Danach je nach Lebensmittel kühlen oder einfrieren."],
+    link, disclosure,
+  };
+  if (isPumpkinCarvingProduct(opportunity.product.name)) return {
+    intro: "Welche Kürbislaterne soll dieses Jahr vor deiner Tür leuchten? Erst ein Gesicht aufzeichnen, dann den Kürbis aushöhlen und Augen und Mund ausschneiden.",
+    advice: "Wenn du dafür ein Schnitzset suchst, prüfe Lieferumfang und Hinweise zur Handhabung auf der Produktseite. Das Schneiden übernimmt eine erwachsene Person.",
+    question: "Welches Gesicht würdest du deiner Kürbislaterne geben?",
+    spoken: ["Ein Kürbis, eine Idee für ein Gesicht.", "Augen und Mund zeichnet ihr zuerst auf.", "Das Schnitzen übernimmt eine erwachsene Person."],
     link, disclosure,
   };
   if (category === "home_living") return {

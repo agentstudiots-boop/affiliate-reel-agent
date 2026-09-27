@@ -2,6 +2,7 @@ import {contentSchema,type ContentJob} from "./schema";
 import type {Instruction} from "../whatsapp/instruction";
 import {requireJobProduct} from "./product-contract";
 import {visualContextError} from "./visual-context";
+import {isPumpkinCarvingProduct} from "./category";
 
 // Pure revision: no providers, publications, URLs or mutable product identity.
 export function reviseStructured(job:ContentJob, instruction:Instruction):ContentJob {
@@ -30,8 +31,13 @@ export function reviseStructured(job:ContentJob, instruction:Instruction):Conten
       content.caption=content.caption.split(/(?<=[.!?])\s+/).slice(0,2).join(" ")+" Bei einem Kauf über den Affiliate-Link kann ich eine Provision erhalten.";
     }
     if(operation==="naturalize"){
-      const pumpkin=/kürbis.*schnitz|schnitz.*kürbis/i.test(job.opportunity.product.name);
-      content.caption=`Werbung | ${pumpkin?"Welche Kürbislaterne soll dieses Jahr vor deiner Tür stehen? Erst das Motiv planen, dann das passende Schnitzwerkzeug auswählen.":`Passt ${job.opportunity.product.name} zu deinem Alltag? Schau dir die vorgesehene Anwendung und die Herstellerhinweise an.`} Details stehen auf der verlinkten Produktseite. Bei einem Kauf über den Affiliate-Link kann ich eine Provision erhalten.`;
+      const pumpkin=isPumpkinCarvingProduct(job.opportunity.product.name);
+      content.hook=pumpkin
+        ? "Welche Kürbislaterne soll dieses Jahr vor deiner Tür leuchten?"
+        : `Passt ${job.opportunity.product.name} zu deinem Alltag?`;
+      content.caption=`Werbung | ${content.hook} ${pumpkin
+        ? "Erst ein Gesicht aufzeichnen, dann den Kürbis aushöhlen und Augen und Mund ausschneiden. Das Schneiden übernimmt eine erwachsene Person. Prüfe Lieferumfang und Hinweise zur Handhabung auf der Produktseite."
+        : "Schau dir die vorgesehene Anwendung und die Herstellerhinweise an. Details stehen auf der verlinkten Produktseite."} Bei einem Kauf über den Affiliate-Link kann ich eine Provision erhalten.`;
     }
   }
   if(JSON.stringify(content)===JSON.stringify(job.content))throw Error("revision_unchanged");
