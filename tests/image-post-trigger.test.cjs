@@ -113,4 +113,8 @@ test('failed generic searches report the actual stage without retrying a paid dr
     async()=>({status:'needs_input',jobId:'rate-limited',reason:'editorial_rate_limited'}),send);
   assert.match(notices[2],/gedrosselt/i);
   assert.doesNotMatch(notices[2],/Guthaben prüfen|ASIN prüfen/i);
+  await startImagePostFromWhatsApp({...message,id:'wamid.review.error'},()=>db,
+    async()=>({status:'needs_input',jobId:'reviewed',reason:'content_review_failed',reviewIssues:['Werkzeug passt nicht zur Anwendung.']}),send);
+  assert.match(notices[3],/Werkzeug passt nicht zur Anwendung/);
+  assert.match(notices[3],/Artikelsuche/);
 });

@@ -106,6 +106,18 @@ test('quality failure at revision limit blocks marketing', async () => {
   assert.ok(!agents.includes('marketing'));
 });
 
+test('rejected AI image never reaches approval; a separately checked reference image can', async () => {
+  const job = await runContentJob({...opportunity,targetPlatform:'facebook'}, { mode: 'ai', allowedFormats: ['image'],
+    generate: async (agent, instruction, input, schema, reference) => agent === 'orchestrator'
+      ? { passed: false, score: 20, issues: ['Unbelegte Behauptung'] } : reference() });
+  assert.equal(job.status, 'awaiting_approval', JSON.stringify(job.review));
+  assert.equal(job.mode, 'reference');
+  assert.equal(job.review.passed, true);
+  assert.equal(job.content.format, 'image');
+  assert.equal(job.marketing.primary, 'Facebook Post');
+  assert.ok(job.events.some(event => event.message.includes('KI-Entwurf verworfen')));
+});
+
 test('invalid specialist output fails closed without retry or marketing', async () => {
   let calls = 0;
   const job = await runContentJob(opportunity, { generate: async () => { calls++; return { ideas: [] }; } });
