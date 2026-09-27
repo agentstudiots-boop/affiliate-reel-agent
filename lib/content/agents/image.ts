@@ -81,6 +81,7 @@ Ein echtes visuelles Konzept ist Pflicht: Lifestyle-/Anwendungsszene, redaktione
 Nutze Product-Inspiration nur redaktionell. Keine Händlerbilder, Amazon-Screenshots, Logos, Shop-UI oder exakte Produktfoto-Nachbauten.
 Bei Such-/Kategorieseiten kategorisch bleiben. Konkrete Produkteigenschaften nur aus verifiedFacts übernehmen.
 ${VISUAL_FUNCTION_RULE}
+Bestätigte Betreiberkorrekturen als Beispiele für wiederkehrende Bildfehler nutzen. Nur den passenden allgemeinen Grundsatz übernehmen, nicht alte Produktgegenstände in ein neues Bild ziehen.
 Keine Typografie in das generierte Bild verlangen; Schrift wird später im Layout ergänzt. Keine Bilder erzeugen.`, { ...brief, inspiration }, imageSchema, () => {
     if (brief.changeRequest) return reviseReferenceImage({ ...brief, inspiration });
     const { idea, opportunity } = brief;

@@ -7,7 +7,8 @@ export async function ensureAutomationSchema(db: Database) {
   const ready = await db.query(`SELECT
     EXISTS (SELECT 1 FROM information_schema.columns
       WHERE table_schema='public' AND table_name='daily_drafts' AND column_name='slot') AS slots,
-    to_regclass('public.story_handoffs') IS NOT NULL AS stories`);
-  if (ready.rows[0]?.slots === true && ready.rows[0]?.stories === true) return;
+    to_regclass('public.story_handoffs') IS NOT NULL AS stories,
+    to_regclass('public.approved_editorial_feedback') IS NOT NULL AS feedback`);
+  if (ready.rows[0]?.slots === true && ready.rows[0]?.stories === true && ready.rows[0]?.feedback === true) return;
   await applyMigrations(db);
 }

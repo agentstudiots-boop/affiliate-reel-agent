@@ -8,6 +8,8 @@ import { classifyWhatsAppReply } from "./intent";
 import { sendWhatsAppText, WhatsAppRejectedError } from "./client";
 import { instagramReelCaption } from "../meta/instagram-reel";
 import type { ContentJob } from "../content/schema";
+import { confirmContentEditorialFeedback } from "./language-memory";
+import { ensureAutomationSchema } from "../memory/ensure-automation-schema";
 
 export function contentFingerprint(job: ContentJob) {
   return createHash("sha256").update(JSON.stringify({product:job.opportunity.product,content:job.content,marketing:job.marketing})).digest("hex");
@@ -71,6 +73,7 @@ export async function handleContentApproval(input:Incoming,onApproved?: (jobId:s
   const db=getDatabase();
   const approver=(process.env.WHATSAPP_APPROVER_WA_ID||"").replace(/\D/g,"");
   if(!approver||input.from.replace(/\D/g,"")!==approver)return false;
+  await ensureAutomationSchema(db);
   let match=input.replyToMessageId
     ? await db.query("SELECT * FROM content_approval_requests WHERE whatsapp_message_id=$1 AND status IN ('pending','changes_requested') AND approver_wa_id=$2",[input.replyToMessageId,approver])
     : await db.query("SELECT * FROM content_approval_requests WHERE status='pending' AND whatsapp_message_id IS NOT NULL AND approver_wa_id=$1 ORDER BY created_at DESC LIMIT 2",[approver]);
@@ -170,6 +173,7 @@ export async function handleContentApproval(input:Incoming,onApproved?: (jobId:s
     if(decision.intent==="approve")requireJobProduct(job);
     await sql.query("UPDATE content_approval_requests SET status=$2,feedback=$3,decided_at=now() WHERE id=$1",[request.id,decision.intent==="approve"?"approved":"rejected",decision.feedback]);
     if(decision.intent==="approve"){
+      await confirmContentEditorialFeedback(sql,job,input.from,input.id);
       job.status="approved";job.updatedAt=new Date().toISOString();
       const event={sequence:job.events.length+1,at:job.updatedAt,agent:"orchestrator" as const,kind:"decision" as const,message:"Vollständiger Inhalt via WhatsApp genehmigt; Medienproduktion benötigt eigene Freigabe."};
       job.events.push(event);

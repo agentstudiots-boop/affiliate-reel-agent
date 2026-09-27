@@ -25,6 +25,19 @@ am selben Tag erneut denselben Produktkandidaten finden.
 Bei mehreren offenen Freigaben immer direkt auf die betreffende WhatsApp
 antworten. Änderungswünsche bleiben bis zur ausdrücklichen Freigabe möglich.
 
+**Lernen aus Korrekturen:** Erst nach der ausdrücklichen Freigabe einer
+überarbeiteten Fassung werden WhatsApp-Korrekturen aus Bildpost- und
+Content-Studio-Freigaben als Beispiele gespeichert (`013_operator_language_examples.sql`,
+`018_approved_editorial_feedback.sql`). Für neue Pläne werden passende und
+aktuelle Beispiele ausgewählt (höchstens zwölf pro Auftrag), nicht frühere
+Produktmerkmale oder Links übernommen. Sobald bestätigte Beispiele und ein
+Replicate-Token vorhanden sind, erstellt die redaktionelle Planung mit
+`openai/gpt-4.1` daraus passende Regeln für Ideen, Texte und Bildbriefings:
+höchstens acht kostenpflichtige Modellaufrufe pro Plan, keine zweite Anfrage
+bei unklarem Resultat. Ohne diese Voraussetzungen bleibt der Referenzmodus.
+Die Bilddatei selbst wird noch nicht automatisch visuell auf Fehler geprüft;
+deshalb ist das fertige Bild weiterhin in der zweiten WhatsApp zu kontrollieren.
+
 **Zwei WhatsApp-Entscheidungen pro Bildpost:** Zuerst wird der Bildentwurf samt
 Hinweis auf die noch nicht bezifferte Bildgenerierung freigegeben; nur danach
 wird ein Originalbild hergestellt. Zweitens kommt das konkrete Bild mit
@@ -72,7 +85,9 @@ auch nach einem unklaren Netzwerkresultat. Der vorhandene Scout recherchiert
 aktuelle Websignale und Saisonkandidaten. Für den Content-Job wird eine
 saisonale **Amazon-Suchauswahl** verwendet, solange kein konkretes Produkt samt
 Eigenschaftsnachweisen vorliegt. Der vorhandene Content-Orchestrator entwickelt
-einen kostenlosen Referenzentwurf für Facebook mit Budget `low`. Der Tageslauf
+einen Entwurf für Facebook mit Budget `low`: ohne bestätigte Korrekturen im
+kostenlosen Referenzmodus, andernfalls bei konfiguriertem Replicate-Token im
+kostenpflichtigen KI-Modus. Der Tageslauf
 begrenzt die Formatwahl auf `image`, weil nur dafür ein überprüftes Original-Visual
 und ein Facebook-Publishing-Weg existieren; ein nicht freigabefähiger Bildentwurf
 stoppt vor der WhatsApp-Freigabe. Der Job und
