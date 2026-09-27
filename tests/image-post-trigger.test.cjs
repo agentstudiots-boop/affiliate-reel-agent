@@ -88,3 +88,25 @@ test('standalone natural product-search requests start TrendScout drafts without
   assert.equal(await startImagePostFromWhatsApp({...standalone,id:'wamid.story.reply',replyToMessageId:'wamid.previous.story'},()=>db,start,async()=>''),false);
   assert.equal(calls.length,2);
 });
+
+test('failed generic searches report the actual stage without retrying a paid draft',async t=>{
+  const pg=new PGlite();t.after(()=>pg.close());
+  await pg.exec(fs.readFileSync('db/migrations/001_memory.sql','utf8'));
+  await pg.exec(fs.readFileSync('db/migrations/002_production_gates.sql','utf8'));
+  const prior=process.env.WHATSAPP_APPROVER_WA_ID;process.env.WHATSAPP_APPROVER_WA_ID='491234';
+  t.after(()=>{if(prior===undefined)delete process.env.WHATSAPP_APPROVER_WA_ID;else process.env.WHATSAPP_APPROVER_WA_ID=prior;});
+  const notices=[];let starts=0;
+  const db={query:(sql,args)=>pg.query(sql,args)};
+  const message={id:'wamid.model.error',from:'491234',body:'Artikelsuche',replyToMessageId:null,payload:{}};
+  const start=async()=>{starts++;return {status:'needs_input',jobId:'blocked',reason:'editorial_model_failed'};};
+  const send=async text=>{notices.push(text);return 'sent';};
+  assert.equal(await startImagePostFromWhatsApp(message,()=>db,start,send),true);
+  assert.equal(await startImagePostFromWhatsApp(message,()=>db,start,send),true);
+  assert.equal(starts,1);assert.equal(notices.length,1);
+  assert.match(notices[0],/redaktionelle Sprachmodell/i);
+  assert.doesNotMatch(notices[0],/ASIN prüfen/i);
+  assert.match(notices[0],/nichts veröffentlicht/);
+  await startImagePostFromWhatsApp({...message,id:'wamid.product.error'},()=>db,
+    async()=>({status:'needs_input',jobId:'no-product',reason:'product_unresolved'}),send);
+  assert.match(notices[1],/Produktseite sicher verifizieren/i);
+});

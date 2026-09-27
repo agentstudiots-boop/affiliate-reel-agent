@@ -25,6 +25,10 @@ am selben Tag erneut denselben Produktkandidaten finden. Eine neue eigenständig
 Suche bezieht sich nicht auf zuvor freigegebene oder erledigte Aufträge;
 Antworten auf alte Freigabe- und Story-Nachrichten bleiben dagegen bei ihrem
 jeweiligen Auftrag.
+Ohne verifizierbare Amazon-Produktseite wird keine redaktionelle Planung gestartet.
+Schlägt das redaktionelle Sprachmodell später fehl, nennt WhatsApp diesen Schritt
+statt pauschal eine fehlende ASIN; der gescheiterte Auftrag wird nicht automatisch
+wiederholt und löst keine Bildgenerierung aus.
 Mit **`Artikelsuche Saugroboter`** oder **`Artikelsuche Produktname Saugroboter`**
 gibt der Betreiber dagegen eine Produktart vor. Der Trendscout recherchiert
 gezielt dazu; erst eine zu diesem Suchbegriff passende und verifizierte

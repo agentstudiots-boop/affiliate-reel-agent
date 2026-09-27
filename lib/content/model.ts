@@ -4,6 +4,15 @@ import { editorialPolicy } from "./agent";
 import { predictionText } from "../whatsapp/instruction";
 
 const MODEL = "openai/gpt-4.1";
+export const EDITORIAL_MODEL_ERROR = "Der KI-Entwurf konnte nicht sicher geprüft werden. Keine automatische Freigabe oder Veröffentlichung.";
+
+function failureCategory(error: unknown) {
+  if (error instanceof z.ZodError || error instanceof SyntaxError) return "invalid_json_or_schema";
+  if (error instanceof Error && /^Modellantwort HTTP \d{3}$/.test(error.message)) return `http_${error.message.slice(-3)}`;
+  if (error instanceof Error && /timeout|aborted|unterbrochen/i.test(error.name + " " + error.message)) return "timeout_or_abort";
+  if (error instanceof Error && /Modellantwort fehlt|Modellstatus|Ungültige Modellantwort/.test(error.message)) return "invalid_provider_result";
+  return "transport_or_provider_error";
+}
 
 // A single paid prediction per agent invocation. GET polling never retries a POST.
 export function createGenerator(options: { mode: "reference" | "ai"; signal?: AbortSignal; request?: typeof fetch }): Generator {
@@ -45,8 +54,8 @@ export function createGenerator(options: { mode: "reference" | "ai"; signal?: Ab
       return schema.parse(JSON.parse(output));
     }catch(error){
       if(options.signal?.aborted)throw error;
-      console.warn(JSON.stringify({event:"editorial_model_failed",agent,model:MODEL,reason:error instanceof z.ZodError?"schema":"provider_or_response"}));
-      throw new Error("Der KI-Entwurf konnte nicht sicher geprüft werden. Keine automatische Freigabe oder Veröffentlichung.");
+      console.warn(JSON.stringify({event:"editorial_model_failed",agent,model:MODEL,reason:failureCategory(error)}));
+      throw new Error(EDITORIAL_MODEL_ERROR);
     }
   };
 }
