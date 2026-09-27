@@ -18,10 +18,13 @@ Produkt; der Orchestrator bindet erst nach Prüfung des genauen Amazon-Titels
 einen Affiliate-Link an dieselbe ASIN. Jeder Start ist an Absender und
 Message-ID gebunden, sodass Meta-Zweitzustellungen keinen zweiten Auftrag
 auslösen. Der Befehl darf nicht als Antwort auf eine Freigabenachricht stehen.
-Auch eine eigenständige Nachricht **`Neue Artikelsuche`**, **`Neue Produktsuche`**
+Auch eine eigenständige Nachricht **`Artikelsuche`**, **`Neue Artikelsuche`**, **`Neue Produktsuche`**
 oder **`Such mir einen neuen Artikel`** startet eine neue TrendScout-Suche;
 diese eindeutigen Befehle brauchen keinen Sprachmodellaufruf. Eine Suche kann
-am selben Tag erneut denselben Produktkandidaten finden.
+am selben Tag erneut denselben Produktkandidaten finden. Eine neue eigenständige
+Suche bezieht sich nicht auf zuvor freigegebene oder erledigte Aufträge;
+Antworten auf alte Freigabe- und Story-Nachrichten bleiben dagegen bei ihrem
+jeweiligen Auftrag.
 Mit **`Artikelsuche Saugroboter`** oder **`Artikelsuche Produktname Saugroboter`**
 gibt der Betreiber dagegen eine Produktart vor. Der Trendscout recherchiert
 gezielt dazu; erst eine zu diesem Suchbegriff passende und verifizierte
