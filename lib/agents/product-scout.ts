@@ -38,7 +38,7 @@ export async function scoutProducts(productSearch?: string) {
     const candidate: Seed = {
       name: productSearch, category: "Gezielte Artikelsuche", kind: "Dauerläufer", season: "Auf Anfrage",
       whyNow: `Gezielte Suche nach ${productSearch} auf Wunsch des Betreibers; kein belegter Trend.`,
-      reelIdea: `Ein ${productSearch} bei einer passenden Alltagsanwendung zeigen. Nur belegte Produkteigenschaften nennen und die Eignung vor dem Kauf prüfen.`,
+      reelIdea: `${productSearch} in einer passenden Alltagssituation zeigen. Nur belegte Produkteigenschaften nennen und die Eignung vor dem Kauf prüfen.`,
       targetGroup: "Menschen, die ein passendes Produkt für ihren Alltag suchen",
       benefitsToVerify: ["Anwendung und Lieferumfang", "Herstellerhinweise und konkrete Produktmerkmale"],
     };
