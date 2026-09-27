@@ -1,6 +1,7 @@
 import type { ContentJob } from "./schema";
 import { analyzeProductInspiration } from "./product-inspiration";
 import { isPumpkinCarvingProduct } from "./category";
+import { VISUAL_FUNCTION_RULE } from "./visual-coherence";
 
 function excerpt(value: string, limit: number): string {
   const clean = value.replace(/\s+/g, " ").trim();
@@ -25,6 +26,7 @@ export function imageBrief(job: ContentJob): string {
     `Alltag und Umgebung: ${excerpt(concept.everydaySituation, 220)}`,
     `Sichtbarer Produktbezug: Eine neutrale, unmarkierte Darstellung der Kategorie ${category} muss bei der beschriebenen Anwendung erkennbar sein. Handlung und Produktbezug sind das Hauptmotiv, nicht bloß Dekoration.`,
     `Bildaufbau und Details: ${excerpt(scene.prompt, 550)}`,
+    `Funktionsprüfung für das sichtbare Motiv: ${VISUAL_FUNCTION_RULE}`,
     pumpkinCarving ? "Nebenmotive: Kleine unmarkierte, als Kürbisschnitzwerkzeuge erkennbare Werkzeuge neben dem Kürbis, echte Kürbiskerne und Schalenreste auf dem Basteltisch, fertige geschnitzte Laternen im unscharfen Hintergrund. Die erwachsene Person arbeitet ausschließlich mit einem kleinen geeigneten Schnitzwerkzeug am Kürbis. Keine Essgabeln, Besteck oder küchenüblichen Utensilien als Schnitzwerkzeuge; keine Gabel in der Hand oder im Kürbis. Keine Kinder, keine Backwaren oder Teigfiguren, keine Speisen, keine Küche, keine Funken und kein großes Küchenmesser. Keine exakte Abbildung oder Ausstattung des beworbenen Modells behaupten." : "",
     "Grenzen: Keine Modellmerkmale, Zubehörteile oder Anwendungsschritte erfinden; ohne verifizierte Fakten nur die Produktkategorie zeigen. Keine Logos, Händlerbilder, Schrift im Bild oder irreführende Produktdarstellung.",
   ].filter(Boolean).join("\n");
