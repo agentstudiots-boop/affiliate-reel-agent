@@ -51,9 +51,16 @@ export async function startImagePostFromWhatsApp(input: IncomingWhatsAppMessage 
   const slot = `manual:${createHash("sha256").update(input.id).digest("hex")}`;
   const result = await start(day, slot, command.product, command.search);
   if (result.status === "failed" || result.status === "needs_input") {
-    await send(command.search
-      ? `Trendscout-Suche nach „${command.search}“: Es konnte noch kein eindeutig passendes Amazon-Produkt verifiziert und als Bildpost geplant werden. Bitte mit einem genaueren Produktnamen oder einer ASIN erneut suchen. Kein Bild gekauft und nichts veröffentlicht.`
-      : `Bildpost-Auftrag ${result.jobId} konnte noch nicht freigabefähig geplant werden. Bitte Produkt und verifizierte Amazon-ASIN prüfen. Es wurde kein Bild gekauft und nichts veröffentlicht.`);
+    const subject = command.search ? `Trendscout-Suche nach „${command.search}“`
+      : `${command.product ? "Bildpost" : "Artikelsuche"} (Auftrag ${result.jobId})`;
+    const reason = result.reason === "product_unresolved"
+      ? "Der Trendscout konnte keine passende Amazon-Produktseite sicher verifizieren. Bitte eine Produktart oder eine konkrete ASIN nennen."
+      : result.reason === "editorial_model_failed"
+        ? "Das redaktionelle Sprachmodell hat keinen sicher prüfbaren Bildentwurf geliefert. Bitte den Modellzugang und das Guthaben prüfen; dieser Auftrag startet nicht automatisch erneut."
+        : result.reason === "content_review_failed"
+          ? "Der Bildentwurf hat die redaktionelle Prüfung nicht bestanden. Bitte den Auftrag im Content Studio prüfen."
+          : "Die Planung wurde durch einen technischen Fehler unterbrochen. Bitte den Auftrag im Content Studio prüfen.";
+    await send(`${subject}: ${reason} Kein Bild gekauft und nichts veröffentlicht.`);
   } else if (result.status === "awaiting_approval" && result.whatsapp !== "approval_sent") {
     await send(`Bildpost-Entwurf ${result.jobId} ist gespeichert, die Freigabenachricht konnte noch nicht zugestellt werden. Kein Bild gekauft und nichts veröffentlicht.`);
   }

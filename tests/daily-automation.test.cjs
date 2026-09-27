@@ -104,3 +104,21 @@ test('a named WhatsApp search reaches TrendScout and can draft only a verified m
   assert.equal((await db.query('SELECT count(*)::int AS n FROM content_jobs')).rows[0].n,1);
   assert.equal(messages.length,1);
 });
+
+test('a generic search stops before content planning when no Amazon product can be verified',async t=>{
+  const pg=new PGlite();t.after(()=>pg.close());
+  for(const name of fs.readdirSync('db/migrations').filter(n=>n.endsWith('.sql')).sort())await pg.exec(fs.readFileSync(`db/migrations/${name}`,'utf8'));
+  const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
+  let planned=false;
+  const daily=loadRoute('lib/daily/draft.ts',{
+    '@/lib/orchestrator':{runProductScout:async()=>({candidates:[{name:'Saisonidee',kind:'Saisontrend',resolutionError:'product_unresolved'}]}),
+      runContentJob:async()=>{planned=true;throw Error('Must not plan unresolved product');}},
+    '@/lib/memory/db':{getDatabase:()=>db},
+  });
+  const result=await daily.createDailyDraft('2026-09-27','manual:unresolved');
+  assert.equal(result.status,'needs_input');
+  assert.equal(result.reason,'product_unresolved');
+  assert.equal(planned,false);
+  assert.equal((await db.query('SELECT count(*)::int AS n FROM content_jobs')).rows[0].n,0);
+  assert.equal((await daily.createDailyDraft('2026-09-27','manual:unresolved')).status,'already_claimed');
+});

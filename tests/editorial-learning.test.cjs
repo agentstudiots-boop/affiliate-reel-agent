@@ -51,3 +51,16 @@ test('AI generator uses one bounded Replicate prediction and validates structure
     assert.equal(requests[0].init.headers.Authorization,'Bearer test-token');
   }finally{if(before===undefined)delete process.env.REPLICATE_API_TOKEN;else process.env.REPLICATE_API_TOKEN=before;}
 });
+
+test('editorial model errors report a safe provider category without retrying the paid request',async t=>{
+  const before=process.env.REPLICATE_API_TOKEN;process.env.REPLICATE_API_TOKEN='test-token';
+  t.after(()=>{if(before===undefined)delete process.env.REPLICATE_API_TOKEN;else process.env.REPLICATE_API_TOKEN=before;});
+  const warnings=[];t.mock.method(console,'warn',message=>warnings.push(JSON.parse(message)));
+  let requests=0;
+  const generate=createGenerator({mode:'ai',request:async()=>{requests++;return new Response('',{status:402});}});
+  await assert.rejects(generate('image','Plan',{},z.object({title:z.string()}),()=>({title:'Fallback'})),/KI-Entwurf konnte nicht sicher geprüft/);
+  assert.equal(requests,1);
+  assert.equal(warnings.length,1);
+  assert.equal(warnings[0].reason,'http_402');
+  assert.doesNotMatch(JSON.stringify(warnings),/test-token/);
+});

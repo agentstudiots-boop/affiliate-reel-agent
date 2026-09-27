@@ -13,6 +13,7 @@ import { isPumpkinCarvingProduct } from "@/lib/content/category";
 import { findAmazonProductByAsin } from "@/lib/product-resolver";
 import { ensureAutomationSchema } from "@/lib/memory/ensure-automation-schema";
 import { loadApprovedEditorialCorrections } from "@/lib/whatsapp/language-memory";
+import { EDITORIAL_MODEL_ERROR } from "@/lib/content/model";
 
 async function resolveRequestedProduct(value: string) {
   const asin = /^(?:[A-Z0-9]{10})$/.test(value) ? value : value.match(/^https:\/\/(?:www\.)?amazon\.de\/dp\/([A-Z0-9]{10})\/?$/)?.[1];
@@ -91,6 +92,7 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
   );
   if (!claim.rows.length) return { status: "already_claimed" as const };
 
+  let stage = "product_search";
   try {
     const report = productQuery ? null : await runProductScout(productSearch);
     // A seasonal idea becomes affiliate content only after exact product resolution.
@@ -99,7 +101,7 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
       : candidate.kind === "Saisontrend") || [];
     if (!productQuery && !productSearch && !candidates.length) throw new Error("Kein saisonaler Kandidat verfügbar.");
     const resolved = candidates.filter(candidate => candidate.resolvedProduct);
-    if(productSearch && !resolved.length){
+    if(!productQuery && !resolved.length){
       await db.query("UPDATE daily_drafts SET status='needs_input',scout_report=$2,updated_at=now() WHERE job_id=$1",
         [jobId,JSON.stringify({requestedSearch:productSearch,report,reason:'product_unresolved'})]);
       return {status:'needs_input' as const,jobId,reason:'product_unresolved' as const,searchTerm:productSearch};
@@ -107,6 +109,7 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
     const pool = resolved.length ? resolved : candidates;
     const candidate = productSearch ? resolved[0] : pool.length ? pool[(new Date(`${day}T00:00:00Z`).getUTCDate() + (slot === "afternoon" ? 1 : 0)) % pool.length] : null;
     await db.query("UPDATE daily_drafts SET status='planning',scout_report=$2,updated_at=now() WHERE job_id=$1", [jobId, JSON.stringify(report ? {requestedSearch:productSearch,report}: { requestedProduct: productQuery })]);
+    stage = "product_verification";
     const requestedProduct = productQuery ? await resolveRequestedProduct(productQuery) : null;
     const opportunity: Opportunity = {
       product: requestedProduct || candidate?.resolvedProduct || { name: candidate!.name, sourceUrl: "https://www.amazon.de/", affiliateUrl: "",
@@ -114,6 +117,7 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
       category: isPumpkinCarvingProduct(requestedProduct?.name || candidate?.resolvedProduct?.name || candidate?.name || "") || candidate?.category === "Wohnen" ? "home_living" : "household", useCaseKey: "seasonal-product-guide", targetPlatform: "facebook",
       useCase: candidate?.reelIdea || `Das Produkt ${requestedProduct!.name} im Alltag verwenden und die Eignung vor dem Kauf prüfen.`, trend: candidate?.whyNow || "", goal: "education", budget: "low", verifiedFacts: [],
     };
+    stage = "content_planning";
     const repo = memoryRepository(db);
     const approver=(process.env.WHATSAPP_APPROVER_WA_ID||"").replace(/\D/g,"");
     const corrections=await loadApprovedEditorialCorrections(db,approver,opportunity);
@@ -151,10 +155,15 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
         return { status, jobId, whatsapp: "notification_sent" as const };
       }
     }
-    return { status, jobId, ...(job.error ? { error: job.error } : {}) };
-  } catch {
+    const reason = job.error === EDITORIAL_MODEL_ERROR ? "editorial_model_failed" as const
+      : job.error === "product_unresolved" ? "product_unresolved" as const
+      : job.review && !job.review.passed ? "content_review_failed" as const : "planning_failed" as const;
+    return { status, jobId, reason };
+  } catch (error) {
     // Preserve the one-time claim. Ambiguous network outcomes must not retry.
+    console.error(JSON.stringify({event:"daily_draft_failed",jobId,stage,
+      errorType:error instanceof Error?error.name:"unknown"}));
     await db.query("UPDATE daily_drafts SET status='failed',updated_at=now() WHERE job_id=$1", [jobId]);
-    return { status: "failed" as const, jobId };
+    return { status: "failed" as const, jobId, reason: "internal_error" as const };
   }
 }
