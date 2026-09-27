@@ -92,5 +92,17 @@ test('Facebook publication needs a distinct signed WhatsApp decision and claims 
     await pg.query("INSERT INTO daily_drafts(day,job_id,status,whatsapp_message_id,feedback) VALUES('2026-09-27',$1,'changes_requested','wamid.real-change','Neues Bild bitte')",[id6]);
     assert.equal((await inbound.applyIncomingWhatsApp({id:'wamid.real-change.reply',from:'491234',body:'Freigeben',replyToMessageId:'wamid.real-change',payload:{}})).reason,'no_pending_approval');
     assert.equal((await memory.list()).find(row=>row.id===id6).status,'awaiting_approval');
+    const id7=crypto.randomUUID();await memory.claim(id7,opportunity,'reference');
+    await runContentJob(opportunity,{id:id7,onUpdate:memory.save,loadLearning:memory.learn});
+    const blocked=(await memory.list()).find(row=>row.id===id7);
+    blocked.opportunity.product=require('../.test-build/lib/amazon').bindAmazonProduct({...blocked.opportunity.product,
+      sourceUrl:'https://www.amazon.de/dp/B0G2XQPG3N',affiliateUrl:'',asin:undefined,productUrl:undefined});
+    await pg.query('UPDATE content_jobs SET snapshot=$2 WHERE id=$1',[id7,JSON.stringify(blocked)]);
+    await pg.query("INSERT INTO daily_drafts(day,job_id,status,whatsapp_message_id) VALUES('2026-09-28',$1,'awaiting_approval','wamid.dead-link')",[id7]);
+    const invalid=await inbound.applyIncomingWhatsApp({id:'wamid.dead.approve',from:'491234',body:'Freigeben',replyToMessageId:'wamid.dead-link',payload:{}});
+    assert.equal(invalid.intent,'link_blocked');
+    assert.equal((await memory.list()).find(row=>row.id===id7).status,'needs_input');
+    assert.equal((await pg.query('SELECT status FROM daily_drafts WHERE job_id=$1',[id7])).rows[0].status,'needs_input');
+    assert.equal((await publication.get(id7)),null);
   }finally{if(old===undefined)delete process.env.WHATSAPP_APPROVER_WA_ID;else process.env.WHATSAPP_APPROVER_WA_ID=old;await pg.close();}
 });

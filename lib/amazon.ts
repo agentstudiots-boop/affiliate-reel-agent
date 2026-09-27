@@ -1,6 +1,9 @@
 import type { Product } from "./types";
 
 export const PRODUCT_UNRESOLVED = "product_unresolved";
+// Operator-reported dead product page on 2026-09-27. Keep historical approvals
+// from spending money or publishing until this exact ASIN has been reviewed.
+const reportedDeadAsins = new Set(["B0G2XQPG3N"]);
 export function associateTag() {
   // Existing configured tracking ID and existing project default; never mint an ID.
   return process.env.AMAZON_ASSOCIATE_TAG?.trim() || "alltaeglichle-21";
@@ -41,7 +44,7 @@ export function bindAmazonProduct(product: Product): Product {
 
 export function productIdentityError(product: Product, copy = ""): string | null {
   const source = amazonProduct(product.sourceUrl);
-  if (!source || product.asin !== source.asin || product.productUrl !== source.productUrl
+  if (!source || reportedDeadAsins.has(source.asin) || product.asin !== source.asin || product.productUrl !== source.productUrl
     || product.sourceUrl !== source.productUrl || !product.productVerifiedAt
     || !Number.isFinite(Date.parse(product.productVerifiedAt))
     || product.productVerifiedName !== product.name || !product.name.trim()

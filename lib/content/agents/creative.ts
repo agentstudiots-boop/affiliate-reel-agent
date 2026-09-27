@@ -16,6 +16,7 @@ Prüfe Humor, Überraschung und Storytelling, ohne diese künstlich zu erzwingen
 Berücksichtige Zielgruppe, Trend, Use Case, Budget und Ziel. Melde sinnvolle Zusatzprodukte mit Begründung und ob erforderlich.`, { opportunity, inspiration, approvedCorrections:corrections }, creativeSchema, () => {
     const vacuum = /vakuumier|vakuum.?versiegl/i.test(opportunity.product.name);
     const pumpkin = /(?:kürbis|kuerbis|pumpkin).{0,40}(?:schnitz|carving)|(?:schnitz|carving).{0,40}(?:kürbis|kuerbis|pumpkin)/i.test(opportunity.product.name);
+    const tortilla = inspiration.categoryLabel === "Tortillapresse";
     const childRequested = pumpkin && /\b(?:kind(?:er)?|familie)\b/i.test(opportunity.useCase);
     const expert = /fach|technik|kompatib|vergleich|community|software|sicherheit/i.test(`${opportunity.useCase} ${opportunity.product.targetGroup}`);
     const storageFocus = /vorrat|haltbar|lager|meal.?prep|einkauf/i.test(opportunity.useCase) && !/steak|familienessen|sous.?vide/i.test(opportunity.useCase);
@@ -44,8 +45,8 @@ Berücksichtige Zielgruppe, Trend, Use Case, Budget und Ziel. Melde sinnvolle Zu
         rationale: "Handlung und emotionales Ergebnis lassen sich in einer kurzen Geschichte zeigen.",
         scores: { audience: storageFocus ? 2 : 4, credibility: 3, demonstration: storageFocus ? 2 : vacuum ? 5 : 3, conversion: storageFocus ? 2 : 4, economy: 1 } },
       { ...shared, id: "guide", format: "image" as const,
-        title: vacuum ? "Ein Einkauf, drei vorbereitete Portionen" : pumpkin ? "Vom Kürbis zur Halloween-Laterne" : categorical ? `Welche ${inspiration.categoryLabel} passt zu deinem Alltag?` : `${inspiration.categoryLabel}: Anwendung und Kriterien im Blick`,
-        hook: vacuum ? "Was morgen auf den Tisch kommt, bereitest du heute vor." : pumpkin ? "Welche Kürbislaterne soll dieses Jahr vor deiner Tür leuchten?" : categorical ? `Nicht nur nach Optik wählen: ${criteria} im Alltag vergleichen.` : `Passt ${inspiration.categoryLabel} zu deinem Anwendungsfall?`,
+        title: vacuum ? "Ein Einkauf, drei vorbereitete Portionen" : pumpkin ? "Vom Kürbis zur Halloween-Laterne" : tortilla ? "Aus Teigkugeln werden Tortilla-Fladen" : categorical ? `Welche ${inspiration.categoryLabel} passt zu deinem Alltag?` : `${inspiration.categoryLabel}: Anwendung und Kriterien im Blick`,
+        hook: vacuum ? "Was morgen auf den Tisch kommt, bereitest du heute vor." : pumpkin ? "Welche Kürbislaterne soll dieses Jahr vor deiner Tür leuchten?" : tortilla ? "Teig portionieren, pressen, dann getrennt zubereiten." : categorical ? `Nicht nur nach Optik wählen: ${criteria} im Alltag vergleichen.` : `Passt ${inspiration.categoryLabel} zu deinem Anwendungsfall?`,
         situation: vacuum ? "Nach dem Einkauf werden Portionen vorbereitet und passend gelagert." : inspiration.useCases[0] || opportunity.useCase,
         story: vacuum ? "Carousel: portionieren, vakuumieren, beschriften, passend kühlen oder einfrieren. Ein letzter Slide trennt Lagerung und Sous-vide-Vorbereitung." : `Eigenständiges redaktionelles Carousel: emotionale Anwendungsszene als Einstieg, danach kurze visuelle Orientierung zu ${criteria}; keine Händlerbilder oder Modellbehauptungen.`,
         benefit: vacuum ? "Vorbereitete Portionen griffbereit haben; Lagerbedingungen bleiben entscheidend." : "Anwendung und relevante Kaufkriterien als visuelle Entscheidungshilfe verständlich machen.",

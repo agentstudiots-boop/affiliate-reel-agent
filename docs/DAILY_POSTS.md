@@ -29,6 +29,15 @@ Bei einer allgemeinen manuellen Artikelsuche berücksichtigt der Trendscout
 verifizierte Dauerläufer und aktuelle Suchsignale ebenso wie Saisonideen.
 Die automatischen Tageszeiten nutzen weiterhin saisonale Kandidaten.
 Ohne verifizierbare Amazon-Produktseite wird keine redaktionelle Planung gestartet.
+Ein indexierter Suchtreffer genügt nicht mehr als Nachweis: Die aktuelle
+Amazon-Detailseite muss direkt abrufbar sein, zur selben ASIN gehören und
+einen erkennbaren Produkttitel enthalten. Tote Seiten, Captchas und nicht
+lesbare Antworten halten die Planung an. Ein früherer Suchtreffer wird nur
+nach erneuter Liveprüfung wiederverwendet. Der am 27.09.2026 gemeldete
+nicht funktionierende Link zu B0G2XQPG3N ist auch für bestehende Freigaben
+gesperrt. Bis eine verlässliche Produktschnittstelle eingerichtet ist,
+können Amazons automatisierte Zugriffssperren legitime Artikel anhalten;
+in diesem Fall wird kein Bild gekauft.
 Schlägt das redaktionelle Sprachmodell später fehl, nennt WhatsApp diesen Schritt
 statt pauschal eine fehlende ASIN; der gescheiterte Auftrag wird nicht automatisch
 wiederholt und löst keine Bildgenerierung aus.

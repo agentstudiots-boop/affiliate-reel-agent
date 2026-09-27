@@ -47,6 +47,13 @@ export function readerCopy(brief: Brief) {
     spoken: ["Ein Einkauf, mehrere Portionen für später.", "Mit passenden Beuteln verschließen und beschriften.", "Danach je nach Lebensmittel kühlen oder einfrieren."],
     link, disclosure,
   };
+  if (/tortillapresse/i.test(label)) return {
+    intro: "Tortillas selbst formen? Aus vorbereiteten Teigkugeln lassen sich mit einer passenden Presse flache Teiglinge machen.",
+    advice: "Prüfe vor dem Kauf die Größe der Pressplatten und die Hinweise zur Reinigung. Das anschließende Garen ist ein eigener Schritt.",
+    question: "Welche Größe sollen deine Tortillas haben?",
+    spoken: ["Teig vorbereiten und portionieren.", "Teigkugel zu einem Fladen pressen.", "Dann getrennt zubereiten."],
+    link, disclosure,
+  };
   if (isPumpkinCarvingProduct(opportunity.product.name)) return {
     intro: "Welche Kürbislaterne soll dieses Jahr vor deiner Tür leuchten? Erst ein Gesicht aufzeichnen, dann den Kürbis aushöhlen und Augen und Mund ausschneiden.",
     advice: "Wenn du dafür ein Schnitzset suchst, prüfe Lieferumfang und Hinweise zur Handhabung auf der Produktseite. Das Schneiden übernimmt eine erwachsene Person.",

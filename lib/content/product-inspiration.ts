@@ -73,6 +73,18 @@ function preset(name: string, useCase: string, category: Opportunity["category"]
       useCases: ["Portionen vorbereiten", "Lebensmittel passend lagern", "Sous-vide nur mit separatem Garer als zusätzlichem Anwendungskontext"],
     };
   }
+  if (/tortilla.{0,25}presse|fladenbrotpresse|maistortilla.{0,15}presse/i.test(name)) {
+    return {
+      categoryLabel: "Tortillapresse",
+      visualDirections: [
+        "Auf einer Küchenarbeitsfläche liegen vorbereitete Teigportionen. Eine erwachsene Person presst eine Teigkugel zwischen den glatten Platten einer neutralen Tortillapresse; ein flacher Teigling liegt daneben. Keine Behauptung über Antrieb oder Heizfunktion.",
+        "Nahaufnahme von Teigportion, Pressplatten und flachem Teigling; nur die Presshandlung zeigen.",
+        "Mehrere geformte Teiglinge liegen auf einer Arbeitsfläche; Zubereitung und Braten sind separate Schritte.",
+      ],
+      purchaseCriteria: ["Plattengröße", "Handhabung", "Reinigung laut Hersteller"],
+      useCases: ["Teigkugeln für Tortillas zu flachen Teiglingen pressen", "Teiglinge anschließend getrennt zubereiten", "Größe und Reinigung vor dem Kauf prüfen"],
+    };
+  }
   const criteria = category === "technology"
     ? ["Kompatibilität", "Abmessungen", "Herstellerangaben"]
     : category === "kitchen"
@@ -80,11 +92,12 @@ function preset(name: string, useCase: string, category: Opportunity["category"]
       : category === "home_living"
         ? ["Material", "Maße", "Pflegehinweise"]
       : ["Eignung für den Alltag", "Größe oder Ausführung", "Pflege und Herstellerhinweise"];
+  const categoryLabel = name.split(/\s+für\s+|[,;|]/i)[0].trim().split(/\s+/).slice(0, 5).join(" ") || name;
   return {
-    categoryLabel: name,
+    categoryLabel,
     visualDirections: [
       `Konkrete Alltagsszene für: ${useCase}`,
-      `Neutrale, markenfreie Darstellung der Produktkategorie ${name} in sinnvoller Anwendung.`,
+      `Neutrale, markenfreie Darstellung der Produktkategorie ${categoryLabel} in sinnvoller Anwendung.`,
       "Redaktioneller Vergleichsaufbau mit eigenständigen Illustrationen und ausreichend Bildanteil.",
     ],
     purchaseCriteria: criteria,
