@@ -60,7 +60,7 @@ export async function startImagePostFromWhatsApp(input: IncomingWhatsAppMessage 
       : result.reason === "editorial_model_failed"
         ? "Das redaktionelle Sprachmodell hat keinen sicher prüfbaren Bildentwurf geliefert. Bitte den Modellzugang und das Guthaben prüfen; dieser Auftrag startet nicht automatisch erneut."
         : result.reason === "content_review_failed"
-          ? "Der Bildentwurf hat die redaktionelle Prüfung nicht bestanden. Bitte den Auftrag im Content Studio prüfen."
+          ? `Auch nach Überarbeitung liegt kein freigabefähiger Bildentwurf vor. ${result.reviewIssues?.length ? `Konkrete Gründe: ${result.reviewIssues.join(" ")}` : "Bitte den Entwurf und die Prüfpunkte im Content Studio ansehen."} Für eine neue Produktsuche sende „Artikelsuche“; kein Auftrag wird stillschweigend freigegeben.`
           : "Die Planung wurde durch einen technischen Fehler unterbrochen. Bitte den Auftrag im Content Studio prüfen.";
     await send(`${subject}: ${reason} Kein Bild gekauft und nichts veröffentlicht.`);
   } else if (result.status === "awaiting_approval" && result.whatsapp !== "approval_sent") {

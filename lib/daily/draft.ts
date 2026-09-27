@@ -33,7 +33,9 @@ export function dailyApprovalMessage(job:ReturnType<typeof parseJob>,day:string)
     .filter(line=>/^(HAUPTMOTIV|Motiv und Handlung|Bildaufbau und Details|Nebenmotive|Grenzen):|^HAUPTMOTIV/.test(line))
     .map(line=>line.slice(0,line.startsWith('Nebenmotive')?480:line.startsWith('HAUPTMOTIV')?440:line.startsWith('Bildaufbau')?500:300))
     .join('\n')}`:'';
-  const body=`Content-Freigabe · Bildpost ${day}\nProdukt: ${job.opportunity.product.name}\nFormat: ${job.content?.format || 'unbekannt'} · Facebook\n\n${(summary||'').slice(0,850)}${visualBrief}\n\nASIN: ${job.opportunity.product.asin}\nProduktlink: ${job.opportunity.product.affiliateUrl}\nAntworte auf DIESE Nachricht mit „Freigeben“, ${costText}. Danach kommt eine ZWEITE WhatsApp für die Veröffentlichung. „Ablehnen“ stoppt den Auftrag, Änderungswünsche bitte als Text. Noch kein Post ist online. Eine Story mit klickbarem Link wird anschließend für die App vorbereitet.`;
+  const referenceNotice=job.mode==='reference' && job.modelCalls>0
+    ? 'Der KI-Bildentwurf wurde verworfen. Dies ist ein geprüfter Referenzentwurf; bitte Bildbeschreibung und Text besonders sorgfältig prüfen.\n\n':'';
+  const body=`Content-Freigabe · Bildpost ${day}\nProdukt: ${job.opportunity.product.name}\nFormat: ${job.content?.format || 'unbekannt'} · Facebook\n\n${referenceNotice}${(summary||'').slice(0,850)}${visualBrief}\n\nASIN: ${job.opportunity.product.asin}\nProduktlink: ${job.opportunity.product.affiliateUrl}\nAntworte auf DIESE Nachricht mit „Freigeben“, ${costText}. Danach kommt eine ZWEITE WhatsApp für die Veröffentlichung. „Ablehnen“ stoppt den Auftrag, Änderungswünsche bitte als Text. Noch kein Post ist online. Eine Story mit klickbarem Link wird anschließend für die App vorbereitet.`;
   if(body.length>3900)throw Error('daily_approval_too_long');
   return body;
 }
@@ -163,7 +165,8 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
       : job.error === EDITORIAL_MODEL_ERROR ? "editorial_model_failed" as const
       : job.error === "product_unresolved" ? "product_unresolved" as const
       : job.review && !job.review.passed ? "content_review_failed" as const : "planning_failed" as const;
-    return { status, jobId, reason };
+    return { status, jobId, reason, reviewIssues: reason === "content_review_failed"
+      ? job.review?.issues.slice(0, 3).map(issue => issue.slice(0, 180)) : undefined };
   } catch (error) {
     // Preserve the one-time claim. Ambiguous network outcomes must not retry.
     console.error(JSON.stringify({event:"daily_draft_failed",jobId,stage,

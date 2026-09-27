@@ -39,6 +39,12 @@ Nach erfolgreicher Planung folgen weiterhin Inhaltsfreigabe, Bildproduktion
 und separate Veröffentlichungsfreigabe. Bei erneutem Limit endet der Auftrag
 ohne Veröffentlichung; unklare oder erfolgreiche POST-Ergebnisse werden nicht
 erneut abgesendet.
+Wenn ein KI-Bildentwurf auch nach zwei Revisionen die redaktionelle Prüfung
+nicht besteht, erstellt der Orchestrator einen neuen Referenzentwurf aus
+regelbasierten Ideen. Dieser muss die strukturelle und produktspezifische
+Prüfung bestehen, bevor er als Referenzentwurf per WhatsApp zur Inhaltsfreigabe
+kommt. Der verworfene KI-Text wird nicht übernommen. Scheitert auch die
+Referenzprüfung, nennt WhatsApp die konkreten Prüfpunkte; kein Bild wird gekauft.
 Mit **`Artikelsuche Saugroboter`** oder **`Artikelsuche Produktname Saugroboter`**
 gibt der Betreiber dagegen eine Produktart vor. Der Trendscout recherchiert
 gezielt dazu; erst eine zu diesem Suchbegriff passende und verifizierte

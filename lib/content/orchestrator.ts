@@ -189,10 +189,45 @@ export async function runContentJob(raw: Opportunity, options: {
       await emit("orchestrator", "decision", job.review.passed ? "Entwurf für Marketingplanung geeignet; menschliche Freigabe bleibt offen." : "Entwurf benötigt Überarbeitung.", job.review);
       if (job.review.passed) break;
     }
-    if (!job.review?.passed) { await status("needs_input", "Revisionslimit erreicht. Briefing oder Fakten ergänzen; kein Marketingauftrag."); return job; }
+    if (!job.review?.passed && job.mode === "ai" && job.decision.format === "image") {
+      // A rejected AI draft is never approved. Offer a fresh, deterministic
+      // editorial draft instead, and run the same structural/category gates.
+      // This fallback does not call a provider or buy an image.
+      const rejected = job.review!;
+      try {
+        const reference = createGenerator({ mode: "reference", signal: options.signal });
+        const alternatives = (await creativeAgent(opportunity, reference, inspiration, corrections)).ideas;
+        const alternativeDecision = selectIdea(alternatives, opportunity, learning, options.allowedFormats);
+        if (alternativeDecision.format !== "image") throw new Error("Kein Bildformat im Referenzentwurf.");
+        const alternativeIdea = alternatives.find(item => item.id === alternativeDecision.ideaId)!;
+        const alternative = contentSchema.parse(await imageAgent(
+          { opportunity, idea: alternativeIdea, inspiration, corrections }, reference));
+        const review = inspectContent(alternative, alternativeDecision, opportunity.targetPlatform);
+        review.issues.push(...pumpkinCreativeIssues(opportunity, alternative));
+        if (review.issues.length) { review.passed = false; review.score = Math.min(40, review.score); }
+        requireProduct(opportunity.product, JSON.stringify(alternative));
+        if (review.passed) {
+          job.ideas = alternatives;
+          job.decision = alternativeDecision;
+          job.content = alternative;
+          job.review = review;
+          job.mode = "reference";
+          await emit("orchestrator", "decision", "KI-Entwurf verworfen. Geprüften Referenzentwurf zur menschlichen Inhaltsfreigabe vorbereitet; kein Bild erzeugt.",
+            { rejectedIssues: rejected.issues });
+        } else {
+          job.review = { ...rejected, issues: [...new Set([...rejected.issues, ...review.issues])] };
+        }
+      } catch (error) {
+        options.signal?.throwIfAborted();
+        await emit("orchestrator", "decision", "Auch der Referenzentwurf ist nicht prüfbar; keine Freigabe.",
+          { failureType: error instanceof Error ? error.name : "unknown" });
+      }
+    }
+    if (!job.review?.passed) { await status("needs_input", "Revisionslimit erreicht. Redaktionelle Gründe im Auftrag gespeichert; kein Marketingauftrag."); return job; }
     requireProduct(opportunity.product, JSON.stringify(job.content));
     await status("marketing", "Geprüften Entwurf an Marketing übergeben");
-    job.marketing = await marketingAgent({ opportunity, content: job.content! }, generate);
+    job.marketing = await marketingAgent({ opportunity, content: job.content! }, job.mode === "reference" && job.modelCalls > 0
+      ? createGenerator({ mode: "reference", signal: options.signal }) : generate);
     const thematicIssues = pumpkinCreativeIssues(opportunity, job.content!, job.marketing);
     if (thematicIssues.length) { job.review = { passed: false, score: 40, issues: thematicIssues }; await status("needs_input", thematicIssues.join(" ")); return job; }
     const platform = job.marketing.primary;
