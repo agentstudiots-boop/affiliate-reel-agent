@@ -4,7 +4,7 @@ import { runContentJob, runProductScout } from "@/lib/orchestrator";
 import { getDatabase } from "@/lib/memory/db";
 import { memoryRepository } from "@/lib/memory/repository";
 import type { Opportunity } from "@/lib/content/schema";
-import { sendWhatsAppText } from "@/lib/whatsapp/client";
+import { sendWhatsAppText, WhatsAppRejectedError } from "@/lib/whatsapp/client";
 import { dailyNotificationTemplateConfigured, sendDailyNotificationTemplate } from "@/lib/whatsapp/client";
 import { parseJob } from "@/lib/content/history";
 import { facebookPagePublicationError } from "@/lib/meta/publication-eligibility";
@@ -18,6 +18,22 @@ async function resolveRequestedProduct(value: string) {
   const asin = /^(?:[A-Z0-9]{10})$/.test(value) ? value : value.match(/^https:\/\/(?:www\.)?amazon\.de\/dp\/([A-Z0-9]{10})\/?$/)?.[1];
   if (!asin) throw new Error("Produkt nur als ASIN oder sauberen Amazon.de/dp/-Link angeben.");
   return findAmazonProductByAsin(asin);
+}
+
+export function dailyApprovalMessage(job:ReturnType<typeof parseJob>,day:string) {
+  const revision=job.events.map(e=>e.data).reverse().find((data): data is {kind:string;instruction:{requires_new_generation:boolean}} => !!data && typeof data==='object' && 'kind' in data && data.kind==='semantic_revision');
+  const costText=revision && !revision.instruction.requires_new_generation
+    ? 'um die Textrevision freizugeben. Das bestehende Bild bleibt erhalten; keine neue Bildgenerierung'
+    : `um den Content-Plan und eine einmalige kostenpflichtige Bildgenerierung freizugeben (Bildprovider: ${imageProviderStatus().provider || "nicht eingerichtet"}, EUR-Kosten nicht vorab bestätigt)`;
+  const summary=job.content?.format==='text'?job.content.body:job.content?.format==='image'?job.content.caption:'Videoentwurf';
+  const image=job.content?.format==='image';
+  const visualBrief=image?`\n\nBildbriefing für das Titelbild:\n${imageBrief(job).split('\n')
+    .filter(line=>/^(HAUPTMOTIV|Motiv und Handlung|Bildaufbau und Details|Nebenmotive|Grenzen):|^HAUPTMOTIV/.test(line))
+    .map(line=>line.slice(0,line.startsWith('Nebenmotive')?480:line.startsWith('HAUPTMOTIV')?440:line.startsWith('Bildaufbau')?500:300))
+    .join('\n')}`:'';
+  const body=`Content-Freigabe · Bildpost ${day}\nProdukt: ${job.opportunity.product.name}\nFormat: ${job.content?.format || 'unbekannt'} · Facebook\n\n${(summary||'').slice(0,850)}${visualBrief}\n\nASIN: ${job.opportunity.product.asin}\nProduktlink: ${job.opportunity.product.affiliateUrl}\nAntworte auf DIESE Nachricht mit „Freigeben“, ${costText}. Danach kommt eine ZWEITE WhatsApp für die Veröffentlichung. „Ablehnen“ stoppt den Auftrag, Änderungswünsche bitte als Text. Noch kein Post ist online. Eine Story mit klickbarem Link wird anschließend für die App vorbereitet.`;
+  if(body.length>3900)throw Error('daily_approval_too_long');
+  return body;
 }
 
 export async function sendDailyApproval(jobId: string) {
@@ -36,19 +52,22 @@ export async function sendDailyApproval(jobId: string) {
     [(process.env.WHATSAPP_APPROVER_WA_ID || "").replace(/\D/g, "")],
   );
   if (!recent.rows.length) return false;
+  const body=dailyApprovalMessage(job,new Date(String(record.rows[0].day)).toISOString().slice(0,10));
   const claimed = await db.query(
     `UPDATE daily_drafts SET whatsapp_send_attempted_at=now() WHERE job_id=$1
      AND status='awaiting_approval' AND whatsapp_message_id IS NULL
      AND whatsapp_send_attempted_at IS NULL RETURNING day`, [jobId],
   );
   if (!claimed.rows.length) return false;
-  const revision=job.events.map(e=>e.data).reverse().find((data): data is {kind:string;instruction:{requires_new_generation:boolean}} => !!data && typeof data==='object' && 'kind' in data && data.kind==='semantic_revision');
-  const costText=revision && !revision.instruction.requires_new_generation
-    ? 'um die Textrevision freizugeben. Das bestehende Bild bleibt erhalten; keine neue Bildgenerierung'
-    : `um den Content-Plan und eine einmalige kostenpflichtige Bildgenerierung freizugeben (Bildprovider: ${imageProviderStatus().provider || "nicht eingerichtet"}, EUR-Kosten nicht vorab bestätigt)`;
-  const summary = job.content?.format === "text" ? job.content.body : job.content?.format === "image" ? job.content.caption : "Videoentwurf";
-  const visualBrief = job.content?.format === "image" ? `\n\nBildbriefing für das Titelbild:\n${imageBrief(job)}` : "";
-  const messageId = await sendWhatsAppText(`Content-Freigabe · Bildpost ${new Date(String(claimed.rows[0].day)).toISOString().slice(0, 10)}\nProdukt: ${job.opportunity.product.name}\nFormat: ${job.content?.format || "unbekannt"} · Facebook\n\n${(summary || "").slice(0, 1100)}${visualBrief}\n\nASIN: ${job.opportunity.product.asin}\nProduktlink: ${job.opportunity.product.affiliateUrl}\nAntworte auf DIESE Nachricht mit „Freigeben“, ${costText}. Danach kommt eine ZWEITE WhatsApp für die Veröffentlichung. „Ablehnen“ stoppt den Auftrag, Änderungswünsche bitte als Text. Noch kein Post ist online. Eine Story mit klickbarem Link wird anschließend für die App vorbereitet.`);
+  let messageId:string;
+  try{messageId=await sendWhatsAppText(body);}
+  catch(error){
+    // A definite Meta rejection cannot have delivered a message. An unknown
+    // network result remains claimed until the operator explicitly asks Status.
+    if(error instanceof WhatsAppRejectedError)await db.query(`UPDATE daily_drafts SET whatsapp_send_attempted_at=NULL,updated_at=now()
+      WHERE job_id=$1 AND status='awaiting_approval' AND whatsapp_message_id IS NULL`,[jobId]);
+    throw error;
+  }
   await db.query("UPDATE daily_drafts SET whatsapp_message_id=$2,updated_at=now() WHERE job_id=$1 AND status='awaiting_approval'", [jobId, messageId]);
   return true;
 }

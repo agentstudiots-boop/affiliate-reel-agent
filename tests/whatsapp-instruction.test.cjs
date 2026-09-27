@@ -165,6 +165,43 @@ test('same WhatsApp message is claimed before LLM call: concurrent duplicate has
   assert.equal((await f.db.query('SELECT status FROM whatsapp_instructions')).rows[0].status,'applied');
 });
 
+test('a parsed WhatsApp correction resumes after a storage failure without a second paid interpretation',async t=>{
+  const f=await fixture(t,{asset:true});let transactions=0,parses=0;
+  const db={...f.db,query:async(q,v)=>{
+    if(q.includes("SET status='clarify',error_code"))throw Error('temporary storage outage');
+    return f.db.query(q,v);
+  },transaction:async fn=>{
+    if(++transactions===2)throw Error('temporary storage outage');
+    return f.db.transaction(fn);
+  }};
+  const input=message('resumable','Bild neu erstellen: Ein Erwachsener schnitzt den Kürbis mit einem kleinen geeigneten Werkzeug. Begleittext natürlich korrigieren.',null);
+  await assert.rejects(processOperatorInstruction(input,{database:db,interpret:async()=>{parses++;return instruction('revise_both');},send:async()=>{throw Error('unexpected notice');},sendApproval:async()=>true}),/temporary storage outage/);
+  assert.equal((await f.db.query("SELECT status FROM whatsapp_instructions WHERE message_id='resumable'")).rows[0].status,'parsed');
+  assert.equal((await f.publication.get(f.id)).status,'changes_requested');
+  await processOperatorInstruction(input,{database:f.db,interpret:async()=>{throw Error('a paid model must not run again');},send:async()=>{throw Error('unexpected notice');},sendApproval:async()=>true});
+  assert.equal(parses,1);
+  assert.equal((await f.snapshot()).revisions,1);
+  assert.equal((await f.db.query("SELECT status FROM whatsapp_instructions WHERE message_id='resumable'")).rows[0].status,'applied');
+  assert.equal((await f.publication.get(f.id)).status,'changes_requested');
+});
+
+test('Status redelivers a missing revised approval without producing or publishing',async t=>{
+  const {recoverLatestInstruction}=require('../.test-build/lib/whatsapp/recover-instruction');
+  const f=await fixture(t,{asset:true});
+  await f.process(message('missing-approval','Neues Bild vom Erwachsenen beim Kürbisschnitzen, Begleittext natürlicher',null),async()=>instruction('revise_both'));
+  assert.equal((await f.db.query('SELECT whatsapp_message_id FROM daily_drafts WHERE job_id=$1',[f.id])).rows[0].whatsapp_message_id,null);
+  let sent=0;
+  const status=await recoverLatestInstruction(f.db,'491234',async id=>{
+    sent++;
+    await f.db.query("UPDATE daily_drafts SET whatsapp_message_id='wamid.corrected' WHERE job_id=$1",[id]);
+    return true;
+  });
+  assert.equal(sent,1);
+  assert.match(status,/gerade zur WhatsApp-Inhaltsfreigabe gesendet/);
+  assert.equal((await f.publication.get(f.id)).status,'changes_requested');
+  assert.equal((await f.db.query('SELECT count(*)::int AS n FROM publications')).rows[0].n,0);
+});
+
 test('ambiguous instruction asks a question once and leaves the creative unchanged',async t=>{
   const f=await fixture(t);await f.process(message('unclear','Mach es anders'),async()=>clarification());
   assert.deepEqual(await f.snapshot(),f.job);assert.equal(f.sends.length,1);assert.match(f.sends[0],/Meinst du/);assert.equal(f.approvals.length,0);
