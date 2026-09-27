@@ -9,6 +9,7 @@ import { analyzeProductInspiration } from "./product-inspiration";
 import { classifyOpportunity, pumpkinCreativeIssues } from "./category";
 import { interpretVideoRevision } from "../whatsapp/video-revision";
 import { evaluateImageCreativeQuality } from "./creative-quality";
+import { VISUAL_FUNCTION_RULE } from "./visual-coherence";
 import { createGenerator } from "./model";
 import { contentSchema, opportunitySchema, reviewSchema, type AgentName, type Content, type ContentJob, type Decision, type Idea, type JobEvent, type JobStatus, type Opportunity, type Review } from "./schema";
 import type { Generator } from "./agent";
@@ -179,7 +180,7 @@ export async function runContentJob(raw: Opportunity, options: {
       const structural = inspectContent(job.content, job.decision, opportunity.targetPlatform);
       structural.issues.push(...pumpkinCreativeIssues(opportunity, job.content));
       if (structural.issues.length) { structural.passed = false; structural.score = Math.min(40, structural.score); }
-      const semantic = job.mode === "ai" ? await generate("orchestrator", `Prüfe redaktionell streng: konkrete Alltagssituation, überzeugender Nutzen, Hook, glaubwürdige Aussagen, Modellnachweise, korrektes Zubehör, verständliche Geschichte, sprechbare Länge, Linkziel und CTA. Unbelegte konkrete Modellbehauptungen oder erfundene Erfahrungen führen zu passed=false. Keine Pflicht zu künstlichen Zusatznutzen. Gib konkrete Reparaturanweisungen; ab score 75 und ohne wesentliche Mängel bestanden.`, { opportunity, inspiration, idea, content: job.content }, reviewSchema, () => structural) : structural;
+      const semantic = job.mode === "ai" ? await generate("orchestrator", `Prüfe redaktionell streng: konkrete Alltagssituation, überzeugender Nutzen, Hook, glaubwürdige Aussagen, Modellnachweise, korrektes Zubehör, verständliche Geschichte, sprechbare Länge, Linkziel und CTA. Prüfe die geplante Szene auch auf sachlich falsche Werkzeugnutzung: ${VISUAL_FUNCTION_RULE} Bei einem solchen Widerspruch passed=false und eine konkrete Korrektur verlangen. Unbelegte konkrete Modellbehauptungen oder erfundene Erfahrungen führen zu passed=false. Keine Pflicht zu künstlichen Zusatznutzen. Gib konkrete Reparaturanweisungen; ab score 75 und ohne wesentliche Mängel bestanden.`, { opportunity, inspiration, idea, content: job.content }, reviewSchema, () => structural) : structural;
       job.review = { passed: structural.passed && semantic.passed && semantic.score >= 75 && semantic.issues.length === 0,
         score: Math.min(structural.score, semantic.score), issues: [...structural.issues, ...semantic.issues].filter((v, i, a) => a.indexOf(v) === i) };
       await emit("orchestrator", "decision", job.review.passed ? "Entwurf für Marketingplanung geeignet; menschliche Freigabe bleibt offen." : "Entwurf benötigt Überarbeitung.", job.review);

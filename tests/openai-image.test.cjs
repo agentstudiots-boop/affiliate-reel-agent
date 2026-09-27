@@ -74,6 +74,8 @@ test('visual prompt stays categorical on search and excludes unverified model cl
   assert.match(prompt,/neutraler, markenfreier Kategorie-Look/);
   assert.match(prompt,/keine konkreten Eigenschaften/);
   assert.match(prompt,/Amazon- oder Händlerbranding/);
+  assert.match(prompt,/Prüfe für jede dargestellte Anwendung die physische Logik/);
+  assert.match(prompt,/nicht durch ähnlich aussehendes Besteck/i);
   const product = await runContentJob(opportunity('https://www.amazon.de/dp/B000000001'));
   assert.match(buildOriginalVisualPrompt(product),/Keine belegten Modellmerkmale/);
   const verified = await runContentJob(opportunity('https://www.amazon.de/dp/B000000001', [{claim:'Baumwolle laut Hersteller',source:'https://example.com/specs'}]));
@@ -90,6 +92,7 @@ test('approval brief is drawn from the saved image plan and included verbatim in
   assert.match(brief,/Sichtbarer Produktbezug:.*Kuscheldecke/);
   assert.match(brief,/Bildaufbau und Details:/);
   assert.match(brief,/Grenzen: Keine Modellmerkmale/);
+  assert.match(brief,/nur Gegenstände und Werkzeuge, die für genau diese Handlung geeignet sind/);
   assert.ok(brief.length < 2200);
   assert.ok(buildOriginalVisualPrompt(job).includes(brief));
 });

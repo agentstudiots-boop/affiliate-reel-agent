@@ -1,5 +1,6 @@
 import { creativeSchema, type Opportunity } from "../schema";
 import type { Generator, ProductInspiration } from "../agent";
+import { VISUAL_FUNCTION_RULE } from "../visual-coherence";
 
 export function creativeAgent(opportunity: Opportunity, generate: Generator, inspiration: ProductInspiration) {
   return generate("creative", `Entwickle drei unterschiedliche starke Werbeideen: je eine für Video, Bild/Carousel und Text.
@@ -9,6 +10,7 @@ Prüfe zuerst die tatsächliche Produktfunktion. Ein Kürbisschnitzset für Hall
 Nutze die mitgelieferte Product-Inspiration nur als redaktionelle Inspirationsquelle. Bei Such-/Kategorie-Seiten kategorisch bleiben und kein konkretes Modell vortäuschen.
 Keine Händlerbilder, Amazon-Screenshots, Logos oder geschützten Shop-Layouts als Creative planen. Keine exakten Produkteigenschaften ohne verifiedFacts behaupten.
 Für Bild/Carousel ist eine echte visuelle Hauptidee Pflicht: Lifestyle, Anwendung, Vergleich oder redaktionelle Collage; keine reine Textkarte.
+${VISUAL_FUNCTION_RULE}
 Prüfe Humor, Überraschung und Storytelling, ohne diese künstlich zu erzwingen. Bewertungen 0–5 sind redaktionelle Einschätzungen, keine Performance-Daten.
 Berücksichtige Zielgruppe, Trend, Use Case, Budget und Ziel. Melde sinnvolle Zusatzprodukte mit Begründung und ob erforderlich.`, { opportunity, inspiration }, creativeSchema, () => {
     const vacuum = /vakuumier|vakuum.?versiegl/i.test(opportunity.product.name);
