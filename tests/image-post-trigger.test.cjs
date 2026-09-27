@@ -55,7 +55,7 @@ test('WhatsApp starts each explicit image post once, while replies stay with the
 });
 
 test('standalone natural product-search requests start TrendScout drafts without consuming approval replies', async t => {
-  for (const phrase of ['Neue Artikelsuche', 'bitte neue Produktsuche!', 'Starte eine neue Trendsuche', 'Such mir einen neuen Artikel', 'Finde ein neues Produkt', 'Ein neues Produkt suchen']) {
+  for (const phrase of ['Artikelsuche', 'Artikelsuche!', 'Produktsuche', 'Neue Artikelsuche', 'bitte neue Produktsuche!', 'Starte eine neue Trendsuche', 'Such mir einen neuen Artikel', 'Finde ein neues Produkt', 'Ein neues Produkt suchen']) {
     assert.deepEqual(imagePostCommand(phrase), { product: undefined, invalid: false });
   }
   for (const phrase of ['Ändere den Text für den neuen Artikel', 'Suche für den bestehenden Post ein neues Bild', 'Neue Artikelsuche für das freigegebene Bild']) {
@@ -71,10 +71,20 @@ test('standalone natural product-search requests start TrendScout drafts without
   const start = async (...args) => { calls.push(args); return { status:'awaiting_approval', jobId:'new-job', whatsapp:'approval_sent' }; };
   const message = { id:'wamid.search.1', from:'491234',body:'Neue Artikelsuche',replyToMessageId:null,payload:{} };
   const db = { query: (sql,values) => pg.query(sql,values) };
+  await db.query('INSERT INTO whatsapp_events(message_id,wa_id,reply_to_message_id,body,payload) VALUES($1,$2,$3,$4,$5)',
+    ['wamid.previous.approval','491234','wamid.previous.post','Freigeben','{}']);
   assert.equal(await startImagePostFromWhatsApp(message,()=>db,start,async()=>''),true);
   assert.equal(await startImagePostFromWhatsApp(message,()=>db,start,async()=>''),true);
   assert.equal(calls.length,1);
   assert.equal(calls[0][2],undefined);
+  const standalone={...message,id:'wamid.after.story',body:'Artikelsuche'};
+  assert.equal(await startImagePostFromWhatsApp(standalone,()=>db,start,async()=>''),true);
+  assert.equal(await startImagePostFromWhatsApp(standalone,()=>db,start,async()=>''),true);
+  assert.equal(calls.length,2);
+  assert.notEqual(calls[0][1],calls[1][1]);
+  assert.equal(calls[1][2],undefined);
+  assert.equal(calls[1][3],undefined);
   assert.equal(await startImagePostFromWhatsApp({...message,id:'wamid.search.reply',replyToMessageId:'wamid.approval'},()=>db,start,async()=>''),false);
-  assert.equal(calls.length,1);
+  assert.equal(await startImagePostFromWhatsApp({...standalone,id:'wamid.story.reply',replyToMessageId:'wamid.previous.story'},()=>db,start,async()=>''),false);
+  assert.equal(calls.length,2);
 });

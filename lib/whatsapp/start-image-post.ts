@@ -9,7 +9,8 @@ import { createHash } from "node:crypto";
 type ImagePostCommand={product?:string;search?:string;invalid:boolean};
 export function imagePostCommand(body: string):ImagePostCommand|null {
   const text = body.trim().replace(/[.!?]+$/, "").replace(/\s+/g, " ");
-  if (/^(?:bitte )?(?:(?:starte|mach|mache) )?(?:eine )?neue (?:artikel|produkt|trend)suche$/i.test(text)
+  if (/^(?:artikel|produkt|trend)suche$/i.test(text)
+    || /^(?:bitte )?(?:(?:starte|mach|mache) )?(?:eine )?neue (?:artikel|produkt|trend)suche$/i.test(text)
     || /^(?:bitte )?(?:suche|such|finde) (?:mir )?(?:einen neuen artikel|ein neues produkt)$/i.test(text)
     || /^(?:bitte )?(?:einen neuen artikel|ein neues produkt) suchen$/i.test(text)) {
     return { product: undefined, invalid: false };
