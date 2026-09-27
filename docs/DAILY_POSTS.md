@@ -22,6 +22,14 @@ Auch eine eigenständige Nachricht **`Neue Artikelsuche`**, **`Neue Produktsuche
 oder **`Such mir einen neuen Artikel`** startet eine neue TrendScout-Suche;
 diese eindeutigen Befehle brauchen keinen Sprachmodellaufruf. Eine Suche kann
 am selben Tag erneut denselben Produktkandidaten finden.
+Mit **`Artikelsuche Saugroboter`** oder **`Artikelsuche Produktname Saugroboter`**
+gibt der Betreiber dagegen eine Produktart vor. Der Trendscout recherchiert
+gezielt dazu; erst eine zu diesem Suchbegriff passende und verifizierte
+Amazon-Produktdetailseite darf in einen neuen Facebook-Bildentwurf übernommen
+werden. Fehlt ein belegbarer Treffer, erhält der Betreiber eine WhatsApp mit
+der Bitte um genaueren Produktnamen oder ASIN. Ein saisonales Ersatzprodukt
+wird nicht eingesetzt. Auch ein solcher Entwurf braucht weiterhin beide
+WhatsApp-Freigaben vor Bildgenerierung und Veröffentlichung.
 Bei mehreren offenen Freigaben immer direkt auf die betreffende WhatsApp
 antworten. Änderungswünsche bleiben bis zur ausdrücklichen Freigabe möglich.
 

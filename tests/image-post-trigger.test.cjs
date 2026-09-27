@@ -3,6 +3,20 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { PGlite } = require('@electric-sql/pglite');
 const { imagePostCommand, startImagePostFromWhatsApp } = require('../.test-build/lib/whatsapp/start-image-post');
+const loadRoute=require('./helpers/load-route.cjs');
+
+test('TrendScout searches the requested product family instead of seasonal defaults',async()=>{
+  const queries=[];
+  const scout=loadRoute('lib/agents/product-scout.ts',{'@/lib/tavily':{
+    tavilySearch:async args=>{queries.push(args);return [];},tavilySources:()=>[],
+  }});
+  const report=await scout.scoutProducts('Saugroboter');
+  assert.equal(queries.length,1);assert.match(queries[0].query,/Saugroboter/);
+  assert.equal(report.output.candidates.length,1);
+  assert.equal(report.output.candidates[0].searchQuery,'Saugroboter');
+  assert.doesNotMatch(JSON.stringify(report.output),/Kürbis-Schnitzwerkzeug-Set|Kuscheldecke/);
+  assert.match(report.output.summary,/gezielte/i);
+});
 
 test('WhatsApp starts each explicit image post once, while replies stay with their approval', async t => {
   const pg = new PGlite(); t.after(() => pg.close());
@@ -13,7 +27,7 @@ test('WhatsApp starts each explicit image post once, while replies stay with the
   process.env.WHATSAPP_APPROVER_WA_ID = '491234';
   t.after(() => { if (prior === undefined) delete process.env.WHATSAPP_APPROVER_WA_ID; else process.env.WHATSAPP_APPROVER_WA_ID = prior; });
   const calls = [], messages = [];
-  const start = async (day, slot, product) => { calls.push({day,slot,product}); return {status:'awaiting_approval',jobId:'new-job',whatsapp:'approval_sent'}; };
+  const start = async (day, slot, product, search) => { calls.push({day,slot,product,search}); return {status:'awaiting_approval',jobId:'new-job',whatsapp:'approval_sent'}; };
   const send = async body => { messages.push(body); return 'notice'; };
   const message = { id:'wamid.test.1=', from:'491234',body:'Bildpost https://www.amazon.de/dp/B0D9YQR9CT?tag=alltaeglichle-21',replyToMessageId:null,payload:{} };
   assert.equal(imagePostCommand(message.body).product, 'B0D9YQR9CT');
@@ -28,6 +42,16 @@ test('WhatsApp starts each explicit image post once, while replies stay with the
   assert.equal(messages.length,0);
   assert.equal(await startImagePostFromWhatsApp({...message,id:'wamid.bad',body:'Bildpost example.com'},()=>db,start,send),true);
   assert.equal(calls.length,1); assert.match(messages[0],/Bitte sende/);
+  for (const [index,body] of ['Artikelsuche Saugroboter','Artikelsuche Produktname Saugroboter',
+    'Artikelsuche (Produktname Saugroboter)','Artikelsuche (Saugroboter)','Neue Artikelsuche: Saugroboter'].entries()) {
+    assert.deepEqual(imagePostCommand(body),{product:undefined,search:'Saugroboter',invalid:false});
+    assert.equal(await startImagePostFromWhatsApp({...message,id:`wamid.robot.${index}`,body},()=>db,start,send),true);
+    assert.equal(calls.at(-1).search,'Saugroboter');
+  }
+  assert.equal(calls.length,6);
+  assert.equal(await startImagePostFromWhatsApp({...message,id:'wamid.robot.0',body:'Artikelsuche Saugroboter'},()=>db,start,send),true);
+  assert.equal(calls.length,6);
+  assert.equal(await startImagePostFromWhatsApp({...message,id:'wamid.robot.reply',body:'Artikelsuche Saugroboter',replyToMessageId:'wamid.approval'},()=>db,start,send),false);
 });
 
 test('standalone natural product-search requests start TrendScout drafts without consuming approval replies', async t => {

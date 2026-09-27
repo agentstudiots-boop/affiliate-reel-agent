@@ -31,8 +31,21 @@ function seasonalSeeds(month: number): Seed[] {
   ];
 }
 
-export async function scoutProducts() {
+export async function scoutProducts(productSearch?: string) {
   const now = new Date();
+  if (productSearch) {
+    const searchResults = await tavilySearch({ query: `${productSearch} Produktvergleich Deutschland Anwendung Kaufberatung`, maxResults: 6 });
+    const candidate: Seed = {
+      name: productSearch, category: "Gezielte Artikelsuche", kind: "Dauerläufer", season: "Auf Anfrage",
+      whyNow: `Gezielte Suche nach ${productSearch} auf Wunsch des Betreibers; kein belegter Trend.`,
+      reelIdea: `Ein ${productSearch} bei einer passenden Alltagsanwendung zeigen. Nur belegte Produkteigenschaften nennen und die Eignung vor dem Kauf prüfen.`,
+      targetGroup: "Menschen, die ein passendes Produkt für ihren Alltag suchen",
+      benefitsToVerify: ["Anwendung und Lieferumfang", "Herstellerhinweise und konkrete Produktmerkmale"],
+    };
+    return {output:{summary:`Gezielte Trendscout-Suche nach „${productSearch}“. Ein konkretes Produkt wird erst nach Prüfung der Amazon-Produktseite ausgewählt.`,
+      researchedAt:now.toISOString(),candidates:[{...candidate,searchQuery:productSearch,confidence:50}]},
+      sources:tavilySources(searchResults)};
+  }
   const searchResults = await tavilySearch({ query: "Deutschland aktuelle Produkttrends Haushalt Küche Geschenke saisonale Produkte", timeRange: "month", maxResults: 10 });
   const signal = searchResults[0];
   const trendName = signal?.title?.slice(0, 110) || "Aktuell gefragtes Haushaltsprodukt";
