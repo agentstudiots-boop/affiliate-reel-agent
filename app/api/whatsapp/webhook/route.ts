@@ -1,4 +1,5 @@
 import { processOperatorInstruction } from "@/lib/whatsapp/process-instruction";
+import { recoverLatestInstruction } from "@/lib/whatsapp/recover-instruction";
 import { handleContentApproval } from "@/lib/whatsapp/content-approval";
 import { requestContentApproval } from "@/lib/whatsapp/content-approval";
 import { after } from "next/server";
@@ -73,10 +74,11 @@ export async function POST(request: Request) {
         && message.from.replace(/\D/g, "") === (process.env.WHATSAPP_APPROVER_WA_ID || "").replace(/\D/g, "")) {
         const claimed=await getDatabase().query("INSERT INTO whatsapp_events(message_id,wa_id,reply_to_message_id,body,payload) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING RETURNING message_id",[message.id,message.from,message.replyToMessageId,message.body,JSON.stringify(payload)]);
         if(claimed.rows.length){
+          const correctionStatus=await recoverLatestInstruction(getDatabase(),message.from.replace(/\D/g,""),sendDailyApproval);
           await recoverRunwayPreflightIncident();
           const status=await latestInstagramReelStatus();
           const imageStatus = await latestImagePostsStatus(getDatabase());
-          await sendWhatsAppText(`Aktuelle Bildpost-Aufträge:\n${imageStatus}\n\nLetzter Instagram-Reel-Auftrag: ${status}`);
+          await sendWhatsAppText(`Aktuelle Bildpost-Aufträge:\n${imageStatus}${correctionStatus?`\n\nLetzte Korrektur: ${correctionStatus}`:''}\n\nLetzter Instagram-Reel-Auftrag: ${status}`);
         }
         continue;
       }

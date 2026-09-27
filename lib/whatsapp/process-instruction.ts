@@ -21,22 +21,32 @@ export async function processOperatorInstruction(input:OperatorMessage,
   const literal=classifyWhatsAppReply(input.body);
   if(literal.intent!=="changes_requested" || /^(entwurf|wochenbilanz)[.!?]*$/i.test(input.body.trim()))return false;
   const db=database ?? getDatabase();
+  // A webhook may fail after the single paid interpretation has been saved.
+  // Meta retries the same message ID; resume that interpretation without another model call.
+  const previous=await db.query(`SELECT i.status,i.interpretation,i.job_id,i.publication_id,i.context_hash,j.snapshot
+    FROM whatsapp_instructions i JOIN whatsapp_events e ON e.message_id=i.message_id
+    LEFT JOIN content_jobs j ON j.id=i.job_id
+    WHERE i.message_id=$1 AND e.wa_id=$2`,[input.id,trusted]);
+  if(previous.rows[0] && previous.rows[0].status!=='parsed')return true;
   // A reply to a video-cost request belongs to the production gate. Do not
   // consume its message ID in the image/text instruction inbox first.
-  if (input.replyToMessageId) {
+  if (!previous.rows[0] && input.replyToMessageId) {
     const video=await db.query(`SELECT 1 FROM approval_requests
       WHERE whatsapp_message_id=$1 AND approver_wa_id=$2 AND kind='render' AND status='pending' LIMIT 1`,
     [input.replyToMessageId,trusted]);
     if (video.rows.length) return false;
   }
-  else {
+  else if(!previous.rows[0]) {
     const openVideo=await db.query(`SELECT count(*)::int AS n FROM approval_requests
       WHERE approver_wa_id=$1 AND kind='render' AND status='pending' AND whatsapp_message_id IS NOT NULL`,[trusted]);
     const other=await db.query(`SELECT 1 FROM publication_requests WHERE platform='facebook' AND status='pending' AND approver_wa_id=$1 AND whatsapp_message_id IS NOT NULL
       UNION ALL SELECT 1 FROM daily_drafts WHERE status='awaiting_approval' AND whatsapp_message_id IS NOT NULL LIMIT 1`,[trusted]);
     if (Number(openVideo.rows[0]?.n)===1 && !other.rows.length) return false;
   }
-  const claim=await db.transaction(async sql=>{
+  const claim=previous.rows[0]?.status==='parsed'
+    ? {job:previous.rows[0].snapshot?parseJob(previous.rows[0].snapshot):null,
+      publicationId:previous.rows[0].publication_id as string|null,targetNotice:''}
+    : await db.transaction(async sql=>{
     const added=await sql.query("INSERT INTO whatsapp_events(message_id,wa_id,reply_to_message_id,body,payload) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING RETURNING message_id",[input.id,input.from,input.replyToMessageId,input.body,JSON.stringify(input.payload)]);
     if(!added.rows.length)return null;
     const targets=await sql.query(`SELECT j.id,j.snapshot,p.id AS publication_id FROM content_jobs j
@@ -83,7 +93,10 @@ export async function processOperatorInstruction(input:OperatorMessage,
   if(!claim)return true; // Durable dedup precedes inference and notifications.
   let instruction:Instruction=clarification();
   let parserFailure:string|null=null;
-  if(claim.job){
+  if(previous.rows[0]?.status==='parsed'){
+    const saved=previous.rows[0].interpretation as {instruction?:unknown}|null;
+    instruction=validateInstruction(saved?.instruction,input.body);
+  }else if(claim.job){
     try{const examples=await loadLanguageExamples(db,trusted,input.body,claim.job);instruction=validateInstruction(await interpret(input.body,claim.job,fetch,examples),input.body);}catch(error){instruction=clarification();parserFailure=error instanceof InstructionParserError?error.message:"parser_unavailable";}
     await db.query("UPDATE whatsapp_instructions SET status='parsed',interpretation=jsonb_set(COALESCE(interpretation,'{}'),'{instruction}',$2::jsonb),updated_at=now() WHERE message_id=$1 AND status='parsing'",[input.id,JSON.stringify(instruction)]);
   }
@@ -124,6 +137,7 @@ export async function processOperatorInstruction(input:OperatorMessage,
     }catch(error){
       const allowed=['visual_context_mismatch','revision_not_available','revision_unchanged','stale_instruction_context','creative_review_failed','parser_auth_missing','parser_auth_rejected','parser_billing_required','parser_context_too_large','parser_unavailable'];
       const code=error instanceof Error && allowed.includes(error.message)?error.message:'instruction_unclear';
+      console.warn(JSON.stringify({event:'instruction_revision_blocked',code,dbCode:typeof error==='object'&&error!==null&&'code' in error?String(error.code):undefined}));
       if(code.startsWith('parser_'))notice='Deine Anweisung wurde gespeichert, aber der Sprachmodell-Zugang funktioniert momentan nicht. Das ist ein technischer Fehler; du musst die Anweisung nicht anders formulieren. Es wurde nichts produziert oder veröffentlicht.';
       if(code==='visual_context_mismatch')notice='Das Bildbriefing passt nicht zum bestehenden Produkt. Bitte beschreibe dessen Anwendung. Es wurde kein Bild erzeugt und nichts veröffentlicht.';
       if(code==='revision_not_available')notice='Diese Revision ist im aktuellen Auftragszustand nicht möglich. Bitte den Auftrag im Content Studio prüfen. Es wurde nichts produziert oder veröffentlicht.';
@@ -132,7 +146,18 @@ export async function processOperatorInstruction(input:OperatorMessage,
   }
   const claimedNotice=await db.query("UPDATE whatsapp_instructions SET notice_attempted_at=now() WHERE message_id=$1 AND notice_attempted_at IS NULL RETURNING message_id",[input.id]);
   if(claimedNotice.rows.length){
-    if(dailyJobId)await sendApproval(dailyJobId);else {
+    if(dailyJobId){
+      try{
+        const sent=await sendApproval(dailyJobId);
+        console.info(JSON.stringify({event:'instruction_approval_delivery',jobId:dailyJobId,sent}));
+      }catch(error){
+        console.error(JSON.stringify({event:'instruction_approval_delivery_failed',jobId:dailyJobId,
+          failureType:error instanceof Error?error.name:'unknown',
+          httpStatus:typeof error==='object'&&error!==null&&'httpStatus' in error?error.httpStatus:undefined,
+          providerCode:typeof error==='object'&&error!==null&&'code' in error?error.code:undefined}));
+        throw error;
+      }
+    }else {
       const noticeId=await send(notice);
       await db.query("UPDATE whatsapp_instructions SET interpretation=jsonb_set(COALESCE(interpretation,'{}'),'{notice_message_id}',to_jsonb($2::text)) WHERE message_id=$1",[input.id,noticeId]);
     }

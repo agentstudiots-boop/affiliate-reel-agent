@@ -39,6 +39,7 @@ test('daily cron produces one saved image brief, requires a WhatsApp window, and
   assert.equal(next.status,'awaiting_approval');assert.equal(next.whatsapp,'approval_sent');
   assert.equal(scouts,2);assert.equal(messages.length,1);
   assert.match(messages[0],/Content-Freigabe/);
+  assert.ok(messages[0].length<=3900);
   const saved=await pg.query("SELECT status,whatsapp_message_id FROM daily_drafts WHERE day='2026-09-25'");
   assert.equal(saved.rows[0].status,'awaiting_approval');
   assert.equal(saved.rows[0].whatsapp_message_id,'wamid.mock.1');
@@ -53,4 +54,17 @@ test('daily cron produces one saved image brief, requires a WhatsApp window, and
   assert.equal(scouts,4);
   assert.equal(messages.length,3);
   assert.equal((await pg.query('SELECT count(*)::int AS n FROM publication_requests')).rows[0].n,0);
+});
+
+test('revised Halloween approval stays within WhatsApp text limits and shows the corrected scene',async()=>{
+  const {runContentJob}=require('../.test-build/lib/content/orchestrator');
+  const {opportunitySchema}=require('../.test-build/lib/content/schema');
+  const daily=loadRoute('lib/daily/draft.ts',{'@/lib/orchestrator':{runContentJob,runProductScout:async()=>{throw Error('unexpected scout');}}});
+  const job=await runContentJob(opportunitySchema.parse({product:{name:'Kürbis Schnitzset',productVerifiedName:'Kürbis Schnitzset',productVerifiedAt:'2026-09-26T08:00:00Z',sourceUrl:'https://www.amazon.de/dp/B0D9YQR9CT',affiliateUrl:'https://www.amazon.de/dp/B0D9YQR9CT?tag=alltaeglichle-21',targetGroup:'Halloween',benefits:'Herstellerhinweise',price:'',notes:''},useCase:'Ein Erwachsener schnitzt einen Halloween-Kürbis mit geeignetem Werkzeug.',targetPlatform:'facebook',budget:'low'}),{allowedFormats:['image']});
+  job.content.slides[0].prompt+=' '.repeat(2)+'Zusätzlicher Text '.repeat(250);
+  const body=daily.dailyApprovalMessage(job,'2026-09-27');
+  assert.ok(body.length<3900,`WhatsApp message has ${body.length} characters`);
+  assert.match(body,/erwachsene Person schnitzt/i);
+  assert.match(body,/Keine Essgabeln/);
+  assert.match(body,/Affiliate-Link|Produktlink/);
 });
