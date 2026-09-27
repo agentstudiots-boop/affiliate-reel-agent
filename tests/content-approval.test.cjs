@@ -9,6 +9,7 @@ const {productionRepository}=require('../.test-build/lib/production/repository')
 const {runContentJob}=require('../.test-build/lib/content/orchestrator');
 const {opportunitySchema}=require('../.test-build/lib/content/schema');
 const {requestContentApproval,handleContentApproval,hasContentApproval,revisePendingVideoCaption}=require('../.test-build/lib/whatsapp/content-approval');
+const {loadApprovedEditorialCorrections}=require('../.test-build/lib/whatsapp/language-memory');
 
 test('operator caption correction revokes the exact pending WhatsApp approval and resends human copy',async t=>{
   const pg=new PGlite();t.after(()=>pg.close());
@@ -93,6 +94,11 @@ test('WhatsApp approves the exact finished script before any video production ca
   assert.equal(approved.status,'approved');
   assert.equal(approved.revisions,4);
   assert.equal(await hasContentApproval(approved,db),true);
+  const recorded=await db.query('SELECT feedback FROM approved_editorial_feedback WHERE content_id=$1',[id]);
+  assert.equal(recorded.rows.length,4);
+  const examples=await loadApprovedEditorialCorrections(db,'491234',approved.opportunity);
+  assert.ok(examples.some(example=>/Begleittext klingt maschinell/.test(example.message)));
+  assert.ok(examples.some(example=>/erste Szene kürzer/.test(example.message)));
   assert.equal((await repo.prepareVideo(id)).run.status,'needs_provider_quote');
   assert.equal((await db.query('SELECT count(*)::int AS n FROM production_runs')).rows[0].n,1);
 });

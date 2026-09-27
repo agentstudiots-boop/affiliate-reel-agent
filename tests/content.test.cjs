@@ -153,7 +153,7 @@ test('specialists cannot import each other or an orchestrator', () => {
   for (const file of readdirSync('lib/content/agents')) {
     const source = readFileSync(`lib/content/agents/${file}`, 'utf8');
     for (const match of source.matchAll(/from\s+["']([^"']+)/g)) {
-      assert.ok(['../schema', '../agent', '../editorial-copy', '../editorial-feedback'].includes(match[1]), `${file} has an unauthorized dependency: ${match[1]}`);
+      assert.ok(['../schema', '../agent', '../editorial-copy', '../editorial-feedback', '../visual-coherence'].includes(match[1]), `${file} has an unauthorized dependency: ${match[1]}`);
     }
   }
 });
@@ -164,15 +164,18 @@ test('JSON contract is serializable and reference generator rejects malformed ou
   await assert.rejects(generate('creative', '', {}, creativeSchema, () => ({ ideas: [] })));
 });
 
-test('removed generative transport fails closed without a network request', async () => {
+test('AI transport fails closed without a configured Replicate token and makes no network request', async () => {
   const originalFetch = global.fetch;
+  const token = process.env.REPLICATE_API_TOKEN;
   let calls = 0;
   try {
+    delete process.env.REPLICATE_API_TOKEN;
     global.fetch = async () => { calls++; throw new Error('unexpected'); };
     const generate = createGenerator({ mode: 'ai' });
-    await assert.rejects(generate('creative', 'Test', {}, z.object({ ok: z.boolean() }), () => ({ ok: false })), /Tavily bleibt auf Recherche begrenzt/);
+    await assert.rejects(generate('creative', 'Test', {}, z.object({ ok: z.boolean() }), () => ({ ok: false })), /Replicate-Zugang/);
     assert.equal(calls, 0);
   } finally {
+    if(token===undefined)delete process.env.REPLICATE_API_TOKEN;else process.env.REPLICATE_API_TOKEN=token;
     global.fetch = originalFetch;
   }
 });

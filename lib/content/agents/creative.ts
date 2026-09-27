@@ -1,8 +1,8 @@
 import { creativeSchema, type Opportunity } from "../schema";
-import type { Generator, ProductInspiration } from "../agent";
+import type { Generator, ProductInspiration, ApprovedEditorialCorrection } from "../agent";
 import { VISUAL_FUNCTION_RULE } from "../visual-coherence";
 
-export function creativeAgent(opportunity: Opportunity, generate: Generator, inspiration: ProductInspiration) {
+export function creativeAgent(opportunity: Opportunity, generate: Generator, inspiration: ProductInspiration, corrections:ApprovedEditorialCorrection[] = []) {
   return generate("creative", `Entwickle drei unterschiedliche starke Werbeideen: je eine für Video, Bild/Carousel und Text.
 Jede Idee: konkrete Alltagssituation, emotionaler Hook, Handlung, Nutzen, ehrliche Grenzen und Formatbegründung.
 Für Video: leite aus dem Trend und dem Anwendungsfall eine passende Atmosphäre und eine konkrete Ausgangsszene ab. Familienmomente, Abenteuer oder Jahreszeit nur verwenden, wenn sie zur Handlung passen. Das visuelle Startbild soll den Einstieg in die Geschichte zeigen, nicht zwingend eine isolierte Produktaufnahme. Suchergebnisse liefern Anregungen, aber keine pauschalen Bildnutzungsrechte.
@@ -11,8 +11,9 @@ Nutze die mitgelieferte Product-Inspiration nur als redaktionelle Inspirationsqu
 Keine Händlerbilder, Amazon-Screenshots, Logos oder geschützten Shop-Layouts als Creative planen. Keine exakten Produkteigenschaften ohne verifiedFacts behaupten.
 Für Bild/Carousel ist eine echte visuelle Hauptidee Pflicht: Lifestyle, Anwendung, Vergleich oder redaktionelle Collage; keine reine Textkarte.
 ${VISUAL_FUNCTION_RULE}
+Berücksichtige bestätigte Betreiberkorrekturen als Beispiele für allgemeine Gestaltungs- und Sprachregeln. Prüfe ihre Relevanz für das aktuelle Produkt; frühere Produkte, Szenen und ungeprüfte Eigenschaften nicht übernehmen. Wiederkehrende Muster stärker gewichten, widersprüchliche Einzelwünsche nicht eigenmächtig verallgemeinern.
 Prüfe Humor, Überraschung und Storytelling, ohne diese künstlich zu erzwingen. Bewertungen 0–5 sind redaktionelle Einschätzungen, keine Performance-Daten.
-Berücksichtige Zielgruppe, Trend, Use Case, Budget und Ziel. Melde sinnvolle Zusatzprodukte mit Begründung und ob erforderlich.`, { opportunity, inspiration }, creativeSchema, () => {
+Berücksichtige Zielgruppe, Trend, Use Case, Budget und Ziel. Melde sinnvolle Zusatzprodukte mit Begründung und ob erforderlich.`, { opportunity, inspiration, approvedCorrections:corrections }, creativeSchema, () => {
     const vacuum = /vakuumier|vakuum.?versiegl/i.test(opportunity.product.name);
     const pumpkin = /(?:kürbis|kuerbis|pumpkin).{0,40}(?:schnitz|carving)|(?:schnitz|carving).{0,40}(?:kürbis|kuerbis|pumpkin)/i.test(opportunity.product.name);
     const childRequested = pumpkin && /\b(?:kind(?:er)?|familie)\b/i.test(opportunity.useCase);

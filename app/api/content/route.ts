@@ -6,11 +6,12 @@ import { databaseConfigured, getDatabase } from "@/lib/memory/db";
 import { authorized } from "@/lib/memory/auth";
 import { ConflictError, memoryRepository } from "@/lib/memory/repository";
 import { requestContentApproval } from "@/lib/whatsapp/content-approval";
+import { loadApprovedEditorialCorrections } from "@/lib/whatsapp/language-memory";
 export const runtime = "nodejs";
 export const maxDuration = 300;
-const requestSchema = z.object({ requestId: z.string().uuid(), opportunity: opportunitySchema, mode: z.literal("reference").default("reference"), formatPreference: z.enum(["automatic","video"]).default("automatic") });
+const requestSchema = z.object({ requestId: z.string().uuid(), opportunity: opportunitySchema, mode: z.enum(["reference","ai"]).default("reference"), formatPreference: z.enum(["automatic","video"]).default("automatic") });
 export function GET() {
-  return Response.json({ databaseConfigured: databaseConfigured(), planningMode: "reference", researchProvider: "tavily", maxAutomaticRevisions: 2, operatorRevisions: "until_approval", maxModelCalls: 0 }, { headers: { "Cache-Control": "no-store" } });
+  return Response.json({ databaseConfigured: databaseConfigured(), planningMode: process.env.REPLICATE_API_TOKEN?.trim()?"reference_or_ai":"reference", researchProvider: "tavily", maxAutomaticRevisions: 2, operatorRevisions: "until_approval", maxModelCalls: process.env.REPLICATE_API_TOKEN?.trim()?8:0 }, { headers: { "Cache-Control": "no-store" } });
 }
 export async function POST(request: Request) {
   if (!authorized(request)) return Response.json({ error: "Zugangscode für den zentralen Speicher erforderlich." }, { status: 401 });
@@ -36,7 +37,12 @@ export async function POST(request: Request) {
     }
   }
   const repo = memoryRepository();
-  try { await repo.claim(input.requestId,input.opportunity,input.mode); }
+  let corrections;
+  try { corrections=await loadApprovedEditorialCorrections(getDatabase(),(process.env.WHATSAPP_APPROVER_WA_ID||"").replace(/\D/g,""),input.opportunity); }
+  catch { return Response.json({error:"Bestätigte Korrekturen konnten nicht geladen werden. Keine Planung gestartet."},{status:503}); }
+  const mode=(input.mode==="ai" || (corrections.length>0 && !!process.env.REPLICATE_API_TOKEN?.trim()))?"ai" as const:"reference" as const;
+  if(mode==="ai" && !process.env.REPLICATE_API_TOKEN?.trim())return Response.json({error:"Replicate-Zugang für KI-Planung fehlt."},{status:503});
+  try { await repo.claim(input.requestId,input.opportunity,mode); }
   catch (error) { return Response.json({ error: error instanceof ConflictError ? error.message : "Postgres ist nicht erreichbar oder die Migration fehlt. Kein Modellaufruf gestartet." }, { status: error instanceof ConflictError ? 409 : 503 }); }
   const abort = new AbortController();
   const signal = AbortSignal.any([request.signal, abort.signal]);
@@ -44,7 +50,9 @@ export async function POST(request: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        const planned=await runContentJob(input.opportunity, { id: input.requestId, mode: input.mode, signal, ...(input.formatPreference === "video" ? { allowedFormats: ["video" as const] } : {}), async loadLearning(opportunity) {
+        const planned=await runContentJob(input.opportunity, { id: input.requestId, mode, signal, ...(input.formatPreference === "video" ? { allowedFormats: ["video" as const] } : {}), async loadCorrections() {
+          return corrections;
+        }, async loadLearning(opportunity) {
           try { return await repo.learn(opportunity); } catch { throw new Error("Historischer Datenbankvergleich nicht verfügbar. Planung gestoppt."); }
         }, async onUpdate(job) {
           // Database commit precedes UI delivery. A lost browser connection cannot erase saved work.

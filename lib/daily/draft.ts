@@ -12,6 +12,7 @@ import { imageBrief } from "@/lib/content/image-brief";
 import { isPumpkinCarvingProduct } from "@/lib/content/category";
 import { findAmazonProductByAsin } from "@/lib/product-resolver";
 import { ensureAutomationSchema } from "@/lib/memory/ensure-automation-schema";
+import { loadApprovedEditorialCorrections } from "@/lib/whatsapp/language-memory";
 
 async function resolveRequestedProduct(value: string) {
   const asin = /^(?:[A-Z0-9]{10})$/.test(value) ? value : value.match(/^https:\/\/(?:www\.)?amazon\.de\/dp\/([A-Z0-9]{10})\/?$/)?.[1];
@@ -87,9 +88,12 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
       useCase: candidate?.reelIdea || `Das Produkt ${requestedProduct!.name} im Alltag verwenden und die Eignung vor dem Kauf prüfen.`, trend: candidate?.whyNow || "", goal: "education", budget: "low", verifiedFacts: [],
     };
     const repo = memoryRepository(db);
-    await repo.claim(jobId, opportunity, "reference");
-    const job = await runContentJob(opportunity, { id: jobId, mode: "reference", allowedFormats: ["image"],
-      loadLearning: value => repo.learn(value), onUpdate: value => repo.save(value) });
+    const approver=(process.env.WHATSAPP_APPROVER_WA_ID||"").replace(/\D/g,"");
+    const corrections=await loadApprovedEditorialCorrections(db,approver,opportunity);
+    const mode=corrections.length && process.env.REPLICATE_API_TOKEN?.trim() ? "ai" as const : "reference" as const;
+    await repo.claim(jobId, opportunity, mode);
+    const job = await runContentJob(opportunity, { id: jobId, mode, allowedFormats: ["image"],
+      loadCorrections:async()=>corrections, loadLearning: value => repo.learn(value), onUpdate: value => repo.save(value) });
     // Do not seek an approval for a plan that the later Facebook gate rejects.
     const publishablePlan = job.status === "awaiting_approval" && job.content?.format === "image"
       && !facebookPagePublicationError({ ...job, status: "approved" });
