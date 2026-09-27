@@ -64,3 +64,30 @@ test('editorial model errors report a safe provider category without retrying th
   assert.equal(warnings[0].reason,'http_402');
   assert.doesNotMatch(JSON.stringify(warnings),/test-token/);
 });
+
+test('an explicit Replicate 429 waits once and resumes the same content plan',async t=>{
+  const before=process.env.REPLICATE_API_TOKEN;process.env.REPLICATE_API_TOKEN='test-token';
+  t.after(()=>{if(before===undefined)delete process.env.REPLICATE_API_TOKEN;else process.env.REPLICATE_API_TOKEN=before;});
+  const waits=[];let requests=0;
+  const generate=createGenerator({mode:'ai',minIntervalMs:0,wait:async ms=>{waits.push(ms);},request:async()=>{
+    requests++;
+    return requests===1?new Response('{"detail":"Request was throttled. Your rate limit resets in ~30s."}',{status:429})
+      :new Response(JSON.stringify({id:'abcdefgh1234',status:'succeeded',output:['{"title":"Passende Szene"}']}),{status:200});
+  }});
+  const result=await generate('image','Bildentwurf',{},z.object({title:z.string()}),()=>({title:'Fallback'}));
+  assert.equal(result.title,'Passende Szene');
+  assert.equal(requests,2);
+  assert.equal(waits.length,1);
+  assert.ok(waits[0]>=30000);
+});
+
+test('a repeated 429 remains blocked and never starts a third paid request',async t=>{
+  const before=process.env.REPLICATE_API_TOKEN;process.env.REPLICATE_API_TOKEN='test-token';
+  t.after(()=>{if(before===undefined)delete process.env.REPLICATE_API_TOKEN;else process.env.REPLICATE_API_TOKEN=before;});
+  let requests=0;
+  const generate=createGenerator({mode:'ai',minIntervalMs:0,wait:async()=>{},request:async()=>{
+    requests++;return new Response('rate limited',{status:429,headers:{'Retry-After':'2'}});
+  }});
+  await assert.rejects(generate('image','Bildentwurf',{},z.object({title:z.string()}),()=>({title:'Fallback'})),/Zugriffslimits/);
+  assert.equal(requests,2);
+});

@@ -55,6 +55,8 @@ export async function startImagePostFromWhatsApp(input: IncomingWhatsAppMessage 
       : `${command.product ? "Bildpost" : "Artikelsuche"} (Auftrag ${result.jobId})`;
     const reason = result.reason === "product_unresolved"
       ? "Der Trendscout konnte keine passende Amazon-Produktseite sicher verifizieren. Bitte eine Produktart oder eine konkrete ASIN nennen."
+      : result.reason === "editorial_rate_limited"
+        ? "Replicate hat die redaktionelle Anfrage auch nach einer kurzen Wartezeit gedrosselt. Der Auftrag bleibt angehalten. Ein neuer Versuch kann später mit einer neuen Artikelsuche gestartet werden."
       : result.reason === "editorial_model_failed"
         ? "Das redaktionelle Sprachmodell hat keinen sicher prüfbaren Bildentwurf geliefert. Bitte den Modellzugang und das Guthaben prüfen; dieser Auftrag startet nicht automatisch erneut."
         : result.reason === "content_review_failed"

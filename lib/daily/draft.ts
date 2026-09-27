@@ -13,7 +13,8 @@ import { isPumpkinCarvingProduct } from "@/lib/content/category";
 import { findAmazonProductByAsin } from "@/lib/product-resolver";
 import { ensureAutomationSchema } from "@/lib/memory/ensure-automation-schema";
 import { loadApprovedEditorialCorrections } from "@/lib/whatsapp/language-memory";
-import { EDITORIAL_MODEL_ERROR } from "@/lib/content/model";
+import { EDITORIAL_MODEL_ERROR, EDITORIAL_RATE_LIMIT_ERROR } from "@/lib/content/model";
+import { createHash } from "node:crypto";
 
 async function resolveRequestedProduct(value: string) {
   const asin = /^(?:[A-Z0-9]{10})$/.test(value) ? value : value.match(/^https:\/\/(?:www\.)?amazon\.de\/dp\/([A-Z0-9]{10})\/?$/)?.[1];
@@ -96,9 +97,10 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
   try {
     const report = productQuery ? null : await runProductScout(productSearch);
     // A seasonal idea becomes affiliate content only after exact product resolution.
+    const openSearch = slot.startsWith("manual:") && !productQuery && !productSearch;
     const candidates = report?.candidates.filter(candidate => productSearch
       ? candidate.searchQuery.toLocaleLowerCase("de-DE")===productSearch.toLocaleLowerCase("de-DE")
-      : candidate.kind === "Saisontrend") || [];
+      : openSearch || candidate.kind === "Saisontrend") || [];
     if (!productQuery && !productSearch && !candidates.length) throw new Error("Kein saisonaler Kandidat verfügbar.");
     const resolved = candidates.filter(candidate => candidate.resolvedProduct);
     if(!productQuery && !resolved.length){
@@ -107,7 +109,9 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
       return {status:'needs_input' as const,jobId,reason:'product_unresolved' as const,searchTerm:productSearch};
     }
     const pool = resolved.length ? resolved : candidates;
-    const candidate = productSearch ? resolved[0] : pool.length ? pool[(new Date(`${day}T00:00:00Z`).getUTCDate() + (slot === "afternoon" ? 1 : 0)) % pool.length] : null;
+    const rotation = openSearch ? createHash("sha256").update(slot).digest().readUInt32BE(0)
+      : new Date(`${day}T00:00:00Z`).getUTCDate() + (slot === "afternoon" ? 1 : 0);
+    const candidate = productSearch ? resolved[0] : pool.length ? pool[rotation % pool.length] : null;
     await db.query("UPDATE daily_drafts SET status='planning',scout_report=$2,updated_at=now() WHERE job_id=$1", [jobId, JSON.stringify(report ? {requestedSearch:productSearch,report}: { requestedProduct: productQuery })]);
     stage = "product_verification";
     const requestedProduct = productQuery ? await resolveRequestedProduct(productQuery) : null;
@@ -155,7 +159,8 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
         return { status, jobId, whatsapp: "notification_sent" as const };
       }
     }
-    const reason = job.error === EDITORIAL_MODEL_ERROR ? "editorial_model_failed" as const
+    const reason = job.error === EDITORIAL_RATE_LIMIT_ERROR ? "editorial_rate_limited" as const
+      : job.error === EDITORIAL_MODEL_ERROR ? "editorial_model_failed" as const
       : job.error === "product_unresolved" ? "product_unresolved" as const
       : job.review && !job.review.passed ? "content_review_failed" as const : "planning_failed" as const;
     return { status, jobId, reason };

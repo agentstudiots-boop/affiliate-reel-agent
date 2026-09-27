@@ -109,4 +109,8 @@ test('failed generic searches report the actual stage without retrying a paid dr
   await startImagePostFromWhatsApp({...message,id:'wamid.product.error'},()=>db,
     async()=>({status:'needs_input',jobId:'no-product',reason:'product_unresolved'}),send);
   assert.match(notices[1],/Produktseite sicher verifizieren/i);
+  await startImagePostFromWhatsApp({...message,id:'wamid.rate.error'},()=>db,
+    async()=>({status:'needs_input',jobId:'rate-limited',reason:'editorial_rate_limited'}),send);
+  assert.match(notices[2],/gedrosselt/i);
+  assert.doesNotMatch(notices[2],/Guthaben prüfen|ASIN prüfen/i);
 });
