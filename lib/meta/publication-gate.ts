@@ -19,7 +19,11 @@ function publicationContent(job: ContentJob) {
   catch { throw new PublicationConflictError("Affiliate-Link fehlt."); }
   if (source.protocol !== "https:" || source.username || source.password) throw new PublicationConflictError("Affiliate-Link ist nicht sicher.");
   const base = job.content.format === "text" ? job.content.body : job.content.caption;
-  const caption = `Werbung | Affiliate-Link\nProdukt direkt ansehen: ${source}\n\n${base}\n\n${job.content.cta}`;
+  const lead = job.content.hook.trim().replace(/^Werbung\s*(?:\|\s*Affiliate-Link)?\s*[|:·–-]?\s*/i, "").trim();
+  if (!lead || /^Werbung\b/i.test(lead)) throw new PublicationConflictError("Für den Beitrag fehlt ein natürlicher Einstieg.");
+  const body = base.trim().replace(/^Werbung\s*(?:\|\s*Affiliate-Link)?\s*[|:·–-]?\s*/i, "").trim();
+  const detail = body.startsWith(lead) ? body.slice(lead.length).trim() : body;
+  const caption = `${lead}\nWerbung | Affiliate-Link\nProdukt direkt ansehen: ${source}\n\n${detail}\n\n${job.content.cta}`;
   const hash = createHash("sha256").update(JSON.stringify({caption,content:job.content,jobId:job.id})).digest("hex");
   return { caption, hash };
 }

@@ -104,6 +104,8 @@ test('signed webhook keeps both Facebook approvals separate and publishes once o
   ]);
   assert.ok(responses.every(response => response.status === 200));
   assert.equal(f.writes.length, 1);
+  assert.doesNotMatch(f.writes[0].caption, /^Werbung\b/i);
+  assert.match(f.writes[0].caption.slice(0, 300), /Werbung \| Affiliate-Link[\s\S]*https:\/\/www\.amazon\.de\/dp\//);
   const request = await f.publication.get(f.id);
   assert.equal(request.status, 'published'); assert.equal(request.metaPostId, '123_456');
   assert.equal(request.permalink, 'https://www.facebook.com/123_456');
