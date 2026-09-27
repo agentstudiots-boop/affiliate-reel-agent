@@ -88,7 +88,7 @@ test('a named WhatsApp search reaches TrendScout and can draft only a verified m
     '@/lib/orchestrator':{runContentJob:require('../.test-build/lib/content/orchestrator').runContentJob,
       runProductScout:async query=>{searches.push(query);return {candidates,sources:[]};}},
     '@/lib/memory/db':{getDatabase:()=>db},
-    '@/lib/whatsapp/client':{sendWhatsAppText:async body=>{messages.push(body);return 'wamid.search.approval';},
+    '@/lib/whatsapp/client':{sendWhatsAppText:async body=>{messages.push(body);return `wamid.search.approval.${messages.length}`;},
       dailyNotificationTemplateConfigured:()=>false,sendDailyNotificationTemplate:async()=>{throw Error('unexpected template');}},
   });
   const found=await daily.createDailyDraft('2026-09-27','manual:search-robot',undefined,'Saugroboter');
@@ -99,10 +99,14 @@ test('a named WhatsApp search reaches TrendScout and can draft only a verified m
   assert.equal(jobs[0].snapshot.opportunity.product.asin,'B0ABCD1234');
   assert.equal(messages.length,1);assert.match(messages[0],/Saugroboter Modell R/);
   assert.equal((await daily.createDailyDraft('2026-09-27','manual:search-robot',undefined,'Saugroboter')).status,'already_claimed');
+  const generic=await daily.createDailyDraft('2026-09-27','manual:general-search');
+  assert.equal(generic.status,'awaiting_approval');
+  assert.equal((await db.query('SELECT snapshot FROM content_jobs WHERE id=$1',[generic.jobId])).rows[0].snapshot.opportunity.product.asin,'B0ABCD1234');
+  assert.equal(searches.at(-1),undefined);
   const missing=await daily.createDailyDraft('2026-09-27','manual:search-missing',undefined,'Wäschetrockner');
   assert.equal(missing.status,'needs_input');assert.equal(missing.reason,'product_unresolved');
-  assert.equal((await db.query('SELECT count(*)::int AS n FROM content_jobs')).rows[0].n,1);
-  assert.equal(messages.length,1);
+  assert.equal((await db.query('SELECT count(*)::int AS n FROM content_jobs')).rows[0].n,2);
+  assert.equal(messages.length,2);
 });
 
 test('a generic search stops before content planning when no Amazon product can be verified',async t=>{

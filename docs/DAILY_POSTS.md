@@ -25,10 +25,20 @@ am selben Tag erneut denselben Produktkandidaten finden. Eine neue eigenständig
 Suche bezieht sich nicht auf zuvor freigegebene oder erledigte Aufträge;
 Antworten auf alte Freigabe- und Story-Nachrichten bleiben dagegen bei ihrem
 jeweiligen Auftrag.
+Bei einer allgemeinen manuellen Artikelsuche berücksichtigt der Trendscout
+verifizierte Dauerläufer und aktuelle Suchsignale ebenso wie Saisonideen.
+Die automatischen Tageszeiten nutzen weiterhin saisonale Kandidaten.
 Ohne verifizierbare Amazon-Produktseite wird keine redaktionelle Planung gestartet.
 Schlägt das redaktionelle Sprachmodell später fehl, nennt WhatsApp diesen Schritt
 statt pauschal eine fehlende ASIN; der gescheiterte Auftrag wird nicht automatisch
 wiederholt und löst keine Bildgenerierung aus.
+Replicate-Anfragen innerhalb desselben redaktionellen Plans werden zeitlich
+abgestuft. Nur bei einer ausdrücklich abgelehnten HTTP-429-Antwort wartet der
+Generator begrenzt und versucht den abgelehnten Aufruf genau einmal erneut.
+Nach erfolgreicher Planung folgen weiterhin Inhaltsfreigabe, Bildproduktion
+und separate Veröffentlichungsfreigabe. Bei erneutem Limit endet der Auftrag
+ohne Veröffentlichung; unklare oder erfolgreiche POST-Ergebnisse werden nicht
+erneut abgesendet.
 Mit **`Artikelsuche Saugroboter`** oder **`Artikelsuche Produktname Saugroboter`**
 gibt der Betreiber dagegen eine Produktart vor. Der Trendscout recherchiert
 gezielt dazu; erst eine zu diesem Suchbegriff passende und verifizierte
