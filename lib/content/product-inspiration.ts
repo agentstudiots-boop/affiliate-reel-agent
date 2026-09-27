@@ -29,7 +29,7 @@ function preset(name: string, useCase: string, category: Opportunity["category"]
     return {
       categoryLabel: "Kürbisschnitzwerkzeuge",
       visualDirections: [
-        "Ein großer echter orangefarbener Halloween-Kürbis mit eingeschnittenem Gesicht füllt den Vordergrund. Erwachsene Hände schnitzen sichtbar eine Augen- oder Mundöffnung mit einem kleinen neutralen Kürbisschnitzwerkzeug an einem Basteltisch; weitere kleine Schnitzwerkzeuge daneben.",
+        "Ein großer echter orangefarbener Halloween-Kürbis mit eingeschnittenem Gesicht füllt den Vordergrund. Erwachsene Hände schnitzen sichtbar eine Augen- oder Mundöffnung mit einem kleinen neutralen Kürbisschnitzwerkzeug an einem Basteltisch; keine Essgabeln oder anderes Besteck als Schnitzwerkzeuge.",
         "Detail der Bearbeitung eines echten Kürbisses mit kleinem Schnitzwerkzeug, sichtbaren Kürbiskernen und Schalenresten; keine Speisen oder Backwaren.",
         "Fertige geschnitzte Kürbislaternen als Ergebnis im Hintergrund, während der aktive Schnitzvorgang im Vordergrund bleibt.",
       ],

@@ -1,5 +1,6 @@
 import type { ContentJob } from "./schema";
 import { analyzeProductInspiration } from "./product-inspiration";
+import { isPumpkinCarvingProduct } from "./category";
 
 function excerpt(value: string, limit: number): string {
   const clean = value.replace(/\s+/g, " ").trim();
@@ -17,14 +18,14 @@ export function imageBrief(job: ContentJob): string {
   const scene = content.slides[0];
   const concept = content.visualConcept!;
   const category = analyzeProductInspiration(opportunity).categoryLabel;
-  const pumpkinCarving = /kürbis.*schnitz|schnitz.*kürbis/i.test(opportunity.product.name);
+  const pumpkinCarving = isPumpkinCarvingProduct(opportunity.product.name);
   return [
     pumpkinCarving ? "HAUPTMOTIV – zwingend sofort erkennbar: Ein großer, eindeutig als echter orangefarbener Halloween-Kürbis erkennbarer Kürbis nimmt den Bildvordergrund ein. Eine erwachsene Person schnitzt gerade mit einem kleinen Kürbisschnitzwerkzeug die Augen- oder Mundöffnung in seine Schale; die ausgeschnittenen Gesichtszüge und der aktive Schnitzvorgang sind deutlich sichtbar. Kürbis und Schnitzhandlung müssen stärker auffallen als Person, Werkzeuge und Hintergrund." : `HAUPTMOTIV – zwingend sofort erkennbar: Die konkrete Anwendung der Produktkategorie ${category} steht groß und deutlich im Vordergrund; Person und Dekoration unterstützen nur die Handlung.`,
     `Motiv und Handlung: ${excerpt(scene.visual, 360)}`,
     `Alltag und Umgebung: ${excerpt(concept.everydaySituation, 220)}`,
     `Sichtbarer Produktbezug: Eine neutrale, unmarkierte Darstellung der Kategorie ${category} muss bei der beschriebenen Anwendung erkennbar sein. Handlung und Produktbezug sind das Hauptmotiv, nicht bloß Dekoration.`,
     `Bildaufbau und Details: ${excerpt(scene.prompt, 550)}`,
-    pumpkinCarving ? "Nebenmotive: Mehrere kleine unmarkierte Kürbisschnitzwerkzeuge neben dem Kürbis, echte Kürbiskerne und Schalenreste auf dem Basteltisch, fertige geschnitzte Laternen im unscharfen Hintergrund. Keine Kinder, keine Backwaren oder Teigfiguren, keine Speisen, keine Küche, keine Funken und kein großes Küchenmesser. Keine exakte Abbildung oder Ausstattung des beworbenen Modells behaupten." : "",
+    pumpkinCarving ? "Nebenmotive: Kleine unmarkierte, als Kürbisschnitzwerkzeuge erkennbare Werkzeuge neben dem Kürbis, echte Kürbiskerne und Schalenreste auf dem Basteltisch, fertige geschnitzte Laternen im unscharfen Hintergrund. Die erwachsene Person arbeitet ausschließlich mit einem kleinen geeigneten Schnitzwerkzeug am Kürbis. Keine Essgabeln, Besteck oder küchenüblichen Utensilien als Schnitzwerkzeuge; keine Gabel in der Hand oder im Kürbis. Keine Kinder, keine Backwaren oder Teigfiguren, keine Speisen, keine Küche, keine Funken und kein großes Küchenmesser. Keine exakte Abbildung oder Ausstattung des beworbenen Modells behaupten." : "",
     "Grenzen: Keine Modellmerkmale, Zubehörteile oder Anwendungsschritte erfinden; ohne verifizierte Fakten nur die Produktkategorie zeigen. Keine Logos, Händlerbilder, Schrift im Bild oder irreführende Produktdarstellung.",
   ].filter(Boolean).join("\n");
 }
