@@ -97,6 +97,9 @@ export async function POST(request: Request) {
       })) continue;
       if (await processOperatorInstruction({ ...message, payload }, { sendApproval: sendDailyApproval })) continue;
       const result = await repo.applyIncomingWhatsApp({ ...message, payload });
+      if (result.handled && result.intent === "link_blocked") {
+        await sendWhatsAppText("Die alte Inhaltsfreigabe ist gesperrt: Der Amazon-Produktlink ist nicht mehr sicher verifiziert. Es wurde kein Bild gekauft und nichts veröffentlicht. Sende „Artikelsuche“ für einen neuen geprüften Artikel.");
+      }
       if(result.handled && result.intent==="approve" && ("productionRunId" in result || ("platform" in result && result.platform==="instagram")))keepPolling=true;
       console.info(JSON.stringify({ event: "whatsapp_approval_message", messageId: message.id, handled: result.handled, reason: "reason" in result ? result.reason : undefined, intent: "intent" in result ? result.intent : undefined }));
       if (result.handled && "weeklyReportWeekStart" in result && typeof result.weeklyReportWeekStart === "string") {

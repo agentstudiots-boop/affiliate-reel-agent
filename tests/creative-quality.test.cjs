@@ -7,6 +7,20 @@ const {evaluateImageCreativeQuality}=require('../.test-build/lib/content/creativ
 const {imageProviderStatus,getOriginalVisualProvider}=require('../.test-build/lib/content/image-provider');
 const {runContentJob,reviseApprovedVideo}=require('../.test-build/lib/content/orchestrator');
 const {pumpkinCreativeIssues}=require('../.test-build/lib/content/category');
+
+test('long tortilla listing uses a concrete press scene rather than SEO keywords',async()=>{
+  const name='Elektrische Tortillapresse für den gewerblichen Gebrauch, Tortilla-Maschine, Fladenbrotpresse, Tortilla-Presse, Mehl-Tortilla-Presse, automatische Maistortilla-Pressen'.slice(0,160);
+  const opportunity={product:{name,productVerifiedName:name,productVerifiedAt:new Date().toISOString(),sourceUrl:'https://www.amazon.de/dp/B000000001',affiliateUrl:'',price:'',targetGroup:'Hobbyköche',benefits:'Vor dem Kauf die Anwendung prüfen.',notes:''},
+    category:'household',targetPlatform:'facebook',useCase:'Das konkrete Alltagsproblem und die Anwendung in einer kurzen Vorher-Nachher-Sequenz zeigen.',goal:'education',budget:'low',verifiedFacts:[]};
+  const job=await require('../.test-build/lib/content/orchestrator').runContentJob(opportunity,{allowedFormats:['image']});
+  assert.equal(job.status,'awaiting_approval',JSON.stringify(job.review));
+  assert.match(job.content.caption,/Tortillas selbst formen/);
+  assert.doesNotMatch(job.content.caption,/gewerblichen Gebrauch|Fladenbrotpresse/);
+  assert.match(job.content.slides[0].visual,/Teigportion|Teigkugel/);
+  const generic=structuredClone(job.content);
+  generic.visualConcept.everydaySituation='Das konkrete Alltagsproblem und die Anwendung in einer kurzen Vorher-Nachher-Sequenz zeigen.';
+  assert.match(require('../.test-build/lib/content/creative-quality').evaluateImageCreativeQuality(generic).issues.join(' '),/tatsächliche Handlung/);
+});
 const {readerCopy}=require('../.test-build/lib/content/editorial-copy');
 const {analyzeProductInspiration}=require('../.test-build/lib/content/product-inspiration');
 const {textAgent}=require('../.test-build/lib/content/agents/text');

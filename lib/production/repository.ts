@@ -1,5 +1,5 @@
 import { confirmLanguageExample } from "../whatsapp/language-memory";
-import { requireJobProduct } from "../content/product-contract";
+import { requireJobProduct, jobProductError } from "../content/product-contract";
 import { randomBytes } from "node:crypto";
 import { parseJob } from "../content/history";
 import { getDatabase, type Database } from "../memory/db";
@@ -340,7 +340,19 @@ export function productionRepository(db: Database = getDatabase()) {
             const stored = await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE", [daily.job_id]);
             if (!stored.rows[0]) throw new ProductionConflictError("Tages-Content-Job fehlt.");
             const job = parseJob(stored.rows[0].snapshot);
-        requireJobProduct(job);
+            if (jobProductError(job)) {
+              job.status="needs_input"; job.error="product_unresolved"; job.updatedAt=new Date().toISOString();
+              const event={sequence:job.events.length+1,at:job.updatedAt,agent:"orchestrator" as const,
+                kind:"decision" as const,message:"Nicht erreichbarer oder nicht mehr verifizierter Produktlink. Alte Freigabe gesperrt; keine Bildproduktion."};
+              job.events.push(event);
+              await sql.query("UPDATE content_jobs SET status='needs_input',snapshot=$2,event_sequence=$3,updated_at=$4 WHERE id=$1",[job.id,JSON.stringify(job),event.sequence,job.updatedAt]);
+              await sql.query("INSERT INTO job_events(job_id,sequence,agent,kind,occurred_at,payload) VALUES($1,$2,$3,$4,$5,$6)",
+                [job.id,event.sequence,event.agent,event.kind,event.at,JSON.stringify(event)]);
+              await sql.query("UPDATE daily_drafts SET status='needs_input',feedback='product_unresolved',updated_at=now() WHERE job_id=$1",[job.id]);
+              await sql.query("UPDATE whatsapp_events SET intent='reject' WHERE message_id=$1",[input.id]);
+              return {handled:true as const,intent:"link_blocked" as const,dailyJobId:String(job.id)};
+            }
+            requireJobProduct(job);
             if (job.status !== "awaiting_approval") throw new ProductionConflictError("Tagesentwurf wurde bereits verändert.");
             await confirmLanguageExample(sql,job,input.from,input.id);
             job.status = "approved"; job.updatedAt = new Date().toISOString();

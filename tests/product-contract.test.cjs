@@ -2,7 +2,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {PGlite}=require('@electric-sql/pglite');
 const {amazonProduct,createAmazonAffiliateUrl,bindAmazonProduct,productIdentityError}=require('../.test-build/lib/amazon');
-const {resolveAmazonProduct,findAmazonProduct,reuseRecentProductIdentity}=require('../.test-build/lib/product-resolver');
+const {resolveAmazonProduct,findAmazonProduct,verifyAmazonProductPage,reuseRecentProductIdentity}=require('../.test-build/lib/product-resolver');
 const {runContentJob}=require('../.test-build/lib/content/orchestrator');
 const {opportunitySchema}=require('../.test-build/lib/content/schema');
 const {memoryRepository}=require('../.test-build/lib/memory/repository');
@@ -28,13 +28,26 @@ test('accepts only concrete Amazon detail pages; rejects searches, categories, b
 test('exact product resolution uses matching Amazon evidence and preserves the existing configured tracking ID',async t=>{
   const previous=process.env.AMAZON_ASSOCIATE_TAG;process.env.AMAZON_ASSOCIATE_TAG='existing-test-21';t.after(()=>{if(previous===undefined)delete process.env.AMAZON_ASSOCIATE_TAG;else process.env.AMAZON_ASSOCIATE_TAG=previous;});
   const evidence=async()=>[{id:'fixture',title:'Kuscheldecke Modell X : Amazon.de: Küche, Haushalt & Wohnen',url:source,content:'No specifications verified'}];
-  const resolved=await resolveAmazonProduct({...product(),productVerifiedAt:'forged'},evidence);
+  const live=async()=> 'Kuscheldecke Modell X';
+  const resolved=await resolveAmazonProduct({...product(),productVerifiedAt:'forged'},evidence,live);
   assert.equal(resolved.name,'Kuscheldecke Modell X');assert.equal(resolved.asin,'B000000001');
   assert.equal(resolved.trackingId,'existing-test-21');assert.equal(resolved.affiliateUrl,source+'?tag=existing-test-21');
   assert.equal(resolved.price,'');assert.ok(Date.parse(resolved.productVerifiedAt));assert.equal(productIdentityError(resolved),null);
-  await assert.rejects(resolveAmazonProduct({...product(),name:'Netzwerkswitch'},evidence),/product_unresolved/);
+  await assert.rejects(resolveAmazonProduct({...product(),name:'Netzwerkswitch'},evidence,live),/product_unresolved/);
   await assert.rejects(resolveAmazonProduct(product(),async()=>[{title:'Amazon Suche',url:'https://www.amazon.de/s?k=Kuscheldecke'}]),/product_unresolved/);
   await assert.rejects(resolveAmazonProduct(product(),async()=>{throw Error('unavailable');}),/product_unresolved/);
+});
+
+test('indexed ASIN cannot stand in for a working product page',async()=>{
+  const html='<html><link rel="canonical" href="https://www.amazon.de/dp/B000000001"><span id="productTitle">Kuscheldecke Modell X</span></html>';
+  assert.equal(await verifyAmazonProductPage('B000000001',async()=>new Response(html)), 'Kuscheldecke Modell X');
+  await assert.rejects(verifyAmazonProductPage('B000000001',async()=>new Response('Not Found',{status:404})),/product_unresolved/);
+  await assert.rejects(verifyAmazonProductPage('B000000001',async()=>new Response('Robot Check /dp/B000000001 <span id="productTitle">Kuscheldecke Modell X</span>')),/product_unresolved/);
+  await assert.rejects(verifyAmazonProductPage('B000000001',async()=>new Response('<html>Amazon.de</html>')),/product_unresolved/);
+  const indexed=async()=>[{title:'Kuscheldecke Modell X : Amazon.de',url:source}];
+  await assert.rejects(resolveAmazonProduct(product(),indexed,async()=>{throw Error('Amazon page gone');}),/product_unresolved/);
+  const dead=bindAmazonProduct({...product(),sourceUrl:'https://www.amazon.de/dp/B0G2XQPG3N',asin:undefined,productUrl:undefined,affiliateUrl:'',productVerifiedName:'Kuscheldecke Modell X'});
+  assert.equal(productIdentityError(dead),'product_unresolved');
 });
 
 test('ASIN, affiliate link, name and verification evidence cannot refer to different products',()=>{
@@ -46,11 +59,13 @@ test('ASIN, affiliate link, name and verification evidence cannot refer to diffe
 test('recent verified identity for the exact ASIN survives a search outage but cannot cross products',async()=>{
   const old=await runContentJob(opportunity(product()));
   const db={query:async()=>({rows:[{snapshot:old}]})};
-  const match=await reuseRecentProductIdentity({...product(),name:'Kuscheldecke Modell'},db);
+  const live=async()=> 'Kuscheldecke Modell X';
+  const match=await reuseRecentProductIdentity({...product(),name:'Kuscheldecke Modell'},db,live);
   assert.equal(match.name,product().name);
-  assert.equal(match.productVerifiedAt,product().productVerifiedAt);
-  await assert.rejects(reuseRecentProductIdentity({...product(),name:'Andere Decke'},db),/product_unresolved/);
-  await assert.rejects(reuseRecentProductIdentity({...product(),sourceUrl:'https://www.amazon.de/dp/B000000002',affiliateUrl:'',asin:undefined,productUrl:undefined},db),/product_unresolved/);
+  assert.ok(Date.parse(match.productVerifiedAt)>=Date.parse(product().productVerifiedAt));
+  await assert.rejects(reuseRecentProductIdentity({...product(),name:'Andere Decke'},db,live),/product_unresolved/);
+  await assert.rejects(reuseRecentProductIdentity({...product(),sourceUrl:'https://www.amazon.de/dp/B000000002',affiliateUrl:'',asin:undefined,productUrl:undefined},db,live),/product_unresolved/);
+  await assert.rejects(reuseRecentProductIdentity({...product(),name:'Kuscheldecke Modell'},db,async()=>{throw Error('listing gone');}),/product_unresolved/);
 });
 
 test('unresolved content is saved as needs_input with no affiliate link and no specialist or approval',async t=>{
@@ -107,6 +122,19 @@ test('the legacy unbound paid clip endpoint cannot bypass product identity and c
 });
 
 test('a seasonal category idea resolves to one actual named product without turning its research query into a link',async()=>{
-  const resolved=await findAmazonProduct('Wärmende Kuscheldecke','Kuscheldecke Herbst','Haushalte',async()=>[{id:'fixture',title:'Kuscheldecke Modell X : Amazon.de: Wohnen',url:source,content:''}]);
+  const resolved=await findAmazonProduct('Wärmende Kuscheldecke','Kuscheldecke Herbst','Haushalte',async()=>[{id:'fixture',title:'Kuscheldecke Modell X : Amazon.de: Wohnen',url:source,content:''}],async()=> 'Kuscheldecke Modell X');
   assert.equal(resolved.name,'Kuscheldecke Modell X');assert.equal(resolved.asin,'B000000001');assert.equal(productIdentityError(resolved),null);
+});
+
+test('scout skips an indexed but dead first listing and checks the next matching page',async()=>{
+  const next='https://www.amazon.de/dp/B000000002';
+  const resolved=await findAmazonProduct('Kuscheldecke','Kuscheldecke Herbst','Haushalte',async()=>[
+    {id:'stale',title:'Kuscheldecke Modell X',url:source,content:''},
+    {id:'current',title:'Kuscheldecke Modell Y',url:next,content:''},
+  ],async asin=>{
+    if(asin==='B000000001')throw Error('gone');
+    return 'Kuscheldecke Modell Y';
+  });
+  assert.equal(resolved.asin,'B000000002');
+  assert.equal(resolved.affiliateUrl.includes('/dp/B000000002?tag='),true);
 });
