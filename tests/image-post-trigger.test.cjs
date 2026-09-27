@@ -29,3 +29,28 @@ test('WhatsApp starts each explicit image post once, while replies stay with the
   assert.equal(await startImagePostFromWhatsApp({...message,id:'wamid.bad',body:'Bildpost example.com'},()=>db,start,send),true);
   assert.equal(calls.length,1); assert.match(messages[0],/Bitte sende/);
 });
+
+test('standalone natural product-search requests start TrendScout drafts without consuming approval replies', async t => {
+  for (const phrase of ['Neue Artikelsuche', 'bitte neue Produktsuche!', 'Starte eine neue Trendsuche', 'Such mir einen neuen Artikel', 'Finde ein neues Produkt', 'Ein neues Produkt suchen']) {
+    assert.deepEqual(imagePostCommand(phrase), { product: undefined, invalid: false });
+  }
+  for (const phrase of ['Ändere den Text für den neuen Artikel', 'Suche für den bestehenden Post ein neues Bild', 'Neue Artikelsuche für das freigegebene Bild']) {
+    assert.equal(imagePostCommand(phrase), null);
+  }
+  const pg = new PGlite(); t.after(() => pg.close());
+  await pg.exec(fs.readFileSync('db/migrations/001_memory.sql','utf8'));
+  await pg.exec(fs.readFileSync('db/migrations/002_production_gates.sql','utf8'));
+  const prior = process.env.WHATSAPP_APPROVER_WA_ID;
+  process.env.WHATSAPP_APPROVER_WA_ID = '491234';
+  t.after(() => { if (prior === undefined) delete process.env.WHATSAPP_APPROVER_WA_ID; else process.env.WHATSAPP_APPROVER_WA_ID = prior; });
+  const calls = [];
+  const start = async (...args) => { calls.push(args); return { status:'awaiting_approval', jobId:'new-job', whatsapp:'approval_sent' }; };
+  const message = { id:'wamid.search.1', from:'491234',body:'Neue Artikelsuche',replyToMessageId:null,payload:{} };
+  const db = { query: (sql,values) => pg.query(sql,values) };
+  assert.equal(await startImagePostFromWhatsApp(message,()=>db,start,async()=>''),true);
+  assert.equal(await startImagePostFromWhatsApp(message,()=>db,start,async()=>''),true);
+  assert.equal(calls.length,1);
+  assert.equal(calls[0][2],undefined);
+  assert.equal(await startImagePostFromWhatsApp({...message,id:'wamid.search.reply',replyToMessageId:'wamid.approval'},()=>db,start,async()=>''),false);
+  assert.equal(calls.length,1);
+});

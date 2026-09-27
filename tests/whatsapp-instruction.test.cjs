@@ -17,6 +17,7 @@ const {opportunitySchema}=require('../.test-build/lib/content/schema');
 const {applyMigrations}=require('../.test-build/lib/memory/migrations');
 const {memoryRepository}=require('../.test-build/lib/memory/repository');
 const {publicationRepository}=require('../.test-build/lib/meta/publication-gate');
+const {facebookPagePublicationError}=require('../.test-build/lib/meta/publication-eligibility');
 const {productionRepository}=require('../.test-build/lib/production/repository');
 const scene='Geschnitzte Halloween-Kürbisse mit Schnitzwerkzeugen des Kürbisschnitzsets und Halloween-Dekoration.';
 const opportunity=()=>opportunitySchema.parse({product:{name:'YAVOCOS Kürbis Schnitzset',productVerifiedName:'YAVOCOS Kürbis Schnitzset',productVerifiedAt:'2026-09-26T08:00:00Z',sourceUrl:'https://www.amazon.de/dp/B0D9YQR9CT',affiliateUrl:'https://www.amazon.de/dp/B0D9YQR9CT?tag=alltaeglichle-21',price:'',targetGroup:'Halloween-Bastler',benefits:'Herstellerangaben prüfen',notes:''},useCase:scene,targetPlatform:'facebook',budget:'low'});
@@ -132,6 +133,19 @@ test('combined pumpkin revision constrains the next image prompt',async()=>{
 test('a new pumpkin plan starts with pumpkin carving as the dominant visible action',async()=>{
   const job=await runContentJob(opportunity(),{allowedFormats:['image']});
   assert.match(job.content.slides[0].visual,/Halloween-Kürbis mit eingeschnittenem Gesicht füllt den Vordergrund/);
+  assert.match(job.content.hook,/Kürbislaterne/);
+  assert.match(job.content.caption,/Kürbis aushöhlen/);
+  assert.doesNotMatch(job.content.caption,/Raum und.*Alltag|Maße und Pflege/i);
+  assert.equal(facebookPagePublicationError({...job,status:'approved'}),null);
+  const stale=structuredClone(job);
+  stale.status='approved';
+  stale.content.hook='Passt Kürbisschnitzwerkzeuge zu deinem Anwendungsfall?';
+  stale.content.caption='Werbung | Beim Einrichten zählt, wie Kürbisschnitzwerkzeuge in deinen Raum und deinen Alltag passt.';
+  assert.match(facebookPagePublicationError(stale),/Begleittext.*Halloween/);
+  const corrected=reviseOperatorInstruction(stale,instruction('revise_text'));
+  assert.match(corrected.content.hook,/Kürbislaterne/);
+  assert.match(corrected.content.caption,/Kürbis aushöhlen/);
+  assert.doesNotMatch(corrected.content.caption,/Raum und.*Alltag/);
   const prompt=buildOriginalVisualPrompt(job);
   assert.match(prompt,/Eine erwachsene Person schnitzt gerade/);
   assert.match(prompt,/Kürbis und Schnitzhandlung müssen stärker auffallen/);

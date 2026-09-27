@@ -18,6 +18,10 @@ Produkt; der Orchestrator bindet erst nach Prüfung des genauen Amazon-Titels
 einen Affiliate-Link an dieselbe ASIN. Jeder Start ist an Absender und
 Message-ID gebunden, sodass Meta-Zweitzustellungen keinen zweiten Auftrag
 auslösen. Der Befehl darf nicht als Antwort auf eine Freigabenachricht stehen.
+Auch eine eigenständige Nachricht **`Neue Artikelsuche`**, **`Neue Produktsuche`**
+oder **`Such mir einen neuen Artikel`** startet eine neue TrendScout-Suche;
+diese eindeutigen Befehle brauchen keinen Sprachmodellaufruf. Eine Suche kann
+am selben Tag erneut denselben Produktkandidaten finden.
 Bei mehreren offenen Freigaben immer direkt auf die betreffende WhatsApp
 antworten. Änderungswünsche bleiben bis zur ausdrücklichen Freigabe möglich.
 
