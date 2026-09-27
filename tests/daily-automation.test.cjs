@@ -68,3 +68,39 @@ test('revised Halloween approval stays within WhatsApp text limits and shows the
   assert.match(body,/Keine Essgabeln/);
   assert.match(body,/Affiliate-Link|Produktlink/);
 });
+
+test('a named WhatsApp search reaches TrendScout and can draft only a verified matching product',async t=>{
+  const pg=new PGlite();t.after(()=>pg.close());
+  for(const name of fs.readdirSync('db/migrations').filter(n=>n.endsWith('.sql')).sort())await pg.exec(fs.readFileSync(`db/migrations/${name}`,'utf8'));
+  const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
+  const previous=process.env.WHATSAPP_APPROVER_WA_ID;process.env.WHATSAPP_APPROVER_WA_ID='491234';
+  t.after(()=>{if(previous===undefined)delete process.env.WHATSAPP_APPROVER_WA_ID;else process.env.WHATSAPP_APPROVER_WA_ID=previous;});
+  await db.query("INSERT INTO whatsapp_events(message_id,wa_id,body,payload) VALUES('named-search','491234','Artikelsuche Saugroboter','{}')");
+  const searches=[],messages=[];
+  const product={name:'Saugroboter Modell R',productVerifiedName:'Saugroboter Modell R',productVerifiedAt:new Date().toISOString(),
+    sourceUrl:'https://www.amazon.de/dp/B0ABCD1234',affiliateUrl:'https://www.amazon.de/dp/B0ABCD1234?tag=alltaeglichle-21',
+    price:'',targetGroup:'Haushalte',benefits:'Eignung vor Kauf prüfen',notes:''};
+  const candidates=[{name:'Kürbis-Schnitzwerkzeug-Set',kind:'Saisontrend',category:'Halloween',searchQuery:'Kürbis-Schnitzwerkzeug-Set',reelIdea:'Kürbislaterne basteln',targetGroup:'Familien',whyNow:'Halloween'},
+    {name:'Saugroboter',kind:'Dauerläufer',category:'Haushalt',searchQuery:'Saugroboter',resolvedProduct:product,
+      reelIdea:'Ein Saugroboter reinigt den Boden in einer Wohnung; vor dem Kauf Einsatzbereich und Herstellerangaben prüfen.',
+      targetGroup:'Haushalte',whyNow:'Gezielte Suche, kein belegter Trend.'}];
+  const daily=loadRoute('lib/daily/draft.ts',{
+    '@/lib/orchestrator':{runContentJob:require('../.test-build/lib/content/orchestrator').runContentJob,
+      runProductScout:async query=>{searches.push(query);return {candidates,sources:[]};}},
+    '@/lib/memory/db':{getDatabase:()=>db},
+    '@/lib/whatsapp/client':{sendWhatsAppText:async body=>{messages.push(body);return 'wamid.search.approval';},
+      dailyNotificationTemplateConfigured:()=>false,sendDailyNotificationTemplate:async()=>{throw Error('unexpected template');}},
+  });
+  const found=await daily.createDailyDraft('2026-09-27','manual:search-robot',undefined,'Saugroboter');
+  assert.deepEqual(searches,['Saugroboter']);
+  assert.equal(found.status,'awaiting_approval');
+  const jobs=(await db.query('SELECT snapshot FROM content_jobs')).rows;
+  assert.equal(jobs.length,1);assert.equal(jobs[0].snapshot.opportunity.product.name,product.name);
+  assert.equal(jobs[0].snapshot.opportunity.product.asin,'B0ABCD1234');
+  assert.equal(messages.length,1);assert.match(messages[0],/Saugroboter Modell R/);
+  assert.equal((await daily.createDailyDraft('2026-09-27','manual:search-robot',undefined,'Saugroboter')).status,'already_claimed');
+  const missing=await daily.createDailyDraft('2026-09-27','manual:search-missing',undefined,'Wäschetrockner');
+  assert.equal(missing.status,'needs_input');assert.equal(missing.reason,'product_unresolved');
+  assert.equal((await db.query('SELECT count(*)::int AS n FROM content_jobs')).rows[0].n,1);
+  assert.equal(messages.length,1);
+});

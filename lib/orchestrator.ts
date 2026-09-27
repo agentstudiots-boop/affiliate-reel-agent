@@ -10,8 +10,8 @@ function webSources(sources: Awaited<ReturnType<typeof scoutProducts>>["sources"
     .map((source) => ({ title: source.title, url: source.url }));
 }
 
-export async function runProductScout() {
-  const result = await scoutProducts();
+export async function runProductScout(productSearch?: string) {
+  const result = await scoutProducts(productSearch);
   return {
     ...result.output,
     candidates: await Promise.all(result.output.candidates.map(async candidate => {

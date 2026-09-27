@@ -6,12 +6,21 @@ import { createHash } from "node:crypto";
 
 // Only standalone, unambiguous requests start a new search. Replies always
 // remain corrections or decisions for the message they reference.
-export function imagePostCommand(body: string) {
+type ImagePostCommand={product?:string;search?:string;invalid:boolean};
+export function imagePostCommand(body: string):ImagePostCommand|null {
   const text = body.trim().replace(/[.!?]+$/, "").replace(/\s+/g, " ");
   if (/^(?:bitte )?(?:(?:starte|mach|mache) )?(?:eine )?neue (?:artikel|produkt|trend)suche$/i.test(text)
     || /^(?:bitte )?(?:suche|such|finde) (?:mir )?(?:einen neuen artikel|ein neues produkt)$/i.test(text)
     || /^(?:bitte )?(?:einen neuen artikel|ein neues produkt) suchen$/i.test(text)) {
     return { product: undefined, invalid: false };
+  }
+  const targeted=text.match(/^(?:bitte\s+)?(?:(?:starte|mach|mache)\s+)?(?:eine?\s+)?(?:neue?\s+)?(?:artikel|produkt)suche(?:\s*[:–-]\s*|\s+)(.+)$/i);
+  if(targeted){
+    const search=targeted[1].trim().replace(/^\(/,'').replace(/^produktname\s*[:–-]?\s*/i,'').replace(/^für\s+/i,'').replace(/\)$/, '').trim();
+    if(/\b(?:freigabe\w*|freigegeben\w*|bestehend\w*|änderung\w*|korrektur\w*|post|bild|beitrag|entwurf)\b/i.test(search))return null;
+    return search.length>=3 && search.length<=90 && search.split(' ').length<=8
+      && /^[\p{L}\p{N}][\p{L}\p{N}\s.,+&-]*$/u.test(search)
+      ? {product:undefined,search,invalid:false}:{product:undefined,invalid:true};
   }
   const match = text.match(/^bildpost(?:\s+(.*))?$/i);
   if (!match) return null;
@@ -34,14 +43,16 @@ export async function startImagePostFromWhatsApp(input: IncomingWhatsAppMessage 
   );
   if (!claim.rows.length) return true;
   if (command.invalid) {
-    await send("Bitte sende „Bildpost“ für eine Produktauswahl oder „Bildpost B0…“ mit einer konkreten ASIN beziehungsweise „Bildpost https://www.amazon.de/dp/ASIN“. Es wurde nichts gestartet.");
+    await send("Bitte sende „Artikelsuche Saugroboter“ mit einer Produktart oder „Bildpost B0…“ mit einer konkreten ASIN. Es wurde nichts gestartet.");
     return true;
   }
   const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const slot = `manual:${createHash("sha256").update(input.id).digest("hex")}`;
-  const result = await start(day, slot, command.product);
+  const result = await start(day, slot, command.product, command.search);
   if (result.status === "failed" || result.status === "needs_input") {
-    await send(`Bildpost-Auftrag ${result.jobId} konnte noch nicht freigabefähig geplant werden. Bitte Produkt und verifizierte Amazon-ASIN prüfen. Es wurde kein Bild gekauft und nichts veröffentlicht.`);
+    await send(command.search
+      ? `Trendscout-Suche nach „${command.search}“: Es konnte noch kein eindeutig passendes Amazon-Produkt verifiziert und als Bildpost geplant werden. Bitte mit einem genaueren Produktnamen oder einer ASIN erneut suchen. Kein Bild gekauft und nichts veröffentlicht.`
+      : `Bildpost-Auftrag ${result.jobId} konnte noch nicht freigabefähig geplant werden. Bitte Produkt und verifizierte Amazon-ASIN prüfen. Es wurde kein Bild gekauft und nichts veröffentlicht.`);
   } else if (result.status === "awaiting_approval" && result.whatsapp !== "approval_sent") {
     await send(`Bildpost-Entwurf ${result.jobId} ist gespeichert, die Freigabenachricht konnte noch nicht zugestellt werden. Kein Bild gekauft und nichts veröffentlicht.`);
   }

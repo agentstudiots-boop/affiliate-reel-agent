@@ -78,9 +78,10 @@ export function berlinDay(now = new Date()) {
 
 // Each scheduled slot or explicit operator message has its own durable claim.
 // A retry of that slot/message never buys a second search or sends another approval.
-export async function createDailyDraft(day = berlinDay(), slot = "morning", productQuery?: string) {
+export async function createDailyDraft(day = berlinDay(), slot = "morning", productQuery?: string, productSearch?: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error("Ungültiger Tag.");
   if (!/^(morning|afternoon|manual:[A-Za-z0-9._:-]{1,160})$/.test(slot)) throw new Error("Ungültiger Auslöser.");
+  if(productSearch && (productQuery || productSearch.length>90 || !/^[\p{L}\p{N}][\p{L}\p{N}\s.,+&-]*$/u.test(productSearch)))throw Error("Ungültiger Suchbegriff.");
   const db = getDatabase();
   await ensureAutomationSchema(db);
   const jobId = crypto.randomUUID();
@@ -91,14 +92,21 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
   if (!claim.rows.length) return { status: "already_claimed" as const };
 
   try {
-    const report = productQuery ? null : await runProductScout();
+    const report = productQuery ? null : await runProductScout(productSearch);
     // A seasonal idea becomes affiliate content only after exact product resolution.
-    const candidates = report?.candidates.filter(candidate => candidate.kind === "Saisontrend") || [];
-    if (!productQuery && !candidates.length) throw new Error("Kein saisonaler Kandidat verfügbar.");
+    const candidates = report?.candidates.filter(candidate => productSearch
+      ? candidate.searchQuery.toLocaleLowerCase("de-DE")===productSearch.toLocaleLowerCase("de-DE")
+      : candidate.kind === "Saisontrend") || [];
+    if (!productQuery && !productSearch && !candidates.length) throw new Error("Kein saisonaler Kandidat verfügbar.");
     const resolved = candidates.filter(candidate => candidate.resolvedProduct);
+    if(productSearch && !resolved.length){
+      await db.query("UPDATE daily_drafts SET status='needs_input',scout_report=$2,updated_at=now() WHERE job_id=$1",
+        [jobId,JSON.stringify({requestedSearch:productSearch,report,reason:'product_unresolved'})]);
+      return {status:'needs_input' as const,jobId,reason:'product_unresolved' as const,searchTerm:productSearch};
+    }
     const pool = resolved.length ? resolved : candidates;
-    const candidate = pool.length ? pool[(new Date(`${day}T00:00:00Z`).getUTCDate() + (slot === "afternoon" ? 1 : 0)) % pool.length] : null;
-    await db.query("UPDATE daily_drafts SET status='planning',scout_report=$2,updated_at=now() WHERE job_id=$1", [jobId, JSON.stringify(report || { requestedProduct: productQuery })]);
+    const candidate = productSearch ? resolved[0] : pool.length ? pool[(new Date(`${day}T00:00:00Z`).getUTCDate() + (slot === "afternoon" ? 1 : 0)) % pool.length] : null;
+    await db.query("UPDATE daily_drafts SET status='planning',scout_report=$2,updated_at=now() WHERE job_id=$1", [jobId, JSON.stringify(report ? {requestedSearch:productSearch,report}: { requestedProduct: productQuery })]);
     const requestedProduct = productQuery ? await resolveRequestedProduct(productQuery) : null;
     const opportunity: Opportunity = {
       product: requestedProduct || candidate?.resolvedProduct || { name: candidate!.name, sourceUrl: "https://www.amazon.de/", affiliateUrl: "",
