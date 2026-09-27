@@ -1,0 +1,98 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const {PGlite}=require('@electric-sql/pglite');
+const {applyMigrations}=require('../.test-build/lib/memory/migrations');
+const dbModule=require('../.test-build/lib/memory/db');
+const whatsapp=require('../.test-build/lib/whatsapp/client');
+const {memoryRepository}=require('../.test-build/lib/memory/repository');
+const {productionRepository}=require('../.test-build/lib/production/repository');
+const {runContentJob}=require('../.test-build/lib/content/orchestrator');
+const {opportunitySchema}=require('../.test-build/lib/content/schema');
+const {requestContentApproval,handleContentApproval,hasContentApproval,revisePendingVideoCaption}=require('../.test-build/lib/whatsapp/content-approval');
+
+test('operator caption correction revokes the exact pending WhatsApp approval and resends human copy',async t=>{
+  const pg=new PGlite();t.after(()=>pg.close());
+  const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
+  await applyMigrations(db);
+  t.mock.method(dbModule,'getDatabase',()=>db);
+  const old=process.env.WHATSAPP_APPROVER_WA_ID;process.env.WHATSAPP_APPROVER_WA_ID='491234';
+  t.after(()=>{if(old===undefined)delete process.env.WHATSAPP_APPROVER_WA_ID;else process.env.WHATSAPP_APPROVER_WA_ID=old;});
+  const sent=[];t.mock.method(whatsapp,'sendWhatsAppText',async body=>{sent.push(body);return `wamid.caption.${sent.length}`;});
+  const memory=memoryRepository(db),id=crypto.randomUUID();
+  const opportunity=opportunitySchema.parse({product:{name:'YAVOCOS Kürbis Schnitzset',productVerifiedName:'YAVOCOS Kürbis Schnitzset',productVerifiedAt:'2026-09-26T08:00:00.000Z',sourceUrl:'https://www.amazon.de/dp/B0D9YQR9CT',affiliateUrl:'',price:'',targetGroup:'Halloween-Bastler',benefits:'Produktdetails prüfen',notes:''},useCase:'Ein Kind zeichnet das Gesicht auf einen echten Kürbis, ein Erwachsener schnitzt, das Kind schöpft Kerne aus.',category:'home_living',targetPlatform:'instagram',budget:'quality'});
+  await memory.claim(id,opportunity,'reference');
+  const draft=await runContentJob(opportunity,{id,allowedFormats:['video'],onUpdate:memory.save});
+  await db.query("INSERT INTO whatsapp_events(message_id,wa_id,body,payload) VALUES('wamid.open-caption','491234','Entwurf','{}')");
+  const first=await requestContentApproval(id);
+  const changed=await revisePendingVideoCaption(id);
+  assert.equal(changed.approvalSent,true);
+  assert.notEqual(changed.job.content.caption,draft.content.caption);
+  assert.match(changed.job.content.caption,/Erst die Idee für ein Kürbisgesicht/);
+  assert.doesNotMatch(changed.job.content.caption,/kein Testbericht|Werkzeugoption/);
+  assert.equal((await db.query('SELECT status FROM content_approval_requests WHERE id=$1',[first.id])).rows[0].status,'rejected');
+  assert.equal((await db.query("SELECT count(*)::int AS n FROM content_approval_requests WHERE job_id=$1 AND status='pending'",[id])).rows[0].n,1);
+  assert.equal((await db.query('SELECT count(*)::int AS n FROM production_runs')).rows[0].n,0);
+  assert.equal(await hasContentApproval(changed.job,db),false);
+});
+
+test('WhatsApp approves the exact finished script before any video production can be prepared',async t=>{
+  const pg=new PGlite();t.after(()=>pg.close());
+  const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
+  await applyMigrations(db);
+  t.mock.method(dbModule,'getDatabase',()=>db);
+  const old=process.env.WHATSAPP_APPROVER_WA_ID;process.env.WHATSAPP_APPROVER_WA_ID='491234';
+  t.after(()=>{if(old===undefined)delete process.env.WHATSAPP_APPROVER_WA_ID;else process.env.WHATSAPP_APPROVER_WA_ID=old;});
+  const sent=[];
+  t.mock.method(whatsapp,'sendWhatsAppText',async message=>{sent.push(message);return `wamid.content.${sent.length}`;});
+  const memory=memoryRepository(db),repo=productionRepository(db),id=crypto.randomUUID();
+  const opportunity=opportunitySchema.parse({product:{name:'YAVOCOS Kürbis Schnitzset',productVerifiedName:'YAVOCOS Kürbis Schnitzset',productVerifiedAt:'2026-09-26T08:00:00.000Z',sourceUrl:'https://www.amazon.de/dp/B0D9YQR9CT',affiliateUrl:'',price:'',targetGroup:'Halloween-Bastler',benefits:'Produktdetails prüfen',notes:''},useCase:'Ein Erwachsener schnitzt mit dem Werkzeug eine Halloween-Laterne.',category:'home_living',targetPlatform:'instagram',budget:'quality'});
+  await memory.claim(id,opportunity,'reference');
+  const draft=await runContentJob(opportunity,{id,allowedFormats:['video'],onUpdate:memory.save});
+  assert.equal(draft.status,'awaiting_approval');
+  await assert.rejects(repo.prepareVideo(id),/freigegeben/);
+  await db.query("INSERT INTO whatsapp_events(message_id,wa_id,body,payload) VALUES('wamid.open-window','491234','Entwurf','{}')");
+  const first=await requestContentApproval(id);
+  assert.match(sent[0],/Drehbuch/);
+  assert.match(sent[0],/Inhaltsfreigabe/);
+  assert.match(sent[0],/Affiliate-Produktlink \(als Text\): https:\/\/www\.amazon\.de\/dp\/B0D9YQR9CT\?tag=/);
+  assert.match(sent[0],/Keine Aktion im Content Studio nötig/);
+  assert.equal(await handleContentApproval({id:'wamid.unclear',from:'491234',body:'Bitte mach das irgendwie anders.',replyToMessageId:first.messageId,payload:{}}),true);
+  assert.match(sent.at(-1),/Bitte antworte mit deiner Präzisierung/);
+  const clarificationId=`wamid.content.${sent.length}`;
+  assert.equal((await handleContentApproval({id:'wamid.change',from:'491234',body:'Kinder dürfen beim Zeichnen des Kürbisgesichts dabei sein, die erwachsene Person schneidet.',replyToMessageId:clarificationId,payload:{}})),true);
+  const changed=(await memory.list()).find(job=>job.id===id);
+  assert.equal(changed.status,'awaiting_approval');
+  assert.match(changed.content.scenes.map(scene=>scene.visual).join(' '),/Kind/);
+  assert.equal(await hasContentApproval(changed,db),false);
+  assert.equal((await db.query("SELECT status FROM content_approval_requests WHERE id=$1",[first.id])).rows[0].status,'changes_requested');
+  const pending=await db.query("SELECT whatsapp_message_id FROM content_approval_requests WHERE job_id=$1 AND status='pending'",[id]);
+  assert.equal(pending.rows.length,1);
+  assert.equal((await handleContentApproval({id:'wamid.old',from:'491234',body:'Freigeben',replyToMessageId:first.messageId,payload:{}})),true);
+  await assert.rejects(repo.prepareVideo(id),/freigegeben/);
+  const corrections=[
+    'Der Begleittext klingt maschinell, bitte menschlicher schreiben.',
+    'Mach die erste Szene kürzer.',
+    'CTA weniger werblich formulieren.',
+  ];
+  let currentMessageId=pending.rows[0].whatsapp_message_id;
+  for(const [index,feedback] of corrections.entries()){
+    assert.equal(await handleContentApproval({id:`wamid.change.${index}`,from:'491234',body:feedback,replyToMessageId:currentMessageId,payload:{}}),true);
+    const next=(await memory.list()).find(job=>job.id===id);
+    assert.equal(next.status,'awaiting_approval');
+    assert.equal(next.revisions,index+2);
+    assert.equal(await hasContentApproval(next,db),false);
+    await assert.rejects(repo.prepareVideo(id),/freigegeben/);
+    const active=await db.query("SELECT whatsapp_message_id FROM content_approval_requests WHERE job_id=$1 AND status='pending'",[id]);
+    assert.equal(active.rows.length,1);
+    assert.notEqual(active.rows[0].whatsapp_message_id,currentMessageId);
+    currentMessageId=active.rows[0].whatsapp_message_id;
+  }
+  assert.equal(await handleContentApproval({id:'wamid.old-again',from:'491234',body:'Freigabe',replyToMessageId:first.messageId,payload:{}}),true);
+  assert.equal(await handleContentApproval({id:'wamid.latest',from:'491234',body:'Freigabe',replyToMessageId:currentMessageId,payload:{}}),true);
+  const approved=(await memory.list()).find(job=>job.id===id);
+  assert.equal(approved.status,'approved');
+  assert.equal(approved.revisions,4);
+  assert.equal(await hasContentApproval(approved,db),true);
+  assert.equal((await repo.prepareVideo(id)).run.status,'needs_provider_quote');
+  assert.equal((await db.query('SELECT count(*)::int AS n FROM production_runs')).rows[0].n,1);
+});

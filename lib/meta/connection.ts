@@ -18,6 +18,42 @@ export function metaConfig(): MetaConfig {
     pageName:process.env.META_PAGE_NAME || "Alltäglich leichter",instagramUsername:process.env.META_INSTAGRAM_USERNAME || "alltaeglich.leichter",
     systemUserName:process.env.META_SYSTEM_USER_NAME || "affiliatecontentsystem" };
 }
+
+// A successful account read does not prove the Page photo endpoint can publish.
+// Meta requires a Page access token for that endpoint. Keep the token server-side.
+export async function pagePublishingToken(pageId: string, config: MetaConfig = metaConfig(), transport: typeof fetch = fetch): Promise<
+  { status: "ready"; source: "configured" | "derived"; token: string } |
+  { status: "missing" | "invalid" | "unavailable"; source: "configured" | "derived"; code?: number; subcode?: number; httpStatus?: number }
+> {
+  if (!/^\d+$/.test(pageId)) return {status:"invalid",source:"derived"};
+  const version=config.version || "v25.0";
+  const configured=process.env.META_PAGE_ACCESS_TOKEN?.trim();
+  const source=configured?"configured" as const:"derived" as const;
+  let token=configured;
+  if (!token) {
+    if (!config.token) return {status:"missing",source};
+    const url=new URL(`https://graph.facebook.com/${version}/${pageId}`);
+    url.searchParams.set("fields","id,access_token");
+    let response:Response;
+    try {response=await transport(url,{method:"GET",headers:{Authorization:`Bearer ${config.token}`},cache:"no-store",redirect:"error",signal:AbortSignal.timeout(8000)});}
+    catch{return {status:"unavailable",source};}
+    let body:{id?:string;access_token?:string;error?:{code?:number;error_subcode?:number}};
+    try{body=await response.json() as typeof body;}
+    catch{return {status:"unavailable",source,httpStatus:response.status};}
+    if(!response.ok||body.error)return {status:"unavailable",source,httpStatus:response.status,code:body.error?.code,subcode:body.error?.error_subcode};
+    token=body.id===pageId?body.access_token?.trim():undefined;
+    if(!token)return {status:"missing",source};
+  }
+  let response:Response;
+  try {response=await transport(`https://graph.facebook.com/${version}/me?fields=id`,{method:"GET",headers:{Authorization:`Bearer ${token}`},cache:"no-store",redirect:"error",signal:AbortSignal.timeout(8000)});}
+  catch{return {status:"unavailable",source};}
+  let body:{id?:string;error?:{code?:number;error_subcode?:number}};
+  try{body=await response.json() as typeof body;}
+  catch{return {status:"unavailable",source,httpStatus:response.status};}
+  if(!response.ok||body.error)return {status:"invalid",source,httpStatus:response.status,code:body.error?.code,subcode:body.error?.error_subcode};
+  if(body.id!==pageId)return {status:"invalid",source};
+  return {status:"ready",source,token};
+}
 export async function checkMetaConnection(config:MetaConfig, transport: typeof fetch = fetch): Promise<MetaReport> {
   const version=config.version || "v25.0";
   const report:MetaReport={status:"service_unavailable",message:"Verbindung nicht geprüft.",checkedAt:new Date().toISOString(),connectionOk:false,publishingReadCheck:false,
@@ -65,7 +101,7 @@ export async function checkMetaConnection(config:MetaConfig, transport: typeof f
       report.steps.push({stage,result:permissions?"ok":"unknown"});
     }catch(error){if(fatal(error))throw error;report.steps.push({stage,result:"unknown"});}
     // Do not infer missing scopes from an unsupported permission-list edge.
-    if(permissions)report.missingPermissions=["instagram_basic","pages_read_engagement","instagram_content_publish"].filter(p=>!permissions!.has(p));
+    if(permissions)report.missingPermissions=["instagram_basic","pages_read_engagement","instagram_content_publish","pages_manage_posts"].filter(p=>!permissions!.has(p));
     stage="page_discovery";
     let pageId=config.pageId;
     if(!pageId){

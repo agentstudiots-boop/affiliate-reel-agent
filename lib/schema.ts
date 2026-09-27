@@ -1,6 +1,12 @@
 import { z } from "zod";
 
 export const productSchema = z.object({
+  asin: z.string().optional(),
+  productUrl: z.string().optional(),
+  trackingId: z.string().optional(),
+  productVerifiedAt: z.string().optional(),
+  productVerifiedName: z.string().optional(),
+
   name: z.string().min(2).max(160),
   sourceUrl: z.string().url(),
   affiliateUrl: z.union([z.literal(""), z.string().url()]),

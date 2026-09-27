@@ -122,9 +122,9 @@ export function VideoStudio({ product, concept }: { product: Product; concept: R
   }
 
   return <section className="videoStudio">
-    <h3>Runway-Videostudio</h3>
-    <p className="videoNote">Der Agent erzeugt einen neutralen 10-Sekunden-Clip im Hochformat. Er bildet nicht zwingend das exakte Produktmodell ab. Auftrag und Download bleiben in diesem Browser gespeichert.</p>
-    {(!job || job.status === "NOT_STARTED") && <button className="primary" type="button" disabled={!ready || starting} onClick={createVideo}>{ready ? "Agent erstellt 10-Sekunden-Clip" : "Gespeicherten Auftrag laden …"}</button>}
+    <h3>Legacy-Runway-Teststudio</h3>
+    <p className="videoNote">Alter v0.1-Testpfad für einen einzelnen neutralen 10-Sekunden-Clip. Er setzt ein mehrszeniges Drehbuch nicht vollständig um und gehört nicht zum neuen Produktions-Gate.</p>
+    {(!job || job.status === "NOT_STARTED") && <button className="primary" type="button" disabled={!ready || starting} onClick={createVideo}>{ready ? "Legacy-Testclip starten (10 s)" : "Gespeicherten Auftrag laden …"}</button>}
     {job && !job.videoUrl && <p role="status">{starting ? "Video-Auftrag wird gestartet …" : job.taskId ? `Runway: ${job.status}` : job.status === "NOT_STARTED" ? "Kein Video gestartet. Nach Behebung der Ursache kannst du erneut starten." : "Start nicht bestätigt. Bitte in Runway prüfen, ob ein Auftrag angelegt wurde. Es wird kein zweiter Clip gestartet."}</p>}
     {job?.status === "STARTING" && !job.taskId && !starting && <button className="secondary" type="button" onClick={() => {
       if (!window.confirm("Nur zurücksetzen, wenn Runway den Start ausdrücklich mit einem Validierungsfehler abgelehnt hat oder du dort geprüft hast, dass kein Auftrag angelegt wurde. Ist das bestätigt?")) return;

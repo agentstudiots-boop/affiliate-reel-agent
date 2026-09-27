@@ -1,4 +1,4 @@
-import { amazonSearchUrls, createAmazonAffiliateUrl } from "@/lib/amazon";
+import { findAmazonProduct, resolveAmazonProduct } from "@/lib/product-resolver";
 import { reviewProduct } from "@/lib/agents/product-reviewer";
 import { scoutProducts } from "@/lib/agents/product-scout";
 import { writeReelConcept } from "@/lib/agents/script-writer";
@@ -14,9 +14,12 @@ export async function runProductScout() {
   const result = await scoutProducts();
   return {
     ...result.output,
-    candidates: result.output.candidates.map((candidate) => ({
-      ...candidate,
-      ...amazonSearchUrls(candidate.searchQuery),
+    candidates: await Promise.all(result.output.candidates.map(async candidate => {
+      try {
+        const resolvedProduct = await findAmazonProduct(candidate.name, candidate.searchQuery, candidate.targetGroup);
+        return { ...candidate, name: resolvedProduct.name, resolvedProduct,
+          amazonUrl: resolvedProduct.sourceUrl, affiliateUrl: resolvedProduct.affiliateUrl };
+      } catch { return { ...candidate, resolvedProduct: undefined, amazonUrl: "", affiliateUrl: "", resolutionError: "product_unresolved" }; }
     })),
     sources: webSources(result.sources),
   };
@@ -28,10 +31,7 @@ export async function runProductReview(candidate: Parameters<typeof reviewProduc
 }
 
 export async function runScriptWriter(product: Product) {
-  const reviewedProduct = {
-    ...product,
-    affiliateUrl: createAmazonAffiliateUrl(product.affiliateUrl || product.sourceUrl),
-  };
+  const reviewedProduct = await resolveAmazonProduct(product);
   const concept = writeReelConcept(reviewedProduct);
   return { concept, affiliateUrl: reviewedProduct.affiliateUrl };
 }

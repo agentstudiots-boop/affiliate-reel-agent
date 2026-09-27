@@ -1,16 +1,40 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { readFileSync, readdirSync } = require('node:fs');
-const { runContentJob, inspectContent } = require('../.test-build/lib/content/orchestrator');
+const { runContentJob, inspectContent, reviseApprovedStaticContent, reviseApprovedVideo } = require('../.test-build/lib/content/orchestrator');
+const { asksForNaturalCopy } = require('../.test-build/lib/content/editorial-feedback');
 const { restoreHistory, parseJob } = require('../.test-build/lib/content/history');
 const { createGenerator } = require('../.test-build/lib/content/model');
 const { creativeSchema } = require('../.test-build/lib/content/schema');
 const { z } = require('zod');
 const opportunity = {
-  product: { name: 'Vakuumiergerät für Lebensmittel', sourceUrl: 'https://www.amazon.de/s?k=Vakuumierer', affiliateUrl: '', price: '', targetGroup: 'Familien und Hobbyköche', benefits: 'Portionieren und Sous-vide vorbereiten', notes: 'Zusätzlicher Garer notwendig' },
+  product: { productVerifiedAt:'2026-09-26T08:00:00.000Z', productVerifiedName:'Vakuumiergerät für Lebensmittel', name: 'Vakuumiergerät für Lebensmittel', sourceUrl: 'https://www.amazon.de/dp/B000000001', affiliateUrl: '', price: '', targetGroup: 'Familien und Hobbyköche', benefits: 'Portionieren und Sous-vide vorbereiten', notes: 'Zusätzlicher Garer notwendig' },
   useCase: 'Oma staunt beim Familienessen über das Steak. Papa erklärt die Zubereitung.',
   trend: '', goal: 'conversion', budget: 'balanced', verifiedFacts: [],
 };
+
+test('ordinary German copy feedback reaches the right agent across post formats',async()=>{
+  assert.equal(asksForNaturalCopy('Der Begleittext passt nicht erkennbar klingt nach System intern'),true);
+  assert.equal(asksForNaturalCopy('Der Begleittext ist unpassend formuliert'),true);
+  assert.equal(asksForNaturalCopy('Die Bildhandlung passt nicht zum Kürbis'),false);
+  for(const [format,changes] of [['video',{targetPlatform:'instagram',budget:'quality'}],['image',{budget:'low'}],['text',{goal:'community'}]]){
+    const job=await runContentJob({...opportunity,...changes},{allowedFormats:[format]});
+    assert.equal(job.status,'awaiting_approval');
+    job.status='approved';
+    const revised=format==='video'
+      ? await reviseApprovedVideo(job,'Der Begleittext klingt nach System intern, bitte lesbarer')
+      : await reviseApprovedStaticContent(job,format==='text'?'Der Text klingt maschinell, bitte menschlicher':'Die Caption klingt nach System intern, bitte lesbarer');
+    assert.equal(revised.status,'awaiting_approval');
+    assert.equal(revised.content.format,format);
+    assert.equal(revised.review.passed,true,JSON.stringify(revised.review));
+    assert.equal(revised.opportunity.product.asin,job.opportunity.product.asin);
+    if(format!=='video'){
+      const further=await reviseApprovedStaticContent({...revised,status:'approved',revisions:2},format==='text'?'CTA sachlicher formulieren':'CTA weniger werblich formulieren');
+      assert.equal(further.revisions,3);
+      assert.equal(further.status,'awaiting_approval');
+    }
+  }
+});
 
 test('routes video, carousel and text by objective and economics without calling a provider', async () => {
   const original = global.fetch;
@@ -33,6 +57,24 @@ test('routes video, carousel and text by objective and economics without calling
       }
     }
   } finally { global.fetch = original; }
+});
+
+test('a home and living reel does not call blankets devices in its spoken CTA', async () => {
+  const job = await runContentJob({
+    ...opportunity,
+    product: { productVerifiedAt:'2026-09-26T08:00:00.000Z', productVerifiedName:'Kuscheldecke', name: 'Kuscheldecke', sourceUrl: 'https://www.amazon.de/dp/B000000001', affiliateUrl: '', price: '', targetGroup: 'Menschen für ruhige Abende zu Hause', benefits: 'Größe, Material und Pflege vergleichen', notes: 'Suchauswahl ohne Angaben zu einem einzelnen Modell' },
+    useCase: 'Feierabend mit Tee und einer Decke auf dem Sofa.',
+    category: 'home_living', targetPlatform: 'instagram', budget: 'quality',
+  }, { allowedFormats: ['video'] });
+  assert.equal(job.status, 'awaiting_approval');
+  assert.equal(job.content.format, 'video');
+  assert.equal(job.content.durationSeconds, 30);
+  assert.match(job.content.scenes[0].audio, /^Feierabend, Tee in der Hand/);
+  assert.match(job.content.scenes[1].audio, /einwickeln oder eher leicht/);
+  assert.match(job.content.scenes.at(-1).audio, /Produkt.*im Beitrag/);
+  assert.doesNotMatch(job.content.scenes.at(-1).audio, /Geräte/);
+  assert.doesNotMatch(job.content.scenes[0].audio, /^Werbung\b/);
+  assert.match(job.content.caption, /^Werbung \|/);
 });
 
 test('allows two revisions, sends feedback through orchestrator and stops at eight model calls', async () => {
@@ -111,7 +153,7 @@ test('specialists cannot import each other or an orchestrator', () => {
   for (const file of readdirSync('lib/content/agents')) {
     const source = readFileSync(`lib/content/agents/${file}`, 'utf8');
     for (const match of source.matchAll(/from\s+["']([^"']+)/g)) {
-      assert.ok(['../schema', '../agent'].includes(match[1]), `${file} has an unauthorized dependency: ${match[1]}`);
+      assert.ok(['../schema', '../agent', '../editorial-copy', '../editorial-feedback'].includes(match[1]), `${file} has an unauthorized dependency: ${match[1]}`);
     }
   }
 });
@@ -136,7 +178,7 @@ test('removed generative transport fails closed without a network request', asyn
 });
 
 test('technical explanation can beat video even for conversion; storage brief favors carousel', async () => {
-  const technical = await runContentJob({ ...opportunity, product: { ...opportunity.product, name: 'Netzwerkswitch', targetGroup: 'IT-Fachleute' }, useCase: 'Fachliche Kaufberatung zur Kompatibilität von Netzwerkgeräten.' });
+  const technical = await runContentJob({ ...opportunity, product: { ...opportunity.product, name: 'Netzwerkswitch', productVerifiedName: 'Netzwerkswitch', targetGroup: 'IT-Fachleute' }, useCase: 'Fachliche Kaufberatung zur Kompatibilität von Netzwerkgeräten.' });
   assert.equal(technical.content.format, 'text');
   assert.equal(technical.status, 'awaiting_approval');
   const storage = await runContentJob({ ...opportunity, useCase: 'Nach dem Einkauf Vorräte portionsweise vorbereiten und passend lagern.' });
