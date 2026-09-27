@@ -10,9 +10,12 @@ import { requestFacebookApproval } from "@/lib/meta/request-publication";
 import { requestVideoCostApproval } from "@/lib/production/request-cost-approval";
 import { getDatabase } from "@/lib/memory/db";
 import { parseJob } from "@/lib/content/history";
-import { sendDailyApproval } from "@/lib/daily/draft";
+import { createDailyDraft, sendDailyApproval } from "@/lib/daily/draft";
+import { startImagePostFromWhatsApp } from "@/lib/whatsapp/start-image-post";
 import { sendWhatsAppText } from "@/lib/whatsapp/client";
+import { sendStoryHandoff } from "@/lib/meta/story-handoff";
 import { deliverWeeklyReport } from "@/lib/reporting/weekly";
+import { latestImagePostsStatus } from "@/lib/reporting/whatsapp-status";
 import { extractIncomingWhatsAppMessages, verifyMetaWebhookSignature, verifyWhatsAppChallenge } from "@/lib/whatsapp/security";
 
 export const runtime = "nodejs";
@@ -72,10 +75,12 @@ export async function POST(request: Request) {
         if(claimed.rows.length){
           await recoverRunwayPreflightIncident();
           const status=await latestInstagramReelStatus();
-          await sendWhatsAppText(`Status des letzten freigegebenen Instagram-Reels: ${status}`);
+          const imageStatus = await latestImagePostsStatus(getDatabase());
+          await sendWhatsAppText(`Aktuelle Bildpost-Aufträge:\n${imageStatus}\n\nLetzter Instagram-Reel-Auftrag: ${status}`);
         }
         continue;
       }
+      if (await startImagePostFromWhatsApp({ ...message, payload }, getDatabase, createDailyDraft, sendWhatsAppText)) continue;
       if (await handleContentApproval({ ...message, payload }, async jobId => {
         try {
           const record=await getDatabase().query("SELECT snapshot FROM content_jobs WHERE id=$1",[jobId]);
@@ -147,6 +152,8 @@ export async function POST(request: Request) {
           phase = "persist";
           await publicationRepo.published(claimed.id, posted.id, posted.permalink);
           console.info(JSON.stringify({ event: "facebook_publication", publicationId: claimed.id, status: "published" }));
+          try { await sendStoryHandoff(claimed.id); }
+          catch { console.warn(JSON.stringify({ event: "story_handoff_unavailable", publicationId: claimed.id })); }
         } catch (error) {
           await publicationRepo.markUnknown(claimed.id);
           console.error(JSON.stringify({ event: "facebook_publication", publicationId: claimed.id, status: "unknown",
@@ -155,9 +162,9 @@ export async function POST(request: Request) {
             ...(error instanceof FacebookPublishFailure ? {httpStatus:error.httpStatus,code:error.code,subcode:error.subcode} : {}) }));
         }
       }
-    } catch {
+    } catch (error) {
       failed = true;
-      console.error(JSON.stringify({ event: "whatsapp_approval_message_failed", messageId: message.id }));
+      console.error(JSON.stringify({ event: "whatsapp_approval_message_failed", messageId: message.id, failureType: error instanceof Error ? error.name : "unknown" }));
     }
   }
   // Successful message IDs deduplicate when Meta redelivers the batch.

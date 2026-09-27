@@ -59,3 +59,17 @@ export async function findAmazonProduct(categoryName: string, query: string, tar
   return resolveAmazonProduct({ name, sourceUrl: found.url, affiliateUrl: "", price: "", targetGroup,
     benefits: "Eignung und Eigenschaften am konkreten Modell prüfen.", notes: "Produktidentität anhand des indexierten Amazon-Produkttitels zugeordnet; keine Eigenschaften oder Preise verifiziert." }, async () => results);
 }
+
+// A WhatsApp command may identify only an ASIN. Bind the exact indexed title,
+// then use the same strict product verification as all other plans.
+export async function findAmazonProductByAsin(asin: string, search = tavilySearch) {
+  if (!/^[A-Z0-9]{10}$/.test(asin)) throw new Error(PRODUCT_UNRESOLVED);
+  const results = await search({ query: `site:amazon.de/dp/ ${asin}`, maxResults: 5 });
+  const found = results.find(item => amazonProduct(item.url)?.asin === asin
+    && item.title.trim().length > 5 && !/captcha|robot|^Amazon\.de\s*[:|-]?\s*$/i.test(item.title.trim()));
+  if (!found) throw new Error(PRODUCT_UNRESOLVED);
+  const name = found.title.replace(/\s*[:|–-]\s*Amazon\.de(?:\s*:.*)?$/i, "").trim().slice(0,160);
+  return resolveAmazonProduct({ name, sourceUrl: `https://www.amazon.de/dp/${asin}`, affiliateUrl: "", price: "",
+    targetGroup: "Menschen mit passender Alltagssituation", benefits: "Eignung und Lieferumfang vor dem Kauf prüfen.",
+    notes: "Identität durch Amazon-Suchergebnis belegt; Merkmale und Preis nicht belegt." }, async () => results);
+}

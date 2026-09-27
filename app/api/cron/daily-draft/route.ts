@@ -13,7 +13,10 @@ export async function GET(request: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
   try {
-    const result = await createDailyDraft();
+    const schedule = request.headers.get("x-vercel-cron-schedule");
+    const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin", hour: "2-digit", hourCycle: "h23" }).format(new Date()));
+    const slot = schedule === "0 7 * * *" ? "morning" : schedule === "0 16 * * *" ? "afternoon" : hour < 14 ? "morning" : "afternoon";
+    const result = await createDailyDraft(undefined, slot);
     console.info(JSON.stringify({ event: "daily_draft", status: result.status, whatsapp: "whatsapp" in result ? result.whatsapp : undefined, jobId: "jobId" in result ? result.jobId : undefined }));
     return Response.json(result, { status: result.status === "failed" ? 503 : 200, headers: { "Cache-Control": "no-store" } });
   } catch {

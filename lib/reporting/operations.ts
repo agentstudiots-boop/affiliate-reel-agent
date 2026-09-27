@@ -1,10 +1,12 @@
 import { getDatabase, type Database } from "../memory/db";
 import { imageProviderStatus } from "../content/image-provider";
 import { dailyNotificationTemplateConfigured, weeklyNotificationTemplateConfigured, whatsappApprovalReady } from "../whatsapp/client";
+import { ensureAutomationSchema } from "../memory/ensure-automation-schema";
 
 export async function getOperationsSnapshot(db: Database = getDatabase()) {
+  await ensureAutomationSchema(db);
   const [days, posts, reports] = await Promise.all([
-    db.query(`SELECT d.day::text AS day, d.job_id::text AS job_id, d.status,
+    db.query(`SELECT d.day::text AS day, d.slot, d.job_id::text AS job_id, d.status,
         j.snapshot->'opportunity'->'product'->>'name' AS product,
         j.content_type AS format,
         d.notification_message_id IS NOT NULL AS notification_sent,
@@ -17,7 +19,7 @@ export async function getOperationsSnapshot(db: Database = getDatabase()) {
         SELECT status,whatsapp_message_id,permalink FROM publication_requests
         WHERE job_id=d.job_id AND platform='facebook' ORDER BY revision DESC LIMIT 1
       ) p ON true
-      ORDER BY d.day DESC LIMIT 14`),
+      ORDER BY d.created_at DESC LIMIT 30`),
     db.query(`SELECT p.job_id::text AS job_id, p.platform, p.url, p.published_at,
         j.snapshot->'opportunity'->'product'->>'name' AS product,
         m.observed_at, m.clicks, m.conversions, m.affiliate_revenue_cents,
@@ -55,7 +57,7 @@ export async function getOperationsSnapshot(db: Database = getDatabase()) {
       imageProviderReason: provider.reason,
     },
     days: days.rows.map(row => ({
-      day: String(row.day), jobId: String(row.job_id), status: String(row.status),
+      day: String(row.day), slot: String(row.slot), jobId: String(row.job_id), status: String(row.status),
       product: String(row.product || "Unbekannt"), format: row.format ? String(row.format) : null,
       notificationSent: row.notification_sent === true, contentApprovalSent: row.content_approval_sent === true,
       publicationStatus: row.publication_status ? String(row.publication_status) : null,

@@ -350,7 +350,7 @@ export function productionRepository(db: Database = getDatabase()) {
             await sql.query("UPDATE content_jobs SET status='approved',snapshot=$2,event_sequence=$3,updated_at=$4 WHERE id=$1", [job.id,JSON.stringify(job),event.sequence,job.updatedAt]);
             await sql.query("INSERT INTO job_events(job_id,sequence,agent,kind,occurred_at,payload) VALUES($1,$2,$3,$4,$5,$6)", [job.id,event.sequence,event.agent,event.kind,event.at,JSON.stringify(event)]);
           }
-          await sql.query("UPDATE daily_drafts SET status=$2,feedback=$3,updated_at=now() WHERE day=$1", [daily.day,status,decision.feedback]);
+          await sql.query("UPDATE daily_drafts SET status=$2,feedback=$3,updated_at=now() WHERE job_id=$1", [daily.job_id,status,decision.feedback]);
           await sql.query("UPDATE whatsapp_events SET intent=$2 WHERE message_id=$1", [input.id,decision.intent]);
           return { handled: true as const, intent: decision.intent, feedback: decision.feedback, dailyJobId: String(daily.job_id) };
         }

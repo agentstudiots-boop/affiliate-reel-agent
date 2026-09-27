@@ -1,5 +1,56 @@
 # Tägliche Entwürfe und Veröffentlichung
 
+## Änderung vom 27. September 2026
+
+Die bisherige Datums-Einmalgrenze wurde durch `(day,slot)` ersetzt (Migration
+`016_multiple_drafts.sql`). Geplant sind jetzt zwei kostenlose **Bildentwürfe**
+pro Tag um 07:00 und 16:00 UTC. Der Vercel-Header `x-vercel-cron-schedule`
+bestimmt den Slot, damit verzögerte Zustellung keine Zuordnung ändert. Vercel
+Cron läuft nur in Production; beide Jobs sind gegen wiederholte Anrufe
+eindeutig geschützt. Die beiden Zeiten sind UTC und verschieben sich relativ
+zur Berliner Sommer-/Winterzeit. Auch der Button für zusätzliche Entwürfe
+legt jedes Mal einen neuen Auftrag an. Es gibt keine Tagesobergrenze.
+
+Eine WhatsApp-Nachricht **`Bildpost`** an die konfigurierte Business-Nummer
+startet eine zusätzliche saisonale Bildplanung. **`Bildpost B0D9YQR9CT`**
+oder **`Bildpost https://www.amazon.de/dp/B0D9YQR9CT`** wählt ein konkretes
+Produkt; der Orchestrator bindet erst nach Prüfung des genauen Amazon-Titels
+einen Affiliate-Link an dieselbe ASIN. Jeder Start ist an Absender und
+Message-ID gebunden, sodass Meta-Zweitzustellungen keinen zweiten Auftrag
+auslösen. Der Befehl darf nicht als Antwort auf eine Freigabenachricht stehen.
+Bei mehreren offenen Freigaben immer direkt auf die betreffende WhatsApp
+antworten. Änderungswünsche bleiben bis zur ausdrücklichen Freigabe möglich.
+
+**Zwei WhatsApp-Entscheidungen pro Bildpost:** Zuerst wird der Bildentwurf samt
+Hinweis auf die noch nicht bezifferte Bildgenerierung freigegeben; nur danach
+wird ein Originalbild hergestellt. Zweitens kommt das konkrete Bild mit
+Facebook-Caption zur Veröffentlichungsfreigabe. In der Facebook-Caption steht
+der eindeutige Affiliate-Produktlink direkt am Anfang. Bis zur zweiten Freigabe
+ist nichts veröffentlicht. Unbekannte Providerergebnisse werden niemals
+blind wiederholt. Ohne WhatsApp-Servicefenster wird eine zuvor ausdrücklich
+aktivierte Benachrichtigungsvorlage benötigt; andernfalls wartet der Entwurf
+gespeichert. Eine Vorlage kann zusätzliche WhatsApp-Gebühren verursachen.
+
+Nach erfolgreichem Facebook-Post wird einmalig eine WhatsApp mit dem bereits
+genehmigten Bild und der Produkt-URL für **Facebook- und Instagram-Stories**
+geschickt (`017_story_handoffs.sql`). Link-Sticker lassen sich über die
+Instagram-Publishing-API nicht setzen; für die Facebook-Story-API gibt es
+ebenfalls keinen hier verifizierten Link-Sticker-Parameter. Deshalb werden
+Stories nicht ohne klickbaren Link automatisch online gestellt: Der Betreiber
+lädt das Bild in beiden Apps als Story hoch, setzt dort jeweils den Link-Sticker,
+prüft das Ziel und veröffentlicht selbst. Die Story erzeugt kein weiteres Bild.
+`Status` zeigt die letzten fünf Bildaufträge samt Facebook-Status und danach
+den letzten Reel-Status.
+
+**Inbetriebnahme:** Die beiden neuen Migrationen vor dem produktiven Deploy
+ausführen, wenn ein geschützter Migrationszugang vorhanden ist. Andernfalls
+prüfen die ersten neuen Tages-/Story-/Statusaufrufe das Schema und wenden die
+transaktional gesperrten Migrationen 001–017 selbst an; erst danach starten
+Suche oder WhatsApp-Versand. Cron/WhatsApp/Bildprovider in der tatsächlichen
+Vercel-Production prüfen. Eine Codeänderung ohne Production-Deployment startet
+keinen Cron und versendet keine produktionsseitige WhatsApp. Die folgenden älteren Abschnitte dokumentieren
+den ursprünglichen Einmal-pro-Tag-Stand und gelten nur als historische Notiz.
+
 Stand: 24. September 2026.
 
 ## Automatischer Teil

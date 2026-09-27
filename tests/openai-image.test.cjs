@@ -178,7 +178,7 @@ test('a previously stored social-card URL can never pass the publish gate', asyn
     await assert.rejects(repo.bindImage(legacy.id,`https://test.public.blob.vercel-storage.com/social-cards/${approved.id}.png`),/Preview-Textkarte/);
     await pg.query("UPDATE publication_requests SET status='approved',image_url=$2,whatsapp_message_id='wamid.legacy' WHERE id=$1",
       [legacy.id,`https://test.public.blob.vercel-storage.com/social-cards/${approved.id}.png`]);
-    await assert.rejects(repo.claimPublish(legacy.id),/nicht freigegeben/);
+    await assert.rejects(repo.claimPublish(legacy.id),/nicht freigegeben|product_unresolved/);
     assert.equal((await repo.get(approved.id)).status,'approved');
   } finally { await pg.close(); }
 });

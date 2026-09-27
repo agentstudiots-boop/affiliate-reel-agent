@@ -19,7 +19,7 @@ function publicationContent(job: ContentJob) {
   catch { throw new PublicationConflictError("Affiliate-Link fehlt."); }
   if (source.protocol !== "https:" || source.username || source.password) throw new PublicationConflictError("Affiliate-Link ist nicht sicher.");
   const base = job.content.format === "text" ? job.content.body : job.content.caption;
-  const caption = `${base}\n\n${job.content.cta}\n${source}`;
+  const caption = `Werbung | Affiliate-Link\nProdukt direkt ansehen: ${source}\n\n${base}\n\n${job.content.cta}`;
   const hash = createHash("sha256").update(JSON.stringify({caption,content:job.content,jobId:job.id})).digest("hex");
   return { caption, hash };
 }
@@ -162,11 +162,7 @@ export function publicationRepository(db: Database = getDatabase()) {
         if (eligibilityError) throw new PublicationConflictError(eligibilityError);
         if (!await hasContentApproval(job,sql)) throw new PublicationConflictError("WhatsApp-Inhaltsfreigabe für den vollständigen Textentwurf fehlt.");
         if (!job.content || job.content.format === "video") throw new PublicationConflictError("Bild- oder Textentwurf fehlt.");
-        const source = new URL(job.opportunity.product.affiliateUrl);
-        if (source.protocol !== "https:" || source.username || source.password) throw new PublicationConflictError("Affiliate-Link ist nicht sicher.");
-        const base = job.content.format === "text" ? job.content.body : job.content.caption;
-        const caption = `${base}\n\n${job.content.cta}\n${source}`;
-        const contentHash = createHash("sha256").update(JSON.stringify({caption,content:job.content,jobId})).digest("hex");
+        const { caption, hash: contentHash } = publicationContent(job);
         const existing = await sql.query("SELECT * FROM publication_requests WHERE job_id=$1 AND platform='facebook' ORDER BY revision DESC LIMIT 1", [jobId]);
         if (existing.rows[0]) {
           if (existing.rows[0].content_hash === contentHash) return publication(existing.rows[0]);

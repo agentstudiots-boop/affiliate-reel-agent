@@ -10,6 +10,14 @@ import { parseJob } from "@/lib/content/history";
 import { facebookPagePublicationError } from "@/lib/meta/publication-eligibility";
 import { imageBrief } from "@/lib/content/image-brief";
 import { isPumpkinCarvingProduct } from "@/lib/content/category";
+import { findAmazonProductByAsin } from "@/lib/product-resolver";
+import { ensureAutomationSchema } from "@/lib/memory/ensure-automation-schema";
+
+async function resolveRequestedProduct(value: string) {
+  const asin = /^(?:[A-Z0-9]{10})$/.test(value) ? value : value.match(/^https:\/\/(?:www\.)?amazon\.de\/dp\/([A-Z0-9]{10})\/?$/)?.[1];
+  if (!asin) throw new Error("Produkt nur als ASIN oder sauberen Amazon.de/dp/-Link angeben.");
+  return findAmazonProductByAsin(asin);
+}
 
 export async function sendDailyApproval(jobId: string) {
   const db = getDatabase();
@@ -39,37 +47,44 @@ export async function sendDailyApproval(jobId: string) {
     : `um den Content-Plan und eine einmalige kostenpflichtige Bildgenerierung freizugeben (Bildprovider: ${imageProviderStatus().provider || "nicht eingerichtet"}, EUR-Kosten nicht vorab bestätigt)`;
   const summary = job.content?.format === "text" ? job.content.body : job.content?.format === "image" ? job.content.caption : "Videoentwurf";
   const visualBrief = job.content?.format === "image" ? `\n\nBildbriefing für das Titelbild:\n${imageBrief(job)}` : "";
-  const messageId = await sendWhatsAppText(`Content-Freigabe · Tagesentwurf ${new Date(String(claimed.rows[0].day)).toISOString().slice(0, 10)}\nProdukt: ${job.opportunity.product.name}\nFormat: ${job.content?.format || "unbekannt"} · Facebook\n\n${(summary || "").slice(0, 1100)}${visualBrief}\n\nASIN: ${job.opportunity.product.asin}\nProduktlink: ${job.opportunity.product.affiliateUrl}\n Antworte auf DIESE Nachricht mit „Freigeben“, ${costText}. Danach kommt eine ZWEITE WhatsApp für die Veröffentlichung. „Ablehnen“ stoppt den Auftrag, Änderungswünsche bitte als Text. Noch kein Post ist online.`);
+  const messageId = await sendWhatsAppText(`Content-Freigabe · Bildpost ${new Date(String(claimed.rows[0].day)).toISOString().slice(0, 10)}\nProdukt: ${job.opportunity.product.name}\nFormat: ${job.content?.format || "unbekannt"} · Facebook\n\n${(summary || "").slice(0, 1100)}${visualBrief}\n\nASIN: ${job.opportunity.product.asin}\nProduktlink: ${job.opportunity.product.affiliateUrl}\nAntworte auf DIESE Nachricht mit „Freigeben“, ${costText}. Danach kommt eine ZWEITE WhatsApp für die Veröffentlichung. „Ablehnen“ stoppt den Auftrag, Änderungswünsche bitte als Text. Noch kein Post ist online. Eine Story mit klickbarem Link wird anschließend für die App vorbereitet.`);
   await db.query("UPDATE daily_drafts SET whatsapp_message_id=$2,updated_at=now() WHERE job_id=$1 AND status='awaiting_approval'", [jobId, messageId]);
   return true;
 }
 
-// Cron runs in Production only. The date claim happens before any external search
-// so a retried invocation cannot buy another search or send another message.
-export async function createDailyDraft(day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date())) {
+export function berlinDay(now = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+}
+
+// Each scheduled slot or explicit operator message has its own durable claim.
+// A retry of that slot/message never buys a second search or sends another approval.
+export async function createDailyDraft(day = berlinDay(), slot = "morning", productQuery?: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error("Ungültiger Tag.");
+  if (!/^(morning|afternoon|manual:[A-Za-z0-9._:-]{1,160})$/.test(slot)) throw new Error("Ungültiger Auslöser.");
   const db = getDatabase();
+  await ensureAutomationSchema(db);
   const jobId = crypto.randomUUID();
   const claim = await db.query(
-    "INSERT INTO daily_drafts(day,job_id,status) VALUES($1,$2,'claimed') ON CONFLICT(day) DO NOTHING RETURNING job_id",
-    [day, jobId],
+    "INSERT INTO daily_drafts(day,slot,job_id,status) VALUES($1,$2,$3,'claimed') ON CONFLICT(day,slot) DO NOTHING RETURNING job_id",
+    [day, slot, jobId],
   );
   if (!claim.rows.length) return { status: "already_claimed" as const };
 
   try {
-    const report = await runProductScout();
+    const report = productQuery ? null : await runProductScout();
     // A seasonal idea becomes affiliate content only after exact product resolution.
-    const candidates = report.candidates.filter(candidate => candidate.kind === "Saisontrend");
-    if (!candidates.length) throw new Error("Kein saisonaler Kandidat verfügbar.");
+    const candidates = report?.candidates.filter(candidate => candidate.kind === "Saisontrend") || [];
+    if (!productQuery && !candidates.length) throw new Error("Kein saisonaler Kandidat verfügbar.");
     const resolved = candidates.filter(candidate => candidate.resolvedProduct);
     const pool = resolved.length ? resolved : candidates;
-    const candidate = pool[new Date(`${day}T00:00:00Z`).getUTCDate() % pool.length];
-    await db.query("UPDATE daily_drafts SET status='planning',scout_report=$2,updated_at=now() WHERE day=$1", [day, JSON.stringify(report)]);
+    const candidate = pool.length ? pool[(new Date(`${day}T00:00:00Z`).getUTCDate() + (slot === "afternoon" ? 1 : 0)) % pool.length] : null;
+    await db.query("UPDATE daily_drafts SET status='planning',scout_report=$2,updated_at=now() WHERE job_id=$1", [jobId, JSON.stringify(report || { requestedProduct: productQuery })]);
+    const requestedProduct = productQuery ? await resolveRequestedProduct(productQuery) : null;
     const opportunity: Opportunity = {
-      product: candidate.resolvedProduct || { name: candidate.name, sourceUrl: "https://www.amazon.de/", affiliateUrl: "",
-        price: "", targetGroup: candidate.targetGroup, benefits: "Konkretes Produkt noch nicht aufgelöst.", notes: "product_unresolved" },
-      category: isPumpkinCarvingProduct(candidate.resolvedProduct?.name || candidate.name) || candidate.category === "Wohnen" ? "home_living" : "household", useCaseKey: "seasonal-product-guide", targetPlatform: "facebook",
-      useCase: candidate.reelIdea, trend: candidate.whyNow, goal: "education", budget: "low", verifiedFacts: [],
+      product: requestedProduct || candidate?.resolvedProduct || { name: candidate!.name, sourceUrl: "https://www.amazon.de/", affiliateUrl: "",
+        price: "", targetGroup: candidate!.targetGroup, benefits: "Konkretes Produkt noch nicht aufgelöst.", notes: "product_unresolved" },
+      category: isPumpkinCarvingProduct(requestedProduct?.name || candidate?.resolvedProduct?.name || candidate?.name || "") || candidate?.category === "Wohnen" ? "home_living" : "household", useCaseKey: "seasonal-product-guide", targetPlatform: "facebook",
+      useCase: candidate?.reelIdea || `Das Produkt ${requestedProduct!.name} im Alltag verwenden und die Eignung vor dem Kauf prüfen.`, trend: candidate?.whyNow || "", goal: "education", budget: "low", verifiedFacts: [],
     };
     const repo = memoryRepository(db);
     await repo.claim(jobId, opportunity, "reference");
@@ -79,7 +94,7 @@ export async function createDailyDraft(day = new Intl.DateTimeFormat("en-CA", { 
     const publishablePlan = job.status === "awaiting_approval" && job.content?.format === "image"
       && !facebookPagePublicationError({ ...job, status: "approved" });
     const status = publishablePlan ? "awaiting_approval" : "needs_input";
-    await db.query("UPDATE daily_drafts SET status=$2,updated_at=now() WHERE day=$1", [day, status]);
+    await db.query("UPDATE daily_drafts SET status=$2,updated_at=now() WHERE job_id=$1", [jobId, status]);
     if (status === "awaiting_approval") {
       const approver = (process.env.WHATSAPP_APPROVER_WA_ID || "").replace(/\D/g, "");
       // Meta accepts free-form texts only within the 24-hour service window.
@@ -95,12 +110,12 @@ export async function createDailyDraft(day = new Intl.DateTimeFormat("en-CA", { 
       else {
         if (!approver || !dailyNotificationTemplateConfigured()) return { status, jobId, whatsapp: "template_required" as const };
         const attempted = await db.query(
-          `UPDATE daily_drafts SET notification_send_attempted_at=now() WHERE day=$1
-           AND notification_send_attempted_at IS NULL RETURNING day`, [day],
+          `UPDATE daily_drafts SET notification_send_attempted_at=now() WHERE job_id=$1
+           AND notification_send_attempted_at IS NULL RETURNING day`, [jobId],
         );
         if (attempted.rows.length) {
           const messageId = await sendDailyNotificationTemplate();
-          await db.query("UPDATE daily_drafts SET notification_message_id=$2,updated_at=now() WHERE day=$1", [day, messageId]);
+          await db.query("UPDATE daily_drafts SET notification_message_id=$2,updated_at=now() WHERE job_id=$1", [jobId, messageId]);
         }
         return { status, jobId, whatsapp: "notification_sent" as const };
       }
@@ -108,7 +123,7 @@ export async function createDailyDraft(day = new Intl.DateTimeFormat("en-CA", { 
     return { status, jobId, ...(job.error ? { error: job.error } : {}) };
   } catch {
     // Preserve the one-time claim. Ambiguous network outcomes must not retry.
-    await db.query("UPDATE daily_drafts SET status='failed',updated_at=now() WHERE day=$1", [day]);
+    await db.query("UPDATE daily_drafts SET status='failed',updated_at=now() WHERE job_id=$1", [jobId]);
     return { status: "failed" as const, jobId };
   }
 }

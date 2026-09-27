@@ -43,6 +43,14 @@ test('daily cron produces one saved image brief, requires a WhatsApp window, and
   assert.equal(saved.rows[0].status,'awaiting_approval');
   assert.equal(saved.rows[0].whatsapp_message_id,'wamid.mock.1');
   assert.equal((await daily.createDailyDraft('2026-09-25')).status,'already_claimed');
-  assert.equal(messages.length,1);
+  const second=await daily.createDailyDraft('2026-09-25','afternoon');
+  assert.equal(second.status,'awaiting_approval');
+  assert.notEqual(second.jobId,next.jobId);
+  assert.equal((await daily.createDailyDraft('2026-09-25','afternoon')).status,'already_claimed');
+  const manual=await daily.createDailyDraft('2026-09-25','manual:wa-id-one');
+  assert.equal(manual.status,'awaiting_approval');
+  assert.equal((await pg.query("SELECT count(*)::int AS n FROM daily_drafts WHERE day='2026-09-25'")).rows[0].n,3);
+  assert.equal(scouts,4);
+  assert.equal(messages.length,3);
   assert.equal((await pg.query('SELECT count(*)::int AS n FROM publication_requests')).rows[0].n,0);
 });

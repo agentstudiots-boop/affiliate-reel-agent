@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     const raw = await request.text();
     if (raw.length > 200) return Response.json({ error: "Anfrage zu groß." }, { status: 413 });
     const input = JSON.parse(raw);
-    if (input.action === "daily") return Response.json(await createDailyDraft(), { headers: { "Cache-Control": "no-store" } });
+    if (input.action === "daily") return Response.json(await createDailyDraft(undefined, `manual:${crypto.randomUUID()}`), { headers: { "Cache-Control": "no-store" } });
     if (input.action === "continue") return Response.json(await continuePendingReels(), { headers: { "Cache-Control": "no-store" } });
     return Response.json({ error: "Unbekannte Aktion." }, { status: 400 });
   } catch {
