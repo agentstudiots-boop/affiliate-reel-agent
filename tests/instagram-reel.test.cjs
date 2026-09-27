@@ -90,7 +90,7 @@ test('route rejects unauthenticated requests and never retries a Graph POST when
   assert.equal(createCalls,1);
 });
 
-test('only the documented Runway URL preflight incident can resume its already approved post',async t=>{
+test('an ambiguous Runway Reel is never retried even when its old preflight markers match',async t=>{
   const id='9ede14e4-4b2d-4da2-9709-21e74dcc7772';
   const video='https://k6pclvml1podnlqd.public.blob.vercel-storage.com/reels/9d13618a-5268-44e3-b073-95b755700238.mp4';
   const f=await fixture(t,{id,video,mode:'RUNWAY_SINGLE_CLIP'});
@@ -101,9 +101,9 @@ test('only the documented Runway URL preflight incident can resume its already a
   await f.repo.claimContainer(request.id);
   await f.repo.markUnknown(request.id);
   await f.pg.query("UPDATE publication_requests SET publish_attempted_at='2026-09-26T20:37:34Z' WHERE id=$1",[request.id]);
-  assert.equal(await recoverRunwayPreflightIncident(f.db),1);
-  assert.equal((await f.repo.get(id)).status,'approved');
-  assert.equal((await f.pg.query('SELECT publish_attempted_at FROM publication_requests WHERE id=$1',[request.id])).rows[0].publish_attempted_at,null);
+  assert.equal(await recoverRunwayPreflightIncident(f.db),0);
+  assert.equal((await f.repo.get(id)).status,'unknown');
+  assert.ok((await f.pg.query('SELECT publish_attempted_at FROM publication_requests WHERE id=$1',[request.id])).rows[0].publish_attempted_at);
   assert.equal(await recoverRunwayPreflightIncident(f.db),0);
   await f.pg.query("UPDATE publication_requests SET status='unknown',publish_attempted_at='2026-09-26T20:37:34Z',instagram_container_id='123' WHERE id=$1",[request.id]);
   assert.equal(await recoverRunwayPreflightIncident(f.db),0,'an existing Instagram container must remain locked');

@@ -13,7 +13,8 @@ const {organicReelPayload,ORGANIC_REEL_CAPABILITIES}=require('../.test-build/lib
 const loadRoute=require('./helpers/load-route.cjs');
 const {approveContent}=require('./helpers/approve-content.cjs');
 const source='https://www.amazon.de/dp/B000000001'; // synthetic test ASIN, never a production default
-function product(changes={}) {return bindAmazonProduct({name:'Kuscheldecke Modell X',sourceUrl:source,affiliateUrl:'',price:'',targetGroup:'Haushalte',benefits:'Eignung vor Kauf prüfen',notes:'',productVerifiedAt:'2026-09-26T08:00:00.000Z',productVerifiedName:'Kuscheldecke Modell X',...changes});}
+const fixtureVerifiedAt=new Date().toISOString();
+function product(changes={}) {return bindAmazonProduct({name:'Kuscheldecke Modell X',sourceUrl:source,affiliateUrl:'',price:'',targetGroup:'Haushalte',benefits:'Eignung vor Kauf prüfen',notes:'',productVerifiedAt:fixtureVerifiedAt,productVerifiedName:'Kuscheldecke Modell X',...changes});}
 function opportunity(p=product(),platform='facebook') {return opportunitySchema.parse({product:p,useCase:'Ein kühler Herbstabend auf dem Sofa mit einer Tasse Tee.',category:'home_living',targetPlatform:platform,budget:platform==='instagram'?'quality':'low'});}
 async function database(t){const pg=new PGlite();t.after(()=>pg.close());const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};await applyMigrations(db);return {pg,db,memory:memoryRepository(db)};}
 
@@ -69,7 +70,7 @@ test('an existing job cannot be rebound to another ASIN or product name',async t
 
 test('Reel CTA stays textual, rejects a different product target, and cannot create a simulated Shopping button',async()=>{
   const job=await runContentJob(opportunity(product(),'instagram'),{allowedFormats:['video']});assert.equal(job.status,'awaiting_approval');
-  assert.match(job.content.cta,/Produkt.*Link im Beitrag/);
+  assert.match(job.content.cta,/Produkt.*im Beitrag/);
   assert.equal(productIdentityError(job.opportunity.product,job.content.cta+' '+job.opportunity.product.affiliateUrl),null);
   assert.equal(productIdentityError(job.opportunity.product,'ASIN B000000002'),'product_unresolved');
   assert.equal(productIdentityError(job.opportunity.product,'https://www.amazon.de/dp/B000000002?tag=alltaeglichle-21'),'product_unresolved');

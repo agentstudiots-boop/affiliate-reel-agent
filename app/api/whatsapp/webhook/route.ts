@@ -2,7 +2,7 @@ import { processOperatorInstruction } from "@/lib/whatsapp/process-instruction";
 import { handleContentApproval } from "@/lib/whatsapp/content-approval";
 import { requestContentApproval } from "@/lib/whatsapp/content-approval";
 import { after } from "next/server";
-import { continuePendingReels } from "@/lib/automation/continue";
+import { continuePendingReels, latestInstagramReelStatus, recoverRunwayPreflightIncident } from "@/lib/automation/continue";
 import { productionRepository } from "@/lib/production/repository";
 import { publicationRepository } from "@/lib/meta/publication-gate";
 import { FacebookPublishFailure, publishFacebookPhoto } from "@/lib/meta/publisher";
@@ -57,6 +57,7 @@ export async function POST(request: Request) {
     try {
       while(true){
         const result=await continuePendingReels();
+        console.info(JSON.stringify({event:'reel_continuation_summary',...result}));
         if(!keepPolling || !result.considered || (result.blocked && result.advanced===0) || Date.now()+15_000>=deadline)break;
         await new Promise(resolve=>setTimeout(resolve,15_000));
       }
@@ -68,7 +69,11 @@ export async function POST(request: Request) {
       if (/^(status|weiter)[.!?]*$/i.test(message.body.trim())
         && message.from.replace(/\D/g, "") === (process.env.WHATSAPP_APPROVER_WA_ID || "").replace(/\D/g, "")) {
         const claimed=await getDatabase().query("INSERT INTO whatsapp_events(message_id,wa_id,reply_to_message_id,body,payload) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING RETURNING message_id",[message.id,message.from,message.replyToMessageId,message.body,JSON.stringify(payload)]);
-        if(claimed.rows.length)await sendWhatsAppText("Ich prüfe den letzten freigegebenen Reel-Auftrag und setze offene Schritte fort. Falls ein Kostenangebot oder eine Veröffentlichungsfreigabe ansteht, kommt sie als eigene WhatsApp-Nachricht.");
+        if(claimed.rows.length){
+          await recoverRunwayPreflightIncident();
+          const status=await latestInstagramReelStatus();
+          await sendWhatsAppText(`Status des letzten freigegebenen Instagram-Reels: ${status}`);
+        }
         continue;
       }
       if (await handleContentApproval({ ...message, payload }, async jobId => {

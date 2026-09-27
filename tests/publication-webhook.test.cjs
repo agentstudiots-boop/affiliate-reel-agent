@@ -40,6 +40,9 @@ async function fixture(t) {
   const route = loadRoute('app/api/whatsapp/webhook/route.ts', {
     '@/lib/whatsapp/content-approval': { handleContentApproval: async () => false },
     'next/server': { after: () => {} },
+    '@/lib/automation/continue': { continuePendingReels: async () => ({considered:0,advanced:0,blocked:0}),
+      recoverRunwayPreflightIncident: async () => 0,
+      latestInstagramReelStatus: async () => 'Kein freigegebener Instagram-Reel-Auftrag gefunden.' },
     '@/lib/memory/db': { getDatabase: () => db },
     '@/lib/production/repository': { productionRepository: () => inbound },
     '@/lib/whatsapp/client': { sendWhatsAppText: async text => { notices.push(text); return 'wamid.status.notice'; } },
@@ -78,10 +81,11 @@ test('Status resumes WhatsApp work once without becoming a content change', asyn
   assert.equal((await f.route.POST(message)).status, 200);
   assert.equal((await f.route.POST(f.request('status-once', null, { body: 'Status' }))).status, 200);
   assert.equal(f.notices.length, 1);
-  assert.match(f.notices[0], /offene Schritte/);
+  assert.match(f.notices[0], /Kein freigegebener Instagram-Reel-Auftrag gefunden/);
   assert.equal((await f.pg.query("SELECT count(*)::int AS n FROM whatsapp_events WHERE message_id='status-once'")).rows[0].n, 1);
   assert.equal((await f.pg.query('SELECT count(*)::int AS n FROM whatsapp_instructions')).rows[0].n, 0);
 });
+
 
 test('signed webhook keeps both Facebook approvals separate and publishes once on concurrent delivery', async t => {
   const f = await fixture(t);

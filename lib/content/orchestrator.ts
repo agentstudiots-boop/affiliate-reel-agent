@@ -29,7 +29,7 @@ export async function reviseApprovedVideo(job: ContentJob, feedback: string, int
       async (_agent, _instruction, _input, schema) => schema.parse(proposal)));
   }
   requireProduct(job.opportunity.product, JSON.stringify(draft));
-  const review = inspectContent(draft, job.decision);
+  const review = inspectContent(draft, job.decision, job.opportunity.targetPlatform);
   review.issues.push(...pumpkinCreativeIssues(job.opportunity, draft));
   if (review.issues.length) { review.passed = false; review.score = Math.min(40, review.score); }
   if (!review.passed) throw new Error(`Überarbeitung verletzt redaktionelle Prüfung: ${review.issues.join(" ")}`);
@@ -92,13 +92,17 @@ export function selectIdea(ideas: Idea[], opportunity: Opportunity, learning?: L
     reason: `${selected.rationale} Gewichtet nach Ziel (${opportunity.goal}) und Budget (${opportunity.budget}). ${allowedFormats ? `Veröffentlichungsweg erlaubt ${allowedFormats.join(", ")}. ` : ""}${learning?.summary || "Keine historischen Messwerte berücksichtigt."} Keine garantierte Conversion-Prognose.` };
 }
 
-export function inspectContent(content: Content, decision: Decision): Review {
+export function inspectContent(content: Content, decision: Decision, platform?: Opportunity["targetPlatform"]): Review {
   const issues: string[] = [];
   if (content.format !== decision.format) issues.push("Das Ergebnis hat nicht das beauftragte Format.");
   if (content.useCase.length < 12 || content.productIntegration.length < 15) issues.push("Anwendung und Produktrolle müssen konkreter werden.");
   if (content.format === "video") {
     if (content.scenes.reduce((sum, scene) => sum + scene.durationSeconds, 0) !== content.durationSeconds) issues.push("Szenendauern passen nicht zur Gesamtlänge.");
     if (content.scenes.some(scene => scene.audio.split(/\s+/).length > scene.durationSeconds * 2.8)) issues.push("Dialog oder Voiceover ist für die Szenendauer zu lang.");
+    if (platform === "instagram") {
+      if (!/mehr dazu/i.test(content.scenes.at(-1)?.overlay || "") || !/beitrag/i.test(content.scenes.at(-1)?.overlay || "")) issues.push("Im letzten Reel-Bild fehlt der sichtbare Hinweis auf die Produktinfos im Beitrag.");
+      if (content.scenes.some(scene => /(?:https?:\/\/|www\.|\bASIN\s*[A-Z0-9]{10}\b)/i.test(scene.audio))) issues.push("Webadressen und ASINs dürfen nicht im Sprechtext stehen.");
+    }
     if (/fiktive (?:familien)?szene|kein testbericht|produktname, asin|redaktionelle anwendungsidee|modellmerkmale bleiben ungeprüft/i.test(content.caption)) issues.push("Der Begleittext enthält interne Hinweise statt einer lesbaren Videobeschreibung.");
   }
   let imageQualityScore = 100;
@@ -172,7 +176,7 @@ export async function runContentJob(raw: Opportunity, options: {
       await status(attempt ? "revising" : "producing", attempt ? `Überarbeitung ${attempt} von ${MAX_REVISIONS}` : `${job.decision.format}-Agent beauftragt`);
       job.content = contentSchema.parse(await producers[job.decision.format]({ opportunity, idea, inspiration, feedback: job.review, previous: job.content }, generate));
       await status("reviewing", "Orchestrator prüft Anwendung, Glaubwürdigkeit und Umsetzbarkeit");
-      const structural = inspectContent(job.content, job.decision);
+      const structural = inspectContent(job.content, job.decision, opportunity.targetPlatform);
       structural.issues.push(...pumpkinCreativeIssues(opportunity, job.content));
       if (structural.issues.length) { structural.passed = false; structural.score = Math.min(40, structural.score); }
       const semantic = job.mode === "ai" ? await generate("orchestrator", `Prüfe redaktionell streng: konkrete Alltagssituation, überzeugender Nutzen, Hook, glaubwürdige Aussagen, Modellnachweise, korrektes Zubehör, verständliche Geschichte, sprechbare Länge, Linkziel und CTA. Unbelegte konkrete Modellbehauptungen oder erfundene Erfahrungen führen zu passed=false. Keine Pflicht zu künstlichen Zusatznutzen. Gib konkrete Reparaturanweisungen; ab score 75 und ohne wesentliche Mängel bestanden.`, { opportunity, inspiration, idea, content: job.content }, reviewSchema, () => structural) : structural;

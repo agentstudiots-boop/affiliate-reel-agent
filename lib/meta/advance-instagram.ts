@@ -17,7 +17,7 @@ export async function advanceInstagram(jobId: string, action: "request" | "publi
     if (!recent.rows.length) return { publication, whatsapp: "service_window_required" };
     await repo.claimWhatsAppSend(publication.id);
     try {
-      const messageId = await send(`Instagram-Reel · separate Veröffentlichungsfreigabe\n\nVideo ansehen: ${publication.videoUrl}\n\nBeitrag:\n${publication.caption.slice(0,1750)}\n\nAntworte auf DIESE Nachricht mit „Freigeben“ für genau ein Reel oder „Ablehnen“. Dieser Schritt kauft kein neues Video.`);
+      const messageId = await send(`Instagram-Reel · separate Veröffentlichungsfreigabe\n\nVideo ansehen: ${publication.videoUrl}\n\nPrüfe das fertige Video mit Ton: Klingt die Stimme natürlich? Stimmen Handlung und Produkt? Steht „Mehr dazu: Produktinfos im Beitrag“ sichtbar in der Schlussblende? Das Text-zu-Video-Modell kann Einblendungen auslassen; falls etwas fehlt, bitte NICHT freigeben.\n\nDieser organische API-Post hat KEINEN anklickbaren externen Produkt-Button. Die URL in der Caption ist nur Text. Wenn ein direkter Klick zur Produktseite nötig ist, diese Fassung NICHT freigeben.\n\nBeitrag:\n${publication.caption.slice(0,1450)}\n\nAntworte auf DIESE Nachricht mit „Freigeben“ für genau dieses geprüfte Reel oder „Ablehnen“. Dieser Schritt kauft kein neues Video.`);
       publication = await repo.bindMessage(publication.id,messageId);
       return { publication, approvalSent: true };
     } catch (error) {

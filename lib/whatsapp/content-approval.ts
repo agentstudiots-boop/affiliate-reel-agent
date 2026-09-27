@@ -22,7 +22,7 @@ export function contentApprovalMessage(job: ContentJob) {
       ? `Bildbriefing:\n${content.slides.map((slide,index)=>`${index+1}. ${slide.visual}; Prompt: ${slide.prompt}; Text: ${slide.copy}`).join("\n")}`
       : `Beitrag:\n${content.body}`;
   const next=content.format==="video"
-    ? "Danach kommt das Kostenangebot automatisch per WhatsApp. Erst deine dortige Freigabe startet genau eine Videoproduktion. Das fertige Video und der vollständige Post kommen vor der Veröffentlichung erneut per WhatsApp zur Prüfung. Keine Aktion im Content Studio nötig."
+    ? "Danach kommt das Kostenangebot automatisch per WhatsApp. Erst deine dortige Freigabe startet genau eine Videoproduktion. Das fertige Video und der vollständige Post kommen vor der Veröffentlichung erneut per WhatsApp zur Prüfung. Bei organischen Instagram-Reels ist der Affiliate-Link im automatischen Post nur Caption-Text, kein anklickbarer Button. Keine Aktion im Content Studio nötig."
     : content.format==="image"
       ? "Diese Freigabe erlaubt genau eine kostenpflichtige Bildgenerierung; der Preis in Euro steht nicht vorab fest. Das fertige Bild und der Post kommen vor Veröffentlichung erneut per WhatsApp zur Prüfung. Keine Aktion im Content Studio nötig."
       : "Die spätere Veröffentlichung benötigt eine eigene WhatsApp-Freigabe.";

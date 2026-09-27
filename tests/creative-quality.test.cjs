@@ -153,7 +153,7 @@ test('pumpkin reel tells a visible carving story with product context and no mod
   assert.match(visuals,/echten Kürbis/i);
   assert.match(voice,/Kürbisschnitzwerkzeug/);
   assert.match(voice,/laterne/i);
-  assert.match(voice,/YAVOCOS/);
+  assert.match(voice,/Infos zum Schnitzset stehen im Beitrag/);
   assert.doesNotMatch(voice,/garantiert|professionell|Edelstahl|sicher für Kinder/i);
   assert.ok(job.content.scenes.every(scene=>scene.audio.split(/\s+/).length<=scene.durationSeconds*2.5));
   assert.deepEqual(pumpkinCreativeIssues(job.opportunity,job.content,job.marketing),[]);

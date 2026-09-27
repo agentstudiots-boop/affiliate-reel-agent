@@ -9,13 +9,13 @@ export function marketingAgent(input: { opportunity: Opportunity; content: Conte
       rationale: `${content.format === "video" ? "Die sichtbare Anwendung und das emotionale Ergebnis tragen die Geschichte." : content.format === "image" ? "Die Schrittfolge lässt sich speichern und in Ruhe ansehen." : "Die Erklärung erlaubt Nuancen und eine Diskussion über Voraussetzungen."} Ziel: ${opportunity.goal === "conversion" ? "informierte Kaufentscheidung" : opportunity.goal === "education" ? "Verständnis" : "Austausch"}.`,
       adaptation: content.format === "video"
         ? /(?:kürbis|kuerbis|pumpkin).{0,40}(?:schnitz|carving)|(?:schnitz|carving).{0,40}(?:kürbis|kuerbis|pumpkin)/i.test(opportunity.product.name)
-          ? "Hochformat, sichtbares Schnitzen eines echten Halloween-Kürbisses mit dem Kürbisschnitzwerkzeug in Nahaufnahme, Untertitel und Werbekennzeichnung. Vom Werkzeug über die Schnitzhandlung zur leuchtenden Deko-Laterne erzählen."
-          : "Hochformat, sprechbarer Dialog, Untertitel, produktbezogene Nahaufnahme und sichtbare Werbung. Einzelne Szenen schneiden und vertonen."
+          ? "Hochformat, sichtbares Schnitzen eines echten Halloween-Kürbisses mit dem Kürbisschnitzwerkzeug in Nahaufnahme, natürliche deutsche Stimme, Untertitel und Werbekennzeichnung. Vom Werkzeug über die Schnitzhandlung zur leuchtenden Deko-Laterne erzählen. In der Schlussblende sichtbar: Mehr dazu: Produktinfos im Beitrag."
+          : "Hochformat, natürlich sprechbarer Dialog, Untertitel, produktbezogene Nahaufnahme und sichtbare Werbung. Einzelne Szenen schneiden und vertonen. Im letzten Bild ein sichtbarer Hinweis auf die Produktinfos im Beitrag."
         : content.format === "image" ? "Einheitliches Layout, große lesbare Überschriften und Werbekennzeichnung auf dem ersten Slide." : "Kurze Absätze, fachliche Grenzen und eine offene Leserfrage beibehalten.",
       linkPlacement: primary.startsWith("Instagram") ? "Genau einen gekennzeichneten Produktlink und die ASIN als Caption-Text angeben. Dieser organische API-Weg erzeugt keinen externen Shopping-Button; der Caption-Link ist kein zugesicherter klickbarer Link." : "Gekennzeichneten Affiliate-Link ergänzen, sofern die Regeln des Veröffentlichungsorts dies erlauben.",
       conversionHypothesis: "Ein nachvollziehbarer Anwendungsfall könnte qualifizierte Klicks fördern. Ohne Messdaten ist das eine Hypothese.",
       metrics: ["Qualifizierte Linkklicks", "Verkäufe und Provision", content.format === "video" ? "Wiedergabedauer" : "Gespeicherte Beiträge und Rückfragen"],
-      publishingChecks: ["Inhalt, Werbekennzeichnung und Linkziel menschlich freigeben.", "Plattform-/Gruppenregeln und benötigte Medienrechte prüfen.", "Keine Veröffentlichung durch diesen Planungsauftrag."],
+      publishingChecks: ["Inhalt, Werbekennzeichnung und Linkziel menschlich freigeben.", ...(content.format === "video" ? ["Fertiges Video mit Ton prüfen: Stimme, Bildhandlung und Schlussblende müssen tatsächlich stimmen; Runway-Prompts garantieren weder Aussprache noch sichtbare Schrift."] : []), "Plattform-/Gruppenregeln und benötigte Medienrechte prüfen.", "Keine Veröffentlichung durch diesen Planungsauftrag."],
     };
   });
 }
