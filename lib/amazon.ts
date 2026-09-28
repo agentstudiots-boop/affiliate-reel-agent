@@ -14,7 +14,9 @@ export function amazonProduct(raw: string) {
     const url = new URL(raw);
     if (url.protocol !== "https:" || url.username || url.password || url.port
       || !["amazon.de", "www.amazon.de"].includes(url.hostname)) return null;
-    const match = url.pathname.match(/^\/(?:[^/]+\/)?dp\/([A-Z0-9]{10})(?:\/ref=[^/]+)?\/?$/)
+    // Amazon search results often use locale-prefixed detail URLs such as
+    // /-/en/product-name/dp/ASIN. Normalize those to the canonical /dp/ASIN.
+    const match = url.pathname.match(/^\/(?:-\/(?:en|de)\/)?(?:[^/]+\/)?dp\/([A-Z0-9]{10})(?:\/ref=[^/]+)?\/?$/)
       || url.pathname.match(/^\/gp\/product\/([A-Z0-9]{10})(?:\/ref=[^/]+)?\/?$/);
     if (!match) return null;
     // Ignore tracking/display parameters, but never accept redirect or variant targets.
