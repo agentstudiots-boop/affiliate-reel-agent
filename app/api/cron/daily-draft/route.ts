@@ -7,7 +7,9 @@ export const maxDuration = 300;
 
 export function berlinSlot(now: Date): "morning" | "afternoon" | null {
   const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin", hour: "2-digit", hourCycle: "h23" }).format(now));
-  return hour === 9 ? "morning" : hour === 18 ? "afternoon" : null;
+  // Hobby cron can arrive up to 59 minutes after the configured UTC hour.
+  return hour === 9 || hour === 10 ? "morning"
+    : hour === 18 || hour === 19 ? "afternoon" : null;
 }
 
 export async function GET(request: Request) {
@@ -18,8 +20,8 @@ export async function GET(request: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
   try {
-    // Four UTC opportunities cover both CET and CEST. Only the local 09:00
-    // and 18:00 invocations claim a slot; delayed runs remain idempotent.
+    // Four single-run UTC schedules cover CET and CEST. The two-hour local
+    // window tolerates Hobby scheduling delays; the DB claim is idempotent.
     const slot = berlinSlot(new Date());
     if (!slot) return Response.json({ status: "outside_berlin_slot" });
     const result = await createDailyDraft(undefined, slot);

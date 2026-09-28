@@ -7,23 +7,16 @@ import { reviseApprovedStaticContent } from "../content/orchestrator";
 import type { OriginalVisualAsset } from "../content/image-provider";
 import type { ContentJob } from "../content/schema";
 import { hasContentApproval } from "../whatsapp/content-approval";
+import { facebookCaption } from "./facebook-caption";
 
 export class PublicationConflictError extends Error {}
 
 function publicationContent(job: ContentJob) {
   const eligibilityError = facebookPagePublicationError(job);
   if (eligibilityError) throw new PublicationConflictError(eligibilityError);
-  if (!job.content || job.content.format === "video") throw new PublicationConflictError("Bild- oder Textentwurf fehlt.");
-  let source: URL;
-  try { source = new URL(job.opportunity.product.affiliateUrl); }
-  catch { throw new PublicationConflictError("Affiliate-Link fehlt."); }
-  if (source.protocol !== "https:" || source.username || source.password) throw new PublicationConflictError("Affiliate-Link ist nicht sicher.");
-  const base = job.content.format === "text" ? job.content.body : job.content.caption;
-  const lead = job.content.hook.trim().replace(/^Werbung\s*(?:\|\s*Affiliate-Link)?\s*[|:·–-]?\s*/i, "").trim();
-  if (!lead || /^Werbung\b/i.test(lead)) throw new PublicationConflictError("Für den Beitrag fehlt ein natürlicher Einstieg.");
-  const body = base.trim().replace(/^Werbung\s*(?:\|\s*Affiliate-Link)?\s*[|:·–-]?\s*/i, "").trim();
-  const detail = body.startsWith(lead) ? body.slice(lead.length).trim() : body;
-  const caption = `${lead}\nWerbung | Affiliate-Link\nProdukt direkt ansehen: ${source}\n\n${detail}\n\n${job.content.cta}`;
+  let caption: string;
+  try { caption = facebookCaption(job); }
+  catch (error) { throw new PublicationConflictError(error instanceof Error ? error.message : "Beitragstext fehlt."); }
   const hash = createHash("sha256").update(JSON.stringify({caption,content:job.content,jobId:job.id})).digest("hex");
   return { caption, hash };
 }

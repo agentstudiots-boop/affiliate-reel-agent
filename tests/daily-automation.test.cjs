@@ -65,7 +65,8 @@ test('revised Halloween approval stays within WhatsApp text limits and shows the
   assert.match(body,/erwachsene Person schnitzt/i);
   assert.match(body,/Keine Essgabeln/);
   assert.match(body,/Affiliate-Link|Produktlink/);
-  assert.match(body,/Beitragstext:/);
+  assert.match(body,/Beitragstext \(geplante Facebook-Caption\):/);
+  assert.doesNotMatch(body.split('Beitragstext (geplante Facebook-Caption):\n')[1].trimStart(),/^Werbung\b/);
   const complete='Ein vollständiger Beitragstext mit einem eindeutigen letzten Satz.';
   job.content.caption=complete;
   assert.ok(daily.dailyApprovalMessage(job,'2026-09-27').includes(complete));

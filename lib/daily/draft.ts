@@ -16,6 +16,7 @@ import { loadApprovedEditorialCorrections } from "@/lib/whatsapp/language-memory
 import { EDITORIAL_MODEL_ERROR, EDITORIAL_RATE_LIMIT_ERROR } from "@/lib/content/model";
 import { createHash } from "node:crypto";
 import { releaseProduct, reserveProduct } from "@/lib/daily/product-lock";
+import { facebookCaption } from "@/lib/meta/facebook-caption";
 
 async function resolveRequestedProduct(value: string) {
   const asin = /^(?:[A-Z0-9]{10})$/.test(value) ? value : value.match(/^https:\/\/(?:www\.)?amazon\.de\/dp\/([A-Z0-9]{10})\/?$/)?.[1];
@@ -30,6 +31,7 @@ export function dailyApprovalMessage(job:ReturnType<typeof parseJob>,day:string)
     : `um den Content-Plan und eine einmalige kostenpflichtige Bildgenerierung freizugeben (Bildprovider: ${imageProviderStatus().provider || "nicht eingerichtet"}, EUR-Kosten nicht vorab bestätigt)`;
   const summary=job.content?.format==='text'?job.content.body:job.content?.format==='image'?job.content.caption:'';
   if (!job.content || !summary?.trim()) throw new Error("missing_caption");
+  const publicCaption=facebookCaption(job);
   const image=job.content?.format==='image';
   const visualBrief=image?`\n\nBildbriefing für das Titelbild:\n${imageBrief(job).split('\n')
     .filter(line=>/^(HAUPTMOTIV|Motiv und Handlung|Bildaufbau und Details|Nebenmotive|Grenzen):|^HAUPTMOTIV/.test(line))
@@ -37,7 +39,7 @@ export function dailyApprovalMessage(job:ReturnType<typeof parseJob>,day:string)
     .join('\n')}`:'';
   const referenceNotice=job.mode==='reference' && job.modelCalls>0
     ? 'Der KI-Bildentwurf wurde verworfen. Dies ist ein geprüfter Referenzentwurf; bitte Bildbeschreibung und Text besonders sorgfältig prüfen.\n\n':'';
-  const body=`Content-Freigabe · Bildpost ${day}\nProdukt: ${job.opportunity.product.name}\nTitel: ${job.content.title}\nFormat: ${job.content?.format || 'unbekannt'} · Facebook\n\n${referenceNotice}Beitragstext:\n${summary}${visualBrief}\n\nASIN: ${job.opportunity.product.asin}\nAffiliate-Hinweis: ${job.content.disclosure}\nProduktlink: ${job.opportunity.product.affiliateUrl}\nCTA: ${job.content.cta}\nAntworte auf DIESE Nachricht mit „Freigeben“, ${costText}. Danach kommt eine ZWEITE WhatsApp für die Veröffentlichung. „Ablehnen“ stoppt den Auftrag, Änderungswünsche bitte als Text. Noch kein Post ist online.`;
+  const body=`Content-Freigabe · Bildpost ${day}\nProdukt: ${job.opportunity.product.name}\nTitel: ${job.content.title}\nFormat: ${job.content?.format || 'unbekannt'} · Facebook\n\n${referenceNotice}Beitragstext (geplante Facebook-Caption):\n${publicCaption}${visualBrief}\n\nASIN: ${job.opportunity.product.asin}\nProduktlink: ${job.opportunity.product.affiliateUrl}\nAntworte auf DIESE Nachricht mit „Freigeben“, ${costText}. Danach kommt eine ZWEITE WhatsApp für die Veröffentlichung. „Ablehnen“ stoppt den Auftrag, Änderungswünsche bitte als Text. Noch kein Post ist online.`;
   if(body.length>3900)throw Error('daily_approval_too_long');
   return body;
 }
