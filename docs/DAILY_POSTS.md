@@ -126,7 +126,7 @@ den letzten Reel-Status.
 **Inbetriebnahme:** Die beiden neuen Migrationen vor dem produktiven Deploy
 ausführen, wenn ein geschützter Migrationszugang vorhanden ist. Andernfalls
 prüfen die ersten neuen Tages-/Story-/Statusaufrufe das Schema und wenden die
-transaktional gesperrten Migrationen 001–017 selbst an; erst danach starten
+transaktional gesperrten Migrationen 001–020 selbst an; erst danach starten
 Suche oder WhatsApp-Versand. Cron/WhatsApp/Bildprovider in der tatsächlichen
 Vercel-Production prüfen. Eine Codeänderung ohne Production-Deployment startet
 keinen Cron und versendet keine produktionsseitige WhatsApp. Die folgenden älteren Abschnitte dokumentieren
