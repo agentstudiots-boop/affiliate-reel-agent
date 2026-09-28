@@ -145,3 +145,13 @@ test('scout skips an indexed but dead first listing and checks the next matching
   assert.equal(resolved.asin,'B000000002');
   assert.equal(resolved.affiliateUrl.includes('/dp/B000000002?tag='),true);
 });
+
+test('a Saugroboter listing with Robot in its title is not mistaken for a bot check',async()=>{
+  const title='Roborock Saugroboter Robot Vacuum Modell X';
+  const resolved=await findAmazonProduct('Saugroboter','Saugroboter','Haushalte',async()=>[
+    {id:'robot',title,url:source,content:''},
+  ],async()=>title);
+  assert.equal(resolved.asin,'B000000001');
+  assert.equal(resolved.name,title);
+  assert.equal(productIdentityError(resolved),null);
+});
