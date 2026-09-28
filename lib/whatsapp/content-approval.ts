@@ -3,6 +3,7 @@ import { getDatabase, type Sql } from "../memory/db";
 import { parseJob } from "../content/history";
 import { requireJobProduct } from "../content/product-contract";
 import { reviseApprovedVideo, reviseApprovedStaticContent, reviseOperatorInstruction, inspectContent } from "../content/orchestrator";
+import { pumpkinCreativeIssues } from "../content/category";
 import { interpretInstruction, validateInstruction } from "./instruction";
 import { classifyWhatsAppReply } from "./intent";
 import { sendWhatsAppText, WhatsAppRejectedError } from "./client";
@@ -137,7 +138,9 @@ export async function handleContentApproval(input:Incoming,onApproved?: (jobId:s
           if(working.content?.format!=="image")throw error;
           const instruction=validateInstruction(await interpretInstruction(input.body,working),input.body);
           revised=reviseOperatorInstruction(working,instruction);
-          const review=inspectContent(revised.content!,revised.decision!);
+          const review=inspectContent(revised.content!,revised.decision!,revised.opportunity.targetPlatform);
+          review.issues.push(...pumpkinCreativeIssues(revised.opportunity,revised.content!));
+          if(review.issues.length)review.passed=false;
           if(!review.passed)throw Error(`Redaktionelle Prüfung: ${review.issues.join(" ")}`);
           revised.review=review;
           revised.events.push({sequence:revised.events.length+1,at:revised.updatedAt,agent:"orchestrator",kind:"decision",message:`WhatsApp-Wunsch strukturiert ins Bildbriefing übernommen: ${input.body.slice(0,500)}`});

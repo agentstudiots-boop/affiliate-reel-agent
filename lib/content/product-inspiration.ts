@@ -73,6 +73,18 @@ function preset(name: string, useCase: string, category: Opportunity["category"]
       useCases: ["Portionen vorbereiten", "Lebensmittel passend lagern", "Sous-vide nur mit separatem Garer als zusätzlichem Anwendungskontext"],
     };
   }
+  if (/saugroboter|robot.?vacuum/i.test(name)) {
+    return {
+      categoryLabel: "Saugroboter",
+      visualDirections: [
+        "In einem Wohnzimmer liegen Krümel auf einem glatten Boden. Ein neutraler Saugroboter fährt sichtbar zur verschmutzten Stelle; keine Marke, kein erfundenes Bedienfeld und kein garantiertes Reinigungsergebnis.",
+        "Eine Person räumt lose Kabel und kleine Gegenstände vom Boden, bevor ein neutraler Saugroboter seine Fahrt beginnt.",
+        "Teppichkanten und Tierhaare nur als Eignungsfragen zeigen: Die Leistung des konkreten Modells dafür erst anhand der Herstellerangaben prüfen.",
+      ],
+      purchaseCriteria: ["Boden- und Teppicheignung laut Hersteller", "Hindernisse und Schwellen", "Wartung von Bürsten und Behälter"],
+      useCases: ["Krümel auf einem glatten Wohnzimmerboden im Alltag entfernen", "Boden und Kabel vor der Fahrt vorbereiten", "Teppiche und Tierhaare nur bei nachgewiesener Modelleignung einplanen"],
+    };
+  }
   if (/tortilla.{0,25}presse|fladenbrotpresse|maistortilla.{0,15}presse/i.test(name)) {
     return {
       categoryLabel: "Tortillapresse",
