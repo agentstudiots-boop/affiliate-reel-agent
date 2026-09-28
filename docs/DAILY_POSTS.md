@@ -1,8 +1,85 @@
 # Tägliche Entwürfe und Veröffentlichung
 
+## Live-Prüfung 29. September 2026, 01:25 Uhr MESZ
+
+`main` wurde erneut am Remote geprüft: `6363b89f5e8f92e76c859bfa0302c97fbc1290d2`
+(Merge von PR #19). Vercel meldet für das Production-Deployment
+`dpl_2pH8MuGhYvDWaxqjDfi9R59DGoFw` **READY**; die produktive Domain
+`affiliate-reel-agent.vercel.app` ist ihm zugeordnet. Das eingecheckte
+`vercel.json` enthält die vier Tages-Crons um 07:00/08:00 und 16:00/17:00 UTC.
+Die Route ordnet nur 09:00–10:59 und 18:00–19:59 Berliner Zeit zu;
+`daily_drafts` beansprucht `(day,slot)` eindeutig. Die Vercel-Projektansicht
+belegt den Deployment-Zustand, nicht die Ausführung eines zukünftigen Cron-Laufs.
+
+Bis zu dieser Prüfung gab es im neuen Deployment keine Runtime-Einträge. Der
+erste Morgenlauf nach PR #19 hatte noch nicht stattgefunden. Deshalb sind für
+ihn weder Kandidat, aktuelle Amazon-Detailseite und ASIN, Affiliate-Link,
+Content-Plan und Review noch WhatsApp-Versand belegt. Ein ausbleibender
+WhatsApp-Eingang allein unterscheidet Produktauflösung, Review-Fehler,
+Servicefenster und Versandfehler nicht. Nach dem Lauf zuerst Runtime-Logs
+(`daily_draft`, `amazon_resolution`, `reference_image_fallback`, Fehlerstufe)
+und gespeicherte `daily_drafts`, `content_jobs` und Versand-IDs abgleichen.
+Unklare POST-Ergebnisse nicht erneut anstoßen.
+
+Die letzten beobachteten Saugroboter-Live-Probleme stammen aus einem älteren
+Deployment. PR #18 verbessert die KI-Prüfgründe und protokolliert den
+Referenz-Fallback; PR #19 bringt den konkreten Saugroboter-Referenzentwurf
+und natürlichere WhatsApp-Textvorschläge. Ein lokaler Lauf auf aktuellem
+`main` bestand Typprüfung, Lint, **172 Tests** und Production-Build, darunter
+abgelehnter KI-Bildentwurf, geprüfter Saugroboter-Referenzentwurf,
+Produktbindung, Textrevision und erneute Freigabe. Das ist kein Beweis für
+einen erfolgreichen Live-Such-, Amazon- oder WhatsApp-Durchlauf. Die ältere
+Angabe „173 Tests“ beschreibt nicht diesen aktuellen lokalen Testlauf.
+
+Ein authentifizierter GET auf `/api/operations` ist derzeit keine garantiert
+rein lesende Datenbankprüfung: `getOperationsSnapshot` ruft
+`ensureAutomationSchema` auf und kann fehlende Migrationen anwenden. Deshalb
+wurde diese Route für die hier ausdrücklich lesende Prüfung nicht aufgerufen;
+ein direkter lesender Datenbankzugang lag nicht vor. Schema-Zustand, konkrete
+Tageszeile und WhatsApp-Message-ID sind damit noch nicht unabhängig bestätigt.
+Die gruppierten Vercel-Fehler zeigen bislang nur eine `pg`-SSL-Moduswarnung
+aus älteren Deployments; sie erklärt keinen erfolgreichen oder gescheiterten
+Morgenlauf.
+
+### WhatsApp-Sprachdialog: Aufwand und laufende Kosten
+
+Der aktuelle Parser verarbeitet gebundene Änderungswünsche mit genau einem
+Replicate-Aufruf von `openai/gpt-4.1`. Eindeutige Freigaben und Ablehnungen
+bleiben wörtliche Befehle; der Parser darf weder Produkt/ASIN/content_id
+wechseln noch eine Veröffentlichung auslösen. Die Tests belegen, dass ein
+natürlicher Textvorschlag den Affiliate-Hinweis und eine neue Inhaltsfreigabe
+erhält. Sie belegen keine beliebige Mehrturn-Konversation im Live-Betrieb.
+
+Ein vollwertiger Dialog bräuchte klar benannte Befehle (Status,
+Artikelsuche, Entwurf ändern, Rückfrage zum gebundenen Produkt, Abbruch),
+eine eindeutige Zuordnung bei mehreren offenen Aufträgen, begrenzte
+Gesprächshistorie und einen reinen Leseweg für Status. Alle schreibenden
+Aktionen müssten über dieselben Produkt- und WhatsApp-Gates laufen;
+Bildkauf, Post und Modellwechsel dürfen nicht aus einer freien Antwort folgen.
+Für offene Fragen zu Produkten wären verifizierte Quellen und eine
+Nichtwissen-Antwort nötig. Ein Modellwechsel allein behebt weder Amazon-
+Verifikation noch Cron-/Servicefensterprobleme.
+
+Replicate listet für GPT-4.1 **$2 je Mio. Eingabetokens und $8 je Mio.
+Ausgabetokens**; GPT-4.1 mini kostet $0,40/$1,60, nano $0,10/$0,40.
+Ein **Rechenbeispiel** von 2.000 Eingabe- und 500 Ausgabetokens kostet damit
+etwa $0,008 / $0,0016 / $0,0004 pro Modellantwort, vor Steuern und ohne
+WhatsApp-Gebühren. Der tatsächliche Kontext des Projekts kann größer sein;
+Tokenverbrauch, Qualität und Fehlerrate müssen vor einer Umstellung gemessen
+werden. Ein regelbasierter Befehl kostet keinen zusätzlichen Modellaufruf.
+Preise: [GPT-4.1](https://replicate.com/openai/gpt-4.1),
+[mini](https://replicate.com/openai/gpt-4.1-mini),
+[nano](https://replicate.com/openai/gpt-4.1-nano).
+Meta kündigt außerdem ab **1. Oktober 2026** eine Abrechnung für
+Service-Nachrichten an; die künftigen länder- und kategorienabhängigen
+WhatsApp-Kosten sind hier nicht beziffert. Keine Business-Vorlage aktivieren
+oder anderes Modell produktiv schalten, bevor Kosten und Verhalten konkret
+geprüft sind: [Meta-Preise](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing),
+[Service-Nachrichten](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing/non-template-messages).
+
 ## Stand 29. September 2026
 
-Production ist mit den Änderungen aus PR #12–#18 auf `main` deployed. Der
+Production ist inzwischen mit den Änderungen aus PR #12–#19 auf `main` deployed. Der
 Meta-Webhook wurde auf `https://affiliate-reel-agent.vercel.app/api/whatsapp/webhook`
 verifiziert; eine `Status`-Nachricht und mehrere gezielte Artikelsuchen wurden
 in Production angenommen und beantwortet. Der erste produktive Morgen- und
