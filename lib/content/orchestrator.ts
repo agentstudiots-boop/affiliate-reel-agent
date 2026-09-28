@@ -183,7 +183,7 @@ export async function runContentJob(raw: Opportunity, options: {
       const structural = inspectContent(job.content, job.decision, opportunity.targetPlatform);
       structural.issues.push(...pumpkinCreativeIssues(opportunity, job.content));
       if (structural.issues.length) { structural.passed = false; structural.score = Math.min(40, structural.score); }
-      const semantic = job.mode === "ai" ? await generate("orchestrator", `Prüfe redaktionell streng: konkrete Alltagssituation, überzeugender Nutzen, Hook, glaubwürdige Aussagen, Modellnachweise, korrektes Zubehör, verständliche Geschichte, sprechbare Länge, Linkziel und CTA. Prüfe die geplante Szene auch auf sachlich falsche Werkzeugnutzung: ${VISUAL_FUNCTION_RULE} Bei einem solchen Widerspruch passed=false und eine konkrete Korrektur verlangen. Bestätigte Korrekturen als Beispiele für übertragbare Regeln auswerten, nicht als alte Produktfakten kopieren. Unbelegte konkrete Modellbehauptungen oder erfundene Erfahrungen führen zu passed=false. Keine Pflicht zu künstlichen Zusatznutzen. Gib konkrete Reparaturanweisungen; ab score 75 und ohne wesentliche Mängel bestanden.`, { opportunity, inspiration, idea, corrections, content: job.content }, reviewSchema, () => structural) : structural;
+      const semantic = job.mode === "ai" ? await generate("orchestrator", `Prüfe redaktionell streng: konkrete Alltagssituation, überzeugender Nutzen, Hook, glaubwürdige Aussagen, Modellnachweise, korrektes Zubehör, verständliche Geschichte, sprechbare Länge, Linkziel und CTA. Prüfe die geplante Szene auch auf sachlich falsche Werkzeugnutzung: ${VISUAL_FUNCTION_RULE} Bei einem solchen Widerspruch passed=false und eine konkrete Korrektur verlangen. Bestätigte Korrekturen als Beispiele für übertragbare Regeln auswerten, nicht als alte Produktfakten kopieren. Unbelegte konkrete Modellbehauptungen oder erfundene Erfahrungen führen zu passed=false. Keine Pflicht zu künstlichen Zusatznutzen. Das Feld issues enthält ausschließlich tatsächliche Mängel mit konkreter Reparaturanweisung, niemals Lob, erfüllte Kriterien oder eine Zusammenfassung der Stärken. Wenn keine Mängel vorliegen, gib issues=[] und passed=true bei score mindestens 75 zurück. Wenn passed=false, benenne mindestens einen echten Mangel und begründe den Score.`, { opportunity, inspiration, idea, corrections, content: job.content }, reviewSchema, () => structural) : structural;
       job.review = { passed: structural.passed && semantic.passed && semantic.score >= 75 && semantic.issues.length === 0,
         score: Math.min(structural.score, semantic.score), issues: [...structural.issues, ...semantic.issues].filter((v, i, a) => a.indexOf(v) === i) };
       await emit("orchestrator", "decision", job.review.passed ? "Entwurf für Marketingplanung geeignet; menschliche Freigabe bleibt offen." : "Entwurf benötigt Überarbeitung.", job.review);
@@ -215,10 +215,12 @@ export async function runContentJob(raw: Opportunity, options: {
           await emit("orchestrator", "decision", "KI-Entwurf verworfen. Geprüften Referenzentwurf zur menschlichen Inhaltsfreigabe vorbereitet; kein Bild erzeugt.",
             { rejectedIssues: rejected.issues });
         } else {
+          console.info(JSON.stringify({event:"reference_image_fallback",stage:"review_rejected",issueCount:review.issues.length,score:review.score}));
           job.review = { ...rejected, issues: [...new Set([...rejected.issues, ...review.issues])] };
         }
       } catch (error) {
         options.signal?.throwIfAborted();
+        console.info(JSON.stringify({event:"reference_image_fallback",stage:"construction_failed",errorType:error instanceof Error?error.name:"unknown"}));
         await emit("orchestrator", "decision", "Auch der Referenzentwurf ist nicht prüfbar; keine Freigabe.",
           { failureType: error instanceof Error ? error.name : "unknown" });
       }
