@@ -19,7 +19,8 @@ export async function runProductScout(productSearch?: string) {
         const resolvedProduct = await findAmazonProduct(candidate.name, candidate.searchQuery, candidate.targetGroup);
         return { ...candidate, name: resolvedProduct.name, resolvedProduct,
           amazonUrl: resolvedProduct.sourceUrl, affiliateUrl: resolvedProduct.affiliateUrl };
-      } catch { return { ...candidate, resolvedProduct: undefined, amazonUrl: "", affiliateUrl: "", resolutionError: "product_unresolved" }; }
+      } catch (error) { return { ...candidate, resolvedProduct: undefined, amazonUrl: "", affiliateUrl: "",
+        resolutionError: error instanceof Error && error.message === "amazon_verification_blocked" ? "amazon_verification_blocked" : "product_unresolved" }; }
     })),
     sources: webSources(result.sources),
   };

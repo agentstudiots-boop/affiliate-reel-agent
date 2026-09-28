@@ -43,14 +43,15 @@ test('WhatsApp starts each explicit image post once, while replies stay with the
   assert.equal(await startImagePostFromWhatsApp({...message,id:'wamid.bad',body:'Bildpost example.com'},()=>db,start,send),true);
   assert.equal(calls.length,1); assert.match(messages[0],/Bitte sende/);
   for (const [index,body] of ['Artikelsuche Saugroboter','Artikelsuche Produktname Saugroboter',
-    'Artikelsuche (Produktname Saugroboter)','Artikelsuche (Saugroboter)','Neue Artikelsuche: Saugroboter'].entries()) {
+    'Artikelsuche (Produktname Saugroboter)','Artikelsuche (Saugroboter)','Neue Artikelsuche: Saugroboter',
+    'Such mir einen Saugroboter','Finde mir einen Saugroboter'].entries()) {
     assert.deepEqual(imagePostCommand(body),{product:undefined,search:'Saugroboter',invalid:false});
     assert.equal(await startImagePostFromWhatsApp({...message,id:`wamid.robot.${index}`,body},()=>db,start,send),true);
     assert.equal(calls.at(-1).search,'Saugroboter');
   }
-  assert.equal(calls.length,6);
+  assert.equal(calls.length,8);
   assert.equal(await startImagePostFromWhatsApp({...message,id:'wamid.robot.0',body:'Artikelsuche Saugroboter'},()=>db,start,send),true);
-  assert.equal(calls.length,6);
+  assert.equal(calls.length,8);
   assert.equal(await startImagePostFromWhatsApp({...message,id:'wamid.robot.reply',body:'Artikelsuche Saugroboter',replyToMessageId:'wamid.approval'},()=>db,start,send),false);
 });
 

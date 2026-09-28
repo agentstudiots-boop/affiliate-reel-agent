@@ -1,5 +1,29 @@
 # Tägliche Entwürfe und Veröffentlichung
 
+## Stand 28. September 2026
+
+Der Tages-Cron hat vier einzelne, jeweils einmal täglich geplante UTC-Aufrufe:
+07:00, 08:00, 16:00 und 17:00. Die Route nimmt einen Morgenlauf nur zwischen
+09:00 und 10:59 Uhr deutscher Zeit und einen Abendlauf nur zwischen 18:00 und
+19:59 Uhr an. Der eindeutige Datenbank-Claim verhindert doppelte Aufträge.
+Diese Anordnung deckt Sommer- und Winterzeit ab und ist mit der
+Einmal-pro-Tag-Grenze je Cron-Eintrag im Vercel-Hobby-Plan vereinbar. Hobby
+garantiert den Aufruf nur innerhalb der geplanten Stunde, nicht minutengenau.
+Eine WhatsApp um exakt 09:00 oder 18:00 ist damit nicht zugesichert.
+
+Der Content-Claim prüft jetzt den tatsächlichen Primärschlüssel auf
+`(day,slot)`. Die Migrationen 019 und 020 reparieren den Schlüssel bei Bedarf
+und reservieren ASINs sowie eng definierte Produktfamilien sieben Tage lang,
+bevor eine kostenpflichtige Planung beginnen kann. Die Freigabe für einen
+Facebook-Bildpost zeigt die vollständige geplante Veröffentlichungscaption.
+Außerhalb des WhatsApp-Servicefensters bleibt ohne ausdrücklich aktivierte,
+genehmigte Business-Vorlage der Entwurf gespeichert und es kommt keine
+automatische WhatsApp. Eine solche Vorlage kann Gebühren verursachen.
+
+Der Preview-Build für PR #12 war erfolgreich. Das produktive Schema, die
+historischen Ausführungslogs und die echte WhatsApp-Zustellung sind damit
+noch nicht geprüft. Production läuft weiterhin auf dem bisherigen `main`.
+
 ## Änderung vom 27. September 2026
 
 Die bisherige Datums-Einmalgrenze wurde durch `(day,slot)` ersetzt (Migration
@@ -102,7 +126,7 @@ den letzten Reel-Status.
 **Inbetriebnahme:** Die beiden neuen Migrationen vor dem produktiven Deploy
 ausführen, wenn ein geschützter Migrationszugang vorhanden ist. Andernfalls
 prüfen die ersten neuen Tages-/Story-/Statusaufrufe das Schema und wenden die
-transaktional gesperrten Migrationen 001–017 selbst an; erst danach starten
+transaktional gesperrten Migrationen 001–020 selbst an; erst danach starten
 Suche oder WhatsApp-Versand. Cron/WhatsApp/Bildprovider in der tatsächlichen
 Vercel-Production prüfen. Eine Codeänderung ohne Production-Deployment startet
 keinen Cron und versendet keine produktionsseitige WhatsApp. Die folgenden älteren Abschnitte dokumentieren

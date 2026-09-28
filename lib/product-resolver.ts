@@ -13,16 +13,21 @@ export async function verifyAmazonProductPage(asin: string, request: typeof fetc
       method: "GET", redirect: "follow", cache: "no-store", signal: AbortSignal.timeout(12000),
       headers: { Accept: "text/html", "Accept-Language": "de-DE,de;q=0.9" },
     });
+    if (response.status === 429 || response.status === 403) throw new Error("amazon_verification_blocked");
+    if (response.url && /(?:captcha|robot.?check|validatecaptcha)/i.test(response.url))
+      throw new Error("amazon_verification_blocked");
     if (!response.ok || (response.url && amazonProduct(response.url)?.asin !== asin)) throw new Error(PRODUCT_UNRESOLVED);
     const html = (await response.text()).slice(0, 2_000_000);
-    if (/Robot Check|Enter the characters you see below|Derzeit nicht verfügbar|Currently unavailable|Seite wurde nicht gefunden/i.test(html)
+    if (/Robot Check|Enter the characters you see below|captcha/i.test(html)) throw new Error("amazon_verification_blocked");
+    if (/Derzeit nicht verfügbar|Currently unavailable|Seite wurde nicht gefunden/i.test(html)
       || !new RegExp(`(?:data-asin=["']${asin}["']|/dp/${asin}(?:[/?"']))`, "i").test(html)) throw new Error(PRODUCT_UNRESOLVED);
     const rawTitle = html.match(/id=["']productTitle["'][^>]*>([\s\S]*?)<\/span>/i)?.[1]
       || html.match(/property=["']og:title["'][^>]*content=["']([^"']+)["']/i)?.[1];
     const title = rawTitle?.replace(/<[^>]*>/g, " ").replace(/&(?:amp|quot|#39);/g, " ").replace(/\s+/g, " ").trim();
     if (!title || title.length < 6 || /^Amazon(?:\.de)?\b/i.test(title)) throw new Error(PRODUCT_UNRESOLVED);
     return title.slice(0, 160);
-  } catch { throw new Error(PRODUCT_UNRESOLVED); }
+  } catch (error) { throw error instanceof Error && error.message === "amazon_verification_blocked"
+    ? error : new Error(PRODUCT_UNRESOLVED); }
 }
 
 // Indexed title suggests a candidate; current Amazon HTML confirms identity.
@@ -40,7 +45,8 @@ export async function resolveAmazonProduct(product: Product, search = tavilySear
   if (!result) throw new Error(PRODUCT_UNRESOLVED);
   let name: string;
   try { name = (await verify(source.asin)).trim().slice(0, 160); }
-  catch { throw new Error(PRODUCT_UNRESOLVED); }
+  catch (error) { throw error instanceof Error && error.message === "amazon_verification_blocked"
+    ? error : new Error(PRODUCT_UNRESOLVED); }
   if (name.length < 5) throw new Error(PRODUCT_UNRESOLVED);
   // Reject a different product family supplied in the briefing; never silently redirect A to B.
   const words = product.name.toLocaleLowerCase("de-DE").match(/[\p{L}\p{N}]{4,}/gu) || [];
@@ -84,14 +90,16 @@ export async function findAmazonProduct(categoryName: string, query: string, tar
   const results = await search({ query: `site:amazon.de ${query}`, maxResults: 5 });
   // A scout seed is a category idea, not yet an identified product. Bind its actual result title.
   const categoryWords = categoryName.toLocaleLowerCase("de-DE").match(/[\p{L}\p{N}]{4,}/gu) || [];
+  let blocked = false;
   for (const found of results.filter(item => amazonProduct(item.url) && categoryWords.some(word => item.title.toLocaleLowerCase("de-DE").includes(word)))) {
     const name = found.title.replace(/\s*[:|–-]\s*Amazon\.de(?:\s*:.*)?$/i, "").trim().slice(0,160);
     try {
       const product = await resolveAmazonProduct({ name, sourceUrl: found.url, affiliateUrl: "", price: "", targetGroup,
         benefits: "Eignung und Eigenschaften am konkreten Modell prüfen.", notes: "Produktidentität anhand der aktuellen Amazon-Produktseite geprüft; keine Eigenschaften oder Preise verifiziert." }, async () => results, verify);
       if (categoryWords.some(word => product.name.toLocaleLowerCase("de-DE").includes(word))) return product;
-    } catch { /* Try the next candidate rather than proposing a dead listing. */ }
+    } catch (error) { if (error instanceof Error && error.message === "amazon_verification_blocked") blocked = true; }
   }
+  if (blocked) throw new Error("amazon_verification_blocked");
   throw new Error(PRODUCT_UNRESOLVED);
 }
 

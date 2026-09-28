@@ -10,7 +10,15 @@
     },
     {
       "path": "/api/cron/daily-draft",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/daily-draft",
       "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/cron/daily-draft",
+      "schedule": "0 17 * * *"
     },
     {
       "path": "/api/cron/weekly-report",

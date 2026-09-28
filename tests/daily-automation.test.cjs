@@ -30,29 +30,27 @@ test('daily cron produces one saved image brief, requires a WhatsApp window, and
     },
   });
   const first=await daily.createDailyDraft('2026-09-24');
-  assert.equal(first.status,'awaiting_approval');assert.equal(first.whatsapp,'template_required');
+  assert.equal(first.status,'awaiting_approval',JSON.stringify(first));assert.equal(first.whatsapp,'template_required');
   assert.equal(messages.length,0);
   const duplicate=await daily.createDailyDraft('2026-09-24');
   assert.equal(duplicate.status,'already_claimed');assert.equal(scouts,1);
   await pg.query("INSERT INTO whatsapp_events(message_id,wa_id,intent,payload) VALUES('inbound.test','491234','changes_requested','{}')");
   const next=await daily.createDailyDraft('2026-09-25');
-  assert.equal(next.status,'awaiting_approval');assert.equal(next.whatsapp,'approval_sent');
-  assert.equal(scouts,2);assert.equal(messages.length,1);
-  assert.match(messages[0],/Content-Freigabe/);
-  assert.ok(messages[0].length<=3900);
+  assert.equal(next.status,'needs_input');assert.equal(next.reason,'product_repeat_blocked');
+  assert.equal(scouts,2);assert.equal(messages.length,0);
   const saved=await pg.query("SELECT status,whatsapp_message_id FROM daily_drafts WHERE day='2026-09-25'");
-  assert.equal(saved.rows[0].status,'awaiting_approval');
-  assert.equal(saved.rows[0].whatsapp_message_id,'wamid.mock.1');
+  assert.equal(saved.rows[0].status,'needs_input');
+  assert.equal(saved.rows[0].whatsapp_message_id,null);
   assert.equal((await daily.createDailyDraft('2026-09-25')).status,'already_claimed');
   const second=await daily.createDailyDraft('2026-09-25','afternoon');
-  assert.equal(second.status,'awaiting_approval');
+  assert.equal(second.status,'needs_input');
   assert.notEqual(second.jobId,next.jobId);
   assert.equal((await daily.createDailyDraft('2026-09-25','afternoon')).status,'already_claimed');
   const manual=await daily.createDailyDraft('2026-09-25','manual:wa-id-one');
-  assert.equal(manual.status,'awaiting_approval');
+  assert.equal(manual.status,'needs_input');
   assert.equal((await pg.query("SELECT count(*)::int AS n FROM daily_drafts WHERE day='2026-09-25'")).rows[0].n,3);
   assert.equal(scouts,4);
-  assert.equal(messages.length,3);
+  assert.equal(messages.length,0);
   assert.equal((await pg.query('SELECT count(*)::int AS n FROM publication_requests')).rows[0].n,0);
 });
 
@@ -67,6 +65,13 @@ test('revised Halloween approval stays within WhatsApp text limits and shows the
   assert.match(body,/erwachsene Person schnitzt/i);
   assert.match(body,/Keine Essgabeln/);
   assert.match(body,/Affiliate-Link|Produktlink/);
+  assert.match(body,/Beitragstext \(geplante Facebook-Caption\):/);
+  assert.doesNotMatch(body.split('Beitragstext (geplante Facebook-Caption):\n')[1].trimStart(),/^Werbung\b/);
+  const complete='Ein vollständiger Beitragstext mit einem eindeutigen letzten Satz.';
+  job.content.caption=complete;
+  assert.ok(daily.dailyApprovalMessage(job,'2026-09-27').includes(complete));
+  job.content.caption='   ';
+  assert.throws(()=>daily.dailyApprovalMessage(job,'2026-09-27'),/missing_caption/);
 });
 
 test('a named WhatsApp search reaches TrendScout and can draft only a verified matching product',async t=>{
@@ -93,20 +98,19 @@ test('a named WhatsApp search reaches TrendScout and can draft only a verified m
   });
   const found=await daily.createDailyDraft('2026-09-27','manual:search-robot',undefined,'Saugroboter');
   assert.deepEqual(searches,['Saugroboter']);
-  assert.equal(found.status,'awaiting_approval');
+  assert.equal(found.status,'awaiting_approval',JSON.stringify(found));
   const jobs=(await db.query('SELECT snapshot FROM content_jobs')).rows;
   assert.equal(jobs.length,1);assert.equal(jobs[0].snapshot.opportunity.product.name,product.name);
   assert.equal(jobs[0].snapshot.opportunity.product.asin,'B0ABCD1234');
   assert.equal(messages.length,1);assert.match(messages[0],/Saugroboter Modell R/);
   assert.equal((await daily.createDailyDraft('2026-09-27','manual:search-robot',undefined,'Saugroboter')).status,'already_claimed');
   const generic=await daily.createDailyDraft('2026-09-27','manual:general-search');
-  assert.equal(generic.status,'awaiting_approval');
-  assert.equal((await db.query('SELECT snapshot FROM content_jobs WHERE id=$1',[generic.jobId])).rows[0].snapshot.opportunity.product.asin,'B0ABCD1234');
+  assert.equal(generic.status,'needs_input');assert.equal(generic.reason,'product_repeat_blocked');
   assert.equal(searches.at(-1),undefined);
   const missing=await daily.createDailyDraft('2026-09-27','manual:search-missing',undefined,'Wäschetrockner');
   assert.equal(missing.status,'needs_input');assert.equal(missing.reason,'product_unresolved');
-  assert.equal((await db.query('SELECT count(*)::int AS n FROM content_jobs')).rows[0].n,2);
-  assert.equal(messages.length,2);
+  assert.equal((await db.query('SELECT count(*)::int AS n FROM content_jobs')).rows[0].n,1);
+  assert.equal(messages.length,1);
 });
 
 test('a generic search stops before content planning when no Amazon product can be verified',async t=>{
