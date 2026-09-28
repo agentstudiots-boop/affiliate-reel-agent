@@ -8,26 +8,51 @@ import { parseJob } from "./content/history";
 // title and ASIN must be readable before an affiliate draft can be proposed.
 export async function verifyAmazonProductPage(asin: string, request: typeof fetch = fetch): Promise<string> {
   if (!/^[A-Z0-9]{10}$/.test(asin)) throw new Error(PRODUCT_UNRESOLVED);
+  const diagnostic = (stage: string, status?: number) => console.info(JSON.stringify({
+    event: "amazon_live_verification", stage, ...(status === undefined ? {} : { status }),
+  }));
   try {
     const response = await request(`https://www.amazon.de/dp/${asin}`, {
       method: "GET", redirect: "follow", cache: "no-store", signal: AbortSignal.timeout(12000),
       headers: { Accept: "text/html", "Accept-Language": "de-DE,de;q=0.9" },
     });
-    if (response.status === 429 || response.status === 403) throw new Error("amazon_verification_blocked");
-    if (response.url && /(?:captcha|robot.?check|validatecaptcha)/i.test(response.url))
+    if (response.status === 429 || response.status === 403) {
+      diagnostic("http_blocked", response.status);
       throw new Error("amazon_verification_blocked");
-    if (!response.ok || (response.url && amazonProduct(response.url)?.asin !== asin)) throw new Error(PRODUCT_UNRESOLVED);
+    }
+    if (response.url && /(?:captcha|robot.?check|validatecaptcha)/i.test(response.url)) {
+      diagnostic("challenge_redirect", response.status);
+      throw new Error("amazon_verification_blocked");
+    }
+    if (!response.ok) { diagnostic("http_unavailable", response.status); throw new Error(PRODUCT_UNRESOLVED); }
+    if (response.url && amazonProduct(response.url)?.asin !== asin) {
+      diagnostic("identity_redirect", response.status);
+      throw new Error(PRODUCT_UNRESOLVED);
+    }
     const html = (await response.text()).slice(0, 2_000_000);
-    if (/Robot Check|Enter the characters you see below|captcha/i.test(html)) throw new Error("amazon_verification_blocked");
+    if (/Robot Check|Enter the characters you see below|captcha/i.test(html)) {
+      diagnostic("challenge_html", response.status);
+      throw new Error("amazon_verification_blocked");
+    }
     if (/Derzeit nicht verfügbar|Currently unavailable|Seite wurde nicht gefunden/i.test(html)
-      || !new RegExp(`(?:data-asin=["']${asin}["']|/dp/${asin}(?:[/?"']))`, "i").test(html)) throw new Error(PRODUCT_UNRESOLVED);
+      || !new RegExp(`(?:data-asin=["']${asin}["']|/dp/${asin}(?:[/?"']))`, "i").test(html)) {
+      diagnostic("identity_html_missing", response.status);
+      throw new Error(PRODUCT_UNRESOLVED);
+    }
     const rawTitle = html.match(/id=["']productTitle["'][^>]*>([\s\S]*?)<\/span>/i)?.[1]
       || html.match(/property=["']og:title["'][^>]*content=["']([^"']+)["']/i)?.[1];
     const title = rawTitle?.replace(/<[^>]*>/g, " ").replace(/&(?:amp|quot|#39);/g, " ").replace(/\s+/g, " ").trim();
-    if (!title || title.length < 6 || /^Amazon(?:\.de)?\b/i.test(title)) throw new Error(PRODUCT_UNRESOLVED);
+    if (!title || title.length < 6 || /^Amazon(?:\.de)?\b/i.test(title)) {
+      diagnostic("product_title_missing", response.status);
+      throw new Error(PRODUCT_UNRESOLVED);
+    }
     return title.slice(0, 160);
-  } catch (error) { throw error instanceof Error && error.message === "amazon_verification_blocked"
-    ? error : new Error(PRODUCT_UNRESOLVED); }
+  } catch (error) {
+    if (error instanceof Error && error.message !== PRODUCT_UNRESOLVED && error.message !== "amazon_verification_blocked")
+      diagnostic("request_failed");
+    throw error instanceof Error && error.message === "amazon_verification_blocked"
+      ? error : new Error(PRODUCT_UNRESOLVED);
+  }
 }
 
 // Indexed title suggests a candidate; current Amazon HTML confirms identity.
