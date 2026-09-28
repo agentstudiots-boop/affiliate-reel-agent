@@ -42,15 +42,24 @@ export async function resolveAmazonProduct(product: Product, search = tavilySear
   catch { throw new Error(PRODUCT_UNRESOLVED); }
   const result = results.find(item => amazonProduct(item.url)?.asin === source.asin
     && item.title.trim().length > 5 && !/captcha|robot|^Amazon\.de\s*[:|-]?\s*$/i.test(item.title.trim()));
-  if (!result) throw new Error(PRODUCT_UNRESOLVED);
+  if (!result) {
+    console.info(JSON.stringify({event:"amazon_resolution",stage:"indexed_asin_missing"}));
+    throw new Error(PRODUCT_UNRESOLVED);
+  }
   let name: string;
   try { name = (await verify(source.asin)).trim().slice(0, 160); }
-  catch (error) { throw error instanceof Error && error.message === "amazon_verification_blocked"
-    ? error : new Error(PRODUCT_UNRESOLVED); }
+  catch (error) {
+    console.info(JSON.stringify({event:"amazon_resolution",stage:error instanceof Error && error.message === "amazon_verification_blocked" ? "live_blocked" : "live_unavailable"}));
+    throw error instanceof Error && error.message === "amazon_verification_blocked"
+      ? error : new Error(PRODUCT_UNRESOLVED);
+  }
   if (name.length < 5) throw new Error(PRODUCT_UNRESOLVED);
   // Reject a different product family supplied in the briefing; never silently redirect A to B.
   const words = product.name.toLocaleLowerCase("de-DE").match(/[\p{L}\p{N}]{4,}/gu) || [];
-  if (!words.length || !words.some(word => name.toLocaleLowerCase("de-DE").includes(word))) throw new Error(PRODUCT_UNRESOLVED);
+  if (!words.length || !words.some(word => name.toLocaleLowerCase("de-DE").includes(word))) {
+    console.info(JSON.stringify({event:"amazon_resolution",stage:"indexed_live_title_mismatch"}));
+    throw new Error(PRODUCT_UNRESOLVED);
+  }
   const verified = bindAmazonProduct({ ...product, name, productVerifiedName: name,
     productVerifiedAt: new Date().toISOString(), asin: source.asin, productUrl: source.productUrl });
   requireProduct(verified);
@@ -92,14 +101,18 @@ export async function findAmazonProduct(categoryName: string, query: string, tar
   // A scout seed is a category idea, not yet an identified product. Bind its actual result title.
   const categoryWords = categoryName.toLocaleLowerCase("de-DE").match(/[\p{L}\p{N}]{4,}/gu) || [];
   let blocked = false;
-  for (const found of results.filter(item => amazonProduct(item.url) && categoryWords.some(word => item.title.toLocaleLowerCase("de-DE").includes(word)))) {
+  const details=results.filter(item=>amazonProduct(item.url));
+  const relevant=details.filter(item=>categoryWords.some(word=>item.title.toLocaleLowerCase("de-DE").includes(word)));
+  for (const found of relevant) {
     const name = found.title.replace(/\s*[:|–-]\s*Amazon\.de(?:\s*:.*)?$/i, "").trim().slice(0,160);
     try {
       const product = await resolveAmazonProduct({ name, sourceUrl: found.url, affiliateUrl: "", price: "", targetGroup,
         benefits: "Eignung und Eigenschaften am konkreten Modell prüfen.", notes: "Produktidentität anhand der aktuellen Amazon-Produktseite geprüft; keine Eigenschaften oder Preise verifiziert." }, async () => results, verify);
       if (categoryWords.some(word => product.name.toLocaleLowerCase("de-DE").includes(word))) return product;
+      console.info(JSON.stringify({event:"amazon_resolution",stage:"category_live_title_mismatch"}));
     } catch (error) { if (error instanceof Error && error.message === "amazon_verification_blocked") blocked = true; }
   }
+  console.info(JSON.stringify({event:"amazon_resolution",stage:blocked?"live_blocked":relevant.length?"no_verified_category_match":"no_indexed_category_match",indexed:results.length,details:details.length,relevant:relevant.length}));
   if (blocked) throw new Error("amazon_verification_blocked");
   throw new Error(PRODUCT_UNRESOLVED);
 }
