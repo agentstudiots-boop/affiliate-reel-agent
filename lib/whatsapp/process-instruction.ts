@@ -2,6 +2,7 @@ import {createHash} from "node:crypto";
 import {getDatabase,type Database} from "../memory/db";
 import {parseJob} from "../content/history";
 import {reviseOperatorInstruction,inspectContent} from "../content/orchestrator";
+import {pumpkinCreativeIssues} from "../content/category";
 import {visualFingerprint} from "../content/visual-context";
 import {interpretInstruction,validateInstruction,clarification,InstructionParserError,type Instruction} from "./instruction";
 import {resolveInstructionTarget} from "./instruction-target";
@@ -121,7 +122,9 @@ export async function processOperatorInstruction(input:OperatorMessage,
         if(parserFailure)throw Error(parserFailure);
         if(!['revise_image','revise_text','revise_both'].includes(instruction.intent))throw Error('clarify');
         const revised=reviseOperatorInstruction(original,instruction);
-        const review=inspectContent(revised.content!,revised.decision!);
+        const review=inspectContent(revised.content!,revised.decision!,revised.opportunity.targetPlatform);
+        review.issues.push(...pumpkinCreativeIssues(revised.opportunity,revised.content!));
+        if(review.issues.length)review.passed=false;
         if(!review.passed)throw Error('creative_review_failed');revised.review=review;
         const event={sequence:original.events.length+1,at:revised.updatedAt,agent:'orchestrator' as const,kind:'decision' as const,
           message:'Strukturierte WhatsApp-Revision übernommen; erneute Freigabe erforderlich.',

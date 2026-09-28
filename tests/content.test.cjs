@@ -77,6 +77,18 @@ test('a home and living reel does not call blankets devices in its spoken CTA', 
   assert.match(job.content.caption, /^Werbung \|/);
 });
 
+test('Saugroboter reference image has a concrete scene and leaves carpet and pet-hair performance unclaimed',async()=>{
+  const product={...opportunity.product,name:'Saugroboter Robot Vacuum Modell R',productVerifiedName:'Saugroboter Robot Vacuum Modell R'};
+  const job=await runContentJob({...opportunity,product,useCase:'Ein Saugroboter im Wohnzimmer als mögliche Alltagshilfe.',
+    category:'household',targetPlatform:'facebook',goal:'education',budget:'low'},
+  {mode:'reference',allowedFormats:['image']});
+  assert.equal(job.status,'awaiting_approval',JSON.stringify(job.review));
+  assert.equal(job.modelCalls,0);
+  assert.match(job.content.slides[0].visual,/Krümel.*glatten Boden.*Saugroboter fährt/i);
+  assert.match(job.content.slides.map(slide=>slide.copy).join(' '),/Teppicheignung laut Hersteller/);
+  assert.doesNotMatch(job.content.caption,/garantiert|entfernt Tierhaare vom Teppich/i);
+});
+
 test('allows two revisions, sends feedback through orchestrator and stops at eight model calls', async () => {
   let reviews = 0;
   const briefs = [];

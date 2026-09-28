@@ -89,6 +89,21 @@ test('invalid, uncertain, product-changing or publishing model output cannot aut
   assert.equal(validateInstruction(instruction('revise_text',{requires_new_generation:true}),'Text natürlicher').requires_new_generation,false);
 });
 
+test('one language-model interpretation can carry grounded natural copy into a new approval',async()=>{
+  const job=await runContentJob(opportunity(),{allowedFormats:['image']});
+  const copy={proposed_hook:'Aus dem Kürbis wird eine Laterne für den Hauseingang',
+    proposed_caption:'Ein Gesicht aufzeichnen und den echten Kürbis am Basteltisch schnitzen: Eine erwachsene Person führt das passende Werkzeug. Schau dir den Lieferumfang auf der Produktseite an. Bei einem Kauf über den Affiliate-Link kann ich eine Provision erhalten.'};
+  const parsed=validateInstruction(instruction('revise_text',copy),'Der Text soll natürlicher klingen');
+  assert.equal(parsed.intent,'revise_text');
+  const revised=reviseOperatorInstruction(job,parsed);
+  assert.equal(revised.status,'awaiting_approval');
+  assert.equal(revised.content.hook,copy.proposed_hook);
+  assert.equal(revised.content.caption,copy.proposed_caption);
+  assert.equal(revised.opportunity.product.asin,job.opportunity.product.asin);
+  assert.equal(validateInstruction(instruction('revise_text',{...copy,proposed_caption:'https://falscher-link.test'}),'Text natürlicher').intent,'clarify');
+  assert.equal(validateInstruction(instruction('revise_text',{...copy,proposed_hook:'Werbung: Laterne'}),'Text natürlicher').intent,'clarify');
+});
+
 test('provider failures stay technical errors with a single attempt',async t=>{
   const old=process.env.REPLICATE_API_TOKEN;process.env.REPLICATE_API_TOKEN='test-only';
   t.after(()=>{if(old===undefined)delete process.env.REPLICATE_API_TOKEN;else process.env.REPLICATE_API_TOKEN=old;});
@@ -222,6 +237,22 @@ test('text-only revision reuses exactly the verified original asset after renewe
   assert.equal(reused.existing.whatsappMessageId,null);assert.notEqual(reused.existing.caption,f.oldPublication.caption);
   const attempts=(await f.db.query('SELECT usage,status FROM original_visual_attempts')).rows;assert.equal(attempts.length,2);assert.equal(attempts.filter(a=>a.usage?.newGeneration===false).length,1);assert.ok(attempts.every(a=>a.status==='media_ready'));
   await assert.rejects(f.publication.claimPublish(reused.existing.id),/nicht freigegeben/);
+});
+
+test('natural WhatsApp copy is stored for fresh approval, while unrelated food copy is blocked',async t=>{
+  const f=await fixture(t);
+  const copy={proposed_hook:'Aus dem Kürbis wird eine Laterne für den Hauseingang',
+    proposed_caption:'Ein Gesicht aufzeichnen, den Kürbis aushöhlen und am Basteltisch schnitzen. Eine erwachsene Person führt das Schnitzwerkzeug. Bei einem Kauf über den Affiliate-Link kann ich eine Provision erhalten.'};
+  await f.process(message('natural-copy','Der Text soll natürlicher klingen'),async()=>instruction('revise_text',copy));
+  const revised=await f.snapshot();
+  assert.equal(revised.content.caption,copy.proposed_caption);
+  assert.equal(revised.status,'awaiting_approval');
+  assert.equal(f.approvals.length,1);
+  await f.db.query("UPDATE daily_drafts SET whatsapp_message_id='wamid.next' WHERE job_id=$1",[f.id]);
+  await f.process(message('food-copy','Der Text soll Pasta empfehlen','wamid.next'),async()=>instruction('revise_text',{
+    ...copy,proposed_caption:'Koche Pasta in der Pfanne und iss sie heiß. Bei einem Kauf über den Affiliate-Link kann ich eine Provision erhalten.'}));
+  assert.equal((await f.snapshot()).content.caption,copy.proposed_caption);
+  assert.equal(f.approvals.length,1);
 });
 
 test('stale context and semantically incorrect image response cannot apply or begin media work',async t=>{

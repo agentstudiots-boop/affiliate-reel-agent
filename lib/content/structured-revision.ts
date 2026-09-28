@@ -32,10 +32,10 @@ export function reviseStructured(job:ContentJob, instruction:Instruction):Conten
     }
     if(operation==="naturalize"){
       const pumpkin=isPumpkinCarvingProduct(job.opportunity.product.name);
-      content.hook=pumpkin
+      content.hook=instruction.proposed_hook?.trim() || (pumpkin
         ? "Welche Kürbislaterne soll dieses Jahr vor deiner Tür leuchten?"
-        : `Passt ${job.opportunity.product.name} zu deinem Alltag?`;
-      content.caption=`Werbung | ${content.hook} ${pumpkin
+        : `Passt ${job.opportunity.product.name} zu deinem Alltag?`);
+      content.caption=instruction.proposed_caption?.trim() || `Werbung | ${content.hook} ${pumpkin
         ? "Erst ein Gesicht aufzeichnen, dann den Kürbis aushöhlen und Augen und Mund ausschneiden. Das Schneiden übernimmt eine erwachsene Person. Prüfe Lieferumfang und Hinweise zur Handhabung auf der Produktseite."
         : "Schau dir die vorgesehene Anwendung und die Herstellerhinweise an. Details stehen auf der verlinkten Produktseite."} Bei einem Kauf über den Affiliate-Link kann ich eine Provision erhalten.`;
     }

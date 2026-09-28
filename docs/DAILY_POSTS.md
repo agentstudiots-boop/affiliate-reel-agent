@@ -1,6 +1,24 @@
 # Tägliche Entwürfe und Veröffentlichung
 
-## Stand 28. September 2026
+## Stand 29. September 2026
+
+Production ist mit den Änderungen aus PR #12–#18 auf `main` deployed. Der
+Meta-Webhook wurde auf `https://affiliate-reel-agent.vercel.app/api/whatsapp/webhook`
+verifiziert; eine `Status`-Nachricht und mehrere gezielte Artikelsuchen wurden
+in Production angenommen und beantwortet. Der erste produktive Morgen- und
+Abendlauf mit dem neuen Zeitplan steht noch aus. Das ist kein Nachweis für eine
+automatische WhatsApp-Zustellung zu einer bestimmten Minute.
+
+Die Suche `Artikelsuche Saugroboter` am 29.09. um 00:30 Uhr lokaler Zeit kam
+nach der Korrektur des `Robot`-Titelfilters über die Produktauflösung hinaus,
+endete aber bei der redaktionellen Bildprüfung mit `content_review_failed`.
+Die WhatsApp-Antwort zeigte positive Szenenbeschreibungen als Prüfmängel.
+PR #18 verlangt echte Mängel mit Korrekturen vom KI-Prüfer und zeichnet einen
+gescheiterten regelbasierten Ersatzentwurf ohne Kundendaten auf. Ob der nächste
+echte Auftrag die vollständige Inhaltsfreigabe erreicht, ist offen. Kein Bild
+wurde für diesen Versuch erzeugt oder veröffentlicht; redaktionelle Modellaufrufe
+können Guthaben beansprucht haben. Weitere identische Live-Suchen nicht nur
+für Diagnostik auslösen.
 
 Der Tages-Cron hat vier einzelne, jeweils einmal täglich geplante UTC-Aufrufe:
 07:00, 08:00, 16:00 und 17:00. Die Route nimmt einen Morgenlauf nur zwischen
@@ -20,9 +38,11 @@ Außerhalb des WhatsApp-Servicefensters bleibt ohne ausdrücklich aktivierte,
 genehmigte Business-Vorlage der Entwurf gespeichert und es kommt keine
 automatische WhatsApp. Eine solche Vorlage kann Gebühren verursachen.
 
-Der Preview-Build für PR #12 war erfolgreich. Das produktive Schema, die
-historischen Ausführungslogs und die echte WhatsApp-Zustellung sind damit
-noch nicht geprüft. Production läuft weiterhin auf dem bisherigen `main`.
+Die Migrationen 019/020 wurden bei produktiven Status- und Suchaufrufen über
+`ensureAutomationSchema` geprüft oder angewendet. Die Zustellung von `Status`
+und von Fehlerantworten ist belegt; eine komplette Bild- und
+Veröffentlichungsfreigabe aus dem neuen täglichen Ablauf wurde noch nicht
+nachgewiesen.
 
 ## Änderung vom 27. September 2026
 
@@ -101,6 +121,18 @@ höchstens acht kostenpflichtige Modellaufrufe pro Plan, keine zweite Anfrage
 bei unklarem Resultat. Ohne diese Voraussetzungen bleibt der Referenzmodus.
 Die Bilddatei selbst wird noch nicht automatisch visuell auf Fehler geprüft;
 deshalb ist das fertige Bild weiterhin in der zweiten WhatsApp zu kontrollieren.
+
+Bei einem natürlichen Textänderungswunsch kann der bestehende Replicate-Parser
+in seiner einen Modellanfrage jetzt zusätzlich einen konkreten Hook und eine
+Caption für das gebundene Produkt vorschlagen. Neue Links, ASINs, ein
+`Werbung`-Hook und eine Caption ohne Affiliate-Provisionshinweis werden
+abgelehnt. Die Prüfung von Bildszene, redaktionellen Mindestregeln und
+Kürbisschnitzkontext gilt auch für diesen Revisionsweg. Danach kommt eine
+neue Inhaltsfreigabe; ein Modellvorschlag ist niemals selbst eine Freigabe.
+Das ist eine erweiterte Änderungsverarbeitung mit `openai/gpt-4.1` auf dem
+vorhandenen Replicate-Zugang, noch kein allgemeiner WhatsApp-Chatbot. Ein
+anderes Modell ist nicht ohne nachgewiesene API-Kompatibilität, Kostenkontrolle
+und Verhaltenstest produktiv aktiviert.
 
 **Zwei WhatsApp-Entscheidungen pro Bildpost:** Zuerst wird der Bildentwurf samt
 Hinweis auf die noch nicht bezifferte Bildgenerierung freigegeben; nur danach

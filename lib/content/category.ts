@@ -18,7 +18,7 @@ export function pumpkinCreativeIssues(opportunity: Opportunity, content: Content
   const publicCopy = `${content.hook} ${content.format === "text" ? content.body : content.caption} ${content.cta} ${marketing?.adaptation ?? ""}`;
   const issues: string[] = [];
   if (opportunity.category !== "home_living") issues.push("Kürbisschnitzen als Home & Living/Dekoration einordnen.");
-  if (/\b(?:appetitlich\w*|koch(?:en|t|st|end)?|garen|ess(?:en|bar)|speise|rezept|mahlzeit|kulinarisch\w*)\b/i.test(publicCopy)) {
+  if (/\b(?:appetitlich\w*|koch(?:e|en|t|st|end)?|garen|ess(?:en|bar)|iss|speise|rezept|mahlzeit|kulinarisch\w*|pasta|nudeln?|pfanne)\b/i.test(publicCopy)) {
     issues.push("Kürbisschnitzen darf nicht als Kochen oder Essen dargestellt werden.");
   }
   if (/deinem anwendungsfall|beim einrichten|raum und (?:deinen )?alltag|material, maße und pflege/i.test(publicCopy)) {
