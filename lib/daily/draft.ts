@@ -131,13 +131,13 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
       }
     }
     if (requestedProduct && !await reserveProduct(db,requestedProduct,jobId) || !selectedProduct) {
-      await db.query("UPDATE daily_drafts SET status='needs_input',updated_at=now() WHERE job_id=$1", [jobId]);
+      await db.query("UPDATE daily_drafts SET status='needs_input',scout_report=jsonb_set(coalesce(scout_report,'{}'::jsonb),'{reason}',to_jsonb($2::text)),updated_at=now() WHERE job_id=$1", [jobId,"product_repeat_blocked"]);
       return {status:'needs_input' as const,jobId,reason:'product_repeat_blocked' as const};
     }
     const opportunity: Opportunity = {
       product: selectedProduct,
       category: isPumpkinCarvingProduct(requestedProduct?.name || candidate?.resolvedProduct?.name || candidate?.name || "") || candidate?.category === "Wohnen" ? "home_living" : "household", useCaseKey: "seasonal-product-guide", targetPlatform: "facebook",
-      useCase: candidate?.reelIdea || `Das Produkt ${requestedProduct!.name} im Alltag verwenden und die Eignung vor dem Kauf prüfen.`, trend: candidate?.whyNow || "", goal: "education", budget: "low", verifiedFacts: [],
+      useCase: candidate?.reelIdea?.trim() || `Das Produkt ${selectedProduct.name} im Alltag verwenden und die Eignung vor dem Kauf prüfen.`, trend: candidate?.whyNow || "", goal: "education", budget: "low", verifiedFacts: [],
     };
     stage = "content_planning";
     const repo = memoryRepository(db);

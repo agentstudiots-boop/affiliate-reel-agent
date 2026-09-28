@@ -38,8 +38,9 @@ test('daily cron produces one saved image brief, requires a WhatsApp window, and
   const next=await daily.createDailyDraft('2026-09-25');
   assert.equal(next.status,'needs_input');assert.equal(next.reason,'product_repeat_blocked');
   assert.equal(scouts,2);assert.equal(messages.length,0);
-  const saved=await pg.query("SELECT status,whatsapp_message_id FROM daily_drafts WHERE day='2026-09-25'");
+  const saved=await pg.query("SELECT status,whatsapp_message_id,scout_report->>'reason' AS reason FROM daily_drafts WHERE day='2026-09-25'");
   assert.equal(saved.rows[0].status,'needs_input');
+  assert.equal(saved.rows[0].reason,'product_repeat_blocked');
   assert.equal(saved.rows[0].whatsapp_message_id,null);
   assert.equal((await daily.createDailyDraft('2026-09-25')).status,'already_claimed');
   const second=await daily.createDailyDraft('2026-09-25','afternoon');
@@ -87,7 +88,7 @@ test('a named WhatsApp search reaches TrendScout and can draft only a verified m
     price:'',targetGroup:'Haushalte',benefits:'Eignung vor Kauf prüfen',notes:''};
   const candidates=[{name:'Kürbis-Schnitzwerkzeug-Set',kind:'Saisontrend',category:'Halloween',searchQuery:'Kürbis-Schnitzwerkzeug-Set',reelIdea:'Kürbislaterne basteln',targetGroup:'Familien',whyNow:'Halloween'},
     {name:'Saugroboter',kind:'Dauerläufer',category:'Haushalt',searchQuery:'Saugroboter',resolvedProduct:product,
-      reelIdea:'Ein Saugroboter reinigt den Boden in einer Wohnung; vor dem Kauf Einsatzbereich und Herstellerangaben prüfen.',
+      reelIdea:'',
       targetGroup:'Haushalte',whyNow:'Gezielte Suche, kein belegter Trend.'}];
   const daily=loadRoute('lib/daily/draft.ts',{
     '@/lib/orchestrator':{runContentJob:require('../.test-build/lib/content/orchestrator').runContentJob,
@@ -101,6 +102,7 @@ test('a named WhatsApp search reaches TrendScout and can draft only a verified m
   assert.equal(found.status,'awaiting_approval',JSON.stringify(found));
   const jobs=(await db.query('SELECT snapshot FROM content_jobs')).rows;
   assert.equal(jobs.length,1);assert.equal(jobs[0].snapshot.opportunity.product.name,product.name);
+  assert.match(jobs[0].snapshot.opportunity.useCase,/Saugroboter Modell R im Alltag/);
   assert.equal(jobs[0].snapshot.opportunity.product.asin,'B0ABCD1234');
   assert.equal(messages.length,1);assert.match(messages[0],/Saugroboter Modell R/);
   assert.equal((await daily.createDailyDraft('2026-09-27','manual:search-robot',undefined,'Saugroboter')).status,'already_claimed');
