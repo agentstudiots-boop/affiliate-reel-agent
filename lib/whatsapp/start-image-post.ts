@@ -16,8 +16,9 @@ export function imagePostCommand(body: string):ImagePostCommand|null {
     return { product: undefined, invalid: false };
   }
   const targeted=text.match(/^(?:bitte\s+)?(?:(?:starte|mach|mache)\s+)?(?:eine?\s+)?(?:neue?\s+)?(?:artikel|produkt)suche(?:\s*[:–-]\s*|\s+)(.+)$/i);
-  if(targeted){
-    const search=targeted[1].trim().replace(/^\(/,'').replace(/^produktname\s*[:–-]?\s*/i,'').replace(/^für\s+/i,'').replace(/\)$/, '').trim();
+  const natural=text.match(/^(?:bitte\s+)?(?:such|suche|finde)\s+mir\s+eine[nm]?\s+(.+)$/i);
+  if(targeted || natural){
+    const search=(targeted?.[1] || natural![1]).trim().replace(/^\(/,'').replace(/^produktname\s*[:–-]?\s*/i,'').replace(/^für\s+/i,'').replace(/\)$/, '').trim();
     if(/\b(?:freigabe\w*|freigegeben\w*|bestehend\w*|änderung\w*|korrektur\w*|post|bild|beitrag|entwurf)\b/i.test(search))return null;
     return search.length>=3 && search.length<=90 && search.split(' ').length<=8
       && /^[\p{L}\p{N}][\p{L}\p{N}\s.,+&-]*$/u.test(search)
@@ -55,6 +56,12 @@ export async function startImagePostFromWhatsApp(input: IncomingWhatsAppMessage 
       : `${command.product ? "Bildpost" : "Artikelsuche"} (Auftrag ${result.jobId})`;
     const reason = result.reason === "product_unresolved"
       ? "Der Trendscout konnte keine passende Amazon-Produktseite sicher verifizieren. Bitte eine Produktart oder eine konkrete ASIN nennen."
+      : result.reason === "amazon_verification_blocked"
+        ? "Amazon hat die automatische Prüfung der Produktseite blockiert. Der Artikel bleibt ungeprüft und es wird kein Content produziert."
+      : result.reason === "product_repeat_blocked"
+        ? "Dieses Produkt oder seine Produktfamilie ist bereits in einem offenen Entwurf oder wurde innerhalb der letzten sieben Tage verwendet. Bitte wähle eine andere Produktart."
+      : result.reason === "missing_caption"
+        ? "Der Beitragstext fehlt. Die Inhaltsfreigabe wurde nicht versendet; bitte den Entwurf prüfen."
       : result.reason === "editorial_rate_limited"
         ? "Replicate hat die redaktionelle Anfrage auch nach einer kurzen Wartezeit gedrosselt. Der Auftrag bleibt angehalten. Ein neuer Versuch kann später mit einer neuen Artikelsuche gestartet werden."
       : result.reason === "editorial_model_failed"

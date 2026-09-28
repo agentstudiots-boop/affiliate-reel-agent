@@ -32,7 +32,7 @@ test('006–017 upgrade populated 001–005 once without replaying or changing p
     const loaded = [];
     const trackedLoader = name => { loaded.push(name); return load(name); };
 
-    const upgrades = ['006_daily_notification.sql', '007_publication_revisions.sql', '008_weekly_reports.sql', '009_original_visual_attempts.sql', '010_replicate_visual_provider.sql', '011_instagram_reel_publications.sql', '012_whatsapp_instructions.sql', '013_operator_language_examples.sql', '014_content_approval_requests.sql', '015_runway_story.sql', '016_multiple_drafts.sql', '017_story_handoffs.sql', '018_approved_editorial_feedback.sql'];
+    const upgrades = ['006_daily_notification.sql', '007_publication_revisions.sql', '008_weekly_reports.sql', '009_original_visual_attempts.sql', '010_replicate_visual_provider.sql', '011_instagram_reel_publications.sql', '012_whatsapp_instructions.sql', '013_operator_language_examples.sql', '014_content_approval_requests.sql', '015_runway_story.sql', '016_multiple_drafts.sql', '017_story_handoffs.sql', '018_approved_editorial_feedback.sql', '019_daily_slot_key.sql', '020_product_selection_locks.sql'];
     assert.deepEqual(await applyMigrations(db, trackedLoader), {
       applied: upgrades, alreadyApplied: previous,
     });

@@ -15,6 +15,7 @@ import { ensureAutomationSchema } from "@/lib/memory/ensure-automation-schema";
 import { loadApprovedEditorialCorrections } from "@/lib/whatsapp/language-memory";
 import { EDITORIAL_MODEL_ERROR, EDITORIAL_RATE_LIMIT_ERROR } from "@/lib/content/model";
 import { createHash } from "node:crypto";
+import { releaseProduct, reserveProduct } from "@/lib/daily/product-lock";
 
 async function resolveRequestedProduct(value: string) {
   const asin = /^(?:[A-Z0-9]{10})$/.test(value) ? value : value.match(/^https:\/\/(?:www\.)?amazon\.de\/dp\/([A-Z0-9]{10})\/?$/)?.[1];
@@ -27,7 +28,8 @@ export function dailyApprovalMessage(job:ReturnType<typeof parseJob>,day:string)
   const costText=revision && !revision.instruction.requires_new_generation
     ? 'um die Textrevision freizugeben. Das bestehende Bild bleibt erhalten; keine neue Bildgenerierung'
     : `um den Content-Plan und eine einmalige kostenpflichtige Bildgenerierung freizugeben (Bildprovider: ${imageProviderStatus().provider || "nicht eingerichtet"}, EUR-Kosten nicht vorab bestätigt)`;
-  const summary=job.content?.format==='text'?job.content.body:job.content?.format==='image'?job.content.caption:'Videoentwurf';
+  const summary=job.content?.format==='text'?job.content.body:job.content?.format==='image'?job.content.caption:'';
+  if (!job.content || !summary?.trim()) throw new Error("missing_caption");
   const image=job.content?.format==='image';
   const visualBrief=image?`\n\nBildbriefing für das Titelbild:\n${imageBrief(job).split('\n')
     .filter(line=>/^(HAUPTMOTIV|Motiv und Handlung|Bildaufbau und Details|Nebenmotive|Grenzen):|^HAUPTMOTIV/.test(line))
@@ -35,7 +37,7 @@ export function dailyApprovalMessage(job:ReturnType<typeof parseJob>,day:string)
     .join('\n')}`:'';
   const referenceNotice=job.mode==='reference' && job.modelCalls>0
     ? 'Der KI-Bildentwurf wurde verworfen. Dies ist ein geprüfter Referenzentwurf; bitte Bildbeschreibung und Text besonders sorgfältig prüfen.\n\n':'';
-  const body=`Content-Freigabe · Bildpost ${day}\nProdukt: ${job.opportunity.product.name}\nFormat: ${job.content?.format || 'unbekannt'} · Facebook\n\n${referenceNotice}${(summary||'').slice(0,850)}${visualBrief}\n\nASIN: ${job.opportunity.product.asin}\nProduktlink: ${job.opportunity.product.affiliateUrl}\nAntworte auf DIESE Nachricht mit „Freigeben“, ${costText}. Danach kommt eine ZWEITE WhatsApp für die Veröffentlichung. „Ablehnen“ stoppt den Auftrag, Änderungswünsche bitte als Text. Noch kein Post ist online. Eine Story mit klickbarem Link wird anschließend für die App vorbereitet.`;
+  const body=`Content-Freigabe · Bildpost ${day}\nProdukt: ${job.opportunity.product.name}\nTitel: ${job.content.title}\nFormat: ${job.content?.format || 'unbekannt'} · Facebook\n\n${referenceNotice}Beitragstext:\n${summary}${visualBrief}\n\nASIN: ${job.opportunity.product.asin}\nAffiliate-Hinweis: ${job.content.disclosure}\nProduktlink: ${job.opportunity.product.affiliateUrl}\nCTA: ${job.content.cta}\nAntworte auf DIESE Nachricht mit „Freigeben“, ${costText}. Danach kommt eine ZWEITE WhatsApp für die Veröffentlichung. „Ablehnen“ stoppt den Auftrag, Änderungswünsche bitte als Text. Noch kein Post ist online.`;
   if(body.length>3900)throw Error('daily_approval_too_long');
   return body;
 }
@@ -106,20 +108,32 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
     if (!productQuery && !productSearch && !candidates.length) throw new Error("Kein saisonaler Kandidat verfügbar.");
     const resolved = candidates.filter(candidate => candidate.resolvedProduct);
     if(!productQuery && !resolved.length){
+      const resolutionReason = candidates.some(candidate => "resolutionError" in candidate && candidate.resolutionError === "amazon_verification_blocked")
+        ? "amazon_verification_blocked" as const : "product_unresolved" as const;
       await db.query("UPDATE daily_drafts SET status='needs_input',scout_report=$2,updated_at=now() WHERE job_id=$1",
-        [jobId,JSON.stringify({requestedSearch:productSearch,report,reason:'product_unresolved'})]);
-      return {status:'needs_input' as const,jobId,reason:'product_unresolved' as const,searchTerm:productSearch};
+        [jobId,JSON.stringify({requestedSearch:productSearch,report,reason:resolutionReason})]);
+      return {status:'needs_input' as const,jobId,reason:resolutionReason,searchTerm:productSearch};
     }
     const pool = resolved.length ? resolved : candidates;
     const rotation = openSearch ? createHash("sha256").update(slot).digest().readUInt32BE(0)
       : new Date(`${day}T00:00:00Z`).getUTCDate() + (slot === "afternoon" ? 1 : 0);
-    const candidate = productSearch ? resolved[0] : pool.length ? pool[rotation % pool.length] : null;
     await db.query("UPDATE daily_drafts SET status='planning',scout_report=$2,updated_at=now() WHERE job_id=$1", [jobId, JSON.stringify(report ? {requestedSearch:productSearch,report}: { requestedProduct: productQuery })]);
     stage = "product_verification";
     const requestedProduct = productQuery ? await resolveRequestedProduct(productQuery) : null;
+    let candidate: typeof pool[number] | null = null;
+    let selectedProduct = requestedProduct;
+    const ordered = productSearch ? resolved : [...pool.slice(rotation % (pool.length || 1)), ...pool.slice(0,rotation % (pool.length || 1))];
+    for (const item of requestedProduct ? [] : ordered) {
+      if (item.resolvedProduct && await reserveProduct(db,item.resolvedProduct,jobId)) {
+        candidate=item; selectedProduct=item.resolvedProduct; break;
+      }
+    }
+    if (requestedProduct && !await reserveProduct(db,requestedProduct,jobId) || !selectedProduct) {
+      await db.query("UPDATE daily_drafts SET status='needs_input',updated_at=now() WHERE job_id=$1", [jobId]);
+      return {status:'needs_input' as const,jobId,reason:'product_repeat_blocked' as const};
+    }
     const opportunity: Opportunity = {
-      product: requestedProduct || candidate?.resolvedProduct || { name: candidate!.name, sourceUrl: "https://www.amazon.de/", affiliateUrl: "",
-        price: "", targetGroup: candidate!.targetGroup, benefits: "Konkretes Produkt noch nicht aufgelöst.", notes: "product_unresolved" },
+      product: selectedProduct,
       category: isPumpkinCarvingProduct(requestedProduct?.name || candidate?.resolvedProduct?.name || candidate?.name || "") || candidate?.category === "Wohnen" ? "home_living" : "household", useCaseKey: "seasonal-product-guide", targetPlatform: "facebook",
       useCase: candidate?.reelIdea || `Das Produkt ${requestedProduct!.name} im Alltag verwenden und die Eignung vor dem Kauf prüfen.`, trend: candidate?.whyNow || "", goal: "education", budget: "low", verifiedFacts: [],
     };
@@ -131,11 +145,13 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
     await repo.claim(jobId, opportunity, mode);
     const job = await runContentJob(opportunity, { id: jobId, mode, allowedFormats: ["image"],
       loadCorrections:async()=>corrections, loadLearning: value => repo.learn(value), onUpdate: value => repo.save(value) });
+    const missingCaption = job.content?.format === "image" && !job.content.caption.trim();
     // Do not seek an approval for a plan that the later Facebook gate rejects.
-    const publishablePlan = job.status === "awaiting_approval" && job.content?.format === "image"
+    const publishablePlan = !missingCaption && job.status === "awaiting_approval" && job.content?.format === "image"
       && !facebookPagePublicationError({ ...job, status: "approved" });
     const status = publishablePlan ? "awaiting_approval" : "needs_input";
     await db.query("UPDATE daily_drafts SET status=$2,updated_at=now() WHERE job_id=$1", [jobId, status]);
+    if (status !== "awaiting_approval") await releaseProduct(db,jobId);
     if (status === "awaiting_approval") {
       const approver = (process.env.WHATSAPP_APPROVER_WA_ID || "").replace(/\D/g, "");
       // Meta accepts free-form texts only within the 24-hour service window.
@@ -161,7 +177,8 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
         return { status, jobId, whatsapp: "notification_sent" as const };
       }
     }
-    const reason = job.error === EDITORIAL_RATE_LIMIT_ERROR ? "editorial_rate_limited" as const
+    const reason = missingCaption ? "missing_caption" as const
+      : job.error === EDITORIAL_RATE_LIMIT_ERROR ? "editorial_rate_limited" as const
       : job.error === EDITORIAL_MODEL_ERROR ? "editorial_model_failed" as const
       : job.error === "product_unresolved" ? "product_unresolved" as const
       : job.review && !job.review.passed ? "content_review_failed" as const : "planning_failed" as const;
@@ -172,6 +189,7 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
     console.error(JSON.stringify({event:"daily_draft_failed",jobId,stage,
       errorType:error instanceof Error?error.name:"unknown"}));
     await db.query("UPDATE daily_drafts SET status='failed',updated_at=now() WHERE job_id=$1", [jobId]);
+    await releaseProduct(db,jobId);
     return { status: "failed" as const, jobId, reason: "internal_error" as const };
   }
 }
