@@ -87,7 +87,8 @@ export async function reuseRecentProductIdentity(product: Product, db: Pick<Data
 
 export async function findAmazonProduct(categoryName: string, query: string, targetGroup: string,
   search = tavilySearch, verify: (asin: string) => Promise<string> = verifyAmazonProductPage) {
-  const results = await search({ query: `site:amazon.de ${query}`, maxResults: 5 });
+  // Category and bestseller hits often precede detail pages in the index.
+  const results = await search({ query: `site:amazon.de ${query}`, maxResults: 10 });
   // A scout seed is a category idea, not yet an identified product. Bind its actual result title.
   const categoryWords = categoryName.toLocaleLowerCase("de-DE").match(/[\p{L}\p{N}]{4,}/gu) || [];
   let blocked = false;

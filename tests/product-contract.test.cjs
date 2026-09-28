@@ -19,7 +19,8 @@ function opportunity(p=product(),platform='facebook') {return opportunitySchema.
 async function database(t){const pg=new PGlite();t.after(()=>pg.close());const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};await applyMigrations(db);return {pg,db,memory:memoryRepository(db)};}
 
 test('accepts only concrete Amazon detail pages; rejects searches, categories, bestsellers, shortlinks and redirects',()=>{
-  for(const url of [source,'https://amazon.de/Kuscheldecke/dp/B000000001/ref=abc?tag=old-21','https://www.amazon.de/gp/product/B000000001'])assert.equal(amazonProduct(url).asin,'B000000001');
+  for(const url of [source,'https://amazon.de/Kuscheldecke/dp/B000000001/ref=abc?tag=old-21','https://www.amazon.de/gp/product/B000000001',
+    'https://www.amazon.de/-/en/Kuscheldecke-Modell/dp/B000000001','https://www.amazon.de/-/de/Kuscheldecke-Modell/dp/B000000001'])assert.equal(amazonProduct(url).asin,'B000000001');
   for(const url of ['https://www.amazon.de/s?k=Kuscheldecke','https://www.amazon.de/b?node=123','https://www.amazon.de/gp/bestsellers','https://www.amazon.de/','https://amzn.to/abc','https://www.amazon.de.evil.invalid/dp/B000000001','http://www.amazon.de/dp/B000000001',source+'?redirect=https://example.com',source+'/dp/B000000002']){
     assert.equal(amazonProduct(url),null,url);assert.equal(createAmazonAffiliateUrl(url),'',url);
   }
@@ -125,7 +126,10 @@ test('the legacy unbound paid clip endpoint cannot bypass product identity and c
 });
 
 test('a seasonal category idea resolves to one actual named product without turning its research query into a link',async()=>{
-  const resolved=await findAmazonProduct('Wärmende Kuscheldecke','Kuscheldecke Herbst','Haushalte',async()=>[{id:'fixture',title:'Kuscheldecke Modell X : Amazon.de: Wohnen',url:source,content:''}],async()=> 'Kuscheldecke Modell X');
+  const resolved=await findAmazonProduct('Wärmende Kuscheldecke','Kuscheldecke Herbst','Haushalte',async options=>{
+    assert.equal(options.maxResults,10);
+    return [{id:'fixture',title:'Kuscheldecke Modell X : Amazon.de: Wohnen',url:'https://www.amazon.de/-/en/Kuscheldecke-Modell/dp/B000000001',content:''}];
+  },async()=> 'Kuscheldecke Modell X');
   assert.equal(resolved.name,'Kuscheldecke Modell X');assert.equal(resolved.asin,'B000000001');assert.equal(productIdentityError(resolved),null);
 });
 
