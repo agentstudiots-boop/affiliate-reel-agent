@@ -43,6 +43,9 @@ test('indexed ASIN cannot stand in for a working product page',async()=>{
   assert.equal(await verifyAmazonProductPage('B000000001',async()=>new Response(html)), 'Kuscheldecke Modell X');
   await assert.rejects(verifyAmazonProductPage('B000000001',async()=>new Response('Not Found',{status:404})),/product_unresolved/);
   await assert.rejects(verifyAmazonProductPage('B000000001',async()=>new Response('Robot Check /dp/B000000001 <span id="productTitle">Kuscheldecke Modell X</span>')),/amazon_verification_blocked/);
+  await assert.rejects(verifyAmazonProductPage('B000000001',async()=>({
+    ok:true,status:200,url:'https://www.amazon.de/errors/validateCaptcha',text:async()=>'<html>Captcha</html>',
+  })),/amazon_verification_blocked/);
   await assert.rejects(verifyAmazonProductPage('B000000001',async()=>new Response('<html>Amazon.de</html>')),/product_unresolved/);
   const indexed=async()=>[{title:'Kuscheldecke Modell X : Amazon.de',url:source}];
   await assert.rejects(resolveAmazonProduct(product(),indexed,async()=>{throw Error('Amazon page gone');}),/product_unresolved/);

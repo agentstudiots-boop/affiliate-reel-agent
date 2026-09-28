@@ -14,6 +14,8 @@ export async function verifyAmazonProductPage(asin: string, request: typeof fetc
       headers: { Accept: "text/html", "Accept-Language": "de-DE,de;q=0.9" },
     });
     if (response.status === 429 || response.status === 403) throw new Error("amazon_verification_blocked");
+    if (response.url && /(?:captcha|robot.?check|validatecaptcha)/i.test(response.url))
+      throw new Error("amazon_verification_blocked");
     if (!response.ok || (response.url && amazonProduct(response.url)?.asin !== asin)) throw new Error(PRODUCT_UNRESOLVED);
     const html = (await response.text()).slice(0, 2_000_000);
     if (/Robot Check|Enter the characters you see below|captcha/i.test(html)) throw new Error("amazon_verification_blocked");
