@@ -1,5 +1,26 @@
 # Tägliche Entwürfe und Veröffentlichung
 
+## WhatsApp-Modellwechsel am 29. September 2026
+
+Der gebundene WhatsApp-Änderungsparser und der Video-Änderungsparser verwenden
+`openai/gpt-5.6-terra` über den vorhandenen Replicate-Zugang. Das redaktionelle
+Modell für neue Content-Pläne bleibt separat `openai/gpt-4.1`. Für die neuen
+WhatsApp-Aufrufe gelten `reasoning_effort=none` und `verbosity=low` statt des
+alten `temperature`-Parameters. Die maximale Antwortlänge bleibt auf 1.200
+bzw. 3.000 Tokens begrenzt. Es gibt weiterhin genau einen Prediction-POST je
+Betreibernachricht, ohne automatischen Ersatzaufruf bei unklarem Ergebnis.
+Wörtliche Freigaben umgehen das Modell; Produktidentität, redaktionelle Prüfung
+und getrennte Freigaben bleiben technische Gates. Ein Modellwechsel macht
+aus dem Parser keinen allgemeinen WhatsApp-Chatbot.
+
+Replicate nennt [für Terra](https://replicate.com/openai/gpt-5.6-terra)
+$2,50/Mio. Eingabetokens und $15/Mio. Ausgabetokens. Das Rechenbeispiel aus
+dem folgenden Abschnitt (2.000/500 Tokens) ergibt etwa **$0,0125** statt
+$0,008 mit GPT-4.1, ohne WhatsApp-Gebühren und Steuern. Das tatsächliche
+Ergebnis und der Verbrauch eines echten Aufrufs sind noch nicht live geprüft;
+lokale Tests mit simulierten Providerantworten prüfen nur API-Payload,
+Produktbindung, Ablehnung unsicherer Antworten und erneute Inhaltsfreigabe.
+
 ## Live-Prüfung 29. September 2026, 01:25 Uhr MESZ
 
 `main` wurde erneut am Remote geprüft: `6363b89f5e8f92e76c859bfa0302c97fbc1290d2`
@@ -43,8 +64,8 @@ Morgenlauf.
 
 ### WhatsApp-Sprachdialog: Aufwand und laufende Kosten
 
-Der aktuelle Parser verarbeitet gebundene Änderungswünsche mit genau einem
-Replicate-Aufruf von `openai/gpt-4.1`. Eindeutige Freigaben und Ablehnungen
+Zum Zeitpunkt dieser Prüfung verarbeitete der Parser gebundene Änderungswünsche
+mit genau einem Replicate-Aufruf von `openai/gpt-4.1`. Eindeutige Freigaben und Ablehnungen
 bleiben wörtliche Befehle; der Parser darf weder Produkt/ASIN/content_id
 wechseln noch eine Veröffentlichung auslösen. Die Tests belegen, dass ein
 natürlicher Textvorschlag den Affiliate-Hinweis und eine neue Inhaltsfreigabe
