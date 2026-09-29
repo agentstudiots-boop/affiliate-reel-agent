@@ -1,6 +1,7 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {interpretVideoRevision}=require('../.test-build/lib/whatsapp/video-revision');
+const {INSTRUCTION_MODEL}=require('../.test-build/lib/whatsapp/instruction');
 const {runContentJob}=require('../.test-build/lib/content/orchestrator');
 const {opportunitySchema}=require('../.test-build/lib/content/schema');
 
@@ -11,9 +12,11 @@ test('natural video feedback becomes a bounded structured draft without any medi
   const job=await runContentJob(opportunity,{allowedFormats:['video']});job.status='approved';
   const revised={...job.content,scenes:job.content.scenes.map((scene,index)=>index===0?{...scene,visual:'Die fertige Kürbislaterne leuchtet zuerst, dann folgt eine Rückblende zur Schnitzhandlung.'}:scene)};
   const calls=[];
-  const request=async(url,options)=>{calls.push({url,method:options.method});return Response.json({id:'abcdefghijklmnop',status:'succeeded',output:[JSON.stringify({intent:'revise_video',confidence:.96,video:revised})]});};
+  const request=async(url,options)=>{calls.push({url,method:options.method,input:JSON.parse(options.body).input});return Response.json({id:'abcdefghijklmnop',status:'succeeded',output:[JSON.stringify({intent:'revise_video',confidence:.96,video:revised})]});};
   const result=await interpretVideoRevision(job,'Beginne mit der fertigen Laterne und zeige dann die Entstehung',request);
   assert.match(result.scenes[0].visual,/Rückblende/);
   assert.equal(calls.length,1);assert.equal(calls[0].method,'POST');
-  assert.match(calls[0].url,/api.replicate.com/);
+  assert.equal(calls[0].url,`https://api.replicate.com/v1/models/${INSTRUCTION_MODEL}/predictions`);
+  assert.equal(calls[0].input.reasoning_effort,'none');assert.equal(calls[0].input.verbosity,'low');
+  assert.equal(calls[0].input.temperature,undefined);
 });
