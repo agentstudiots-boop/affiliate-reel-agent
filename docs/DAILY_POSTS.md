@@ -1,5 +1,48 @@
 # Tägliche Entwürfe und Veröffentlichung
 
+## Nachtrag 29. September 2026: gespeicherter WhatsApp-Status um 18:13 MESZ
+
+Der Betreiber zeigte die Antwort auf `Status?` aus dem produktiven WhatsApp-Chat.
+Sie nennt `2026-09-29 Vormittag · Produktsuche: needs_input (Produkt in den
+letzten sieben Tagen verwendet)`. Damit ist jetzt ein gespeicherter
+Vormittagsauftrag mit einem Abbruch **bei der Produktauswahl** beobachtet.
+Der Status wird aus `daily_drafts` gelesen; der zugehörige Code schreibt
+`product_repeat_blocked`, wenn keiner der aufgelösten Saisonkandidaten die
+ASIN-/Produktfamilien-Sperre passieren kann. Diese Zuordnung zum Code ist
+eine Schlussfolgerung, nicht ein gelesener Lock- oder Scout-Datensatz.
+Insbesondere zeigt diese WhatsApp-Antwort weder Job-ID und konkrete Kandidaten
+noch Amazon-Detailseite, ASIN und Affiliate-Link. Für den Vormittagsauftrag
+ist kein Content-Plan, Review oder WhatsApp-Inhaltsfreigabe in dieser Ansicht
+belegt. Der Abbruch vor `runContentJob` erklärt, warum aus diesem Auftrag
+keine Inhaltsfreigabe kam. Der separate Cron-Runtime-Eintrag um 10:25:30
+MESZ und der gespeicherte Vormittagsstatus passen zusammen; ohne Request-ID
+oder direkte Datenbankabfrage ist ihre genaue Verknüpfung nicht unabhängig
+bewiesen. Production ist inzwischen `READY` auf `90ab6c352827b36cf0d7fb2c2cf903bf068dcce7`
+(PR #22, Deployment `dpl_2daYjLD7rAHtN7tZhYsKj1cKEHUo`). Die eng begrenzte
+Runtime-Log-Abfrage liefert weiterhin `400 ExceedsBillingLimitError` statt
+Einzelereignissen.
+
+Die gleiche WhatsApp-Antwort zeigt einen **anderen**, auf Anfrage gestarteten
+MEDION-Saugroboter-Auftrag vom 29.09. mit `needs_input`, aber ohne Abbruchgrund.
+Aus der bloßen Produktbezeichnung lassen sich Verifikation, ASIN, Review und
+Versand nicht ableiten. Die drei manuellen Suchen vom 28.09. stehen ausdrücklich
+auf `needs_input (keine verifizierte Produktseite gefunden)`. Eine kleine
+Statuskorrektur liest vorhandene redaktionelle Prüfmängel für künftige
+`Status`-Antworten aus; sie startet keinen Auftrag und gibt nichts frei.
+Ob der MEDION-Auftrag daran scheiterte, ist bislang unbekannt. Keine
+identische Live-Suche zur Diagnose wiederholen.
+
+Nach der Betreiberpräzisierung filtert der Trendscout vor der Ausgabe alle
+bereits verifizierten Produkte heraus, deren ASIN oder eng definierte
+Produktfamilie noch im Cooldown liegt. Die Prüfung verwendet dieselben
+gespeicherten Locks, offenen Aufträge und Veröffentlichungszeiten wie die
+endgültige, gegen Parallelität gesicherte Reservierung. Sind alle Treffer
+gesperrt, entsteht kein Content-Plan und der Tagesauftrag erhält
+`product_repeat_blocked`; es wird keine zusätzliche Live-Suche gestartet.
+Unverifizierte Suchideen werden dadurch nicht als verifizierte Produkte
+ausgegeben. Die lokale Prüfung belegt dieses Verhalten, noch keinen
+erfolgreichen folgenden Production-Lauf.
+
 ## Morgenlauf 29. September 2026: lesende Nachprüfung um 12:19 MESZ
 
 Remote-`main` und Vercel Production stehen auf
