@@ -3,6 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {PGlite}=require('@electric-sql/pglite');
 const {reserveProduct,productFamily}=require('../.test-build/lib/daily/product-lock');
+const loadRoute=require('./helpers/load-route.cjs');
 
 test('seven-day reservations block exact ASIN and narrow family before planning',async t=>{
   const pg=new PGlite();t.after(()=>pg.close());
@@ -51,4 +52,28 @@ test('publication time extends the seven-day block; an older pending draft still
     now()-interval '20 days',now()-interval '20 days')`,
     [pending,pendingProduct.asin,JSON.stringify({product:pendingProduct})]);
   assert.equal(await reserveProduct(db,pendingProduct,other),false);
+});
+
+test('TrendScout omits cooldown products before presenting suggestions',async t=>{
+  const pg=new PGlite();t.after(()=>pg.close());
+  for(const name of fs.readdirSync('db/migrations').filter(n=>n.endsWith('.sql')).sort())
+    await pg.exec(fs.readFileSync(`db/migrations/${name}`,'utf8'));
+  const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v)}))};
+  const blocked={name:'Kürbis Schnitzset A',asin:'B000000001',sourceUrl:'https://www.amazon.de/dp/B000000001'};
+  const sameFamily={name:'Pumpkin Carving Kit B',asin:'B000000002',sourceUrl:'https://www.amazon.de/dp/B000000002'};
+  const fresh={name:'Kuscheldecke Modell C',asin:'B000000003',sourceUrl:'https://www.amazon.de/dp/B000000003'};
+  assert.equal(await reserveProduct(db,blocked,crypto.randomUUID()),true);
+  const candidates=[blocked,sameFamily,fresh].map(p=>({name:p.name,searchQuery:p.name,targetGroup:'Haushalte'}));
+  const scout=loadRoute('lib/orchestrator.ts',{
+    '@/lib/agents/product-scout':{scoutProducts:async()=>({output:{candidates},sources:[]})},
+    '@/lib/product-resolver':{findAmazonProduct:async name=>[blocked,sameFamily,fresh].find(p=>p.name===name)},
+    '@/lib/memory/db':{getDatabase:()=>db},
+    '@/lib/agents/product-reviewer':{},
+    '@/lib/agents/script-writer':{},
+    '@/lib/content/orchestrator':{},
+  });
+  const report=await scout.runProductScout();
+  assert.deepEqual(report.candidates.map(c=>c.name),[fresh.name]);
+  assert.equal(report.cooldownBlocked,2);
+  assert.equal((await pg.query('SELECT count(*)::int AS n FROM content_jobs')).rows[0].n,0);
 });
