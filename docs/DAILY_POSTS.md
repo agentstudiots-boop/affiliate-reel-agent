@@ -1,5 +1,36 @@
 # Tägliche Entwürfe und Veröffentlichung
 
+## Morgenlauf 29. September 2026: lesende Nachprüfung um 12:19 MESZ
+
+Remote-`main` und Vercel Production stehen auf
+`e9df9d9b0515dd616d5248a914f77a4bedb192c3` (PR #21); das Deployment
+`dpl_4dZLdhpq7SvDZFP5DHB1L9LpY3wu` ist `READY`. Vercels gruppierte
+Runtime-Fehler zeigen für `/api/cron/daily-draft` einen Eintrag vom
+29.09. um **08:25:30 UTC = 10:25:30 MESZ**. Der Eintrag enthält nur die
+`pg`-Warnung zum SSL-Modus. Das belegt eine Invocation der Cron-Route und
+Postgres-Initialisierung, aber weder den Tages-Claim noch ein erfolgreiches
+Pipeline-Ergebnis. Die Route würde um diese Berliner Uhrzeit `morning`
+zuordnen; das ist eine Schlussfolgerung aus dem deployten Code, kein gelesener
+Datenbankwert.
+
+Die Vercel-Runtime-Log-Abfrage scheitert sogar für das enge Fenster
+08:20–08:31 UTC mit `400 ExceedsBillingLimitError`. Breitere Abfragen
+lieferten „No logs found“, können wegen dieses Limits aber nicht als
+Negativbeweis verwendet werden. Ein direkter lesender Produktions-DB-Zugang
+liegt nicht vor. Der authentifizierte GET `/api/operations` wurde bewusst
+nicht verwendet, da er bei fehlendem Schema Migrationen ausführen kann.
+
+Deshalb bleiben für genau diesen Morgenlauf **unbekannt**: `(day,slot)`-Claim
+und Job-ID, Produktkandidat, live verifizierte Amazon-Detailseite und ASIN,
+Affiliate-Link, Content-Plan, redaktionelles Review, WhatsApp-Sendestatus
+und gegebenenfalls die Abbruchstufe. Weder ein Erfolg noch ein Fehler der
+Produkt- oder WhatsApp-Pipeline ist damit belegt. Keine Live-Suche und keinen
+POST nur zur Diagnose wiederholen. Zur weiteren Prüfung ist ein tatsächlich
+lesender Datenbankauszug oder der gespeicherte Tagesauftrag im
+authentifizierten Content Studio nötig; bei einem Versandfehler zusätzlich
+der konkrete Versandstatus. Änderungen an Amazon, Meta oder Modell sind aus
+den bisher sichtbaren Daten nicht gerechtfertigt.
+
 ## WhatsApp-Modellwechsel am 29. September 2026
 
 Der gebundene WhatsApp-Änderungsparser und der Video-Änderungsparser verwenden
