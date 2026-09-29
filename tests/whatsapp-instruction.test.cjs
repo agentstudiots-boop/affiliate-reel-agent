@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 const {PGlite}=require('@electric-sql/pglite');
 const {interpretInstruction,validateInstruction,clarification,INSTRUCTION_MODEL,predictionText}=require('../.test-build/lib/whatsapp/instruction');
 test('strong pretrained parser accepts both documented text output shapes',()=>{
-  assert.equal(INSTRUCTION_MODEL,'openai/gpt-4.1');
+  assert.equal(INSTRUCTION_MODEL,'openai/gpt-5.6-terra');
   assert.equal(predictionText('plain JSON'),'plain JSON');
   assert.equal(predictionText(['plain ','JSON']),'plain JSON');
   assert.equal(predictionText({unexpected:true}),null);
@@ -66,7 +66,9 @@ for(const [body,intent] of [
   const result=await interpretInstruction(body,job,async(url,init)=>{
     calls++;assert.equal(url,`https://api.replicate.com/v1/models/${INSTRUCTION_MODEL}/predictions`);
     const request=JSON.parse(init.body);assert.equal(request.input.max_completion_tokens,1200);assert.equal(request.tools,undefined);
-    assert.match(request.input.system_prompt,/additionalProperties/);assert.equal(request.input.temperature,0);
+    assert.match(request.input.system_prompt,/additionalProperties/);
+    assert.equal(request.input.reasoning_effort,'none');assert.equal(request.input.verbosity,'low');
+    assert.equal(request.input.temperature,undefined);
     const input=JSON.parse(request.input.prompt);assert.equal(input.operator_message,body);assert.equal(input.context.content_id,job.id);
     assert.equal(input.context.product.asin,'B0D9YQR9CT');assert.equal(input.context.product.name,job.opportunity.product.name);
     assert.deepEqual(input.context.current_content,job.content);assert.ok(input.context.current_creative);assert.equal(input.context.status,job.status);
