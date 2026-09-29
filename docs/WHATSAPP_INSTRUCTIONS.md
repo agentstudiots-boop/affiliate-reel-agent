@@ -1,6 +1,8 @@
 # Natürliche WhatsApp-Anweisungen
 
 Stand: 26.09.2026. Ergänzung des bestehenden Orchestrators, keine neue Agentenarchitektur.
+Die Modell- und Parameterangaben dieses historischen Stands wurden am 29.09.2026
+ersetzt; aktueller Stand: `docs/DAILY_POSTS.md`.
 
 ## Ablauf und Identität
 
