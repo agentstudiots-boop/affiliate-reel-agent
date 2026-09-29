@@ -107,7 +107,8 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
     const candidates = report?.candidates.filter(candidate => productSearch
       ? candidate.searchQuery.toLocaleLowerCase("de-DE")===productSearch.toLocaleLowerCase("de-DE")
       : openSearch || candidate.kind === "Saisontrend") || [];
-    if (!productQuery && !candidates.length && report?.cooldownBlocked) {
+    const relevantCooldownBlocked = productSearch || openSearch ? report?.cooldownBlocked : report?.cooldownBlockedSeasonal;
+    if (!productQuery && !candidates.length && relevantCooldownBlocked) {
       await db.query("UPDATE daily_drafts SET status='needs_input',scout_report=$2,updated_at=now() WHERE job_id=$1",
         [jobId,JSON.stringify({requestedSearch:productSearch,report,reason:"product_repeat_blocked"})]);
       return {status:'needs_input' as const,jobId,reason:'product_repeat_blocked' as const};
@@ -116,7 +117,7 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
     const resolved = candidates.filter(candidate => candidate.resolvedProduct);
     if(!productQuery && !resolved.length){
       const resolutionReason = candidates.some(candidate => "resolutionError" in candidate && candidate.resolutionError === "amazon_verification_blocked")
-        ? "amazon_verification_blocked" as const : report?.cooldownBlocked ? "product_repeat_blocked" as const : "product_unresolved" as const;
+        ? "amazon_verification_blocked" as const : relevantCooldownBlocked ? "product_repeat_blocked" as const : "product_unresolved" as const;
       await db.query("UPDATE daily_drafts SET status='needs_input',scout_report=$2,updated_at=now() WHERE job_id=$1",
         [jobId,JSON.stringify({requestedSearch:productSearch,report,reason:resolutionReason})]);
       return {status:'needs_input' as const,jobId,reason:resolutionReason,searchTerm:productSearch};
