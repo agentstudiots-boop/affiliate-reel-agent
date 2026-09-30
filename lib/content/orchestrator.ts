@@ -4,7 +4,7 @@ import { creativeAgent } from "./agents/creative";
 import { videoAgent } from "./agents/video";
 import { imageAgent } from "./agents/image";
 import { textAgent } from "./agents/text";
-import { marketingAgent } from "./agents/marketing";
+import { marketingAgent, bindMarketingPlatform } from "./agents/marketing";
 import { analyzeProductInspiration } from "./product-inspiration";
 import { classifyOpportunity, pumpkinCreativeIssues } from "./category";
 import { interpretVideoRevision } from "../whatsapp/video-revision";
@@ -233,6 +233,9 @@ export async function runContentJob(raw: Opportunity, options: {
     await status("marketing", "Geprüften Entwurf an Marketing übergeben");
     job.marketing = await marketingAgent({ opportunity, content: job.content! }, job.mode === "reference" && job.modelCalls > 0
       ? createGenerator({ mode: "reference", signal: options.signal }) : generate);
+    const plannedPlatform = job.marketing.primary;
+    job.marketing = bindMarketingPlatform(opportunity, job.content!, job.marketing);
+    if (job.marketing.primary !== plannedPlatform) await emit("orchestrator", "decision", `Marketingplattform „${plannedPlatform}“ passt nicht zur verbindlichen Zielplattform; ${job.marketing.primary} übernommen.`);
     const thematicIssues = [...pumpkinCreativeIssues(opportunity, job.content!, job.marketing), ...bathtubMatIssues(opportunity, job.content!)];
     if (thematicIssues.length) { job.review = { passed: false, score: 40, issues: thematicIssues }; await status("needs_input", thematicIssues.join(" ")); return job; }
     const platform = job.marketing.primary;

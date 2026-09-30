@@ -212,3 +212,14 @@ test('technical explanation can beat video even for conversion; storage brief fa
   assert.equal(storage.content.format, 'image');
   assert.equal(storage.status, 'awaiting_approval');
 });
+
+test('a concrete Facebook target binds the marketing platform instead of ending the plan',()=>{
+  const {bindMarketingPlatform}=require('../.test-build/lib/content/agents/marketing');
+  const opp={targetPlatform:'facebook',goal:'education'};
+  const marketing={primary:'Instagram Reel',rationale:'r'};
+  assert.equal(bindMarketingPlatform(opp,{format:'image'},marketing).primary,'Facebook Post');
+  assert.equal(bindMarketingPlatform(opp,{format:'video'},marketing).primary,'Facebook Video');
+  assert.equal(bindMarketingPlatform({...opp,goal:'community'},{format:'text'},marketing).primary,'Gruppenbeitrag');
+  assert.equal(bindMarketingPlatform({...opp,targetPlatform:'instagram'},{format:'image'},marketing),marketing);
+  assert.equal(bindMarketingPlatform(opp,{format:'image'},{primary:'Facebook Post'}).primary,'Facebook Post');
+});
