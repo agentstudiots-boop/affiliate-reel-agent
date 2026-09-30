@@ -16,7 +16,9 @@ export async function ensureAutomationSchema(db: Database) {
     to_regclass('public.story_handoffs') IS NOT NULL AS stories,
     to_regclass('public.approved_editorial_feedback') IS NOT NULL AS feedback,
     to_regclass('public.product_selection_locks') IS NOT NULL AS product_locks,
-    to_regclass('public.whatsapp_chat_turns') IS NOT NULL AS chat_turns`);
-  if (ready.rows[0]?.slots === true && ready.rows[0]?.slot_key === true && ready.rows[0]?.stories === true && ready.rows[0]?.feedback === true && ready.rows[0]?.product_locks === true && ready.rows[0]?.chat_turns === true) return;
+    to_regclass('public.whatsapp_chat_turns') IS NOT NULL AS chat_turns,
+    EXISTS (SELECT 1 FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='daily_drafts' AND column_name='attempts') AS slot_retry`);
+  if (ready.rows[0]?.slots === true && ready.rows[0]?.slot_key === true && ready.rows[0]?.stories === true && ready.rows[0]?.feedback === true && ready.rows[0]?.product_locks === true && ready.rows[0]?.chat_turns === true && ready.rows[0]?.slot_retry === true) return;
   await applyMigrations(db);
 }

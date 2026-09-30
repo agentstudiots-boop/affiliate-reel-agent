@@ -32,7 +32,7 @@ test('006–017 upgrade populated 001–005 once without replaying or changing p
     const loaded = [];
     const trackedLoader = name => { loaded.push(name); return load(name); };
 
-    const upgrades = ['006_daily_notification.sql', '007_publication_revisions.sql', '008_weekly_reports.sql', '009_original_visual_attempts.sql', '010_replicate_visual_provider.sql', '011_instagram_reel_publications.sql', '012_whatsapp_instructions.sql', '013_operator_language_examples.sql', '014_content_approval_requests.sql', '015_runway_story.sql', '016_multiple_drafts.sql', '017_story_handoffs.sql', '018_approved_editorial_feedback.sql', '019_daily_slot_key.sql', '020_product_selection_locks.sql', '021_whatsapp_chat.sql'];
+    const upgrades = ['006_daily_notification.sql', '007_publication_revisions.sql', '008_weekly_reports.sql', '009_original_visual_attempts.sql', '010_replicate_visual_provider.sql', '011_instagram_reel_publications.sql', '012_whatsapp_instructions.sql', '013_operator_language_examples.sql', '014_content_approval_requests.sql', '015_runway_story.sql', '016_multiple_drafts.sql', '017_story_handoffs.sql', '018_approved_editorial_feedback.sql', '019_daily_slot_key.sql', '020_product_selection_locks.sql', '021_whatsapp_chat.sql', '022_daily_slot_retry.sql'];
     assert.deepEqual(await applyMigrations(db, trackedLoader), {
       applied: upgrades, alreadyApplied: previous,
     });
@@ -42,7 +42,7 @@ test('006–017 upgrade populated 001–005 once without replaying or changing p
     assert.deepEqual(loaded, upgrades, 'existing migration SQL must never be replayed');
     assert.deepEqual((await pg.query('SELECT * FROM schema_migrations ORDER BY name')).rows.slice(0, 5), before);
     assert.deepEqual((await pg.query('SELECT * FROM daily_drafts')).rows[0], {
-      ...draft, notification_send_attempted_at: null, notification_message_id: null, slot: 'morning',
+      ...draft, notification_send_attempted_at: null, notification_message_id: null, slot: 'morning', attempts: 1,
     });
     assert.deepEqual((await pg.query('SELECT * FROM whatsapp_events')).rows[0], event);
     await pg.exec("INSERT INTO whatsapp_events(message_id,wa_id,intent,payload) VALUES('test.notification','test-approver','notification_reply','{}')");

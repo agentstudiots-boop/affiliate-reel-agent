@@ -11,7 +11,7 @@ import { requestFacebookApproval } from "@/lib/meta/request-publication";
 import { requestVideoCostApproval } from "@/lib/production/request-cost-approval";
 import { getDatabase } from "@/lib/memory/db";
 import { parseJob } from "@/lib/content/history";
-import { createDailyDraft, sendDailyApproval } from "@/lib/daily/draft";
+import { createDailyDraft, sendDailyApproval, sendPendingDailyApprovals } from "@/lib/daily/draft";
 import { startImagePostFromWhatsApp } from "@/lib/whatsapp/start-image-post";
 import { answerWhatsAppConversation } from "@/lib/whatsapp/chat";
 import { sendWhatsAppText } from "@/lib/whatsapp/client";
@@ -173,6 +173,14 @@ export async function POST(request: Request) {
       failed = true;
       console.error(JSON.stringify({ event: "whatsapp_approval_message_failed", messageId: message.id, failureType: error instanceof Error ? error.name : "unknown" }));
     }
+  }
+  // An inbound operator message opens the 24 h service window. Deliver any
+  // saved daily approval that could not be sent earlier; the send is claimed once.
+  const approverId = (process.env.WHATSAPP_APPROVER_WA_ID || "").replace(/\D/g, "");
+  if (!failed && approverId && typeof sendPendingDailyApprovals === "function"
+    && messages.some(message => message.from.replace(/\D/g, "") === approverId)) {
+    try { await sendPendingDailyApprovals(getDatabase()); }
+    catch { console.error(JSON.stringify({ event: "daily_approval_flush_unavailable" })); }
   }
   // Successful message IDs deduplicate when Meta redelivers the batch.
   if (failed) return new Response("Storage unavailable", { status: 503, headers: { "Cache-Control": "no-store" } });
