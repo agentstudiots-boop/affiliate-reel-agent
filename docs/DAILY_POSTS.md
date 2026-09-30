@@ -1,5 +1,37 @@
 # Tägliche Entwürfe und Veröffentlichung
 
+## 30. September 2026, 15:53–15:58 MESZ: neuer Artikel per Amazon-Kurzlink
+
+Der Betreiber zeigte, dass er `https://amzn.eu/d/05U6rTa5` als neuen Auftrag
+teilte, darauf mit „Ich möchte dieses Produkt bewerben“ antwortete und
+anschließend ausdrücklich „Keinen bestehenden Auftrag ...“ schrieb. Der Bot
+fragte dennoch nach alten Kürbis-, Tortillapressen- und Kuscheldeckenjobs.
+Zwei Webhook-POSTs um 13:53 UTC sind auf dem damaligen Production-Deployment
+mit HTTP 200 sichtbar; die verfügbaren Logs nennen weder die einzelnen
+Nachrichten noch eine Modellinterpretation. Der Screenshot belegt den
+Antworttext, aber **keine** Live-Verifikation der Kurzlink-Zielseite, ASIN,
+Affiliate-Link, neue Content-Planung oder Inhaltsfreigabe. Ein öffentlicher
+Abruf des konkreten Kurzlinks war in dieser Nachprüfung nicht möglich.
+
+Ursache im Code: Der bisherige explizite WhatsApp-Bildpostbefehl kannte nur
+eine ASIN oder direkte Amazon-Detail-URL nach `Bildpost`; Antworten auf
+beliebige Nachrichten wurden zu bestehenden Aufträgen geroutet. Der neue
+Weg nimmt `Neuer Auftrag <Link>`, `Bildpost <Link>` und eine Antwort mit
+„Ich möchte dieses Produkt bewerben“ direkt auf eine zuvor gesendete
+Link-Nachricht als **separaten** Auftrag an. Ein allein gesendeter Link wird
+zunächst nur gespeichert und mit einer Anweisung zum direkten Antworten
+quittiert. Der Kurzlink darf ausschließlich von `amzn.eu/d/...` stammen;
+ein einzelner manueller Redirect muss zu einer eindeutigen Amazon.de-
+Produktdetailseite führen. Danach durchläuft die ASIN die vorhandene
+Amazon-Liveprüfung, Familien-/ASIN-Sperre, Content-Planung und WhatsApp-
+Inhaltsfreigabe. Weder Linkvorschau noch bloßer Redirect gelten als
+Produktverifikation. Ein unauflösbarer oder fremder Redirect stoppt ohne
+Produktsuche, Bildkauf und Veröffentlichung. Derselbe eingehende WhatsApp-
+Nachrichten-ID wird nicht als unbekannter POST erneut gestartet. Das
+Production-Verhalten muss nach dem Deployment mit einer neuen Nachricht
+beobachtet werden; ein alter, bereits verarbeiteter Webhook wird nicht
+automatisch nachgeholt.
+
 ## 30. September 2026, 15:14 MESZ: WhatsApp-Fragen und alte abgebrochene Aufträge
 
 Der Betreiber zeigte eine neue WhatsApp-Unterhaltung. Eine Frage nach einer

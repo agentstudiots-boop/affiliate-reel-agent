@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { PGlite } = require('@electric-sql/pglite');
 const { imagePostCommand, startImagePostFromWhatsApp } = require('../.test-build/lib/whatsapp/start-image-post');
+const { operatorProductLink, asinFromOperatorLink } = require('../.test-build/lib/whatsapp/product-link');
+const {applyMigrations}=require('../.test-build/lib/memory/migrations');
 const loadRoute=require('./helpers/load-route.cjs');
 
 test('TrendScout searches the requested product family instead of seasonal defaults',async()=>{
@@ -118,4 +120,47 @@ test('failed generic searches report the actual stage without retrying a paid dr
     async()=>({status:'needs_input',jobId:'reviewed',reason:'content_review_failed',reviewIssues:['Werkzeug passt nicht zur Anwendung.']}),send);
   assert.match(notices[3],/Werkzeug passt nicht zur Anwendung/);
   assert.match(notices[3],/Artikelsuche/);
+});
+
+test('Amazon short link redirects only to a concrete Amazon detail ASIN',async()=>{
+  const short='https://amzn.eu/d/05U6rTa5';
+  assert.equal(operatorProductLink(`Neuer Auftrag ${short}`),short);
+  assert.equal(operatorProductLink('https://evil.example/d/05U6rTa5'),null);
+  assert.equal(operatorProductLink(`${short} https://www.amazon.de/dp/B0C2C739KY`),null);
+  let calls=0;
+  const request=async(url,init)=>{calls++;assert.equal(url,short);assert.equal(init.redirect,'manual');
+    return new Response(null,{status:302,headers:{location:'https://www.amazon.de/dp/B0C2C739KY?tag=other-21'}});};
+  assert.equal(await asinFromOperatorLink(short,request),'B0C2C739KY');assert.equal(calls,1);
+  await assert.rejects(asinFromOperatorLink(short,async()=>new Response(null,{status:302,headers:{location:'https://example.com/dp/B0C2C739KY'}})),/product_link_unresolved/);
+  await assert.rejects(asinFromOperatorLink(short,async()=>new Response('Not found',{status:200})),/product_link_unresolved/);
+  assert.equal(calls,1,'no live provider calls');
+});
+
+test('a quoted product link starts one separate job; an old approval cannot be replaced',async t=>{
+  const pg=new PGlite();t.after(()=>pg.close());
+  const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
+  await applyMigrations(db);
+  const old=process.env.WHATSAPP_APPROVER_WA_ID;process.env.WHATSAPP_APPROVER_WA_ID='491234';
+  t.after(()=>{if(old===undefined)delete process.env.WHATSAPP_APPROVER_WA_ID;else process.env.WHATSAPP_APPROVER_WA_ID=old;});
+  const short='https://amzn.eu/d/05U6rTa5',sends=[],starts=[];
+  const send=async text=>{sends.push(text);return 'wamid.notice';};
+  const start=async(...args)=>{starts.push(args);return {status:'awaiting_approval',jobId:'new-job',whatsapp:'approval_sent'};};
+  const resolve=async link=>{assert.equal(link,short);return 'B0C2C739KY';};
+  const original={id:'wamid.link',from:'491234',body:short,replyToMessageId:null,payload:{}};
+  assert.equal(await startImagePostFromWhatsApp(original,()=>db,start,send,resolve),true);
+  assert.equal(starts.length,0);assert.match(sends[0],/Produktlink erhalten/);
+  const reply={...original,id:'wamid.new-request',body:'Ich möchte dieses Produkt bewerben',replyToMessageId:original.id};
+  assert.equal(await startImagePostFromWhatsApp(reply,()=>db,start,send,resolve),true);
+  assert.equal(await startImagePostFromWhatsApp(reply,()=>db,start,send,resolve),true);
+  assert.equal(starts.length,1);assert.equal(starts[0][2],'B0C2C739KY');
+  const onOldApproval={...reply,id:'wamid.old-quote',replyToMessageId:'wamid.old-approval'};
+  await db.query("INSERT INTO whatsapp_events(message_id,wa_id,body,payload) VALUES('wamid.old-approval','491234','Freigabe','{}')");
+  assert.equal(await startImagePostFromWhatsApp(onOldApproval,()=>db,start,send,resolve),true);
+  assert.equal(starts.length,1);assert.match(sends.at(-1),/Bitte sende/);
+  assert.equal(await startImagePostFromWhatsApp({...onOldApproval,id:'wamid.direct-link',body:`Keinen bestehenden Auftrag, erstelle aus diesem Produktlink einen Affiliate Link ${short}`},()=>db,start,send,resolve),true);
+  assert.equal(starts.length,2);
+  assert.notEqual(starts[0][1],starts[1][1]);
+  assert.equal(imagePostCommand(`Neuer Auftrag ${short}`).link,short);
+  assert.equal(imagePostCommand(`Keinen bestehenden Auftrag, erstelle aus dem Produktlink einen Affiliate Link ${short}`).link,short);
+  assert.equal(imagePostCommand('Artikelsuche Saugroboter?'),null);
 });
