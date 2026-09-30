@@ -82,6 +82,40 @@ export async function sendDailyApproval(jobId: string) {
 }
 
 
+
+// Inside the 24 h service window the full draft is sent. Outside it only the
+// approved notification template goes out; the reply "Entwurf" then fetches the
+// stored draft. A template is never a content approval.
+async function deliverDailyApproval(db: Database, jobId: string) {
+  const approver = (process.env.WHATSAPP_APPROVER_WA_ID || "").replace(/\D/g, "");
+  const window = approver ? await db.query(
+    "SELECT 1 FROM whatsapp_events WHERE wa_id=$1 AND received_at > now()-interval '24 hours' LIMIT 1",
+    [approver],
+  ) : { rows: [] };
+  if (window.rows.length) return (await sendDailyApproval(jobId)) ? "approval_sent" as const : "approval_not_sent" as const;
+  if (!approver || !dailyNotificationTemplateConfigured()) return "template_required" as const;
+  const attempted = await db.query(
+    `UPDATE daily_drafts SET notification_send_attempted_at=now() WHERE job_id=$1
+     AND status='awaiting_approval' AND whatsapp_message_id IS NULL
+     AND notification_message_id IS NULL AND notification_send_attempted_at IS NULL RETURNING day`, [jobId],
+  );
+  if (!attempted.rows.length) return "notification_sent" as const;
+  try {
+    const messageId = await sendDailyNotificationTemplate();
+    await db.query("UPDATE daily_drafts SET notification_message_id=$2,updated_at=now() WHERE job_id=$1", [jobId, messageId]);
+    return "notification_sent" as const;
+  } catch (error) {
+    // A definite Meta rejection (e.g. unknown template/language) delivered nothing:
+    // release the claim so the next cron call retries, and log only safe fields.
+    if (error instanceof WhatsAppRejectedError) {
+      await db.query("UPDATE daily_drafts SET notification_send_attempted_at=NULL,updated_at=now() WHERE job_id=$1 AND notification_message_id IS NULL", [jobId]);
+      console.error(JSON.stringify({ event: "daily_template_rejected", jobId, httpStatus: error.httpStatus, code: error.code, subcode: error.subcode, detail: error.providerMessage }));
+      return "template_rejected" as const;
+    }
+    throw error;
+  }
+}
+
 // Scheduled slots are fully automatic: nobody can supply input, so a failed,
 // needs_input or killed (stale claim) attempt is retried by the next cron call.
 const MAX_SLOT_ATTEMPTS = 3;
@@ -114,9 +148,10 @@ async function reclaimScheduledSlot(db: Database, day: string, slot: string, job
 async function resendPendingApproval(db: Database, day: string, slot: string) {
   const pending = await db.query(
     `SELECT job_id FROM daily_drafts WHERE day=$1 AND slot=$2 AND status='awaiting_approval'
-     AND whatsapp_message_id IS NULL AND whatsapp_send_attempted_at IS NULL`, [day, slot]);
+     AND whatsapp_message_id IS NULL AND whatsapp_send_attempted_at IS NULL
+     AND notification_message_id IS NULL`, [day, slot]);
   if (!pending.rows.length) return {};
-  try { return { whatsapp: (await sendDailyApproval(String(pending.rows[0].job_id))) ? "approval_sent" as const : "approval_not_sent" as const }; }
+  try { return { whatsapp: await deliverDailyApproval(db, String(pending.rows[0].job_id)) }; }
   catch { console.error(JSON.stringify({ event: "daily_approval_resend_failed", day, slot })); return { whatsapp: "approval_send_failed" as const }; }
 }
 
@@ -235,26 +270,7 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
       stage = "whatsapp_send";
       // Meta accepts free-form texts only within the 24-hour service window.
       // An approved business-initiated template is a separate configuration step.
-      const window = approver ? await db.query(
-        "SELECT 1 FROM whatsapp_events WHERE wa_id=$1 AND received_at > now()-interval '24 hours' LIMIT 1",
-        [approver],
-      ) : { rows: [] };
-      if (window.rows.length) {
-        const sent = await sendDailyApproval(jobId);
-        return { status, jobId, whatsapp: sent ? "approval_sent" as const : "approval_not_sent" as const };
-      }
-      else {
-        if (!approver || !dailyNotificationTemplateConfigured()) return { status, jobId, whatsapp: "template_required" as const };
-        const attempted = await db.query(
-          `UPDATE daily_drafts SET notification_send_attempted_at=now() WHERE job_id=$1
-           AND notification_send_attempted_at IS NULL RETURNING day`, [jobId],
-        );
-        if (attempted.rows.length) {
-          const messageId = await sendDailyNotificationTemplate();
-          await db.query("UPDATE daily_drafts SET notification_message_id=$2,updated_at=now() WHERE job_id=$1", [jobId, messageId]);
-        }
-        return { status, jobId, whatsapp: "notification_sent" as const };
-      }
+      return { status, jobId, whatsapp: await deliverDailyApproval(db, jobId) };
     }
     const reason = missingCaption ? "missing_caption" as const
       : job.error === EDITORIAL_RATE_LIMIT_ERROR ? "editorial_rate_limited" as const

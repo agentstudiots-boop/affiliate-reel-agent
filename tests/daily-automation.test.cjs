@@ -222,6 +222,7 @@ test('automatic draft uses an already researched evergreen when seasonal product
   assert.equal(jobs.rows[0].snapshot.opportunity.product.asin,'B000000044');
 });
 
+class Rejected extends Error{constructor(){super('rejected');this.code=132001;this.subcode=0;this.httpStatus=404;this.providerMessage='template missing';}}
 async function retryFixture(t){
   const pg=new PGlite();t.after(()=>pg.close());
   for(const name of fs.readdirSync('db/migrations').filter(n=>n.endsWith('.sql')).sort())await pg.exec(fs.readFileSync(`db/migrations/${name}`,'utf8'));
@@ -229,14 +230,14 @@ async function retryFixture(t){
   const old=process.env.WHATSAPP_APPROVER_WA_ID;process.env.WHATSAPP_APPROVER_WA_ID='491234';
   t.after(()=>{if(old===undefined)delete process.env.WHATSAPP_APPROVER_WA_ID;else process.env.WHATSAPP_APPROVER_WA_ID=old;});
   const product={name:'Kuscheldecke',productVerifiedName:'Kuscheldecke',productVerifiedAt:'2026-09-26T08:00:00.000Z',sourceUrl:'https://www.amazon.de/dp/B000000001',affiliateUrl:'https://www.amazon.de/dp/B000000001?tag=alltaeglichle-21',price:'',targetGroup:'Haushalte',benefits:'Eigenschaften vor Kauf prüfen',notes:''};
-  const state={scouts:0,fail:0,messages:[],sendError:null};
+  const state={scouts:0,fail:0,messages:[],sendError:null,template:false,templates:0,templateError:null};
   const daily=loadRoute('lib/daily/draft.ts',{
     '@/lib/orchestrator':{runContentJob:require('../.test-build/lib/content/orchestrator').runContentJob,
       runProductScout:async()=>{state.scouts++;if(state.fail-->0)throw Error('Amazon unavailable');
         return {candidates:[{resolvedProduct:product,kind:'Saisontrend',name:'Kuscheldecke',category:'Wohnen',reelIdea:'Eine Kuscheldecke am Abend auf dem Sofa vergleichen.',whyNow:'Herbst'}]};}},
     '@/lib/memory/db':{getDatabase:()=>db},
-    '@/lib/whatsapp/client':{WhatsAppRejectedError:class extends Error{},sendWhatsAppText:async body=>{if(state.sendError)throw state.sendError;state.messages.push(body);return `wamid.${state.messages.length}`;},
-      dailyNotificationTemplateConfigured:()=>false,sendDailyNotificationTemplate:async()=>{throw Error('no template');}},
+    '@/lib/whatsapp/client':{WhatsAppRejectedError:Rejected,sendWhatsAppText:async body=>{if(state.sendError)throw state.sendError;state.messages.push(body);return `wamid.${state.messages.length}`;},
+      dailyNotificationTemplateConfigured:()=>!!state.template,sendDailyNotificationTemplate:async()=>{if(state.templateError)throw state.templateError;state.templates++;return `wamid.template.${state.templates}`;}},
   });
   return {pg,daily,state};
 }
@@ -293,4 +294,22 @@ test('a failed WhatsApp send keeps the planned draft instead of marking the slot
   assert.equal((await pg.query("SELECT status FROM daily_drafts")).rows[0].status,'awaiting_approval');
   assert.equal((await daily.createDailyDraft('2026-09-30','afternoon')).status,'already_claimed');
   assert.equal(state.scouts,1);
+});
+
+test('outside the 24 h window the approved template is sent once, never counts as approval, and a rejected template is retried',async t=>{
+  const {pg,daily,state}=await retryFixture(t);
+  state.template=true;state.templateError=new Rejected();
+  const first=await daily.createDailyDraft('2026-09-30','afternoon');
+  assert.equal(first.status,'awaiting_approval');assert.equal(first.whatsapp,'template_rejected');
+  assert.equal(state.messages.length,0);assert.equal(state.templates,0);
+  state.templateError=null;
+  const second=await daily.createDailyDraft('2026-09-30','afternoon');
+  assert.equal(second.status,'already_claimed');assert.equal(second.whatsapp,'notification_sent');
+  assert.equal(state.templates,1);
+  const third=await daily.createDailyDraft('2026-09-30','afternoon');
+  assert.equal(third.status,'already_claimed');assert.equal(state.templates,1);assert.equal(state.scouts,1);
+  const row=(await pg.query("SELECT status,whatsapp_message_id,notification_message_id FROM daily_drafts")).rows[0];
+  assert.deepEqual(row,{status:'awaiting_approval',whatsapp_message_id:null,notification_message_id:'wamid.template.1'});
+  assert.equal(state.messages.length,0);
+  assert.equal((await pg.query('SELECT count(*)::int AS n FROM publication_requests')).rows[0].n,0);
 });
