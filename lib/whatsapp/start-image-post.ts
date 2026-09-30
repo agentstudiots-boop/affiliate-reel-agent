@@ -8,6 +8,7 @@ import { createHash } from "node:crypto";
 // remain corrections or decisions for the message they reference.
 type ImagePostCommand={product?:string;search?:string;invalid:boolean};
 export function imagePostCommand(body: string):ImagePostCommand|null {
+  if (body.includes("?")) return null; // Questions never start a paid search.
   const text = body.trim().replace(/[.!?]+$/, "").replace(/\s+/g, " ");
   if (/^(?:artikel|produkt|trend)suche$/i.test(text)
     || /^(?:bitte )?(?:(?:starte|mach|mache) )?(?:eine )?neue (?:artikel|produkt|trend)suche$/i.test(text)
