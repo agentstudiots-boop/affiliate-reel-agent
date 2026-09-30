@@ -1,6 +1,16 @@
 import type {Database} from "../memory/db";
 import {processOperatorInstruction} from "./process-instruction";
 
+// Plain-language reason for an unapplied correction; internal codes are never shown.
+export function clarifyStatusText(code:string) {
+  const nothing=' Es wurde nichts produziert oder veröffentlicht.';
+  if(code==='target_unresolved')return 'Deine letzte Änderung konnte keinem Entwurf zugeordnet werden, weil gerade keine Inhaltsfreigabe auf dich wartet.'+nothing+' Für ein neues Motiv oder Produkt starte bitte einen neuen Auftrag, zum Beispiel „Artikelsuche Kürbisschnitzset“.';
+  if(code==='instruction_busy')return 'Zu diesem Entwurf wird gerade noch eine andere Änderung verarbeitet. Bitte warte kurz und schicke den Wunsch danach erneut.'+nothing;
+  if(code==='instruction_interrupted')return 'Die Verarbeitung deiner letzten Änderung wurde unterbrochen. Bitte schicke den Wunsch noch einmal als Antwort auf die Freigabenachricht.'+nothing;
+  if(code.startsWith('parser_'))return 'Deine Änderung ist gespeichert, aber der Sprachmodell-Zugang funktioniert momentan nicht. Das ist ein technischer Fehler; du musst nichts anders formulieren.'+nothing;
+  return 'Deine Änderung war nicht eindeutig genug, um sie umzusetzen. Bitte antworte direkt auf die Freigabenachricht und beschreibe, ob Bild, Text oder Produkt geändert werden soll.'+nothing;
+}
+
 // Only a trusted, explicit Status message resumes a previously saved correction.
 // Reuse the stored interpretation and never repeat the paid parser call.
 export async function recoverLatestInstruction(db:Database,waId:string,sendApproval:(jobId:string)=>Promise<boolean>) {
@@ -42,7 +52,7 @@ export async function recoverLatestInstruction(db:Database,waId:string,sendAppro
       : 'Deine Korrektur ist gespeichert und die alte Veröffentlichung gesperrt. Die neue Freigabenachricht konnte noch nicht sicher zugestellt werden; keine neue Bildproduktion und kein Post.';
   }
   if(latest?.status==='parsed')return 'Deine Korrektur ist gespeichert, aber die technische Verarbeitung ist noch unterbrochen. Das alte Bild bleibt gesperrt; kein neuer Post.';
-  if(latest?.status==='clarify')return `Deine Korrektur wurde noch nicht umgesetzt (${String(latest.error_code||'Klärung nötig')}). Das alte Bild bleibt gesperrt; bitte antworte auf die Freigabenachricht mit einer Präzisierung.`;
+  if(latest?.status==='clarify')return clarifyStatusText(String(latest.error_code||''));
   if(latest?.status==='applied')return 'Deine Korrektur ist gespeichert. Die alte Veröffentlichungsfreigabe ist gesperrt; eine neue Freigabe ist erforderlich.';
   return 'Deine Korrektur wird verarbeitet. Das alte Bild bleibt gesperrt.';
 }
