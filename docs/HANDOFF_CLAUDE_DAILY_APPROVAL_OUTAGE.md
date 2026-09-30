@@ -90,3 +90,15 @@ Screenshot des Betreibers (Antwort zugestellt, doppelte Haken) zeigt für den 30
 Änderung: Wenn ein Slot nach der Planung `needs_input` wird, wird der Grund (`publication_gate_failed`,
 `content_review_failed`, …) samt Kurztext gespeichert, als `daily_draft_needs_input` geloggt und in „Status"
 angezeigt. Damit ist der nächste Ausfall ohne Datenbankzugang erklärbar. Lokal getestet; produktiv noch nicht beobachtet.
+
+## Entscheidung Betreiber 30.09.2026 (spät): keine WhatsApp-Vorlage
+
+Um Kosten zu vermeiden, wird die Marketing-Vorlage `content_entwurf` **nicht** genutzt.
+`WHATSAPP_DAILY_TEMPLATE_ENABLED=false` (Vercel Production; Name/Sprache bleiben gesetzt, sind aber unwirksam).
+Ablauf stattdessen: Der Betreiber schreibt **einmal täglich** eine Nachricht an die Business-Nummer (öffnet das
+24-Stunden-Fenster). Ist das Fenster bei einem Slot geschlossen, wird der fertige Entwurf gespeichert
+(`template_required`) und nach der nächsten eingehenden Betreibernachricht gesendet (`sendPendingDailyApprovals`,
+Entwürfe bis 48 h alt). Empfehlung: die Tagesnachricht **vor 09:00 MESZ** senden, dann liegen Vormittags- und
+Abend-Slot im Fenster. Ohne diese Nachricht gibt es keine zugestellte Freigabe; das ist eine bewusste
+Einschränkung, kein Fehler. Planung Trend-Posts (Text+Bild, Instagram+Facebook, gemeinsame Freigabe, zusätzlich
+zu den zwei Tagesposts) erst nach Bestätigung des Tagesablaufs.
