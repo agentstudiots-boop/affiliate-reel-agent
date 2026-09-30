@@ -323,6 +323,26 @@ test('signed natural-language webhook only revises and requests review; no publi
   assert.equal(parses,1);assert.equal(paid,0);assert.equal(published,0);assert.equal((await f.snapshot()).status,'awaiting_approval');assert.equal((await f.publication.get(f.id)).status,'changes_requested');
 });
 
+test('a signed question quoting an approval reaches chat before the change parser',async t=>{
+  const {createHmac}=require('node:crypto');const loadRoute=require('./helpers/load-route.cjs');
+  const f=await fixture(t);const env={META_APP_SECRET:'test-chat-signature',WHATSAPP_PHONE_NUMBER_ID:'123456'};
+  const old=Object.fromEntries(Object.keys(env).map(k=>[k,process.env[k]]));Object.assign(process.env,env);
+  t.after(()=>{for(const key of Object.keys(env)){if(old[key]===undefined)delete process.env[key];else process.env[key]=old[key];}});
+  let chats=0,parses=0;
+  const route=loadRoute('app/api/whatsapp/webhook/route.ts',{
+    'next/server':{after:()=>{}},
+    '@/lib/production/repository':{productionRepository:()=>productionRepository(f.db)},
+    '@/lib/whatsapp/chat':{answerWhatsAppConversation:async input=>{chats++;assert.equal(input.replyToMessageId,'wamid.current');return true;}},
+    '@/lib/daily/draft':{createDailyDraft:async()=>{throw Error('unexpected draft');},sendDailyApproval:async()=>{throw Error('unexpected approval');}},
+    '@/lib/whatsapp/process-instruction':{processOperatorInstruction:async()=>{parses++;return true;}},
+    '@/lib/whatsapp/content-approval':{handleContentApproval:async()=>{throw Error('question entered approval gate');}},
+  });
+  const payload=JSON.stringify({object:'whatsapp_business_account',entry:[{changes:[{value:{metadata:{phone_number_id:'123456'},messages:[{id:'signed-question',from:'491234',type:'text',text:{body:'Gibt es auch eine Whirlpoolmatte?'},context:{id:'wamid.current'}}]}}]}]});
+  const request=new Request('https://local.test/api/whatsapp/webhook',{method:'POST',headers:{'x-hub-signature-256':`sha256=${createHmac('sha256',env.META_APP_SECRET).update(payload).digest('hex')}`},body:payload});
+  assert.equal((await route.POST(request)).status,200);assert.equal(chats,1);assert.equal(parses,0);
+  assert.equal((await f.db.query('SELECT status FROM daily_drafts WHERE job_id=$1',[f.id])).rows[0].status,'awaiting_approval');
+});
+
 test('two open products: explicit Halloween context and follow-up choose the pumpkin job, no newest-job guessing',async()=>{
   const {resolveInstructionTarget}=require('../.test-build/lib/whatsapp/instruction-target');
   const pumpkin=await runContentJob(opportunity());const blanket=structuredClone(pumpkin);blanket.id=crypto.randomUUID();blanket.opportunity.product.name='Kuscheldecke';blanket.opportunity.product.asin='B000000001';

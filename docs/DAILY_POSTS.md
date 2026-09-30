@@ -1,5 +1,48 @@
 # Tägliche Entwürfe und Veröffentlichung
 
+## 30. September 2026, 15:14 MESZ: WhatsApp-Fragen und alte abgebrochene Aufträge
+
+Der Betreiber zeigte eine neue WhatsApp-Unterhaltung. Eine Frage nach einer
+Whirlpool-Badewannenmatte als **anderem** Produkt, zitiert auf den bestehenden
+Badewannenmatten-Entwurf, erhielt um 15:10 MESZ die Antwort, im Studio ein
+neues Produkt auszuwählen; danach führte eine weitere freie Nachricht zu
+„Welchen Auftrag meinst du?“ mit mehreren älteren Kandidaten. Production-Logs
+um 13:10:05 UTC belegen für die erste Nachricht die Modellinterpretation
+`change_product` mit Konfidenz 0,98. Der damalige Handler setzte den
+bestehenden Auftrag daraufhin auf `needs_input`. Das war eine falsche
+Ausführung einer Frage als Änderungsanweisung. Das Screenshot zeigt keine
+Zustimmung zur Inhalts- oder Veröffentlichungsfreigabe und keinen Bildkauf.
+
+Fragen, Begrüßungen und explizite Bitten um Textvorschläge gehen nun vor den
+Freigabe- und Änderungsparser in eine getrennte WhatsApp-Unterhaltung. Das
+bereits eingesetzte `openai/gpt-5.6-terra` über Replicate liefert eine kurze
+Antwort mit bis zu sechs vorherigen Gesprächspaaren und, bei direkter Antwort
+auf eine Freigabe, dem gebundenen Produktnamen. Themen-Posttexte sind
+unveröffentlichte Vorschläge. Dieser Weg hat weder Produktsuche noch
+Schreibzugriff auf Entwürfe, Freigaben oder Veröffentlichung. Eindeutige
+`Freigeben`-/`Ablehnen`-Antworten, `Artikelsuche <Produktart>` und direkte
+Änderungsanweisungen bleiben in ihren getrennten Wegen. Ein Fragezeichen
+wie in `Freigeben?` oder `Artikelsuche?` löst keine Freigabe oder Suche aus.
+Jede eingehende
+Nachricht wird vor der höchstens einmaligen Modellanforderung dauerhaft
+beansprucht; bei unbekanntem POST- oder Versandresultat gibt es keine
+automatische Wiederholung. Das Gespräch hat ein Limit von 20 Nachrichten
+je Berliner Tag, 550 Antwort-Tokens und maximal sechs vorherige Paare.
+Dadurch ist es ein begrenzter Textdialog, kein allgemeiner ChatGPT-Agent
+mit Websuche, Kontoaktionen oder eigenständigem Posten. Echtes WhatsApp-
+Verhalten muss nach dem Production-Deployment beobachtet werden.
+
+Ein einmaliges Datenbank-Upgrade entfernt nur **ältere terminale Einträge**
+(`rejected`, `needs_input`, `failed`) aus `daily_drafts`, sofern keine offene
+Inhalts- oder Publikationsfreigabe zu ihrem Job existiert. Der heutige Slot
+und noch offene Entwürfe bleiben. `content_jobs`, Ereignisse und
+Freigabenachweise bleiben für Sieben-Tage-Produktbindung, Deduplizierung und
+Audit erhalten. Es handelt sich somit um das Entfernen aus der aktiven
+Tagesauftragsliste, nicht um vollständiges Löschen aller historischen
+Datensätze. Ohne direkten Produktions-DB-Zugang sind Anzahl und genaue IDs
+der entfernten Einträge erst nach dem Upgrade beziehungsweise in einem
+anschließenden Status überprüfbar.
+
 ## 30. September 2026, 14:16 MESZ: falscher Einsatzort der Badewannenmatte
 
 Ein vom Betreiber gezeigter produktiver WhatsApp-Entwurf nennt die ASIN

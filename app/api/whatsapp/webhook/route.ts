@@ -13,6 +13,7 @@ import { getDatabase } from "@/lib/memory/db";
 import { parseJob } from "@/lib/content/history";
 import { createDailyDraft, sendDailyApproval } from "@/lib/daily/draft";
 import { startImagePostFromWhatsApp } from "@/lib/whatsapp/start-image-post";
+import { answerWhatsAppConversation } from "@/lib/whatsapp/chat";
 import { sendWhatsAppText } from "@/lib/whatsapp/client";
 import { sendStoryHandoff } from "@/lib/meta/story-handoff";
 import { deliverWeeklyReport } from "@/lib/reporting/weekly";
@@ -83,6 +84,7 @@ export async function POST(request: Request) {
         continue;
       }
       if (await startImagePostFromWhatsApp({ ...message, payload }, getDatabase, createDailyDraft, sendWhatsAppText)) continue;
+      if (await answerWhatsAppConversation({ ...message, payload })) continue;
       if (await handleContentApproval({ ...message, payload }, async jobId => {
         try {
           const record=await getDatabase().query("SELECT snapshot FROM content_jobs WHERE id=$1",[jobId]);
