@@ -76,5 +76,6 @@ test('TrendScout omits cooldown products before presenting suggestions',async t=
   assert.deepEqual(report.candidates.map(c=>c.name),[fresh.name]);
   assert.equal(report.cooldownBlocked,2);
   assert.equal(report.cooldownBlockedSeasonal,0);
+  assert.equal(report.cooldownBlockedAutomatic,2);
   assert.equal((await pg.query('SELECT count(*)::int AS n FROM content_jobs')).rows[0].n,0);
 });

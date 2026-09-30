@@ -31,6 +31,7 @@ export async function runProductScout(productSearch?: string) {
     candidates: checked.filter(item => !item.blocked).map(item => item.candidate),
     cooldownBlocked: checked.filter(item => item.blocked).length,
     cooldownBlockedSeasonal: checked.filter(item => item.blocked && item.candidate.kind === "Saisontrend").length,
+    cooldownBlockedAutomatic: checked.filter(item => item.blocked && item.candidate.kind !== "Aktueller Trend").length,
     sources: webSources(result.sources),
   };
 }

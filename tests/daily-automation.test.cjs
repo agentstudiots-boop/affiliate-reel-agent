@@ -139,7 +139,7 @@ test('a fully cooled-down TrendScout report stops before content planning',async
     await pg.exec(fs.readFileSync(`db/migrations/${name}`,'utf8'));
   let planned=false;
   const daily=loadRoute('lib/daily/draft.ts',{
-    '@/lib/orchestrator':{runProductScout:async()=>({candidates:[],cooldownBlocked:2,cooldownBlockedSeasonal:2,sources:[]}),
+    '@/lib/orchestrator':{runProductScout:async()=>({candidates:[],cooldownBlocked:2,cooldownBlockedSeasonal:2,cooldownBlockedAutomatic:2,sources:[]}),
       runContentJob:async()=>{planned=true;throw Error('Unexpected planning');}},
     '@/lib/memory/db':{getDatabase:()=>({query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q)})},
   });
@@ -151,15 +151,45 @@ test('a fully cooled-down TrendScout report stops before content planning',async
   assert.equal(saved.rows[0].reason,'product_repeat_blocked');
 });
 
-test('a blocked evergreen does not mislabel an unresolved seasonal morning candidate',async t=>{
+test('a blocked current trend does not mislabel an unresolved automatic candidate',async t=>{
   const pg=new PGlite();t.after(()=>pg.close());
   for(const name of fs.readdirSync('db/migrations').filter(n=>n.endsWith('.sql')).sort())
     await pg.exec(fs.readFileSync(`db/migrations/${name}`,'utf8'));
   const daily=loadRoute('lib/daily/draft.ts',{
     '@/lib/orchestrator':{runProductScout:async()=>({candidates:[{kind:'Saisontrend',resolutionError:'product_unresolved'}],
-      cooldownBlocked:1,cooldownBlockedSeasonal:0,sources:[]})},
+      cooldownBlocked:1,cooldownBlockedSeasonal:0,cooldownBlockedAutomatic:0,sources:[]})},
     '@/lib/memory/db':{getDatabase:()=>({query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q)})},
   });
   const result=await daily.createDailyDraft('2026-09-30','morning');
   assert.equal(result.reason,'product_unresolved');
+});
+
+test('automatic draft uses an already researched evergreen when seasonal products are unavailable',async t=>{
+  const pg=new PGlite();t.after(()=>pg.close());
+  for(const name of fs.readdirSync('db/migrations').filter(n=>n.endsWith('.sql')).sort())
+    await pg.exec(fs.readFileSync(`db/migrations/${name}`,'utf8'));
+  const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
+  const old=process.env.WHATSAPP_APPROVER_WA_ID;process.env.WHATSAPP_APPROVER_WA_ID='491234';
+  t.after(()=>{if(old===undefined)delete process.env.WHATSAPP_APPROVER_WA_ID;else process.env.WHATSAPP_APPROVER_WA_ID=old;});
+  t.mock.method(global,'fetch',async()=>{throw Error('Unexpected external request');});
+  const evergreen={name:'Küchenreibe Modell A',productVerifiedName:'Küchenreibe Modell A',productVerifiedAt:new Date().toISOString(),
+    sourceUrl:'https://www.amazon.de/dp/B000000044',affiliateUrl:'https://www.amazon.de/dp/B000000044?tag=alltaeglichle-21',
+    price:'',targetGroup:'Hobbyköche',benefits:'Eignung vor Kauf prüfen',notes:''};
+  const daily=loadRoute('lib/daily/draft.ts',{
+    '@/lib/orchestrator':{runContentJob:require('../.test-build/lib/content/orchestrator').runContentJob,
+      runProductScout:async()=>({candidates:[
+        {name:'Kürbis-Schnitzwerkzeug-Set',kind:'Saisontrend',resolutionError:'product_unresolved'},
+        {name:'Küchenreibe Modell A',kind:'Dauerläufer',category:'Küche',resolvedProduct:evergreen,
+          reelIdea:'Eine Zitrone für ein Rezept abreiben und die Handhabung der Reibe zeigen.',whyNow:'Ganzjährig'},
+      ],cooldownBlockedAutomatic:1,sources:[]})},
+    '@/lib/memory/db':{getDatabase:()=>db},
+    '@/lib/whatsapp/client':{sendWhatsAppText:async()=>{throw Error('Unexpected send');},
+      dailyNotificationTemplateConfigured:()=>false,sendDailyNotificationTemplate:async()=>{throw Error('Unexpected template');}},
+  });
+  const result=await daily.createDailyDraft('2026-09-30','morning');
+  assert.equal(result.status,'awaiting_approval',JSON.stringify(result));
+  assert.equal(result.whatsapp,'template_required');
+  const jobs=await pg.query('SELECT snapshot FROM content_jobs');
+  assert.equal(jobs.rows.length,1);
+  assert.equal(jobs.rows[0].snapshot.opportunity.product.asin,'B000000044');
 });

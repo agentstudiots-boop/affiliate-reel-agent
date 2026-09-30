@@ -1,5 +1,41 @@
 # Tägliche Entwürfe und Veröffentlichung
 
+## Morgenlauf 30. September 2026: Prüfung um 10:48 MESZ
+
+Remote-`main` und Production waren zu Beginn der Prüfung auf `1d23ae5`
+(PR #23, Vercel-Deployment `dpl_HUNvF8HaHi5nN6rBDbqiDUr5fhgg`, `READY`).
+Der Runtime-Eintrag um **08:25:30 UTC = 10:25:30 MESZ** zeigt für
+`GET /api/cron/daily-draft` HTTP 200 und `daily_draft: already_claimed`.
+Damit wurde der Morgen-Slot spätestens vor diesem zweiten Aufruf beansprucht.
+Welcher frühere Aufruf ihn beanspruchte und welcher gespeicherte Zustand daraus
+folgte, ist nicht gelesen: Die erste Ausführung liegt außerhalb der verfügbaren
+Hobby-Log-Aufbewahrung; ein direkter rein lesender Datenbankzugang fehlt.
+Insbesondere sind Kandidat, ASIN, Amazon-Antwort, Content-Review und
+WhatsApp-Sendestatus des **heutigen** Jobs nicht belegt. Die fehlende
+Inhaltsfreigabe beweist weder eine PartnerNet-Sperre noch einen WhatsApp-Fehler.
+Keine unbekannten POSTs oder kostenpflichtigen Suchen zur Diagnose wiederholen.
+
+Ein belegter struktureller Engpass im Code ist, dass der Trendscout bei einer
+allgemeinen Suche bereits zwei Dauerläufer und zwei Saisonideen recherchiert
+und auf Amazon prüft, der automatische Tageslauf aber bislang nur Saisonideen
+übernommen hat. Sind beide gesperrt oder unverifizierbar, bleibt ein bereits
+verifizierter Dauerläufer ungenutzt. Der Tageslauf bevorzugt deshalb weiterhin
+Saisonideen und kann anschließend einen im **selben** Scout-Aufruf vorhandenen,
+verifizierten, nicht gesperrten Dauerläufer wählen. Die atomare ASIN- und
+Produktfamilien-Sperre bleibt vor der Content-Planung. Das verursacht keinen
+zusätzlichen Trendscout- oder Bildprovider-Aufruf; es garantiert keinen
+verifizierbaren Kandidaten und keinen WhatsApp-Versand. Der heutige Morgen-Claim
+wird durch ein Deployment nicht zurückgesetzt. Der nächste planmäßige Slot
+oder ein ausdrücklich neuer Betreiberauftrag ist nötig, um die Änderung live
+zu beobachten.
+
+Der Affiliate-Link wird im Projekt lokal aus der verifizierten Produkt-URL und
+der bestehenden Tracking-ID zusammengesetzt. Dafür ruft es weder PartnerNet
+noch eine Amazon-Link-API auf. Ein `Robot Check` oder HTTP 403 bei der
+öffentlichen Produktdetailseite würde nur die Server-Abfrage blockieren; der
+PartnerNet-Kontostatus lässt sich daraus nicht ableiten. Erst eine konkrete
+Kontobenachrichtigung oder Anmeldung im PartnerNet würde eine Sperre belegen.
+
 ## Nachtrag 29. September 2026: gespeicherter WhatsApp-Status um 18:13 MESZ
 
 Der Betreiber zeigte die Antwort auf `Status?` aus dem produktiven WhatsApp-Chat.
