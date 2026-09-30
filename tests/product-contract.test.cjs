@@ -2,7 +2,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {PGlite}=require('@electric-sql/pglite');
 const {amazonProduct,createAmazonAffiliateUrl,bindAmazonProduct,productIdentityError}=require('../.test-build/lib/amazon');
-const {resolveAmazonProduct,findAmazonProduct,verifyAmazonProductPage,reuseRecentProductIdentity}=require('../.test-build/lib/product-resolver');
+const {resolveAmazonProduct,findAmazonProduct,findAmazonProductByAsin,verifyAmazonProductPage,reuseRecentProductIdentity}=require('../.test-build/lib/product-resolver');
 const {runContentJob}=require('../.test-build/lib/content/orchestrator');
 const {opportunitySchema}=require('../.test-build/lib/content/schema');
 const {memoryRepository}=require('../.test-build/lib/memory/repository');
@@ -52,6 +52,17 @@ test('indexed ASIN cannot stand in for a working product page',async()=>{
   await assert.rejects(resolveAmazonProduct(product(),indexed,async()=>{throw Error('Amazon page gone');}),/product_unresolved/);
   const dead=bindAmazonProduct({...product(),sourceUrl:'https://www.amazon.de/dp/B0G2XQPG3N',asin:undefined,productUrl:undefined,affiliateUrl:'',productVerifiedName:'Kuscheldecke Modell X'});
   assert.equal(productIdentityError(dead),'product_unresolved');
+});
+
+test('a supplied exact ASIN uses current Amazon page identity without a paid index search',async()=>{
+  const item=await findAmazonProductByAsin('B000000001',async asin=>{
+    assert.equal(asin,'B000000001');return 'Kuscheldecke Modell X';
+  });
+  assert.equal(item.asin,'B000000001');assert.equal(item.sourceUrl,source);
+  assert.equal(item.name,'Kuscheldecke Modell X');assert.equal(item.productVerifiedName,item.name);
+  assert.equal(productIdentityError(item),null);
+  await assert.rejects(findAmazonProductByAsin('B000000002',async()=>{throw Error('amazon_verification_blocked')}),/amazon_verification_blocked/);
+  await assert.rejects(findAmazonProductByAsin('B000000003',async()=>{throw Error('product_unresolved')}),/product_unresolved/);
 });
 
 test('ASIN, affiliate link, name and verification evidence cannot refer to different products',()=>{

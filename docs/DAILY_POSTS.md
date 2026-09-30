@@ -1,5 +1,36 @@
 # Tägliche Entwürfe und Veröffentlichung
 
+## 30. September 2026, 16:16 MESZ: konkreter Produktlink-Auftrag abgebrochen
+
+Der Betreiber erhielt für Job `6ccf6402-b0e3-4f8a-92e4-e4eae004865f` die
+allgemeine WhatsApp-Antwort „Artikelsuche ... technischer Fehler“. Production
+`dpl_9agZRbAJmmYNg8thmrttt5NqiaYL` loggte um **14:16:15 UTC**
+`daily_draft_failed` mit `stage=product_verification` und `errorType=Error`.
+Damit ist ein neuer, beanspruchter Tagesauftrag und der Abbruch **vor**
+Produktbindung, Content-Plan und Inhaltsfreigabe belegt. Der Bericht nennt
+keine ASIN und keine Ursache innerhalb der Verifikation. Es gibt zu diesem
+Request weder einen belegten `amazon_live_verification`- noch einen
+`amazon_resolution`-Logeintrag. Ein fehlender Tavily-Indexeintrag, eine
+fehlende Tavily-Verbindung und eine Amazon-Sperrseite bleiben deshalb
+verschiedene Möglichkeiten; keine davon ist für diesen Job bewiesen. Der
+PartnerNet-Kontostatus ist daraus nicht abzuleiten. Kein unbekannter POST
+wurde erneut ausgeführt.
+
+Ein konkreter Code-Engpass war unabhängig von der exakten Ursache sichtbar:
+Selbst bei einer vom Betreiber gelieferten eindeutigen ASIN wurde zunächst
+eine zusätzliche Tavily-Suche nach einer indexierten Produktseite verlangt.
+Bei fehlendem Treffer wurde `product_unresolved` als allgemeiner technischer
+Fehler gespeichert. Exakte Betreiber-ASINs gehen jetzt ohne diesen
+zusätzlichen Suchaufruf direkt an die bestehende strenge Live-Prüfung der
+Amazon.de-Detailseite. Nur ein lesbarer Titel mit derselben ASIN darf
+Produktname und Affiliate-Link binden; Merkmale, Preis und Lieferumfang
+bleiben unbelegt. `product_unresolved` und `amazon_verification_blocked`
+werden als `needs_input` mit ihrem konkreten Grund gespeichert und in
+WhatsApp erläutert. Ein fehlgeschlagener Link startet dadurch weder Bild-
+generierung noch Veröffentlichung. Der bereits gescheiterte Job bleibt
+dedupliziert; die Verbesserung braucht für einen Live-Nachweis eine neue
+ausdrückliche Betreiberanfrage nach dem Production-Deployment.
+
 ## 30. September 2026, 15:53–15:58 MESZ: neuer Artikel per Amazon-Kurzlink
 
 Der Betreiber zeigte, dass er `https://amzn.eu/d/05U6rTa5` als neuen Auftrag

@@ -89,9 +89,11 @@ export async function startImagePostFromWhatsApp(input: IncomingWhatsAppMessage 
   const result = await start(day, slot, product, command.search);
   if (result.status === "failed" || result.status === "needs_input") {
     const subject = command.search ? `Trendscout-Suche nach „${command.search}“`
-      : `${command.product ? "Bildpost" : "Artikelsuche"} (Auftrag ${result.jobId})`;
+      : `${command.link ? "Produktlink" : command.product ? "Bildpost" : "Artikelsuche"} (Auftrag ${result.jobId})`;
     const reason = result.reason === "product_unresolved"
-      ? "Der Trendscout konnte keine passende Amazon-Produktseite sicher verifizieren. Bitte eine Produktart oder eine konkrete ASIN nennen."
+      ? command.link || command.product
+        ? "Die Amazon-Produktdetailseite und ASIN konnten nicht sicher verifiziert werden. Bitte die konkrete Amazon.de/dp/-Seite prüfen."
+        : "Der Trendscout konnte keine passende Amazon-Produktseite sicher verifizieren. Bitte eine Produktart oder eine konkrete ASIN nennen."
       : result.reason === "amazon_verification_blocked"
         ? "Amazon hat die automatische Prüfung der Produktseite blockiert. Der Artikel bleibt ungeprüft und es wird kein Content produziert."
       : result.reason === "product_repeat_blocked"
