@@ -102,18 +102,19 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
   let stage = "product_search";
   try {
     const report = productQuery ? null : await runProductScout(productSearch);
-    // A seasonal idea becomes affiliate content only after exact product resolution.
+    // Prefer seasonal ideas, then already researched evergreen candidates.
+    // Neither category becomes affiliate content without exact product resolution.
     const openSearch = slot.startsWith("manual:") && !productQuery && !productSearch;
     const candidates = report?.candidates.filter(candidate => productSearch
       ? candidate.searchQuery.toLocaleLowerCase("de-DE")===productSearch.toLocaleLowerCase("de-DE")
-      : openSearch || candidate.kind === "Saisontrend") || [];
-    const relevantCooldownBlocked = productSearch || openSearch ? report?.cooldownBlocked : report?.cooldownBlockedSeasonal;
+      : openSearch || candidate.kind === "Saisontrend" || candidate.kind === "Dauerläufer") || [];
+    const relevantCooldownBlocked = productSearch || openSearch ? report?.cooldownBlocked : report?.cooldownBlockedAutomatic;
     if (!productQuery && !candidates.length && relevantCooldownBlocked) {
       await db.query("UPDATE daily_drafts SET status='needs_input',scout_report=$2,updated_at=now() WHERE job_id=$1",
         [jobId,JSON.stringify({requestedSearch:productSearch,report,reason:"product_repeat_blocked"})]);
       return {status:'needs_input' as const,jobId,reason:'product_repeat_blocked' as const};
     }
-    if (!productQuery && !productSearch && !candidates.length) throw new Error("Kein saisonaler Kandidat verfügbar.");
+    if (!productQuery && !productSearch && !candidates.length) throw new Error("Kein geeigneter Kandidat verfügbar.");
     const resolved = candidates.filter(candidate => candidate.resolvedProduct);
     if(!productQuery && !resolved.length){
       const resolutionReason = candidates.some(candidate => "resolutionError" in candidate && candidate.resolutionError === "amazon_verification_blocked")
@@ -130,7 +131,9 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
     const requestedProduct = productQuery ? await resolveRequestedProduct(productQuery) : null;
     let candidate: typeof pool[number] | null = null;
     let selectedProduct = requestedProduct;
-    const ordered = productSearch ? resolved : [...pool.slice(rotation % (pool.length || 1)), ...pool.slice(0,rotation % (pool.length || 1))];
+    const rotate = (items: typeof pool) => [...items.slice(rotation % (items.length || 1)), ...items.slice(0,rotation % (items.length || 1))];
+    const ordered = productSearch ? resolved : openSearch ? rotate(pool)
+      : [...rotate(pool.filter(item => item.kind === "Saisontrend")), ...rotate(pool.filter(item => item.kind === "Dauerläufer"))];
     for (const item of requestedProduct ? [] : ordered) {
       if (item.resolvedProduct && await reserveProduct(db,item.resolvedProduct,jobId)) {
         candidate=item; selectedProduct=item.resolvedProduct; break;
