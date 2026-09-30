@@ -435,3 +435,16 @@ test('language memory absent before migration does not block core parsing',async
   assert.deepEqual(await loadLanguageExamples(f.db,'491234','neues Bild',f.job),[]);
   await f.process(message('no-memory'),async()=>instruction('revise_image'));assert.equal((await f.snapshot()).revisions,1);
 });
+
+test('unapplied-correction status explains the reason in plain language without internal codes',()=>{
+  const {clarifyStatusText}=require('../.test-build/lib/whatsapp/recover-instruction');
+  const {noOpenApprovalText}=require('../.test-build/lib/whatsapp/process-instruction');
+  for(const code of ['target_unresolved','instruction_busy','instruction_interrupted','parser_auth_missing','instruction_unclear','']){
+    const text=clarifyStatusText(code);
+    assert.ok(!/target_unresolved|instruction_|parser_/.test(text),code);
+    assert.match(text,/nichts produziert oder veröffentlicht/);
+  }
+  assert.match(clarifyStatusText('target_unresolved'),/keine Inhaltsfreigabe auf dich wartet/);
+  assert.match(clarifyStatusText('target_unresolved'),/Artikelsuche/);
+  assert.ok(!/Content Studio/.test(noOpenApprovalText));
+});

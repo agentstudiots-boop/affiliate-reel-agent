@@ -13,6 +13,9 @@ import {sendWhatsAppText} from "./client";
 
 export type OperatorMessage={id:string;from:string;body:string;replyToMessageId:string|null;payload:unknown};
 const hash=(value:unknown)=>createHash("sha256").update(JSON.stringify(value)).digest("hex");
+// Without any open content approval there is nothing to revise. An empty notice would be
+// rejected by WhatsApp and leave the operator without an answer.
+export const noOpenApprovalText="Gerade wartet keine Inhaltsfreigabe auf dich, der ich diesen Änderungswunsch zuordnen könnte. Es wurde nichts produziert oder veröffentlicht. Für ein neues Motiv oder Produkt starte bitte einen neuen Auftrag, zum Beispiel „Artikelsuche Kürbisschnitzset“.";
 const clarifyText="Meinst du ein neues Bild für das bestehende Produkt, nur eine Textänderung oder ein anderes Produkt? Bitte antworte direkt auf die betreffende Freigabenachricht. Es wurde nichts produziert oder veröffentlicht.";
 
 type Dependencies={database?:Database;interpret?:typeof interpretInstruction;send?:typeof sendWhatsAppText;sendApproval:(jobId:string)=>Promise<boolean>};
@@ -90,7 +93,7 @@ export async function processOperatorInstruction(input:OperatorMessage,
       if(!row?.publication_id&&!held.rows.length)throw Error('stale_instruction_context');
     }
     return {job,publicationId:job?row!.publication_id as string|null:null,
-      targetNotice:targets.rows.length?`Welchen Auftrag meinst du? ${targets.rows.map(row=>{const p=parseJob(row.snapshot).opportunity.product;return `${p.name.slice(0,90)} (ASIN ${p.asin})`;}).join(' oder ')}. Nenne bitte das Produkt oder antworte direkt auf dessen Freigabenachricht. Es wurde nichts produziert oder veröffentlicht.`:'Es gibt keine eindeutig zuordenbare offene Freigabe für diese Nachricht. Bitte den Auftrag im Content Studio prüfen. Es wurde nichts produziert oder veröffentlicht.'};
+      targetNotice:targets.rows.length?`Welchen Auftrag meinst du? ${targets.rows.map(row=>{const p=parseJob(row.snapshot).opportunity.product;return `${p.name.slice(0,90)} (ASIN ${p.asin})`;}).join(' oder ')}. Nenne bitte das Produkt oder antworte direkt auf dessen Freigabenachricht. Es wurde nichts produziert oder veröffentlicht.`:noOpenApprovalText};
   });
   if(!claim)return true; // Durable dedup precedes inference and notifications.
   let instruction:Instruction=clarification();
