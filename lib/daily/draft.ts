@@ -278,7 +278,8 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
       : job.error === EDITORIAL_RATE_LIMIT_ERROR ? "editorial_rate_limited" as const
       : job.error === EDITORIAL_MODEL_ERROR ? "editorial_model_failed" as const
       : job.error === "product_unresolved" ? "product_unresolved" as const
-      : job.review && !job.review.passed ? "content_review_failed" as const : "planning_failed" as const;
+      : job.review && !job.review.passed ? "content_review_failed" as const
+      : job.status === "needs_input" && job.marketing ? "marketing_format_mismatch" as const : "planning_failed" as const;
     // Persist why the slot stopped; without it Status cannot explain an empty needs_input.
     const detail = reason === "publication_gate_failed" ? String(gateError).slice(0, 200)
       : reason === "content_review_failed" ? job.review?.issues[0]?.slice(0, 200) : undefined;

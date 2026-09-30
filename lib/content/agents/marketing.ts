@@ -1,4 +1,4 @@
-import { marketingSchema, type Content, type Opportunity } from "../schema";
+import { marketingSchema, type Content, type Marketing, type Opportunity } from "../schema";
 import type { Generator } from "../agent";
 
 export function marketingAgent(input: { opportunity: Opportunity; content: Content }, generate: Generator) {
@@ -18,4 +18,13 @@ export function marketingAgent(input: { opportunity: Opportunity; content: Conte
       publishingChecks: ["Inhalt, Werbekennzeichnung und Linkziel menschlich freigeben.", ...(content.format === "video" ? ["Fertiges Video mit Ton prüfen: Stimme, Bildhandlung und Schlussblende müssen tatsächlich stimmen; Runway-Prompts garantieren weder Aussprache noch sichtbare Schrift."] : []), "Plattform-/Gruppenregeln und benötigte Medienrechte prüfen.", "Keine Veröffentlichung durch diesen Planungsauftrag."],
     };
   });
+}
+
+// A concrete targetPlatform is binding. A model-written marketing plan that names another
+// platform must not end the whole plan as "Marketingformat passt nicht".
+export function bindMarketingPlatform(opportunity: Opportunity, content: Content, marketing: Marketing): Marketing {
+  if (opportunity.targetPlatform !== "facebook") return marketing;
+  const expected = content.format === "video" ? "Facebook Video" as const
+    : opportunity.goal === "community" ? "Gruppenbeitrag" as const : "Facebook Post" as const;
+  return marketing.primary === expected ? marketing : { ...marketing, primary: expected };
 }
