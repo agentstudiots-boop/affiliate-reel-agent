@@ -47,7 +47,7 @@ test('indexed ASIN cannot stand in for a working product page',async()=>{
   await assert.rejects(verifyAmazonProductPage('B000000001',async()=>({
     ok:true,status:200,url:'https://www.amazon.de/errors/validateCaptcha',text:async()=>'<html>Captcha</html>',
   })),/amazon_verification_blocked/);
-  await assert.rejects(verifyAmazonProductPage('B000000001',async()=>new Response('<html>Amazon.de</html>')),/product_unresolved/);
+  await assert.rejects(verifyAmazonProductPage('B000000001',async()=>new Response('<html>Amazon.de</html>')),/amazon_identity_missing/);
   const indexed=async()=>[{title:'Kuscheldecke Modell X : Amazon.de',url:source}];
   await assert.rejects(resolveAmazonProduct(product(),indexed,async()=>{throw Error('Amazon page gone');}),/product_unresolved/);
   const dead=bindAmazonProduct({...product(),sourceUrl:'https://www.amazon.de/dp/B0G2XQPG3N',asin:undefined,productUrl:undefined,affiliateUrl:'',productVerifiedName:'Kuscheldecke Modell X'});

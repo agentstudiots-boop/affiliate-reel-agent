@@ -10,7 +10,7 @@ import { parseJob } from "@/lib/content/history";
 import { facebookPagePublicationError } from "@/lib/meta/publication-eligibility";
 import { imageBrief } from "@/lib/content/image-brief";
 import { isPumpkinCarvingProduct } from "@/lib/content/category";
-import { findAmazonProductByAsin } from "@/lib/product-resolver";
+import { AMAZON_IDENTITY_MISSING, findAmazonProductByAsin } from "@/lib/product-resolver";
 import { ensureAutomationSchema } from "@/lib/memory/ensure-automation-schema";
 import { loadApprovedEditorialCorrections } from "@/lib/whatsapp/language-memory";
 import { EDITORIAL_MODEL_ERROR, EDITORIAL_RATE_LIMIT_ERROR } from "@/lib/content/model";
@@ -134,7 +134,7 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
       try { requestedProduct = await resolveRequestedProduct(productQuery); }
       catch (error) {
         const code = error instanceof Error ? error.message : "unknown";
-        if (code !== PRODUCT_UNRESOLVED && code !== "amazon_verification_blocked") throw error;
+        if (code !== PRODUCT_UNRESOLVED && code !== "amazon_verification_blocked" && code !== AMAZON_IDENTITY_MISSING) throw error;
         await db.query("UPDATE daily_drafts SET status='needs_input',scout_report=$2,updated_at=now() WHERE job_id=$1",
           [jobId,JSON.stringify({requestedProduct:productQuery,reason:code})]);
         console.info(JSON.stringify({event:"daily_product_verification",jobId,reason:code}));
