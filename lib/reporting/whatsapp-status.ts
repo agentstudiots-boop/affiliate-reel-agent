@@ -20,6 +20,7 @@ export async function latestImagePostsStatus(db: Database) {
     const state = row.publication_status || row.status;
     const knownReason = ({
       amazon_verification_blocked: "Amazon hat die Produktprüfung blockiert",
+      amazon_identity_missing: "Amazon-Seite ohne eindeutigen ASIN-Nachweis",
       product_unresolved: "keine verifizierte Produktseite gefunden",
       product_repeat_blocked: "Produkt in den letzten sieben Tagen verwendet",
     } as Record<string, string>)[String(row.reason || "")];

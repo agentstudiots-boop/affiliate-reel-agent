@@ -94,6 +94,8 @@ export async function startImagePostFromWhatsApp(input: IncomingWhatsAppMessage 
       ? command.link || command.product
         ? "Die Amazon-Produktdetailseite und ASIN konnten nicht sicher verifiziert werden. Bitte die konkrete Amazon.de/dp/-Seite prüfen."
         : "Der Trendscout konnte keine passende Amazon-Produktseite sicher verifizieren. Bitte eine Produktart oder eine konkrete ASIN nennen."
+      : result.reason === "amazon_identity_missing"
+        ? "Amazon antwortete, aber die Seite enthielt keinen eindeutigen Nachweis für diese ASIN. Derselbe Link wird nicht automatisch erneut geprüft. Bitte die Produktseite und ASIN im Browser prüfen; noch kein sicher gebundener Artikel."
       : result.reason === "amazon_verification_blocked"
         ? "Amazon hat die automatische Prüfung der Produktseite blockiert. Der Artikel bleibt ungeprüft und es wird kein Content produziert."
       : result.reason === "product_repeat_blocked"

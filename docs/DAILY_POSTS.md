@@ -1,5 +1,32 @@
 # Tägliche Entwürfe und Veröffentlichung
 
+## 30. September 2026, 16:30 MESZ: Amazon-Seite ohne ASIN-Nachweis
+
+Der Betreiber startete einen neuen Auftrag mit `https://amzn.eu/d/03PCGIMB`.
+Production-Deployment `dpl_J3Zs51VhwXhu7767B7ryMGfFtBvd` loggte um
+**14:30:28 UTC** `amazon_live_verification` mit
+`stage=identity_html_missing,status=200` und anschließend
+`daily_product_verification` für
+`8a6d6571-8e7c-4d3b-a605-8df1d975a496` mit
+`reason=product_unresolved`. Damit ist ein erfolgreich beanspruchter
+separater Auftrag und ein Abbruch bei der **Live-Produktprüfung** belegt.
+Die Antwort der Amazon-URL hatte HTTP 200, enthielt aber keinen vom
+Verifizierer erkannten Nachweis der erwarteten ASIN. Die Logs zeigen weder
+die ASIN noch den HTML-Inhalt; sie beweisen keine PartnerNet-Kontosperre,
+keine Bot-Sperre und auch keine sicher richtige Produktseite. Ein Content-
+Plan, Affiliate-Link oder eine Inhaltsfreigabe für diesen Job ist nicht
+belegt. Keine kostenpflichtige Suche oder unbekannter POST wurde wiederholt.
+
+Der bereits beobachtete Zustand bekommt einen eigenen Fehlercode
+`amazon_identity_missing`. Bei einer **expliziten** Betreiber-ASIN wird
+dieser als `needs_input` gespeichert und per WhatsApp mit dem genauen
+Problem erklärt; `Status` zeigt ihn ebenfalls. Die Identitätsprüfung wird
+nicht gelockert. Ohne eine tatsächlich verifizierbare Detailseite kann das
+System keinen Affiliate-Post für diesen Artikel freigeben. Der alte Job
+bleibt dedupliziert. Ob der neue Diagnosecode in Production greift, kann
+erst ein späterer unabhängiger Auftrag zeigen; einen identischen Live-
+Suchversuch nur zur Diagnose gibt es nicht.
+
 ## 30. September 2026, 16:16 MESZ: konkreter Produktlink-Auftrag abgebrochen
 
 Der Betreiber erhielt für Job `6ccf6402-b0e3-4f8a-92e4-e4eae004865f` die

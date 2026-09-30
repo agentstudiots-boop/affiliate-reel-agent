@@ -4,6 +4,8 @@ import type { Product } from "./types";
 import type { Database } from "./memory/db";
 import { parseJob } from "./content/history";
 
+export const AMAZON_IDENTITY_MISSING = "amazon_identity_missing";
+
 // Search indexes may retain deleted listings. A live detail page with its own
 // title and ASIN must be readable before an affiliate draft can be proposed.
 export async function verifyAmazonProductPage(asin: string, request: typeof fetch = fetch): Promise<string> {
@@ -34,10 +36,13 @@ export async function verifyAmazonProductPage(asin: string, request: typeof fetc
       diagnostic("challenge_html", response.status);
       throw new Error("amazon_verification_blocked");
     }
-    if (/Derzeit nicht verfügbar|Currently unavailable|Seite wurde nicht gefunden/i.test(html)
-      || !new RegExp(`(?:data-asin=["']${asin}["']|/dp/${asin}(?:[/?"']))`, "i").test(html)) {
-      diagnostic("identity_html_missing", response.status);
+    if (/Derzeit nicht verfügbar|Currently unavailable|Seite wurde nicht gefunden/i.test(html)) {
+      diagnostic("listing_unavailable", response.status);
       throw new Error(PRODUCT_UNRESOLVED);
+    }
+    if (!new RegExp(`(?:data-asin=["']${asin}["']|/dp/${asin}(?:[/?"']))`, "i").test(html)) {
+      diagnostic("identity_html_missing", response.status);
+      throw new Error(AMAZON_IDENTITY_MISSING);
     }
     const rawTitle = html.match(/id=["']productTitle["'][^>]*>([\s\S]*?)<\/span>/i)?.[1]
       || html.match(/property=["']og:title["'][^>]*content=["']([^"']+)["']/i)?.[1];
@@ -48,9 +53,9 @@ export async function verifyAmazonProductPage(asin: string, request: typeof fetc
     }
     return title.slice(0, 160);
   } catch (error) {
-    if (error instanceof Error && error.message !== PRODUCT_UNRESOLVED && error.message !== "amazon_verification_blocked")
+    if (error instanceof Error && ![PRODUCT_UNRESOLVED,"amazon_verification_blocked",AMAZON_IDENTITY_MISSING].includes(error.message))
       diagnostic("request_failed");
-    throw error instanceof Error && error.message === "amazon_verification_blocked"
+    throw error instanceof Error && ["amazon_verification_blocked",AMAZON_IDENTITY_MISSING].includes(error.message)
       ? error : new Error(PRODUCT_UNRESOLVED);
   }
 }

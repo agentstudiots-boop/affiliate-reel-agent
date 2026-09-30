@@ -150,6 +150,14 @@ test('an exact operator ASIN records Amazon verification failures without callin
     [{status:'needs_input',reason:'amazon_verification_blocked'}]);
   assert.equal((await daily.createDailyDraft('2026-09-30','manual:verified-link','B0C2C739KY')).status,'already_claimed');
   assert.equal(verifications,1);
+  const missing=loadRoute('lib/daily/draft.ts',{
+    '@/lib/orchestrator':{runProductScout:async()=>{throw Error('no trend search');},runContentJob:async()=>{throw Error('no planning');}},
+    '@/lib/product-resolver':{AMAZON_IDENTITY_MISSING:'amazon_identity_missing',findAmazonProductByAsin:async()=>{throw Error('amazon_identity_missing');}},
+    '@/lib/memory/db':{getDatabase:()=>db},
+  });
+  const other=await missing.createDailyDraft('2026-09-30','manual:identity-missing','B0C2C739KY');
+  assert.equal(other.status,'needs_input');assert.equal(other.reason,'amazon_identity_missing');
+  assert.equal((await pg.query("SELECT scout_report->>'reason' AS reason FROM daily_drafts WHERE job_id=$1",[other.jobId])).rows[0].reason,'amazon_identity_missing');
 });
 
 test('a fully cooled-down TrendScout report stops before content planning',async t=>{

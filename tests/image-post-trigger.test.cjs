@@ -120,6 +120,10 @@ test('failed generic searches report the actual stage without retrying a paid dr
     async()=>({status:'needs_input',jobId:'reviewed',reason:'content_review_failed',reviewIssues:['Werkzeug passt nicht zur Anwendung.']}),send);
   assert.match(notices[3],/Werkzeug passt nicht zur Anwendung/);
   assert.match(notices[3],/Artikelsuche/);
+  await startImagePostFromWhatsApp({...message,id:'wamid.identity.error',body:'Bildpost B0C2C739KY'},()=>db,
+    async()=>({status:'needs_input',jobId:'identity',reason:'amazon_identity_missing'}),send);
+  assert.match(notices[4],/keinen eindeutigen Nachweis für diese ASIN/);
+  assert.doesNotMatch(notices[4],/technischen Fehler/);
 });
 
 test('Amazon short link redirects only to a concrete Amazon detail ASIN',async()=>{
