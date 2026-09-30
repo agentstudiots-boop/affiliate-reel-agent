@@ -1,7 +1,7 @@
 import { requireProduct, PRODUCT_UNRESOLVED } from "@/lib/amazon";
 import { imageProviderStatus } from "@/lib/content/image-provider";
 import { runContentJob, runProductScout } from "@/lib/orchestrator";
-import { getDatabase } from "@/lib/memory/db";
+import { getDatabase, type Database } from "@/lib/memory/db";
 import { memoryRepository } from "@/lib/memory/repository";
 import type { Opportunity } from "@/lib/content/schema";
 import { sendWhatsAppText, WhatsAppRejectedError } from "@/lib/whatsapp/client";
@@ -81,6 +81,58 @@ export async function sendDailyApproval(jobId: string) {
   return true;
 }
 
+
+// Scheduled slots are fully automatic: nobody can supply input, so a failed,
+// needs_input or killed (stale claim) attempt is retried by the next cron call.
+const MAX_SLOT_ATTEMPTS = 3;
+const STALE_CLAIM_MINUTES = 7; // above the route's 300 s maxDuration
+
+async function reclaimScheduledSlot(db: Database, day: string, slot: string, jobId: string) {
+  const previous = await db.query("SELECT job_id FROM daily_drafts WHERE day=$1 AND slot=$2", [day, slot]);
+  const oldJobId = previous.rows[0]?.job_id ? String(previous.rows[0].job_id) : null;
+  const claimed = await db.query(
+    `UPDATE daily_drafts SET job_id=$3,status='claimed',attempts=attempts+1,scout_report=NULL,
+       whatsapp_message_id=NULL,whatsapp_send_attempted_at=NULL,
+       notification_message_id=NULL,notification_send_attempted_at=NULL,updated_at=now()
+     WHERE day=$1 AND slot=$2 AND attempts<$4 AND whatsapp_message_id IS NULL
+       AND notification_message_id IS NULL
+       AND (status IN ('failed','needs_input')
+         OR (status IN ('claimed','planning') AND updated_at<now()-make_interval(mins=>$5)))
+     RETURNING job_id`, [day, slot, jobId, MAX_SLOT_ATTEMPTS, STALE_CLAIM_MINUTES]);
+  if (!claimed.rows.length) return false;
+  if (oldJobId) {
+    await releaseProduct(db, oldJobId);
+    // A killed attempt leaves a non-terminal job that would block its product for seven days.
+    await db.query("UPDATE content_jobs SET status='failed',updated_at=now() WHERE id=$1 AND status IN ('queued','checking','ideating','selecting','producing','reviewing','revising','marketing')", [oldJobId]);
+  }
+  console.info(JSON.stringify({ event: "daily_slot_retry", day, slot, previousJobId: oldJobId, jobId }));
+  return true;
+}
+
+// The operator may have opened the 24 h window after the draft was planned.
+// Claiming inside sendDailyApproval keeps this idempotent across cron retries.
+async function resendPendingApproval(db: Database, day: string, slot: string) {
+  const pending = await db.query(
+    `SELECT job_id FROM daily_drafts WHERE day=$1 AND slot=$2 AND status='awaiting_approval'
+     AND whatsapp_message_id IS NULL AND whatsapp_send_attempted_at IS NULL`, [day, slot]);
+  if (!pending.rows.length) return {};
+  try { return { whatsapp: (await sendDailyApproval(String(pending.rows[0].job_id))) ? "approval_sent" as const : "approval_not_sent" as const }; }
+  catch { console.error(JSON.stringify({ event: "daily_approval_resend_failed", day, slot })); return { whatsapp: "approval_send_failed" as const }; }
+}
+
+// Sends every saved but unsent approval once the operator has (re)opened the window.
+export async function sendPendingDailyApprovals(db: Database = getDatabase()) {
+  const pending = await db.query(
+    `SELECT job_id FROM daily_drafts WHERE status='awaiting_approval' AND whatsapp_message_id IS NULL
+     AND whatsapp_send_attempted_at IS NULL AND created_at>now()-interval '48 hours' ORDER BY created_at LIMIT 4`);
+  let sent = 0;
+  for (const row of pending.rows) {
+    try { if (await sendDailyApproval(String(row.job_id))) sent++; }
+    catch { console.error(JSON.stringify({ event: "daily_approval_flush_failed", jobId: String(row.job_id) })); }
+  }
+  return sent;
+}
+
 export function berlinDay(now = new Date()) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
 }
@@ -98,7 +150,11 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
     "INSERT INTO daily_drafts(day,slot,job_id,status) VALUES($1,$2,$3,'claimed') ON CONFLICT(day,slot) DO NOTHING RETURNING job_id",
     [day, slot, jobId],
   );
-  if (!claim.rows.length) return { status: "already_claimed" as const };
+  if (!claim.rows.length) {
+    if (slot.startsWith("manual:")) return { status: "already_claimed" as const };
+    const retry = await reclaimScheduledSlot(db, day, slot, jobId);
+    if (!retry) return { status: "already_claimed" as const, ...(await resendPendingApproval(db, day, slot)) };
+  }
 
   let stage = "product_search";
   try {
@@ -176,7 +232,7 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
     await db.query("UPDATE daily_drafts SET status=$2,updated_at=now() WHERE job_id=$1", [jobId, status]);
     if (status !== "awaiting_approval") await releaseProduct(db,jobId);
     if (status === "awaiting_approval") {
-      const approver = (process.env.WHATSAPP_APPROVER_WA_ID || "").replace(/\D/g, "");
+      stage = "whatsapp_send";
       // Meta accepts free-form texts only within the 24-hour service window.
       // An approved business-initiated template is a separate configuration step.
       const window = approver ? await db.query(
@@ -211,6 +267,9 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
     // Preserve the one-time claim. Ambiguous network outcomes must not retry.
     console.error(JSON.stringify({event:"daily_draft_failed",jobId,stage,
       errorType:error instanceof Error?error.name:"unknown"}));
+    // A complete, validated plan must survive a failed WhatsApp send. Marking it
+    // failed would let a retry plan a second draft next to a possibly delivered one.
+    if (stage === "whatsapp_send") return { status: "awaiting_approval" as const, jobId, whatsapp: "approval_send_failed" as const };
     await db.query("UPDATE daily_drafts SET status='failed',updated_at=now() WHERE job_id=$1", [jobId]);
     await releaseProduct(db,jobId);
     return { status: "failed" as const, jobId, reason: "internal_error" as const };

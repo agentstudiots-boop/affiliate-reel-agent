@@ -15,7 +15,7 @@ test('one approved Facebook publication hands its exact product link and origina
     events:[],revisions:0,modelCalls:0,totalTokens:0 };
   let published = false, claimed = false;
   const sql = { query: async query => {
-    if (query.includes('information_schema.columns')) return {rows:[{slots:true,slot_key:true,stories:true,feedback:true,product_locks:true,chat_turns:true}]};
+    if (query.includes('information_schema.columns')) return {rows:[{slots:true,slot_key:true,stories:true,feedback:true,product_locks:true,chat_turns:true,slot_retry:true}]};
     if (query.startsWith('INSERT INTO story_handoffs')) return {rows: published && !claimed ? (claimed=true,[{publication_id:id}]) : []};
     if (query.startsWith('SELECT p.image_url')) return {rows:[{image_url:'https://assets.public.blob.vercel-storage.com/approved.png',snapshot}]};
     if (query.startsWith('UPDATE story_handoffs')) return {rows:[]};

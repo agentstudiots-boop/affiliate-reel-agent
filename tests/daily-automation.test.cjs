@@ -42,15 +42,16 @@ test('daily cron produces one saved image brief, requires a WhatsApp window, and
   assert.equal(saved.rows[0].status,'needs_input');
   assert.equal(saved.rows[0].reason,'product_repeat_blocked');
   assert.equal(saved.rows[0].whatsapp_message_id,null);
-  assert.equal((await daily.createDailyDraft('2026-09-25')).status,'already_claimed');
+  // A scheduled slot that ended in needs_input is retried (bounded by the attempt cap).
+  assert.equal((await daily.createDailyDraft('2026-09-25')).status,'needs_input');
   const second=await daily.createDailyDraft('2026-09-25','afternoon');
   assert.equal(second.status,'needs_input');
   assert.notEqual(second.jobId,next.jobId);
-  assert.equal((await daily.createDailyDraft('2026-09-25','afternoon')).status,'already_claimed');
+  assert.equal((await daily.createDailyDraft('2026-09-25','afternoon')).status,'needs_input');
   const manual=await daily.createDailyDraft('2026-09-25','manual:wa-id-one');
   assert.equal(manual.status,'needs_input');
   assert.equal((await pg.query("SELECT count(*)::int AS n FROM daily_drafts WHERE day='2026-09-25'")).rows[0].n,3);
-  assert.equal(scouts,4);
+  assert.equal(scouts,6);
   assert.equal(messages.length,0);
   assert.equal((await pg.query('SELECT count(*)::int AS n FROM publication_requests')).rows[0].n,0);
 });
@@ -219,4 +220,77 @@ test('automatic draft uses an already researched evergreen when seasonal product
   const jobs=await pg.query('SELECT snapshot FROM content_jobs');
   assert.equal(jobs.rows.length,1);
   assert.equal(jobs.rows[0].snapshot.opportunity.product.asin,'B000000044');
+});
+
+async function retryFixture(t){
+  const pg=new PGlite();t.after(()=>pg.close());
+  for(const name of fs.readdirSync('db/migrations').filter(n=>n.endsWith('.sql')).sort())await pg.exec(fs.readFileSync(`db/migrations/${name}`,'utf8'));
+  const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
+  const old=process.env.WHATSAPP_APPROVER_WA_ID;process.env.WHATSAPP_APPROVER_WA_ID='491234';
+  t.after(()=>{if(old===undefined)delete process.env.WHATSAPP_APPROVER_WA_ID;else process.env.WHATSAPP_APPROVER_WA_ID=old;});
+  const product={name:'Kuscheldecke',productVerifiedName:'Kuscheldecke',productVerifiedAt:'2026-09-26T08:00:00.000Z',sourceUrl:'https://www.amazon.de/dp/B000000001',affiliateUrl:'https://www.amazon.de/dp/B000000001?tag=alltaeglichle-21',price:'',targetGroup:'Haushalte',benefits:'Eigenschaften vor Kauf prüfen',notes:''};
+  const state={scouts:0,fail:0,messages:[],sendError:null};
+  const daily=loadRoute('lib/daily/draft.ts',{
+    '@/lib/orchestrator':{runContentJob:require('../.test-build/lib/content/orchestrator').runContentJob,
+      runProductScout:async()=>{state.scouts++;if(state.fail-->0)throw Error('Amazon unavailable');
+        return {candidates:[{resolvedProduct:product,kind:'Saisontrend',name:'Kuscheldecke',category:'Wohnen',reelIdea:'Eine Kuscheldecke am Abend auf dem Sofa vergleichen.',whyNow:'Herbst'}]};}},
+    '@/lib/memory/db':{getDatabase:()=>db},
+    '@/lib/whatsapp/client':{WhatsAppRejectedError:class extends Error{},sendWhatsAppText:async body=>{if(state.sendError)throw state.sendError;state.messages.push(body);return `wamid.${state.messages.length}`;},
+      dailyNotificationTemplateConfigured:()=>false,sendDailyNotificationTemplate:async()=>{throw Error('no template');}},
+  });
+  return {pg,daily,state};
+}
+
+test('a failed scheduled slot is retried by the next cron call, and only once it succeeds it is claimed',async t=>{
+  const {pg,daily,state}=await retryFixture(t);
+  await pg.query("INSERT INTO whatsapp_events(message_id,wa_id,intent,payload) VALUES('in.1','491234','changes_requested','{}')");
+  state.fail=1;
+  const first=await daily.createDailyDraft('2026-09-30','afternoon');
+  assert.equal(first.status,'failed');
+  const second=await daily.createDailyDraft('2026-09-30','afternoon');
+  assert.equal(second.status,'awaiting_approval',JSON.stringify(second));
+  assert.equal(second.whatsapp,'approval_sent');
+  assert.notEqual(second.jobId,first.jobId);
+  assert.equal(state.messages.length,1);
+  assert.match(state.messages[0],/Beitragstext/);assert.match(state.messages[0],/B000000001/);assert.match(state.messages[0],/tag=alltaeglichle-21/);
+  // Repeated triggers neither plan nor send again.
+  const third=await daily.createDailyDraft('2026-09-30','afternoon');
+  assert.equal(third.status,'already_claimed');assert.equal(state.scouts,2);assert.equal(state.messages.length,1);
+  const row=await pg.query("SELECT attempts,status FROM daily_drafts WHERE slot='afternoon'");
+  assert.deepEqual(row.rows[0],{attempts:2,status:'awaiting_approval'});
+});
+
+test('a killed attempt (stale claim) is recovered, a fresh claim is not stolen, attempts are capped',async t=>{
+  const {pg,daily,state}=await retryFixture(t);
+  await pg.query("INSERT INTO whatsapp_events(message_id,wa_id,intent,payload) VALUES('in.1','491234','changes_requested','{}')");
+  await pg.query("INSERT INTO daily_drafts(day,slot,job_id,status) VALUES('2026-09-30','morning',gen_random_uuid(),'planning')");
+  assert.equal((await daily.createDailyDraft('2026-09-30','morning')).status,'already_claimed');
+  assert.equal(state.scouts,0);
+  await pg.query("UPDATE daily_drafts SET updated_at=now()-interval '10 minutes'");
+  assert.equal((await daily.createDailyDraft('2026-09-30','morning')).status,'awaiting_approval');
+  await pg.query("INSERT INTO daily_drafts(day,slot,job_id,status,attempts) VALUES('2026-09-30','afternoon',gen_random_uuid(),'failed',3)");
+  assert.equal((await daily.createDailyDraft('2026-09-30','afternoon')).status,'already_claimed');
+  assert.equal(state.scouts,1);
+});
+
+test('an approval saved outside the WhatsApp window is delivered once the operator writes again',async t=>{
+  const {pg,daily,state}=await retryFixture(t);
+  const first=await daily.createDailyDraft('2026-09-30','afternoon');
+  assert.equal(first.whatsapp,'template_required');assert.equal(state.messages.length,0);
+  assert.equal(await daily.sendPendingDailyApprovals(),0);
+  await pg.query("INSERT INTO whatsapp_events(message_id,wa_id,intent,payload) VALUES('in.2','491234','changes_requested','{}')");
+  assert.equal(await daily.sendPendingDailyApprovals(),1);
+  assert.equal(await daily.sendPendingDailyApprovals(),0);
+  assert.equal(state.messages.length,1);
+});
+
+test('a failed WhatsApp send keeps the planned draft instead of marking the slot failed',async t=>{
+  const {pg,daily,state}=await retryFixture(t);
+  await pg.query("INSERT INTO whatsapp_events(message_id,wa_id,intent,payload) VALUES('in.1','491234','changes_requested','{}')");
+  state.sendError=new Error('network');
+  const result=await daily.createDailyDraft('2026-09-30','afternoon');
+  assert.equal(result.status,'awaiting_approval');assert.equal(result.whatsapp,'approval_send_failed');
+  assert.equal((await pg.query("SELECT status FROM daily_drafts")).rows[0].status,'awaiting_approval');
+  assert.equal((await daily.createDailyDraft('2026-09-30','afternoon')).status,'already_claimed');
+  assert.equal(state.scouts,1);
 });
