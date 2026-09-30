@@ -35,7 +35,8 @@ export async function checkWhatsAppConnection(transport: typeof fetch = fetch) {
     wabaAccessible:null|boolean;
     senderBelongsToConfiguredWaba:null|boolean;
     permissions:null|Record<string,boolean>;
-  }={wabaAccessible:null,senderBelongsToConfiguredWaba:null,permissions:null};
+    dailyTemplate:null|{configuredLanguage:string|null;found:boolean;matches:Array<{language:string;status:string;category:string}>};
+  }={wabaAccessible:null,senderBelongsToConfiguredWaba:null,permissions:null,dailyTemplate:null};
   const finish=(status:WhatsAppStatus,message:string,code?:number,subcode?:number)=>({
     status,message,checkedAt:new Date().toISOString(),connectionOk:status==="connected",configured,diagnostics,
     ...(code!==undefined?{code}:{code:undefined}),
@@ -98,6 +99,26 @@ export async function checkWhatsAppConnection(transport: typeof fetch = fetch) {
       } catch {
         diagnostics.wabaAccessible=false;
       }
+    }
+
+    // Read-only lookup of the configured daily template: its exact API language code,
+    // approval status and category. Never sends a message.
+    const templateName=process.env.WHATSAPP_DAILY_TEMPLATE_NAME;
+    if(waba?.trim() && /^\d+$/.test(waba) && templateName && /^[a-z0-9_]+$/.test(templateName)){
+      try {
+        const templateUrl=new URL(`https://graph.facebook.com/${version}/${waba}/message_templates`);
+        templateUrl.searchParams.set("name",templateName);
+        templateUrl.searchParams.set("fields","name,language,status,category");
+        const templateResponse=await transport(templateUrl,{
+          method:"GET",headers:{Authorization:`Bearer ${token.trim()}`},cache:"no-store",redirect:"error",signal:AbortSignal.timeout(8000),
+        });
+        const templateBody=await templateResponse.json() as {data?:Array<{name?:string;language?:string;status?:string;category?:string}>};
+        if(templateResponse.ok && Array.isArray(templateBody.data)){
+          const matches=templateBody.data.filter(item=>item.name===templateName)
+            .map(item=>({language:String(item.language||""),status:String(item.status||""),category:String(item.category||"")}));
+          diagnostics.dailyTemplate={configuredLanguage:process.env.WHATSAPP_DAILY_TEMPLATE_LANGUAGE||null,found:matches.length>0,matches};
+        }
+      } catch {}
     }
 
     if(diagnostics.permissions && diagnostics.permissions.whatsapp_business_messaging===false){
