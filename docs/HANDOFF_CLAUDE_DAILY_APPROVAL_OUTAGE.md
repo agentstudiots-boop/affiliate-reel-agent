@@ -62,3 +62,16 @@ Vercel AI Gateway, Affiliate-Kennzeichnung/Caption, Video/Runway. Das sind die n
    lesen (`status`, `attempts`, `scout_report->>'reason'`, `whatsapp_*`) – das würde die tatsächliche Ursache belegen.
 3. Für zuverlässigen Versand ohne vorherige Operator-Nachricht: genehmigte WhatsApp-Vorlage konfigurieren
    (Gebühren möglich). Ohne sie wartet die Freigabe bis zur nächsten Nachricht des Betreibers.
+
+## Nachtrag 30.09.2026 (abends): WhatsApp-Vorlage
+
+- In Vercel **Production** gesetzt (per API, plain): `WHATSAPP_DAILY_TEMPLATE_ENABLED=true`,
+  `WHATSAPP_DAILY_TEMPLATE_NAME=content_entwurf`, `WHATSAPP_DAILY_TEMPLATE_LANGUAGE=de`.
+- Sprachcode `de` folgt der Meta-Dokumentation („German" = `de`; `de_DE` existiert dort nicht). **Nicht** gegen das
+  Konto verifiziert: Kein Meta-Token im Zugriff. Zuordnung der Vorlage zum produktiven WhatsApp-Konto ungeprüft.
+- Die Vorlage wird ohne Parameter gesendet. Hat `content_entwurf` Platzhalter, lehnt Meta ab.
+- Code: Vorlagenversand und Volltext-Versand laufen über `deliverDailyApproval`. Eine definitive Meta-Ablehnung
+  der Vorlage (`daily_template_rejected` im Log, nur Code/Status/Kurztext) gibt den Claim frei; der nächste
+  Cron-Aufruf versucht es erneut. Die Vorlage ist nie eine Inhaltsfreigabe; „Entwurf" (Antwort auf die Vorlage) ruft
+  den gespeicherten Entwurf ab, die Veröffentlichungsfreigabe bleibt eine eigene spätere Nachricht.
+- Lokal: 195/195 Tests. Versand, Zustellung und Empfang der Vorlage sind **nicht** nachgewiesen.
