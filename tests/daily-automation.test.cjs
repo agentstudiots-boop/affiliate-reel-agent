@@ -133,6 +133,25 @@ test('a generic search stops before content planning when no Amazon product can 
   assert.equal((await daily.createDailyDraft('2026-09-27','manual:unresolved')).status,'already_claimed');
 });
 
+test('an exact operator ASIN records Amazon verification failures without calling the scout or planning',async t=>{
+  const pg=new PGlite();t.after(()=>pg.close());
+  for(const name of fs.readdirSync('db/migrations').filter(n=>n.endsWith('.sql')).sort())await pg.exec(fs.readFileSync(`db/migrations/${name}`,'utf8'));
+  const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
+  let verifications=0;
+  const daily=loadRoute('lib/daily/draft.ts',{
+    '@/lib/orchestrator':{runProductScout:async()=>{throw Error('no trend search');},runContentJob:async()=>{throw Error('no planning');}},
+    '@/lib/product-resolver':{findAmazonProductByAsin:async()=>{verifications++;throw Error('amazon_verification_blocked');}},
+    '@/lib/memory/db':{getDatabase:()=>db},
+  });
+  const result=await daily.createDailyDraft('2026-09-30','manual:verified-link','B0C2C739KY');
+  assert.equal(result.status,'needs_input');assert.equal(result.reason,'amazon_verification_blocked');
+  assert.equal(verifications,1);
+  assert.deepEqual((await pg.query("SELECT status,scout_report->>'reason' AS reason FROM daily_drafts WHERE job_id=$1",[result.jobId])).rows,
+    [{status:'needs_input',reason:'amazon_verification_blocked'}]);
+  assert.equal((await daily.createDailyDraft('2026-09-30','manual:verified-link','B0C2C739KY')).status,'already_claimed');
+  assert.equal(verifications,1);
+});
+
 test('a fully cooled-down TrendScout report stops before content planning',async t=>{
   const pg=new PGlite();t.after(()=>pg.close());
   for(const name of fs.readdirSync('db/migrations').filter(n=>n.endsWith('.sql')).sort())

@@ -142,17 +142,17 @@ export async function findAmazonProduct(categoryName: string, query: string, tar
   throw new Error(PRODUCT_UNRESOLVED);
 }
 
-// A WhatsApp command may identify only an ASIN. Bind the exact indexed title,
-// then use the same strict product verification as all other plans.
-export async function findAmazonProductByAsin(asin: string, search = tavilySearch,
+// A supplied exact ASIN needs a current Amazon detail-page title, not an
+// additional paid index search that may not have indexed this listing yet.
+export async function findAmazonProductByAsin(asin: string,
   verify: (asin: string) => Promise<string> = verifyAmazonProductPage) {
   if (!/^[A-Z0-9]{10}$/.test(asin)) throw new Error(PRODUCT_UNRESOLVED);
-  const results = await search({ query: `site:amazon.de/dp/ ${asin}`, maxResults: 5 });
-  const found = results.find(item => amazonProduct(item.url)?.asin === asin
-    && item.title.trim().length > 5 && !/captcha|robot\s*check|^Amazon\.de\s*[:|-]?\s*$/i.test(item.title.trim()));
-  if (!found) throw new Error(PRODUCT_UNRESOLVED);
-  const name = found.title.replace(/\s*[:|–-]\s*Amazon\.de(?:\s*:.*)?$/i, "").trim().slice(0,160);
-  return resolveAmazonProduct({ name, sourceUrl: `https://www.amazon.de/dp/${asin}`, affiliateUrl: "", price: "",
+  const name = (await verify(asin)).trim().slice(0,160);
+  if (name.length < 6) throw new Error(PRODUCT_UNRESOLVED);
+  const product = bindAmazonProduct({ name, productVerifiedName:name, productVerifiedAt:new Date().toISOString(),
+    sourceUrl: `https://www.amazon.de/dp/${asin}`, affiliateUrl: "", price: "",
     targetGroup: "Menschen mit passender Alltagssituation", benefits: "Eignung und Lieferumfang vor dem Kauf prüfen.",
-    notes: "Identität durch aktuelle Amazon-Seite belegt; Merkmale und Preis nicht belegt." }, async () => results, verify);
+    notes: "Identität durch aktuelle Amazon-Seite belegt; Merkmale und Preis nicht belegt." });
+  requireProduct(product);
+  return product;
 }

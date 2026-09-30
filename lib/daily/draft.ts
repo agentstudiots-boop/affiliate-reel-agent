@@ -1,4 +1,4 @@
-import { requireProduct } from "@/lib/amazon";
+import { requireProduct, PRODUCT_UNRESOLVED } from "@/lib/amazon";
 import { imageProviderStatus } from "@/lib/content/image-provider";
 import { runContentJob, runProductScout } from "@/lib/orchestrator";
 import { getDatabase } from "@/lib/memory/db";
@@ -129,7 +129,18 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
       : new Date(`${day}T00:00:00Z`).getUTCDate() + (slot === "afternoon" ? 1 : 0);
     await db.query("UPDATE daily_drafts SET status='planning',scout_report=$2,updated_at=now() WHERE job_id=$1", [jobId, JSON.stringify(report ? {requestedSearch:productSearch,report}: { requestedProduct: productQuery })]);
     stage = "product_verification";
-    const requestedProduct = productQuery ? await resolveRequestedProduct(productQuery) : null;
+    let requestedProduct: Awaited<ReturnType<typeof resolveRequestedProduct>> | null = null;
+    if (productQuery) {
+      try { requestedProduct = await resolveRequestedProduct(productQuery); }
+      catch (error) {
+        const code = error instanceof Error ? error.message : "unknown";
+        if (code !== PRODUCT_UNRESOLVED && code !== "amazon_verification_blocked") throw error;
+        await db.query("UPDATE daily_drafts SET status='needs_input',scout_report=$2,updated_at=now() WHERE job_id=$1",
+          [jobId,JSON.stringify({requestedProduct:productQuery,reason:code})]);
+        console.info(JSON.stringify({event:"daily_product_verification",jobId,reason:code}));
+        return {status:"needs_input" as const,jobId,reason:code};
+      }
+    }
     let candidate: typeof pool[number] | null = null;
     let selectedProduct = requestedProduct;
     const rotate = (items: typeof pool) => [...items.slice(rotation % (items.length || 1)), ...items.slice(0,rotation % (items.length || 1))];
