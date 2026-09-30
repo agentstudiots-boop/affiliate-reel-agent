@@ -1,5 +1,40 @@
 # Tägliche Entwürfe und Veröffentlichung
 
+## 30. September 2026, 14:16 MESZ: falscher Einsatzort der Badewannenmatte
+
+Ein vom Betreiber gezeigter produktiver WhatsApp-Entwurf nennt die ASIN
+`B0C2C739KY` und einen Amazon-`/dp/`-Affiliate-Link. Sein Titel bezeichnet
+eine **Badewannenmatte**, aber Text und Bildbriefing platzieren sie **vor der
+Dusche**. Das ist ein konkreter sachlicher Widerspruch; die vorhandene
+Inhaltsfreigabe ist nicht erteilt. Die Betreiberantwort „Das ist aber eine
+Badematte für in die Badewanne“ erhielt um 14:16 MESZ nur eine allgemeine
+Rückfrage. Production-Logs des Deployments `dpl_DdyFA6ZBWKVr4SBneccG5znyUifc`
+zeigen um 12:16:07 UTC `instruction_parser_result` mit `intent=clarify`
+(`openai/gpt-5.6-terra` über Replicate) und anschließend
+`instruction_revision_blocked` mit `instruction_unclear`. Die Logs legen
+keine genaue interne Ursache der ungültigen Modellantwort offen. Der
+Produktname im gespeicherten Entwurf und die allgemeine Scout-Szene „vor die
+Dusche“ belegen aber die zweite Fehlerquelle. Die WhatsApp-Antwort erklärt,
+dass daraus kein Bild erzeugt und nichts veröffentlicht wurde. Die Amazon-
+Detailseite wurde in dieser Nachprüfung nicht erneut abgerufen; die
+Anwendung des konkreten Modells ist nur aus dem im Entwurf angezeigten Titel
+abgeleitet, weitere Modellmerkmale bleiben ungeprüft.
+
+Für künftige Entwürfe hat der verifizierte Titel „Badewannenmatte“ Vorrang
+vor der allgemeinen Badematten-Szene. Eine enge redaktionelle Regel sperrt
+eine Szene oder Caption vor der Dusche bereits vor der Inhaltsfreigabe und
+auch vor Bildkauf/Veröffentlichungsauftrag eines älteren Plans. Die exakte
+Betreiberkorrektur wird für einen weiterhin offenen Auftrag als Bild- **und**
+Textänderung mit unveränderter ASIN und Affiliate-Link übernommen; dafür ist
+kein weiterer Sprachmodellaufruf nötig. Der neue Entwurf benötigt wiederum
+eine ausdrückliche Inhaltsfreigabe und danach eine getrennte
+Veröffentlichungsfreigabe. Die alte WhatsApp-Nachricht bleibt dedupliziert;
+ein eingegangener Änderungswunsch wird nicht als unbekannter POST wiederholt.
+Der Betreiber muss die Korrektur nach dem Deployment einmal neu direkt auf
+die offene Freigabe beziehungsweise ihre Rückfrage senden. Ein freier
+Themen-Chat mit autonomer Post-Erstellung ist weiterhin ein eigener,
+kosten- und sicherheitsgeprüft zu entwickelnder Ablauf.
+
 ## 30. September 2026: Vormittagsstatus und diversifizierte Auswahl
 
 Der Betreiber zeigte die produktive WhatsApp-`Status?`-Antwort von **11:28 MESZ**.

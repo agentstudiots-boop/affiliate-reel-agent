@@ -4,6 +4,7 @@ import { parseJob } from "../content/history";
 import { requireJobProduct } from "../content/product-contract";
 import { reviseApprovedVideo, reviseApprovedStaticContent, reviseOperatorInstruction, inspectContent } from "../content/orchestrator";
 import { pumpkinCreativeIssues } from "../content/category";
+import { bathtubMatIssues } from "../content/bathtub-mat";
 import { interpretInstruction, validateInstruction } from "./instruction";
 import { classifyWhatsAppReply } from "./intent";
 import { sendWhatsAppText, WhatsAppRejectedError } from "./client";
@@ -139,7 +140,7 @@ export async function handleContentApproval(input:Incoming,onApproved?: (jobId:s
           const instruction=validateInstruction(await interpretInstruction(input.body,working),input.body);
           revised=reviseOperatorInstruction(working,instruction);
           const review=inspectContent(revised.content!,revised.decision!,revised.opportunity.targetPlatform);
-          review.issues.push(...pumpkinCreativeIssues(revised.opportunity,revised.content!));
+          review.issues.push(...pumpkinCreativeIssues(revised.opportunity,revised.content!),...bathtubMatIssues(revised.opportunity,revised.content!));
           if(review.issues.length)review.passed=false;
           if(!review.passed)throw Error(`Redaktionelle Prüfung: ${review.issues.join(" ")}`);
           revised.review=review;
