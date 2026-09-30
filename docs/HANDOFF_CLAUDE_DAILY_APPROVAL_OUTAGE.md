@@ -75,3 +75,18 @@ Vercel AI Gateway, Affiliate-Kennzeichnung/Caption, Video/Runway. Das sind die n
   Cron-Aufruf versucht es erneut. Die Vorlage ist nie eine Inhaltsfreigabe; „Entwurf" (Antwort auf die Vorlage) ruft
   den gespeicherten Entwurf ab, die Veröffentlichungsfreigabe bleibt eine eigene spätere Nachricht.
 - Lokal: 195/195 Tests. Versand, Zustellung und Empfang der Vorlage sind **nicht** nachgewiesen.
+
+## Nachtrag 30.09.2026, 21:53 MESZ: Nachweis aus „Status"-Antwort
+
+Screenshot des Betreibers (Antwort zugestellt, doppelte Haken) zeigt für den 30.09.:
+- **Nachmittag (18-Uhr-Slot): lief.** Produkt „180ml Espresso Messbecher Glas …" wurde gewählt, Endstatus
+  `needs_input` **ohne** gespeicherten Grund. Der Ausfall war damit **nicht** ein fehlender Cron-Aufruf und nicht
+  das WhatsApp-Fenster, sondern ein Abbruch in Content-Planung/Freigabeprüfung vor dem Versand. Die genaue Stufe
+  ist nicht belegt (Logs der Stunde durch Billing-Limit gesperrt).
+- **Vormittag:** `needs_input`, „Produkt in den letzten sieben Tagen verwendet" (alle Kandidaten gesperrt).
+- Weitere manuelle Aufträge: Badematte „Content-Planung abgebrochen", einmal `failed`, einmal keine verifizierte Produktseite.
+- Webhook-Logs 19:53 UTC: Nachricht angekommen, HTTP 200; kein Fehler beim Nachsenden.
+
+Änderung: Wenn ein Slot nach der Planung `needs_input` wird, wird der Grund (`publication_gate_failed`,
+`content_review_failed`, …) samt Kurztext gespeichert, als `daily_draft_needs_input` geloggt und in „Status"
+angezeigt. Damit ist der nächste Ausfall ohne Datenbankzugang erklärbar. Lokal getestet; produktiv noch nicht beobachtet.
