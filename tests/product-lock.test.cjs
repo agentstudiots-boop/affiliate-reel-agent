@@ -63,10 +63,11 @@ test('TrendScout omits cooldown products before presenting suggestions',async t=
   const sameFamily={name:'Pumpkin Carving Kit B',asin:'B000000002',sourceUrl:'https://www.amazon.de/dp/B000000002'};
   const fresh={name:'Kuscheldecke Modell C',asin:'B000000003',sourceUrl:'https://www.amazon.de/dp/B000000003'};
   assert.equal(await reserveProduct(db,blocked,crypto.randomUUID()),true);
-  const candidates=[blocked,sameFamily,fresh].map(p=>({name:p.name,searchQuery:p.name,targetGroup:'Haushalte'}));
+  const candidates=[blocked,sameFamily,fresh].map(p=>({name:p.name,searchQuery:p.name,targetGroup:'Haushalte',kind:p===fresh?'Dauerläufer':'Saisontrend'}));
+  const lookups=[];
   const scout=loadRoute('lib/orchestrator.ts',{
     '@/lib/agents/product-scout':{scoutProducts:async()=>({output:{candidates},sources:[]})},
-    '@/lib/product-resolver':{findAmazonProduct:async name=>[blocked,sameFamily,fresh].find(p=>p.name===name)},
+    '@/lib/product-resolver':{findAmazonProduct:async name=>{lookups.push(name);return [blocked,sameFamily,fresh].find(p=>p.name===name)}},
     '@/lib/memory/db':{getDatabase:()=>db},
     '@/lib/agents/product-reviewer':{},
     '@/lib/agents/script-writer':{},
@@ -74,8 +75,39 @@ test('TrendScout omits cooldown products before presenting suggestions',async t=
   });
   const report=await scout.runProductScout();
   assert.deepEqual(report.candidates.map(c=>c.name),[fresh.name]);
+  assert.deepEqual(lookups,[fresh.name]);
   assert.equal(report.cooldownBlocked,2);
-  assert.equal(report.cooldownBlockedSeasonal,0);
+  assert.equal(report.cooldownBlockedSeasonal,2);
   assert.equal(report.cooldownBlockedAutomatic,2);
   assert.equal((await pg.query('SELECT count(*)::int AS n FROM content_jobs')).rows[0].n,0);
+});
+
+test('scout rotates diverse unblocked families by daily slot within the existing lookup budget',async t=>{
+  const pg=new PGlite();t.after(()=>pg.close());
+  for(const name of fs.readdirSync('db/migrations').filter(n=>n.endsWith('.sql')).sort())
+    await pg.exec(fs.readFileSync(`db/migrations/${name}`,'utf8'));
+  const db={query:(q,v)=>pg.query(q,v),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v)}))};
+  const blocked={name:'Kürbis Schnitzset',asin:'B000000001',sourceUrl:'https://www.amazon.de/dp/B000000001'};
+  assert.equal(await reserveProduct(db,blocked,crypto.randomUUID()),true);
+  const names=['Kürbis Schnitzset','Silikon Backmatte','Messbecher mit Skala','Wäschekorb mit Griffen',
+    'LED Schreibtischlampe','Edelstahl Trinkflasche','Brotdose mit Fächern','Duschabzieher','Gartenhandschuhe'];
+  const candidates=names.map((name,i)=>({name,searchQuery:name,targetGroup:'Haushalte',kind:i?'Dauerläufer':'Saisontrend'}));
+  const lookups=[];
+  const scout=loadRoute('lib/orchestrator.ts',{
+    '@/lib/agents/product-scout':{scoutProducts:async()=>({output:{candidates},sources:[]})},
+    '@/lib/product-resolver':{findAmazonProduct:async name=>{lookups.push(name);const asin=`B${String(names.indexOf(name)+1).padStart(9,'0')}`;
+      return {name,asin,sourceUrl:`https://www.amazon.de/dp/${asin}`}}},
+    '@/lib/memory/db':{getDatabase:()=>db},
+    '@/lib/agents/product-reviewer':{},'@/lib/agents/script-writer':{},'@/lib/content/orchestrator':{},
+  });
+  const first=await scout.runProductScout(undefined,'2026-09-30:morning');
+  assert.equal(first.cooldownBlocked,1);
+  assert.equal(first.candidates.length,5);
+  assert.equal(lookups.length,5);
+  assert.ok(!lookups.includes(blocked.name));
+  const firstOrder=[...lookups];lookups.length=0;
+  const second=await scout.runProductScout(undefined,'2026-09-30:afternoon');
+  assert.equal(second.candidates.length,5);
+  assert.equal(lookups.length,5);
+  assert.notDeepEqual(lookups,firstOrder);
 });

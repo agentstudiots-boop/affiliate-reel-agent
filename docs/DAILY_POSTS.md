@@ -1,5 +1,39 @@
 # Tägliche Entwürfe und Veröffentlichung
 
+## 30. September 2026: Vormittagsstatus und diversifizierte Auswahl
+
+Der Betreiber zeigte die produktive WhatsApp-`Status?`-Antwort von **11:28 MESZ**.
+Sie nennt für den 30.09. vormittags `Produktsuche: needs_input (Produkt in den
+letzten sieben Tagen verwendet)` und für den 29.09. nachmittags denselben
+Abbruch. Damit ist für beide gespeicherten Slots die Produktauswahl als
+Abbruchstufe beobachtet; aus diesen Aufträgen ging keine Inhaltsfreigabe
+hervor. Die Ansicht nennt weder Kandidat, ASIN, Amazon-Detailseite und
+Affiliate-Link noch eine Job-ID oder einen konkreten Lock. Content-Plan,
+redaktionelle Prüfung und WhatsApp-Sendestatus sind daraus nicht einzeln
+lesbar. Der heute um 09:28 UTC beobachtete `POST /api/whatsapp/webhook` mit
+HTTP 200 belegt die Verarbeitung der Statusanfrage auf Production, nicht den
+ursprünglichen Cron-Aufruf. Ein lesender direkter Produktions-DB-Zugang liegt
+weiterhin nicht vor. Die Abfragen der Cron-Runtime-Logs für den Morgen
+lieferten keine passenden Einträge; daraus folgt kein Negativbeweis. Remote
+`main` und Production waren vor dieser Änderung auf `08bb62f` (PR #24,
+Deployment `dpl_GsTVfgJm1CxwGD7ahKagyUmJZqHk`, `READY`).
+
+Der allgemeine Trendscout hat jetzt mehr eng unterscheidbare, ganzjährige
+Produktideen. Vor einer Produktseiten-Abfrage liest er aktive Familien-Locks
+und relevante frühere beziehungsweise offene Aufträge und überspringt
+bekannt gesperrte Familien. Die verbleibenden Ideen rotieren je Berliner Tag
+und Slot. Der Scout prüft pro Lauf weiterhin höchstens fünf Kandidaten; die
+ASIN- und Familien-Sperre wird nach der Verifikation zusätzlich atomar bei
+der Reservierung geprüft. Ein unbekannter exakter ASIN-Treffer kann die
+Auswahl weiter scheitern lassen. Die Änderung startet keine zusätzliche
+Suche und setzt den heutigen Claim nicht zurück. Lokal: Typprüfung, Lint,
+Build und **178 Tests** bestanden, darunter ein Test mit gesperrter Familie,
+Rotation zwischen zwei Slots und fünf Abfragen als Obergrenze. Ein
+erfolgreicher Production-Lauf mit zwei WhatsApp-Inhaltsfreigaben ist damit
+noch nicht beobachtet. Amazon-Verifikation, redaktionelles Gate und das
+WhatsApp-Servicefenster bleiben Voraussetzungen; zwei Zustellungen pro Tag
+sind deshalb nicht garantiert.
+
 ## Morgenlauf 30. September 2026: Prüfung um 10:48 MESZ
 
 Remote-`main` und Production waren zu Beginn der Prüfung auf `1d23ae5`

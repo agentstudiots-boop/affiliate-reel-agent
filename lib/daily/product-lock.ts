@@ -10,18 +10,22 @@ export function productFamily(name: string): string | null {
   if (/vakuumier|vacuum.seal/.test(s)) return "vacuum_sealer";
   if (/saugroboter|robot.*(saug|vacuum)|robot.vacuum/.test(s)) return "robot_vacuum";
   if (/kuscheldecke|throw.blanket/.test(s)) return "throw_blanket";
+  if (/kuchenreibe|zestenreibe/.test(s)) return "kitchen_grater";
+  if (/backmatte/.test(s)) return "baking_mat";
+  if (/messbecher/.test(s)) return "measuring_cup";
+  if (/aufbewahrungsbox|vorratsdose/.test(s)) return "storage_box";
+  if (/waschekorb/.test(s)) return "laundry_basket";
+  if (/badematte/.test(s)) return "bath_mat";
+  if (/schreibtischlampe/.test(s)) return "desk_lamp";
+  if (/gartenhandschuh/.test(s)) return "gardening_gloves";
+  if (/trinkflasche/.test(s)) return "water_bottle";
+  if (/brotdose/.test(s)) return "lunch_box";
+  if (/duschabzieher/.test(s)) return "shower_squeegee";
+  if (/kabel.organizer|kabelhalter/.test(s)) return "cable_organizer";
   return null;
 }
 
-export async function productOnCooldown(db: Sql, product: Product, jobId = "00000000-0000-0000-0000-000000000000"): Promise<boolean> {
-  const asin = product.asin || amazonProduct(product.sourceUrl)?.asin;
-  if (!asin) return true;
-  const keys = [`asin:${asin}`, ...(productFamily(product.name) ? [`family:${productFamily(product.name)}`] : [])];
-  const locked = await db.query(
-    "SELECT 1 FROM product_selection_locks WHERE key=ANY($1::text[]) AND expires_at>now() AND job_id<>$2 LIMIT 1",
-    [keys, jobId],
-  );
-  if (locked.rows.length) return true;
+async function recentProducts(db: Sql, jobId: string) {
   const recent = await db.query(
     `SELECT j.opportunity->'product' AS product FROM content_jobs j
      WHERE j.id<>$1 AND (
@@ -35,8 +39,31 @@ export async function productOnCooldown(db: Sql, product: Product, jobId = "0000
          AND r.status IN ('preparing','pending','approved','publishing','unknown'))
      )`, [jobId],
   );
-  return recent.rows.some(row => {
-    const prior = row.product as { asin?: string; name?: string } | null;
+  return recent.rows.map(row => row.product as { asin?: string; name?: string } | null);
+}
+
+// Read-only early filter. The final reservation below still checks exact ASIN
+// and family atomically after a live product page has been verified.
+export async function blockedProductFamilies(db: Sql): Promise<Set<string>> {
+  const locks = await db.query("SELECT key FROM product_selection_locks WHERE key LIKE 'family:%' AND expires_at>now()");
+  const families = new Set(locks.rows.map(row => String(row.key).slice("family:".length)));
+  for (const product of await recentProducts(db,"00000000-0000-0000-0000-000000000000")) {
+    const family = product?.name && productFamily(product.name);
+    if (family) families.add(family);
+  }
+  return families;
+}
+
+export async function productOnCooldown(db: Sql, product: Product, jobId = "00000000-0000-0000-0000-000000000000"): Promise<boolean> {
+  const asin = product.asin || amazonProduct(product.sourceUrl)?.asin;
+  if (!asin) return true;
+  const keys = [`asin:${asin}`, ...(productFamily(product.name) ? [`family:${productFamily(product.name)}`] : [])];
+  const locked = await db.query(
+    "SELECT 1 FROM product_selection_locks WHERE key=ANY($1::text[]) AND expires_at>now() AND job_id<>$2 LIMIT 1",
+    [keys, jobId],
+  );
+  if (locked.rows.length) return true;
+  return (await recentProducts(db,jobId)).some(prior => {
     return prior?.asin === asin || !!(prior?.name && productFamily(product.name)
       && productFamily(prior.name) === productFamily(product.name));
   });
