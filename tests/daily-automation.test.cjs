@@ -313,3 +313,22 @@ test('outside the 24 h window the approved template is sent once, never counts a
   assert.equal(state.messages.length,0);
   assert.equal((await pg.query('SELECT count(*)::int AS n FROM publication_requests')).rows[0].n,0);
 });
+
+test('a plan rejected by the publication gate is stored with its reason and explained by Status',async t=>{
+  const {pg,daily,state}=await retryFixture(t);
+  const {latestImagePostsStatus}=loadRoute('lib/reporting/whatsapp-status.ts',{'../memory/ensure-automation-schema':{ensureAutomationSchema:async()=>{}}});
+  const gated=loadRoute('lib/daily/draft.ts',{
+    '@/lib/orchestrator':{runProductScout:async()=>({candidates:[{kind:'Saisontrend',name:'Kuscheldecke',category:'Wohnen',whyNow:'Herbst',reelIdea:'x',
+      resolvedProduct:{name:'Kuscheldecke',productVerifiedName:'Kuscheldecke',productVerifiedAt:new Date().toISOString(),sourceUrl:'https://www.amazon.de/dp/B000000001',affiliateUrl:'https://www.amazon.de/dp/B000000001?tag=alltaeglichle-21',price:'',targetGroup:'',benefits:'',notes:''}}]}),
+      runContentJob:async(opportunity,options)=>({id:options.id,status:'awaiting_approval',opportunity,events:[],content:{format:'image',caption:'Text'},marketing:{primary:'Reel'},modelCalls:0,totalTokens:0,revisions:0,mode:'reference'})},
+    '@/lib/memory/db':{getDatabase:()=>({query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))})},
+    '@/lib/whatsapp/client':{WhatsAppRejectedError:Error,sendWhatsAppText:async()=>{throw Error('unexpected');},dailyNotificationTemplateConfigured:()=>false,sendDailyNotificationTemplate:async()=>{throw Error('unexpected');}},
+  });
+  const result=await gated.createDailyDraft('2026-09-30','afternoon');
+  assert.equal(result.status,'needs_input');assert.equal(result.reason,'publication_gate_failed');
+  const row=(await pg.query("SELECT scout_report->>'reason' AS reason,scout_report->>'detail' AS detail FROM daily_drafts")).rows[0];
+  assert.equal(row.reason,'publication_gate_failed');assert.ok(row.detail&&row.detail.length>5);
+  const text=await latestImagePostsStatus({query:(q,v)=>pg.query(q,v)});
+  assert.match(text,/needs_input \(Entwurf nicht freigabefähig: /);
+  assert.equal(state.messages.length,0);
+});

@@ -4,7 +4,7 @@ import { ensureAutomationSchema } from "../memory/ensure-automation-schema";
 export async function latestImagePostsStatus(db: Database) {
   await ensureAutomationSchema(db);
   const result = await db.query(`SELECT d.day::text AS day, d.slot, d.status,
-      d.scout_report->>'reason' AS reason,
+      d.scout_report->>'reason' AS reason, d.scout_report->>'detail' AS detail,
       j.snapshot->'opportunity'->'product'->>'name' AS product,
       j.snapshot->'review'->>'passed' AS review_passed,
       j.snapshot->'review'->'issues'->>0 AS review_issue,
@@ -23,6 +23,12 @@ export async function latestImagePostsStatus(db: Database) {
       amazon_identity_missing: "Amazon-Seite ohne eindeutigen ASIN-Nachweis",
       product_unresolved: "keine verifizierte Produktseite gefunden",
       product_repeat_blocked: "Produkt in den letzten sieben Tagen verwendet",
+      publication_gate_failed: `Entwurf nicht freigabefähig: ${String(row.detail || "Prüfung fehlgeschlagen").replace(/\s+/g, " ").slice(0, 120)}`,
+      missing_caption: "Beitragstext fehlt",
+      editorial_rate_limited: "Redaktionsmodell ausgelastet",
+      editorial_model_failed: "Redaktionsmodell nicht erreichbar",
+      content_review_failed: `redaktionelle Prüfung: ${String(row.detail || "nicht bestanden").replace(/\s+/g, " ").slice(0, 120)}`,
+      planning_failed: "Content-Planung nicht abgeschlossen",
     } as Record<string, string>)[String(row.reason || "")];
     const reviewIssue = String(row.review_issue || "").replace(/\s+/g, " ").slice(0, 160);
     const reason = state === "needs_input" ? knownReason

@@ -261,8 +261,9 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
       loadCorrections:async()=>corrections, loadLearning: value => repo.learn(value), onUpdate: value => repo.save(value) });
     const missingCaption = job.content?.format === "image" && !job.content.caption.trim();
     // Do not seek an approval for a plan that the later Facebook gate rejects.
-    const publishablePlan = !missingCaption && job.status === "awaiting_approval" && job.content?.format === "image"
-      && !facebookPagePublicationError({ ...job, status: "approved" });
+    const gateError = !missingCaption && job.status === "awaiting_approval" && job.content?.format === "image"
+      ? facebookPagePublicationError({ ...job, status: "approved" }) : null;
+    const publishablePlan = !missingCaption && job.status === "awaiting_approval" && job.content?.format === "image" && !gateError;
     const status = publishablePlan ? "awaiting_approval" : "needs_input";
     await db.query("UPDATE daily_drafts SET status=$2,updated_at=now() WHERE job_id=$1", [jobId, status]);
     if (status !== "awaiting_approval") await releaseProduct(db,jobId);
@@ -273,10 +274,17 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
       return { status, jobId, whatsapp: await deliverDailyApproval(db, jobId) };
     }
     const reason = missingCaption ? "missing_caption" as const
+      : gateError ? "publication_gate_failed" as const
       : job.error === EDITORIAL_RATE_LIMIT_ERROR ? "editorial_rate_limited" as const
       : job.error === EDITORIAL_MODEL_ERROR ? "editorial_model_failed" as const
       : job.error === "product_unresolved" ? "product_unresolved" as const
       : job.review && !job.review.passed ? "content_review_failed" as const : "planning_failed" as const;
+    // Persist why the slot stopped; without it Status cannot explain an empty needs_input.
+    const detail = reason === "publication_gate_failed" ? String(gateError).slice(0, 200)
+      : reason === "content_review_failed" ? job.review?.issues[0]?.slice(0, 200) : undefined;
+    await db.query("UPDATE daily_drafts SET scout_report=jsonb_set(coalesce(scout_report,'{}'::jsonb),'{reason}',to_jsonb($2::text)) || jsonb_build_object('detail',$3::text),updated_at=now() WHERE job_id=$1",
+      [jobId, reason, detail ?? null]);
+    console.info(JSON.stringify({ event: "daily_draft_needs_input", jobId, reason }));
     return { status, jobId, reason, reviewIssues: reason === "content_review_failed"
       ? job.review?.issues.slice(0, 3).map(issue => issue.slice(0, 180)) : undefined };
   } catch (error) {
