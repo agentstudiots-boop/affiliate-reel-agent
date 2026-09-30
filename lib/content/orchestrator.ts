@@ -12,6 +12,7 @@ import { evaluateImageCreativeQuality } from "./creative-quality";
 import { VISUAL_FUNCTION_RULE } from "./visual-coherence";
 import { createGenerator } from "./model";
 import { contentSchema, opportunitySchema, reviewSchema, type AgentName, type Content, type ContentJob, type Decision, type Idea, type JobEvent, type JobStatus, type Opportunity, type Review } from "./schema";
+import { bathtubMatIssues } from "./bathtub-mat";
 import type { Generator, ApprovedEditorialCorrection } from "./agent";
 
 export const MAX_REVISIONS = 2;
@@ -31,7 +32,7 @@ export async function reviseApprovedVideo(job: ContentJob, feedback: string, int
   }
   requireProduct(job.opportunity.product, JSON.stringify(draft));
   const review = inspectContent(draft, job.decision, job.opportunity.targetPlatform);
-  review.issues.push(...pumpkinCreativeIssues(job.opportunity, draft));
+  review.issues.push(...pumpkinCreativeIssues(job.opportunity, draft), ...bathtubMatIssues(job.opportunity, draft));
   if (review.issues.length) { review.passed = false; review.score = Math.min(40, review.score); }
   if (!review.passed) throw new Error(`Überarbeitung verletzt redaktionelle Prüfung: ${review.issues.join(" ")}`);
   const next = structuredClone(job);
@@ -62,6 +63,8 @@ export async function reviseApprovedStaticContent(job: ContentJob, feedback: str
     createGenerator({ mode: job.mode }),
   ));
   const review = inspectContent(draft, job.decision);
+  review.issues.push(...bathtubMatIssues(job.opportunity, draft));
+  if (review.issues.length) review.passed = false;
   if (!review.passed) throw new Error(`Überarbeitung verletzt redaktionelle Prüfung: ${review.issues.join(" ")}`);
   const next = structuredClone(job);
   next.revisions++;
@@ -181,7 +184,7 @@ export async function runContentJob(raw: Opportunity, options: {
       job.content = contentSchema.parse(await producers[job.decision.format]({ opportunity, idea, inspiration, corrections, feedback: job.review, previous: job.content }, generate));
       await status("reviewing", "Orchestrator prüft Anwendung, Glaubwürdigkeit und Umsetzbarkeit");
       const structural = inspectContent(job.content, job.decision, opportunity.targetPlatform);
-      structural.issues.push(...pumpkinCreativeIssues(opportunity, job.content));
+      structural.issues.push(...pumpkinCreativeIssues(opportunity, job.content), ...bathtubMatIssues(opportunity, job.content));
       if (structural.issues.length) { structural.passed = false; structural.score = Math.min(40, structural.score); }
       const semantic = job.mode === "ai" ? await generate("orchestrator", `Prüfe redaktionell streng: konkrete Alltagssituation, überzeugender Nutzen, Hook, glaubwürdige Aussagen, Modellnachweise, korrektes Zubehör, verständliche Geschichte, sprechbare Länge, Linkziel und CTA. Prüfe die geplante Szene auch auf sachlich falsche Werkzeugnutzung: ${VISUAL_FUNCTION_RULE} Bei einem solchen Widerspruch passed=false und eine konkrete Korrektur verlangen. Bestätigte Korrekturen als Beispiele für übertragbare Regeln auswerten, nicht als alte Produktfakten kopieren. Unbelegte konkrete Modellbehauptungen oder erfundene Erfahrungen führen zu passed=false. Keine Pflicht zu künstlichen Zusatznutzen. Das Feld issues enthält ausschließlich tatsächliche Mängel mit konkreter Reparaturanweisung, niemals Lob, erfüllte Kriterien oder eine Zusammenfassung der Stärken. Wenn keine Mängel vorliegen, gib issues=[] und passed=true bei score mindestens 75 zurück. Wenn passed=false, benenne mindestens einen echten Mangel und begründe den Score.`, { opportunity, inspiration, idea, corrections, content: job.content }, reviewSchema, () => structural) : structural;
       job.review = { passed: structural.passed && semantic.passed && semantic.score >= 75 && semantic.issues.length === 0,
@@ -203,7 +206,7 @@ export async function runContentJob(raw: Opportunity, options: {
         const alternative = contentSchema.parse(await imageAgent(
           { opportunity, idea: alternativeIdea, inspiration, corrections }, reference));
         const review = inspectContent(alternative, alternativeDecision, opportunity.targetPlatform);
-        review.issues.push(...pumpkinCreativeIssues(opportunity, alternative));
+        review.issues.push(...pumpkinCreativeIssues(opportunity, alternative), ...bathtubMatIssues(opportunity, alternative));
         if (review.issues.length) { review.passed = false; review.score = Math.min(40, review.score); }
         requireProduct(opportunity.product, JSON.stringify(alternative));
         if (review.passed) {
@@ -230,7 +233,7 @@ export async function runContentJob(raw: Opportunity, options: {
     await status("marketing", "Geprüften Entwurf an Marketing übergeben");
     job.marketing = await marketingAgent({ opportunity, content: job.content! }, job.mode === "reference" && job.modelCalls > 0
       ? createGenerator({ mode: "reference", signal: options.signal }) : generate);
-    const thematicIssues = pumpkinCreativeIssues(opportunity, job.content!, job.marketing);
+    const thematicIssues = [...pumpkinCreativeIssues(opportunity, job.content!, job.marketing), ...bathtubMatIssues(opportunity, job.content!)];
     if (thematicIssues.length) { job.review = { passed: false, score: 40, issues: thematicIssues }; await status("needs_input", thematicIssues.join(" ")); return job; }
     const platform = job.marketing.primary;
     const compatible = job.content!.format === "video" ? ["Instagram Reel", "Facebook Video"].includes(platform)

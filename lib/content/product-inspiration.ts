@@ -1,4 +1,5 @@
 import type { Opportunity } from "./schema";
+import { bathtubMatUseCase, isBathtubMat } from "./bathtub-mat";
 
 export type ProductSourceKind = "product" | "search" | "category" | "unknown";
 
@@ -25,6 +26,16 @@ function classifySource(url: URL): ProductSourceKind {
 
 function preset(name: string, useCase: string, category: Opportunity["category"]) {
   const value = `${name} ${useCase}`.toLocaleLowerCase("de-DE");
+  if (isBathtubMat(name)) return {
+    categoryLabel: "Badewannenmatte",
+    visualDirections: [
+      "Eine neutrale Badewannenmatte liegt sichtbar innerhalb einer leeren Badewanne; Material und Sicherheitswirkung des konkreten Modells werden nicht behauptet.",
+      "Die Lage einer neutralen Badewannenmatte in einer Badewanne veranschaulichen; keine unbelegten Details des konkreten Modells nachbilden.",
+      "Maße, Eignung für den Untergrund und Pflege als Fragen anhand der Herstellerhinweise einordnen.",
+    ],
+    purchaseCriteria: ["Maße", "Eignung für die eigene Badewanne laut Hersteller", "Pflegehinweise"],
+    useCases: [bathtubMatUseCase, "Vorgesehene Anwendung in der Badewanne prüfen", "Herstellerhinweise zur Eignung vergleichen"],
+  };
   if (/kürbis.*schnitz|schnitz.*kürbis/i.test(name)) {
     return {
       categoryLabel: "Kürbisschnitzwerkzeuge",

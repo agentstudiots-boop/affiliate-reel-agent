@@ -17,6 +17,7 @@ import { EDITORIAL_MODEL_ERROR, EDITORIAL_RATE_LIMIT_ERROR } from "@/lib/content
 import { createHash } from "node:crypto";
 import { releaseProduct, reserveProduct } from "@/lib/daily/product-lock";
 import { facebookCaption } from "@/lib/meta/facebook-caption";
+import { bathtubMatUseCase, isBathtubMat } from "@/lib/content/bathtub-mat";
 
 async function resolveRequestedProduct(value: string) {
   const asin = /^(?:[A-Z0-9]{10})$/.test(value) ? value : value.match(/^https:\/\/(?:www\.)?amazon\.de\/dp\/([A-Z0-9]{10})\/?$/)?.[1];
@@ -146,7 +147,7 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
     const opportunity: Opportunity = {
       product: selectedProduct,
       category: isPumpkinCarvingProduct(requestedProduct?.name || candidate?.resolvedProduct?.name || candidate?.name || "") || candidate?.category === "Wohnen" ? "home_living" : "household", useCaseKey: "seasonal-product-guide", targetPlatform: "facebook",
-      useCase: candidate?.reelIdea?.trim() || `Das Produkt ${selectedProduct.name} im Alltag verwenden und die Eignung vor dem Kauf prüfen.`, trend: candidate?.whyNow || "", goal: "education", budget: "low", verifiedFacts: [],
+      useCase: isBathtubMat(selectedProduct.name) ? bathtubMatUseCase : candidate?.reelIdea?.trim() || `Das Produkt ${selectedProduct.name} im Alltag verwenden und die Eignung vor dem Kauf prüfen.`, trend: candidate?.whyNow || "", goal: "education", budget: "low", verifiedFacts: [],
     };
     stage = "content_planning";
     const repo = memoryRepository(db);

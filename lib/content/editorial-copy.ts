@@ -1,5 +1,6 @@
 import type { Brief } from "./agent";
 import { isPumpkinCarvingProduct } from "./category";
+import { isBathtubMat } from "./bathtub-mat";
 
 // Reference mode has no language model. These sentences are deliberately grounded
 // in the category and the supplied situation, without claiming first-hand use.
@@ -59,6 +60,13 @@ export function readerCopy(brief: Brief) {
     advice: "Wenn du dafür ein Schnitzset suchst, prüfe Lieferumfang und Hinweise zur Handhabung auf der Produktseite. Das Schneiden übernimmt eine erwachsene Person.",
     question: "Welches Gesicht würdest du deiner Kürbislaterne geben?",
     spoken: ["Ein Kürbis, eine Idee für ein Gesicht.", "Augen und Mund zeichnet ihr zuerst auf.", "Das Schnitzen übernimmt eine erwachsene Person."],
+    link, disclosure,
+  };
+  if (isBathtubMat(opportunity.product.name)) return {
+    intro: "Eine Matte für die Badewanne? Entscheidend ist, ob sie zu deiner Wanne und der vorgesehenen Anwendung passt.",
+    advice: "Prüfe Maße, Eignung für den Untergrund und Pflegehinweise des Herstellers. Ein bestimmter Halt oder mehr Sicherheit ist damit noch nicht belegt.",
+    question: "Welche Maße und welchen Untergrund hat deine Badewanne?",
+    spoken: ["Eine Matte für die Badewanne?", "Passt sie zu deiner Wanne?", "Prüfe Maße und Herstellerhinweise."],
     link, disclosure,
   };
   if (category === "home_living") return {

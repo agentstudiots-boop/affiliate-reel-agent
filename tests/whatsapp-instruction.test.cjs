@@ -14,6 +14,7 @@ const {runContentJob,reviseOperatorInstruction}=require('../.test-build/lib/cont
 const {visualContextError,visualFingerprint}=require('../.test-build/lib/content/visual-context');
 const {buildOriginalVisualPrompt}=require('../.test-build/lib/content/providers/openai-image');
 const {opportunitySchema}=require('../.test-build/lib/content/schema');
+const {bathtubMatIssues}=require('../.test-build/lib/content/bathtub-mat');
 const {applyMigrations}=require('../.test-build/lib/memory/migrations');
 const {memoryRepository}=require('../.test-build/lib/memory/repository');
 const {publicationRepository}=require('../.test-build/lib/meta/publication-gate');
@@ -50,6 +51,39 @@ async function fixture(t,{asset=false}={}){
   return{pg,db,id,job,memory,publication,oldPublication,process:handle,sends,approvals,snapshot};
 }
 
+test('quoted correction of a bathtub mat replaces the wrong shower scene and resends content approval',async t=>{
+  const f=await fixture(t);
+  const old=await f.snapshot();
+  const name='Rutschfeste Badematte, weich gesteppte Badewannenmatte';
+  old.opportunity.product={...old.opportunity.product,name,productVerifiedName:name,productVerifiedAt:new Date().toISOString(),
+    asin:'B0C2C739KY',sourceUrl:'https://www.amazon.de/dp/B0C2C739KY',
+    productUrl:'https://www.amazon.de/dp/B0C2C739KY',trackingId:'alltaeglichle-21',
+    affiliateUrl:'https://www.amazon.de/dp/B0C2C739KY?tag=alltaeglichle-21'};
+  const bath=await runContentJob({...old.opportunity,useCase:'Eine Badewannenmatte innerhalb der Badewanne zeigen und Herstellerhinweise prüfen.'},{allowedFormats:['image']});
+  assert.equal(bath.status,'awaiting_approval',`${bath.error||''} ${bath.review?.issues.join('; ')||''}`);
+  old.content=bath.content;old.ideas=bath.ideas;old.decision=bath.decision;old.marketing=bath.marketing;
+  old.opportunity.useCase='Die Badematte vor die Dusche legen.';
+  old.content.visualConcept.mainIdea+=' Die Matte liegt vor der Dusche.';
+  old.content.slides[0].visual+=' Die Matte liegt vor der Dusche.';
+  old.content.slides[0].prompt+=' Die Matte liegt vor der Dusche.';
+  old.content.caption='Werbung | Die Badematte vor der Dusche zeigen. Bei einem Kauf über den Affiliate-Link kann ich eine Provision erhalten.';
+  await f.db.query('UPDATE content_jobs SET snapshot=$2,opportunity=$3 WHERE id=$1',[f.id,JSON.stringify(old),JSON.stringify(old.opportunity)]);
+  const handled=await f.process(message('bath-correction','Das ist aber eine Badematte für in die Badewanne'),interpretInstruction);
+  assert.equal(handled,true);
+  const next=await f.snapshot();
+  assert.equal(next.status,'awaiting_approval');
+  assert.equal(bathtubMatIssues(next.opportunity,next.content).length,0);
+  assert.equal(f.approvals.length,1);
+  assert.equal(f.approvals[0],f.id);
+  assert.equal(f.sends.length,0);
+  assert.match(next.content.caption,/Badewanne/);
+  assert.equal(next.opportunity.product.asin,'B0C2C739KY');
+  assert.equal(next.opportunity.product.affiliateUrl,'https://www.amazon.de/dp/B0C2C739KY?tag=alltaeglichle-21');
+  const row=await f.db.query("SELECT status,whatsapp_message_id FROM daily_drafts WHERE job_id=$1",[f.id]);
+  assert.equal(row.rows[0].status,'awaiting_approval');
+  assert.equal(row.rows[0].whatsapp_message_id,null);
+});
+
 for(const [body,intent] of [
   ['Mach ein neues Bild mit Halloween-Kürbissen','revise_image'],
   ['neues passendes Bild','revise_image'],
@@ -67,6 +101,7 @@ for(const [body,intent] of [
     calls++;assert.equal(url,`https://api.replicate.com/v1/models/${INSTRUCTION_MODEL}/predictions`);
     const request=JSON.parse(init.body);assert.equal(request.input.max_completion_tokens,1200);assert.equal(request.tools,undefined);
     assert.match(request.input.system_prompt,/additionalProperties/);
+    assert.match(request.input.system_prompt,/falschen Einsatzort.*revise_both/);
     assert.equal(request.input.reasoning_effort,'none');assert.equal(request.input.verbosity,'low');
     assert.equal(request.input.temperature,undefined);
     const input=JSON.parse(request.input.prompt);assert.equal(input.operator_message,body);assert.equal(input.context.content_id,job.id);

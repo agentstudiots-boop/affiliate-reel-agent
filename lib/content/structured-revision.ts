@@ -3,6 +3,7 @@ import type {Instruction} from "../whatsapp/instruction";
 import {requireJobProduct} from "./product-contract";
 import {visualContextError} from "./visual-context";
 import {isPumpkinCarvingProduct} from "./category";
+import {isBathtubMat} from "./bathtub-mat";
 
 // Pure revision: no providers, publications, URLs or mutable product identity.
 export function reviseStructured(job:ContentJob, instruction:Instruction):ContentJob {
@@ -22,6 +23,7 @@ export function reviseStructured(job:ContentJob, instruction:Instruction):Conten
     content.visualConcept={...content.visualConcept!,kind:"application",mainIdea:scene,everydaySituation:scene,
       productRelation:`Anwendung von ${job.opportunity.product.name}, ASIN ${job.opportunity.product.asin}.`};
     content.useCase=scene;
+    if(isBathtubMat(job.opportunity.product.name))content.productIntegration="Die Badewannenmatte wird innerhalb der Badewanne gezeigt; Eignung und Herstellerhinweise bleiben zu prüfen.";
     content.slides=[{headline:content.hook,copy:"Anwendung und Herstellerhinweise vor dem Kauf prüfen.",
       visual:scene,prompt:`Originelles redaktionelles Lifestyle-Foto im Hochformat 4:5: ${scene}. Keine Logos oder erfundenen Modellmerkmale.`,alt:scene}];
   }
@@ -38,6 +40,10 @@ export function reviseStructured(job:ContentJob, instruction:Instruction):Conten
       content.caption=instruction.proposed_caption?.trim() || `Werbung | ${content.hook} ${pumpkin
         ? "Erst ein Gesicht aufzeichnen, dann den Kürbis aushöhlen und Augen und Mund ausschneiden. Das Schneiden übernimmt eine erwachsene Person. Prüfe Lieferumfang und Hinweise zur Handhabung auf der Produktseite."
         : "Schau dir die vorgesehene Anwendung und die Herstellerhinweise an. Details stehen auf der verlinkten Produktseite."} Bei einem Kauf über den Affiliate-Link kann ich eine Provision erhalten.`;
+      if(instruction.intent!=="revise_text") {
+        content.title=content.hook;
+        if(content.slides[0])content.slides[0].headline=content.hook;
+      }
     }
   }
   if(JSON.stringify(content)===JSON.stringify(job.content))throw Error("revision_unchanged");
