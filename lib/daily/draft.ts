@@ -101,7 +101,7 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
 
   let stage = "product_search";
   try {
-    const report = productQuery ? null : await runProductScout(productSearch);
+    const report = productQuery ? null : await runProductScout(productSearch,`${day}:${slot}`);
     // Prefer seasonal ideas, then already researched evergreen candidates.
     // Neither category becomes affiliate content without exact product resolution.
     const openSearch = slot.startsWith("manual:") && !productQuery && !productSearch;
