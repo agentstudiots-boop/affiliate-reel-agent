@@ -31,7 +31,8 @@ const stage = (item: OpenItem) => item.stage === "content_approval" ? "Inhaltsfr
 export function systemFacts(context: RouteContext) {
   const open = context.open_items.map(item => `- „${item.product}“${item.asin ? ` (ASIN ${item.asin})` : ""}: wartet seit ${time(item.waiting_since)} Uhr auf die ${stage(item)}`).join("\n") || "- nichts offen";
   const recent = context.recent_products.slice(0, 10).map(item => `- ${item.product}${item.asin ? ` (${item.asin})` : ""}: ${item.state}`).join("\n") || "- keine";
-  return `Offene Freigaben:\n${open}\nProdukte der letzten 7 Tage:\n${recent}\nProdukte dürfen innerhalb von 7 Tagen nicht erneut automatisch vorgeschlagen werden; abgelehnte oder ersetzte Produkte bleiben ebenfalls gesperrt.`;
+  const focus = context.focus ? `Besprochenes Produkt (${context.focus.source}): „${context.focus.product}“${context.focus.asin ? ` (ASIN ${context.focus.asin})` : ""}, Zustand: ${context.focus.state}.\nAuswahlgrund: ${context.focus.selection_basis.join(" ")}\nIm Plan vorgesehene Anwendung: ${context.focus.use_case_in_plan || "–"}\nBelegte Produktdaten: ${context.focus.verified_product_data.join("; ")}\n${context.focus.data_limits}\n` : "";
+  return `${focus}Offene Freigaben:\n${open}\nProdukte der letzten 7 Tage:\n${recent}\nProdukte dürfen innerhalb von 7 Tagen nicht erneut automatisch vorgeschlagen werden; abgelehnte oder ersetzte Produkte bleiben ebenfalls gesperrt.`;
 }
 
 export function statusText(context: RouteContext) {
@@ -100,6 +101,10 @@ export async function routeOperatorMessage(input: Message, deps: RouterDeps): Pr
   const { item, ambiguous } = target(route, context);
   const base = { raw_message: input.body.slice(0, 300), normalized_message: input.body.trim().replace(/\s+/g, " ").slice(0, 300), wa_message_id: input.id,
     active_content_id: item?.draft_id ?? null, active_state: item?.stage ?? (context.open_items.length ? "multiple_open" : "idle"),
+    inbound_message_id: input.id, reply_to_message_id: input.replyToMessageId, resolved_job_id: context.focus?.draft_id ?? item?.draft_id ?? null,
+    resolved_content_id: context.focus?.draft_id ?? item?.draft_id ?? null, resolved_product_name: context.focus?.product ?? item?.product ?? null,
+    asin: context.focus?.asin ?? item?.asin ?? null, focus_source: context.focus?.source ?? null, candidate_job_ids: context.candidate_job_ids,
+    context_fields_supplied: ["open_items", "recent_messages", "recent_products", "recent_instructions", ...(context.focus ? ["focus"] : [])],
     open_items: context.open_items.length, intent: route.intent, search_query: route.search_query, reject_current: route.reject_current,
     confidence: route.confidence, ambiguity: route.ambiguity };
 
@@ -141,10 +146,16 @@ export async function routeOperatorMessage(input: Message, deps: RouterDeps): Pr
     case "clarify":
       log({ ...base, action: "clarify" });
       return reply(route.clarification_question?.trim() || whichQuestion(context), "clarified");
-    default: // question | chitchat
-      log({ ...base, action: "converse", pipeline: "conversation" });
+    default: { // question | chitchat: answered in the same model call from the supplied facts, never starts a pipeline
+      const answer = route.answer?.trim();
+      if (answer && answer.length >= 10) {
+        log({ ...base, action: "answer_inline", answer_status: "answered_inline" });
+        return reply(answer.slice(0, 1500), "answered");
+      }
+      log({ ...base, action: "converse", pipeline: "conversation", answer_status: "fallback_chat", abort_reason: "no_inline_answer" });
       await mark("converse");
       await deps.converse(input, systemFacts(context));
       return { handled: true };
+    }
   }
 }

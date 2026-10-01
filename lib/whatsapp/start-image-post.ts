@@ -113,6 +113,8 @@ export async function startImagePostFromWhatsApp(input: IncomingWhatsAppMessage 
         ? "Amazon hat die automatische Prüfung der Produktseite blockiert. Der Artikel bleibt ungeprüft und es wird kein Content produziert."
       : result.reason === "product_repeat_blocked"
         ? "Dieses Produkt oder seine Produktfamilie ist bereits in einem offenen Entwurf oder wurde innerhalb der letzten sieben Tage verwendet. Bitte wähle eine andere Produktart."
+      : result.reason === "product_data_uncertain"
+        ? "Die Produktdaten dieses Artikels belegen die geplanten Aussagen nicht. Ich rate nicht und erzeuge keine Freigabe. Nenne ein anderes Produkt oder sende den Amazon-Link eines genauer passenden Artikels."
       : result.reason === "missing_caption"
         ? "Der Beitragstext fehlt. Die Inhaltsfreigabe wurde nicht versendet; bitte den Entwurf prüfen."
       : result.reason === "editorial_rate_limited"
@@ -148,6 +150,7 @@ export async function startProductSearch(input: IncomingWhatsAppMessage & { payl
     const reason = result.reason === "product_unresolved" ? "Ich konnte dazu keine passende, sicher geprüfte Amazon-Produktseite finden. Nenne bitte eine genauere Produktart oder sende einen Amazon-Link."
       : result.reason === "product_repeat_blocked" ? "Dieses Produkt oder seine Produktfamilie wurde in den letzten sieben Tagen schon verwendet oder gerade abgelehnt."
       : result.reason === "amazon_verification_blocked" ? "Amazon hat die automatische Prüfung blockiert."
+      : result.reason === "product_data_uncertain" ? "Die Produktdaten dieses Artikels belegen die geplanten Aussagen nicht; ich rate nicht und erzeuge keine Freigabe. Nenne ein anderes Produkt oder sende den Amazon-Link eines genauer passenden Artikels."
       : "Die Planung konnte nicht abgeschlossen werden. Schreibe „Status“ für den Grund.";
     await send(`Suche${search ? ` nach „${search}“` : ""}: ${reason} Nichts veröffentlicht.`);
   } else if (result.status === "awaiting_approval" && result.whatsapp !== "approval_sent") {

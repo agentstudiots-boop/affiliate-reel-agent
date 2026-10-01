@@ -83,3 +83,35 @@ Prüfung danach: „Status“ (Grund/Stand) und Log-Ereignisse `whatsapp_route` 
 - Nicht-Text-Nachrichten (Sprache, Bild, Buttons) werden vom Webhook ignoriert.
 - „Ähnlich, aber günstiger“: Preise sind nicht belegt; es wird nach Produktart gesucht und das offen gesagt.
 - Mehrere offene Entwürfe: Rückfrage statt Raten; ist der Verlauf mehrdeutig, bleibt es bei einer Rückfrage.
+
+## Nachtrag 01.10.2026, 19:35 (produktiver Verlauf): Fragepfad und Produktdaten
+
+**Beobachtet:** „was gerade offen“ → deterministische Router-Antwort (funktioniert). „Warum hast du eigentlich dieses Produkt ausgewählt?“ und die
+Folgefrage → „Ich konnte gerade keine sichere Antwort formulieren …“. Logs waren nicht lesbar; die Analyse folgt dem Code.
+
+**Ursache Fragepfad (Code-Befund, Logbeleg fehlt):**
+1. Zwei bezahlte Modell-POSTs je Frage (Router, dann Chat) kurz hintereinander; der Chat-Pfad hatte keine Behandlung für HTTP 429 (der
+   Replicate-Zugang ist laut `model.ts` gedrosselt: Mindestabstand 11 s) und loggte keinen Fehlergrund. Jeder Fehler endete in derselben Fallback-Antwort.
+2. Selbst bei Erfolg fehlte dem Chat die Antwortgrundlage: Der Kontext kannte nur *offene* Entwürfe; das Produkt war nach dem früheren Wechsel
+   gestoppt, also ohne Fokus. Auswahlgrund (Trendscout/Suchbegriff), Produktdaten und deren Grenzen standen nicht im Kontext.
+Der Abbruch lag im Chat-Executor (Modellaufruf), nicht im Validator oder Kontextaufbau des Routers; der Router erkannte die Absicht (`question`).
+
+**Fixes:** `context.focus` (zitierte Freigabenachricht → einziger offener Entwurf → zuletzt bearbeitetes Produkt der letzten 6 h; bei mehreren
+offenen Entwürfen ohne Zitat **kein** Fokus, stattdessen Rückfrage) mit Produkt, ASIN, Zustand, Auswahlgrund, Anwendung im Plan, belegten Produktdaten,
+Datengrenzen. Fragen werden im selben Modellaufruf beantwortet (`answer`); fehlt sie, greift der Chat mit denselben Fakten. HTTP 429 wird einmal nach der
+genannten Wartezeit wiederholt (sicher, da vor der Inferenz abgelehnt), Fehlergrund wird geloggt (`whatsapp_chat_unavailable.reason`, `router_http_429`).
+Logging je Nachricht: inbound_message_id, reply_to_message_id, resolved_job_id/content_id, resolved_product_name, asin, candidate_job_ids, focus_source,
+intent, confidence, context_fields_supplied, answer_status, abort_reason (ohne Secrets). Produktnamen werden entschlüsselt/normalisiert und an Wortgrenzen gekürzt.
+
+**Ursache falsche Produktbeschreibung (Befund):** Keine Vermischung von Snapshots und kein falscher Snapshot belegt. `opportunity.useCase` kam aus der
+Trendscout-Idee (`candidate.reelIdea`, Kategorieebene: „Silikon-Backmatte“ → Teig ausrollen/Arbeitsfläche) und wurde ungeprüft auf das konkret gefundene
+Amazon-Angebot angewandt; `verifiedFacts` war leer, gespeichert sind nur Titel/ASIN. Der Titel beschreibt eine Backofen-/Knusper-Matte mit Noppen, nicht eine
+Ausroll-Unterlage. Die Auflösung prüft zudem nur, ob irgendein Wort ≥4 Buchstaben im Live-Titel vorkommt – eine Kategorie-Verwechslung ist so möglich.
+Antwort auf „Fehlerhafte Daten oder Halluzination?“: **keine falschen Datenbankdaten, sondern eine nicht belegte Anwendung (Kategorie-Idee), die der Content als Tatsache ausformulierte.**
+Ob Textmodell oder Vorlage die Formulierung „Teig ausrollen“ lieferte, ist ohne den Datensatz nicht belegt.
+
+**Harte Regel (neu):** `lib/content/claim-support.ts`: Funktionen/Eigenschaften (Teig ausrollen, Spülmaschine, Mikrowelle, Gefrieren, Grill, Heißluftfritteuse,
+lebensmittelecht/BPA-frei, Antihaft, Hitzebeständigkeit, wiederverwendbar, leicht zu reinigen, knusprig) und Zahlen mit Einheit müssen im Titel oder in `verifiedFacts`
+stehen. Wirkung: Scout-Idee wird bei Lücken verworfen (neutraler Anwendungstext), fertiger Plan mit unbelegter Aussage → `needs_input`/`product_data_uncertain`, keine
+Inhaltsfreigabe, WhatsApp-Rückmeldung; zusätzlich blockiert das Veröffentlichungstor ältere Entwürfe mit unbelegten Aussagen. Grenze: Mustergestützt (Liste oben);
+neue Funktionsaussagen außerhalb der Liste werden nicht erkannt und bräuchten weitere Regeln oder echte Produktdaten (Bulletpoints/Beschreibung werden nicht gespeichert).
