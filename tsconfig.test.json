@@ -22,6 +22,7 @@
     "lib/content/**/*.ts",
     "lib/product-resolver.ts",
     "lib/daily/product-lock.ts",
+    "lib/daily/slots.ts",
     "lib/memory/**/*.ts",
     "lib/meta/**/*.ts",
     "lib/production/**/*.ts",

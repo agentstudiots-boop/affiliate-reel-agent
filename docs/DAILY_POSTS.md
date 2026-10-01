@@ -684,3 +684,12 @@ verifizierten Einzelprodukte. Natürliche Änderungswünsche für Bild-/Textbeit
 werden gespeichert, führen zu einer neuen redaktionellen Revision und sperren
 die alte Freigabe. Instagram erfordert einen separaten
 Container-/Publish-Ablauf und eigene Prüfung der externen Bild-URL.
+
+## Slot-Fenster statt fester Uhrzeit (Stabilisierung)
+
+- Ein Slot ist ein lokales Berliner Zeitfenster (`lib/daily/slots.ts`): **Morgen 09:00–13:59**, **Nachmittag 18:00–22:59**. Tag und Slot werden aus *einem* Zeitpunkt abgeleitet; Cron-Minute und Verspätung spielen keine Rolle.
+- Cron (`vercel.json`): 07, 08, 09, 16, 17, 18 UTC. In CEST liegen 07/08/09 UTC bzw. 16/17/18 UTC im Fenster; in CET jeweils zwei davon (08/09 bzw. 17/18). Es gibt also in jeder Jahreszeit mindestens zwei Aufrufe pro Slot (Test prüft jeden Tag des Jahres, Minuten :00/:01/:30/:59).
+- Eindeutigkeit: Primärschlüssel `(day, slot)` + atomarer Reclaim (`attempts<3`, nur `failed`/`needs_input`/veraltete Claims, nie nach zugestellter WhatsApp). Parallele oder wiederholte Aufrufe erzeugen weder zweiten Job noch zweite Freigabe.
+- Manuelle Aufträge („Artikelsuche …“, Produktlink, Bildpost) nutzen ausschließlich `manual:<hash>`-Slots und berühren `morning`/`afternoon` nie. Gemeinsam bleibt nur die Produktsperre (gleiche ASIN/Produktfamilie in offenem Entwurf oder 7 Tage), keine Slot-Sperre. Ein ausdrückliches „ersetze den offenen Entwurf“ lehnt den *zugestellten* Entwurf ab (wie „Ablehnen“); der Slot wird dadurch nicht erneut gestartet.
+- Logs je Aufruf: `daily_cron_invocation` (UTC, Zeitzone, lokaler Tag/Zeit, Slot), `daily_cron_outside_window`, `daily_cron_unauthorized`, `daily_slot_claim` (accepted/reclaimed/rejected, Zustand done/open/in_progress), `daily_slot_stage` (product_found, content_planning, draft_saved, whatsapp_send), `daily_slot_whatsapp` (Ergebnis, `slotCompleted`), `daily_draft_failed` (Schritt + bereinigte Ursache), `daily_slot_exhausted`.
+- Nicht prüfbar ohne Produktionslogs (Vercel-Logabfrage lieferte `ExceedsBillingLimitError`): welche Aufrufe in der Vergangenheit tatsächlich liefen.
