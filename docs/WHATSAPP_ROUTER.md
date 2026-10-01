@@ -115,3 +115,17 @@ lebensmittelecht/BPA-frei, Antihaft, Hitzebeständigkeit, wiederverwendbar, leic
 stehen. Wirkung: Scout-Idee wird bei Lücken verworfen (neutraler Anwendungstext), fertiger Plan mit unbelegter Aussage → `needs_input`/`product_data_uncertain`, keine
 Inhaltsfreigabe, WhatsApp-Rückmeldung; zusätzlich blockiert das Veröffentlichungstor ältere Entwürfe mit unbelegten Aussagen. Grenze: Mustergestützt (Liste oben);
 neue Funktionsaussagen außerhalb der Liste werden nicht erkannt und bräuchten weitere Regeln oder echte Produktdaten (Bulletpoints/Beschreibung werden nicht gespeichert).
+
+## Nachtrag 01.10.2026, 20:12–20:14: Bildänderung scheiterte mit HTTP 429 im Instruction-Parser
+
+Verlauf: „ich will ein anderes Bild mit halloween muffins“ (und die Folge-Nachricht als Antwort auf die Veröffentlichungsfreigabe) wurden vom Router
+richtig als `revise_image` (Confidence 0,99) dem richtigen Auftrag zugeordnet. Danach rief der bestehende Instruction-Parser **ein zweites Mal** das Modell
+auf (zwei bezahlte POSTs in wenigen Sekunden); der gedrosselte Replicate-Zugang antwortete mit HTTP 429, das als `parser_unavailable` (technischer Fehler,
+„Sprachmodell-Zugang funktioniert nicht“) endete. Es wurde nichts produziert oder veröffentlicht (Fail-safe unverändert).
+
+Fix: (1) **Kein zweiter Modellaufruf bei eindeutiger Lage:** Der Router liefert bei `revise_image` mit eindeutigem Auftrag, Confidence ≥ 0,9, präziser
+Bildanweisung (`image_instruction`, ≥ 8 Zeichen, keine Links) und ohne Mehrdeutigkeit eine fertige Anweisung, die durch dieselbe `validateInstruction`-Prüfung
+läuft (Produkt unverändert, `keep_content_id`, keine Veröffentlichung, Pflicht zur erneuten Freigabe) und an `processOperatorInstruction` übergeben wird.
+Textänderungen und unsichere Fälle nehmen weiter den geprüften Parser-Weg. (2) **Backoff bei 429:** bis zu zwei Wiederholungen nach der genannten Wartezeit
+(2–15 s, sicher, weil vor der Inferenz abgelehnt); danach der eigene Fehlercode `parser_rate_limited` mit ehrlicher WhatsApp-Meldung statt „Zugang
+funktioniert nicht“. Die inhaltliche Prüfung (z. B. Bildwunsch passt zum Produkt, `visual_context_mismatch`) bleibt aktiv.

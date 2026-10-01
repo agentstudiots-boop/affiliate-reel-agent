@@ -13,6 +13,7 @@ import { getDatabase } from "@/lib/memory/db";
 import { parseJob } from "@/lib/content/history";
 import { createDailyDraft, sendDailyApproval, sendPendingDailyApprovals } from "@/lib/daily/draft";
 import { routeOperatorMessage } from "@/lib/whatsapp/router";
+import type { Instruction } from "@/lib/whatsapp/instruction";
 import { startImagePostFromWhatsApp, startProductSearch } from "@/lib/whatsapp/start-image-post";
 import { answerWhatsAppConversation } from "@/lib/whatsapp/chat";
 import { sendWhatsAppText } from "@/lib/whatsapp/client";
@@ -89,6 +90,7 @@ export async function POST(request: Request) {
       }
       // Free language first: one bounded interpretation, then deterministic execution through the existing gates.
       let skipKeywordStages = false;
+      let routedInstruction: Instruction | undefined;
       if (process.env.WHATSAPP_ROUTER_ENABLED !== "false") {
         // The router must never block a message: any failure before it acts falls back to the keyword chain.
         const routed = await routeOperatorMessage({ ...message, payload }, {
@@ -101,6 +103,7 @@ export async function POST(request: Request) {
         if (routed.handled) continue;
         if (routed.message) { message = { ...message, body: routed.message.body, replyToMessageId: routed.message.replyToMessageId }; }
         skipKeywordStages = !!routed.skipKeywordStages;
+        routedInstruction = "instruction" in routed ? routed.instruction : undefined;
       }
       if (!skipKeywordStages && await startImagePostFromWhatsApp({ ...message, payload }, getDatabase, createDailyDraft, sendWhatsAppText)) continue;
       if (!skipKeywordStages && await answerWhatsAppConversation({ ...message, payload })) continue;
@@ -116,7 +119,7 @@ export async function POST(request: Request) {
           try{await sendWhatsAppText(`Der Inhalt ist freigegeben, aber der nächste Schritt ist noch blockiert: ${error instanceof Error?error.message:"Status unklar."} Es wurde nichts zusätzlich gekauft oder veröffentlicht. Antworte mit „Status“, nachdem der Zugang geprüft wurde.`);}catch{}
         }
       })) continue;
-      if (await processOperatorInstruction({ ...message, payload }, { sendApproval: sendDailyApproval })) continue;
+      if (await processOperatorInstruction({ ...message, payload }, { sendApproval: sendDailyApproval, ...(routedInstruction ? { interpret: async () => routedInstruction! } : {}) })) continue;
       const result = await repo.applyIncomingWhatsApp({ ...message, payload });
       if (result.handled && result.intent === "link_blocked") {
         await sendWhatsAppText("Die alte Inhaltsfreigabe ist gesperrt: Der Amazon-Produktlink ist nicht mehr sicher verifiziert. Es wurde kein Bild gekauft und nichts veröffentlicht. Sende „Artikelsuche“ für einen neuen geprüften Artikel.");

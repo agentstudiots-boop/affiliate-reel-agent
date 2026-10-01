@@ -145,10 +145,13 @@ test('provider failures stay technical errors with a single attempt',async t=>{
   const old=process.env.REPLICATE_API_TOKEN;process.env.REPLICATE_API_TOKEN='test-only';
   t.after(()=>{if(old===undefined)delete process.env.REPLICATE_API_TOKEN;else process.env.REPLICATE_API_TOKEN=old;});
   const job=await runContentJob(opportunity());
-  for(const response of [new Response('{}',{status:429}),Response.json({id:'prediction12345',status:'succeeded',output:['not json']})]){
+  for(const response of [Response.json({id:'prediction12345',status:'succeeded',output:['not json']})]){
     let calls=0;await assert.rejects(interpretInstruction('Mach ein Bild',job,async()=>{calls++;return response;}),/parser_unavailable/);
     assert.equal(calls,1);
   }
+  // HTTP 429 is rejected before inference: bounded waiting retries are safe and end as a rate-limit, not a broken credential.
+  let limited=0;await assert.rejects(interpretInstruction('Mach ein Bild',job,async()=>{limited++;return new Response('{}',{status:429});},[],async()=>{}),/parser_rate_limited/);
+  assert.equal(limited,3);
 });
 
 test('revision retains content identity, product, ASIN and affiliate; all stale image fields are replaced',async()=>{
@@ -447,4 +450,61 @@ test('unapplied-correction status explains the reason in plain language without 
   assert.match(clarifyStatusText('target_unresolved'),/keine Inhaltsfreigabe auf dich wartet/);
   assert.match(clarifyStatusText('target_unresolved'),/Artikelsuche/);
   assert.ok(!/Content Studio/.test(noOpenApprovalText));
+});
+
+// ---- Regression 01.10. 20:12: „ich will ein anderes Bild mit Halloween-Muffins“ → HTTP 429 im Parser ----
+test('the router understanding is final for a confident image change: no second model call, same safety gates',async t=>{
+  const {routedImageInstruction}=require('../.test-build/lib/whatsapp/router');
+  const base={intent:'revise_image',draft_id:null,search_query:null,reject_current:false,operator_note:null,answer:null,clarification_question:null,confidence:0.99,ambiguity:'none',
+    image_instruction:'Anderes Bild mit Halloween-Muffins und dezenter Halloween-Deko; das Grundkonzept des Bildes bleibt erhalten.'};
+  const body='mach ein anderes bild mit halloween muffins und dezenter halloween deko das grundkonzept des bildes ist hervorragend';
+  const ready=routedImageInstruction(base,body);
+  assert.equal(ready.intent,'revise_image');assert.equal(ready.keep_product,true);assert.equal(ready.keep_content_id,true);
+  assert.equal(ready.requires_new_generation,true);assert.equal(ready.requires_new_approval,true);assert.equal(ready.publish_requested,false);
+  // Not confident, ambiguous, no precise wish, a link, text change or approval: the existing parser path (second call) stays in charge.
+  for(const over of [{confidence:0.8},{ambiguity:'high'},{image_instruction:null},{image_instruction:'kurz'},{image_instruction:'Siehe https://evil.example/x'},{intent:'revise_text'},{intent:'revise_both'},{intent:'approve_attempt'}])
+    assert.equal(routedImageInstruction({...base,...over},body),undefined,JSON.stringify(over));
+  assert.equal(routedImageInstruction(base,'Freigeben'),undefined,'a literal approval is never turned into a revision');
+
+  // Real revision pipeline with the pre-built instruction: no HTTP, product and content id stay, nothing is published.
+  const f=await fixture(t);
+  const prepared=await f.snapshot();
+  const name='Halloween Kürbis Silikon Backformen, 2er-Set für perfekte Grusel-Muffins & Schokolade';
+  prepared.opportunity.product={...prepared.opportunity.product,name,productVerifiedName:name,productVerifiedAt:new Date().toISOString(),asin:'B0DB22FD87',
+    sourceUrl:'https://www.amazon.de/dp/B0DB22FD87',productUrl:'https://www.amazon.de/dp/B0DB22FD87',trackingId:'alltaeglichle-21',affiliateUrl:'https://www.amazon.de/dp/B0DB22FD87?tag=alltaeglichle-21'};
+  const baked=await runContentJob({...prepared.opportunity,useCase:'Halloween-Muffins in Kürbisform backen und auf dem Buffet servieren.'},{allowedFormats:['image']});
+  assert.equal(baked.status,'awaiting_approval',`${baked.error||''} ${baked.review?.issues.join('; ')||''}`);
+  prepared.content=baked.content;prepared.ideas=baked.ideas;prepared.decision=baked.decision;prepared.marketing=baked.marketing;prepared.opportunity.useCase=baked.opportunity.useCase;
+  await f.db.query('UPDATE content_jobs SET snapshot=$2,opportunity=$3 WHERE id=$1',[f.id,JSON.stringify(prepared),JSON.stringify(prepared.opportunity)]);
+  t.mock.method(global,'fetch',async()=>{throw new Error('a second model call was attempted');});
+  const before=await f.snapshot();
+  assert.equal(await f.process(message('muffins',body),async()=>ready),true);
+  const after=await f.snapshot();
+  assert.equal(after.id,before.id);assert.equal(after.opportunity.product.asin,before.opportunity.product.asin);
+  assert.equal(after.opportunity.product.name,before.opportunity.product.name);
+  assert.equal(f.approvals.length,1);assert.equal(f.approvals[0],f.id);
+  assert.equal((await f.db.query('SELECT status FROM whatsapp_instructions')).rows[0].status,'applied');
+  assert.equal((await f.db.query('SELECT count(*)::int AS n FROM publications')).rows[0].n,0);
+  assert.equal((await f.db.query('SELECT count(*)::int AS n FROM publication_requests WHERE status IN (\'approved\',\'publishing\',\'published\')')).rows[0].n,0);
+});
+
+test('HTTP 429 from the instruction parser is retried after the advertised wait, then reported as rate limit, never as a broken credential',async t=>{
+  const saved=process.env.REPLICATE_API_TOKEN;process.env.REPLICATE_API_TOKEN='token-for-429-test';
+  t.after(()=>{if(saved===undefined)delete process.env.REPLICATE_API_TOKEN;else process.env.REPLICATE_API_TOKEN=saved;});
+  const job=await runContentJob(opportunity());
+  const good=JSON.stringify({intent:'revise_image',confidence:.98,keep_product:true,keep_content_id:true,image_instruction:scene,text_instruction:null,product_instruction:null,
+    requires_new_generation:true,requires_new_approval:true,publish_requested:false,product_context_matches:true,text_operations:[]});
+  let posts=0;const waits=[];
+  const flaky=async(url,init)=>{if(init?.method==='POST'){posts++;return posts===1?new Response('{"retry_after":5}',{status:429}):new Response(JSON.stringify({id:'abcdefghijkl3',status:'succeeded',output:good}),{status:200});}throw Error('unexpected GET');};
+  const result=await interpretInstruction('Neues Bild mit Halloween-Muffins',job,flaky,[],async ms=>{waits.push(ms);});
+  assert.equal(result.intent,'revise_image');assert.equal(posts,2);assert.deepEqual(waits,[5000]);
+  posts=0;waits.length=0;
+  const always=async(url,init)=>{if(init?.method==='POST'){posts++;return new Response('{"retry_after":3}',{status:429});}throw Error('unexpected GET');};
+  await assert.rejects(interpretInstruction('Neues Bild mit Halloween-Muffins',job,always,[],async ms=>{waits.push(ms);}),/parser_rate_limited/);
+  assert.equal(posts,3);assert.deepEqual(waits,[3000,3000]);
+  // The operator is told the real cause and that nothing was produced.
+  const f=await fixture(t);const {InstructionParserError}=require('../.test-build/lib/whatsapp/instruction');
+  await f.process(message('limited'),async()=>{throw new InstructionParserError('parser_rate_limited');});
+  assert.match(f.sends[0],/Rate-Limit/);assert.doesNotMatch(f.sends[0],/Zugang funktioniert momentan nicht/);assert.match(f.sends[0],/nichts produziert oder veröffentlicht/);
+  assert.equal((await f.db.query('SELECT error_code FROM whatsapp_instructions')).rows[0].error_code,'parser_rate_limited');
 });

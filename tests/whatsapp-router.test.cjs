@@ -7,7 +7,7 @@ const {startProductSearch}=require('../.test-build/lib/whatsapp/start-image-post
 const {RouterUnavailable,routeSchema}=require('../.test-build/lib/whatsapp/route-llm');
 const {loadRouteContext}=require('../.test-build/lib/whatsapp/route-context');
 
-const route=(over={})=>({intent:'chitchat',draft_id:null,search_query:null,reject_current:false,operator_note:null,answer:null,clarification_question:null,confidence:0.95,ambiguity:'none',...over});
+const route=(over={})=>({intent:'chitchat',draft_id:null,search_query:null,reject_current:false,operator_note:null,answer:null,image_instruction:null,clarification_question:null,confidence:0.95,ambiguity:'none',...over});
 
 // A well-behaved model, simulated: sentence -> structured intent. The router itself is what is under test.
 const MODEL={
@@ -347,4 +347,42 @@ test('a stale snapshot of another article cannot leak its properties into new co
   for(const id of ['dishwasher','food_safe','heat'])assert.ok(ids.includes(id),id);
   assert.ok(ids.some(id=>id.startsWith('number:10stück')));
   assert.deepEqual(unsupportedProductClaims(opportunity,{title:'Ordnung im Bad',caption:'Der Wäschekorb ist faltbar und grau.'}),[]);
+});
+
+test('signed webhook: a confident image change reaches the revision pipeline with ONE model call and the right content id',async t=>{
+  const {createHmac}=require('node:crypto');const loadRoute=require('./helpers/load-route.cjs');
+  const f=await fixture(t);
+  const env={META_APP_SECRET:'test-router-signature-2',WHATSAPP_PHONE_NUMBER_ID:'123456',REPLICATE_API_TOKEN:'router-test-token',WHATSAPP_ROUTER_ENABLED:'true'};
+  const old=Object.fromEntries(Object.keys(env).map(k=>[k,process.env[k]]));Object.assign(process.env,env);
+  t.after(()=>{for(const key of Object.keys(env)){if(old[key]===undefined)delete process.env[key];else process.env[key]=old[key];}});
+  const body='mach ein anderes bild mit halloween muffins und dezenter halloween deko das grundkonzept des bildes ist hervorragend';
+  let modelCalls=0;
+  t.mock.method(global,'fetch',async(url)=>{
+    if(String(url).includes('/models/')){modelCalls++;
+      return new Response(JSON.stringify({id:'abcdefghijkl4',status:'succeeded',output:JSON.stringify(route({intent:'revise_image',confidence:0.99,
+        image_instruction:'Anderes Bild mit Halloween-Muffins und dezenter Halloween-Deko; das Grundkonzept des Bildes bleibt erhalten.'}))}),{status:200});}
+    throw new Error('unexpected request '+url);
+  });
+  const real=require('../.test-build/lib/whatsapp/router');
+  let captured=null;
+  const handler=loadRoute('app/api/whatsapp/webhook/route.ts',{
+    'next/server':{after:()=>{}},
+    '@/lib/memory/db':{getDatabase:()=>f.db},
+    '@/lib/production/repository':{productionRepository:()=>({applyIncomingWhatsApp:async()=>{throw Error('keyword chain must not run');}})},
+    '@/lib/whatsapp/router':{routeOperatorMessage:(m,deps)=>real.routeOperatorMessage(m,{...deps,database:f.db})},
+    '@/lib/whatsapp/start-image-post':{startImagePostFromWhatsApp:async()=>{throw Error('keyword stage ran');},startProductSearch:async()=>{throw Error('no search for an image change');}},
+    '@/lib/whatsapp/chat':{answerWhatsAppConversation:async()=>{throw Error('no chat for an image change');}},
+    '@/lib/whatsapp/content-approval':{handleContentApproval:async()=>false},
+    '@/lib/whatsapp/process-instruction':{processOperatorInstruction:async(input,deps)=>{captured={input,instruction:deps.interpret?await deps.interpret():null};return true;}},
+    '@/lib/daily/draft':{createDailyDraft:async()=>{throw Error('no new draft');},sendDailyApproval:async()=>true,sendPendingDailyApprovals:async()=>0},
+    '@/lib/whatsapp/client':{sendWhatsAppText:async()=>'wamid.out'},
+  });
+  const payload=JSON.stringify({object:'whatsapp_business_account',entry:[{changes:[{value:{metadata:{phone_number_id:'123456'},messages:[{id:'wamid.muffins',from:'491234',type:'text',text:{body}}]}}]}]});
+  const request=new Request('https://local.test/api/whatsapp/webhook',{method:'POST',headers:{'x-hub-signature-256':`sha256=${createHmac('sha256',env.META_APP_SECRET).update(payload).digest('hex')}`},body:payload});
+  assert.equal((await handler.POST(request)).status,200);
+  assert.equal(modelCalls,1,'exactly one model call');
+  assert.equal(captured.input.replyToMessageId,'wamid.approval0');assert.equal(captured.input.body,body,'the operator text reaches the pipeline unchanged');
+  assert.equal(captured.instruction.intent,'revise_image');assert.match(captured.instruction.image_instruction,/Halloween-Muffins/);
+  assert.equal(captured.instruction.publish_requested,false);
+  assert.deepEqual(await f.draftStatus(),[{job:'awaiting_approval',draft:'awaiting_approval'}]);
 });
