@@ -124,3 +124,20 @@ Veröffentlichungsfreigabe-Text nennt jetzt Facebook und Instagram gemeinsam.
 **Tests:** lokal 202/202 (u. a. echte JPEG-Konvertierung, Einmalpublish, abgelehnter Container, unklares Ergebnis,
 Seitenverhältnis). **Nicht belegt:** Instagram-Berechtigung/-Konto für Feed-Bilder, JPEG-Annahme durch Meta und Zustellung
 produktiv. Erste echte Probe: nächste Veröffentlichungsfreigabe.
+
+## 01.10.2026 abends: WhatsApp-Dialog „Produkt tauschen" (Screenshot-Befund)
+
+Beobachtet (Betreiber-Screenshot, Silikon-Backmatte): „Finde ein Artikel Silpat Matte, dann passt die Produktbeschreibung"
+→ Rückfrage „Welchen Auftrag meinst du?" mit vier alten Entwürfen (ASIN undefined, `&#34;` im Namen); weitergeleiteter
+Amazon-Link nach „Neuer Auftrag" → als Korrektur des offenen Entwurfs behandelt; „Ein anderes Produkt …" → Hinweis auf das
+Content Studio. Ursachen im Code: kein Pfad für „Produkt ersetzen + Suchbegriff"; Zielauswahl ohne Zeitbezug; Link mit
+Vorschautext wurde nicht als Link erkannt; Hinweistexte verwiesen auf das Content Studio; Amazon-Titel wurden nicht
+entschlüsselt/normalisiert.
+
+Änderungen: `lib/whatsapp/replace-draft.ts` (Erkennung „finde … Artikel/Produkt <Begriff>" / „finde stattdessen <Begriff>",
+stoppt den offenen, noch nicht freigegebenen Entwurf wie „Ablehnen", gibt die 7-Tage-Sperre frei, startet die Suche;
+Rückfrage ohne Begriff); `start-image-post.ts` (Link mit Vorschautext = Produktlink; direkt nach „Neuer Auftrag" startet er
+den Auftrag; verständliche Rückfrage statt „Bitte sende …"); `process-instruction.ts` (nur offene Freigaben der letzten 36 h;
+Nachricht kurz nach der neuesten Freigabe gehört zu ihr; keine „ASIN undefined"); alle WhatsApp-Texte ohne Content-Studio-Verweis;
+`cleanAmazonTitle` (HTML-Entitäten, „HitzebestäNdig" → „Hitzebeständig"). Lokal 205/205; produktiv nicht beobachtet.
+Grenze: Die Erkennung ist regelbasiert; ungewöhnliche Formulierungen führen zur Rückfrage, nicht zu einer Suche.

@@ -4,6 +4,7 @@ import type { IncomingWhatsAppMessage } from "./security";
 import { amazonProduct } from "../amazon";
 import { createHash } from "node:crypto";
 import { asinFromOperatorLink, operatorProductLink } from "./product-link";
+import { replacementRequest, supersedeOpenDraft } from "./replace-draft";
 
 // Only standalone, unambiguous requests start a new search. Replies always
 // remain corrections or decisions for the message they reference.
@@ -45,12 +46,18 @@ export async function startImagePostFromWhatsApp(input: IncomingWhatsAppMessage 
   database: () => Database, start: typeof import("../daily/draft").createDailyDraft, send = sendWhatsAppText,
   resolveLink: typeof asinFromOperatorLink = asinFromOperatorLink): Promise<boolean> {
   let command = input.replyToMessageId ? null : imagePostCommand(input.body);
+  const replacement = command ? null : replacementRequest(input.body);
+  // A forwarded Amazon link (with preview text) is a product link, not a correction of an open draft.
+  const bareLink = !command && !replacement && !input.replyToMessageId && !input.body.trim().endsWith("?") ? operatorProductLink(input.body) : null;
+  if (bareLink) command = { link: bareLink, pending: true, invalid: false };
   const quotedNewProduct = !!input.replyToMessageId && !input.body.includes("?") && wantsNewProduct(input.body);
   if (quotedNewProduct) command = imagePostCommand(input.body) || {invalid:true};
-  if (!command) return false;
+  if (!command && !replacement) return false;
   const trusted = (process.env.WHATSAPP_APPROVER_WA_ID || "").replace(/\D/g, "");
   if (!trusted || input.from.replace(/\D/g, "") !== trusted) return true;
   const db=database();
+  if (!command && replacement) return replaceProduct(input, replacement, db, start, send);
+  if (!command) return false;
   let sourceId=input.id;
   if (quotedNewProduct && !command?.link) {
     const quote=await db.query(`SELECT body FROM whatsapp_events
@@ -58,13 +65,19 @@ export async function startImagePostFromWhatsApp(input: IncomingWhatsAppMessage 
     const link=quote.rows[0] ? operatorProductLink(String(quote.rows[0].body)) : null;
     if (link) { command={link,invalid:false};sourceId=input.replyToMessageId!; }
   }
+  // „Neuer Auftrag“ shortly before a link means: this link starts the new job.
+  if (bareLink) {
+    const recent = await db.query(`SELECT body FROM whatsapp_events WHERE wa_id=$1 AND message_id<>$2
+      AND received_at>now()-interval '15 minutes' ORDER BY received_at DESC LIMIT 3`, [input.from, input.id]);
+    if (recent.rows.some(row => wantsNewProduct(String(row.body || "").replace(/[.!?]+$/, "").trim()) && !operatorProductLink(String(row.body || "")))) command = { link: bareLink, invalid: false };
+  }
   const claim = await db.query(
     "INSERT INTO whatsapp_events(message_id,wa_id,reply_to_message_id,body,payload) VALUES($1,$2,$3,$4,$5) ON CONFLICT(message_id) DO NOTHING RETURNING message_id",
     [input.id, input.from, input.replyToMessageId, input.body, JSON.stringify(input.payload)],
   );
   if (!claim.rows.length) return true;
   if (command.invalid) {
-    await send("Bitte sende „Neuer Auftrag“ mit einem Amazon-Produktlink oder „Bildpost B0…“ mit einer konkreten ASIN. Es wurde nichts gestartet.");
+    await send("Was soll ich bewerben? Schreibe „Artikelsuche <Produkt>“, zum Beispiel „Artikelsuche Silpat Backmatte“, oder sende einen Amazon-Link mit „Neuer Auftrag“. Es wurde nichts gestartet.");
     return true;
   }
   if (command.pending) {
@@ -107,11 +120,39 @@ export async function startImagePostFromWhatsApp(input: IncomingWhatsAppMessage 
       : result.reason === "editorial_model_failed"
         ? "Das redaktionelle Sprachmodell hat keinen sicher prüfbaren Bildentwurf geliefert. Bitte den Modellzugang und das Guthaben prüfen; dieser Auftrag startet nicht automatisch erneut."
         : result.reason === "content_review_failed"
-          ? `Auch nach Überarbeitung liegt kein freigabefähiger Bildentwurf vor. ${result.reviewIssues?.length ? `Konkrete Gründe: ${result.reviewIssues.join(" ")}` : "Bitte den Entwurf und die Prüfpunkte im Content Studio ansehen."} Für eine neue Produktsuche sende „Artikelsuche“; kein Auftrag wird stillschweigend freigegeben.`
-          : "Die Planung wurde durch einen technischen Fehler unterbrochen. Bitte den Auftrag im Content Studio prüfen.";
+          ? `Auch nach Überarbeitung liegt kein freigabefähiger Bildentwurf vor. ${result.reviewIssues?.length ? `Konkrete Gründe: ${result.reviewIssues.join(" ")}` : "Bitte starte mit „Artikelsuche <Produkt>“ neu."} Für eine neue Produktsuche sende „Artikelsuche“; kein Auftrag wird stillschweigend freigegeben.`
+          : "Die Planung wurde durch einen technischen Fehler unterbrochen. Schreibe „Status“ für Details oder starte mit „Artikelsuche <Produkt>“ neu.";
     await send(`${subject}: ${reason} Kein Bild gekauft und nichts veröffentlicht.`);
   } else if (result.status === "awaiting_approval" && result.whatsapp !== "approval_sent") {
     await send(`Bildpost-Entwurf ${result.jobId} ist gespeichert, die Freigabenachricht konnte noch nicht zugestellt werden. Kein Bild gekauft und nichts veröffentlicht.`);
+  }
+  return true;
+}
+
+// Replacing the product of an open draft: stop the draft (like „Ablehnen“), then search the named product.
+async function replaceProduct(input: IncomingWhatsAppMessage & { payload: unknown }, request: { search?: string }, db: Database,
+  start: typeof import("../daily/draft").createDailyDraft, send: typeof sendWhatsAppText) {
+  const claim = await db.query(
+    "INSERT INTO whatsapp_events(message_id,wa_id,reply_to_message_id,body,payload) VALUES($1,$2,$3,$4,$5) ON CONFLICT(message_id) DO NOTHING RETURNING message_id",
+    [input.id, input.from, input.replyToMessageId, input.body, JSON.stringify(input.payload)]);
+  if (!claim.rows.length) return true;
+  if (!request.search) {
+    await send("Verstanden, du willst ein anderes Produkt. Welches soll ich suchen? Schreibe zum Beispiel „Finde stattdessen Silpat Backmatte“. Der aktuelle Entwurf bleibt bis dahin unverändert; es wurde nichts produziert oder veröffentlicht.");
+    return true;
+  }
+  const replaced = await supersedeOpenDraft(db, input.replyToMessageId);
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const slot = `manual:${createHash("sha256").update(input.id).digest("hex")}`;
+  await send(`${replaced ? `Alten Entwurf${replaced.name ? ` („${replaced.name.slice(0, 60)}“)` : ""} gestoppt. ` : ""}Ich suche jetzt „${request.search}“ und schicke dir danach eine neue Inhaltsfreigabe. Das dauert einen Moment; es wurde nichts produziert oder veröffentlicht.`);
+  const result = await start(day, slot, undefined, request.search);
+  if (result.status === "failed" || result.status === "needs_input") {
+    const reason = result.reason === "product_unresolved" ? "Ich konnte dazu keine passende, sicher geprüfte Amazon-Produktseite finden. Nenne bitte eine genauere Produktart oder sende einen Amazon-Link mit „Neuer Auftrag“."
+      : result.reason === "product_repeat_blocked" ? "Dieses Produkt oder seine Produktfamilie wurde in den letzten sieben Tagen schon verwendet."
+      : result.reason === "amazon_verification_blocked" ? "Amazon hat die automatische Prüfung blockiert."
+      : "Die Planung konnte nicht abgeschlossen werden. Schreibe „Status“ für den Grund.";
+    await send(`Suche nach „${request.search}“: ${reason} Nichts veröffentlicht.`);
+  } else if (result.status === "awaiting_approval" && result.whatsapp !== "approval_sent") {
+    await send("Der neue Entwurf ist gespeichert, die Freigabenachricht konnte noch nicht zugestellt werden. Schreibe „Status“, dann sende ich sie.");
   }
   return true;
 }

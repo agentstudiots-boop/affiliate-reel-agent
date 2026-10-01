@@ -32,7 +32,7 @@ export function contentApprovalMessage(job: ContentJob) {
       : "Die spätere Veröffentlichung benötigt eine eigene WhatsApp-Freigabe.";
   const caption=content.format==="video" && job.opportunity.targetPlatform==="instagram" ? instagramReelCaption(job) : content.format==="text" ? "" : content.caption;
   const message=`Inhaltsfreigabe · ${content.format} · ${job.opportunity.targetPlatform}\nProdukt: ${job.opportunity.product.name}\nASIN: ${job.opportunity.product.asin}\nTitel: ${content.title}\n${detail}\n${content.format==="text"?"":`Vollständiger Begleittext einschließlich Affiliate-Link:\n${caption}\n`}CTA: ${content.cta}\n${content.disclosure}\n\nAntworte auf DIESE Nachricht mit „Freigabe“, um genau diese Fassung zu genehmigen. Du kannst beliebig oft Änderungen als Text anfordern; jede neue Fassung kommt erneut zur Inhaltsfreigabe. „Ablehnen“ stoppt den Auftrag. ${next}`;
-  if (message.length>3900) throw Error("Der vollständige Entwurf ist für eine WhatsApp-Nachricht zu lang. Im Content Studio kürzen, bevor eine Freigabe angefragt wird.");
+  if (message.length>3900) throw Error("Der vollständige Entwurf ist für eine WhatsApp-Nachricht zu lang. Der Entwurf wird so nicht gesendet; antworte bitte mit „Text kürzer“, dann kürze ich ihn.");
   return message;
 }
 
@@ -162,7 +162,7 @@ export async function handleContentApproval(input:Incoming,onApproved?: (jobId:s
     });
     if(applied) {
       try { await requestContentApproval(original.id); }
-      catch(error) { await sendWhatsAppText(`Der überarbeitete Entwurf ist gespeichert. Die erneute WhatsApp-Inhaltsfreigabe konnte nicht zugestellt werden: ${error instanceof Error?error.message:"Versand unklar."} Bitte im Content Studio prüfen. Keine Medienproduktion.`); }
+      catch(error) { await sendWhatsAppText(`Der überarbeitete Entwurf ist gespeichert. Die erneute WhatsApp-Inhaltsfreigabe konnte nicht zugestellt werden: ${error instanceof Error?error.message:"Versand unklar."} Antworte mit „Status“, dann sende ich ihn erneut. Keine Medienproduktion.`); }
     }
     return true;
   }
@@ -188,7 +188,7 @@ export async function handleContentApproval(input:Incoming,onApproved?: (jobId:s
     return true;
   });
   if(applied) {
-    await sendWhatsAppText(decision.intent==="approve"?"Inhalt freigegeben. Die nächsten Schritte laufen über WhatsApp; du musst im Content Studio nichts zusätzlich freigeben.":"Entwurf abgelehnt. Es wurde nichts produziert oder veröffentlicht.");
+    await sendWhatsAppText(decision.intent==="approve"?"Inhalt freigegeben. Die nächsten Schritte laufen über WhatsApp; du musst nirgendwo sonst etwas freigeben.":"Entwurf abgelehnt. Es wurde nichts produziert oder veröffentlicht.");
     if(decision.intent==="approve")await onApproved?.(String(request.job_id));
   }
   return true;

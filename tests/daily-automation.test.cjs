@@ -332,3 +332,58 @@ test('a plan rejected by the publication gate is stored with its reason and expl
   assert.match(text,/needs_input \(Entwurf nicht freigabefähig: /);
   assert.equal(state.messages.length,0);
 });
+
+test('"Finde ein Artikel Silpat Matte" replaces the open draft and searches the named product, without touching other messages',async t=>{
+  const {replacementRequest}=require('../.test-build/lib/whatsapp/replace-draft');
+  assert.deepEqual(replacementRequest('Die Produktbeschreibung passt nicht zum artikel. Finde ein artikel silpat matte dann passt die produktbeschreibung'),{search:'silpat matte'});
+  assert.deepEqual(replacementRequest('Finde stattdessen Silpat Backmatte'),{search:'Silpat Backmatte'});
+  assert.deepEqual(replacementRequest('Ein anderes Produkt zu dieser artikel beschreibung'),{});
+  for(const text of ['Schreib den Text stattdessen kürzer','Finde einen besseren Einstieg','Mach das Bild mit geschnitzten Kürbissen','Freigeben','Finde ein Produkt?','Mach den Text natürlicher'])assert.equal(replacementRequest(text),null,text);
+
+  const {pg,daily,state}=await retryFixture(t);
+  await pg.query("INSERT INTO whatsapp_events(message_id,wa_id,intent,payload) VALUES('in.1','491234','changes_requested','{}')");
+  const draft=await daily.createDailyDraft('2026-10-01','afternoon');
+  assert.equal(draft.whatsapp,'approval_sent');
+  const {startImagePostFromWhatsApp}=require('../.test-build/lib/whatsapp/start-image-post');
+  const started=[],sent=[];
+  const db=()=>({query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))});
+  const start=async(...args)=>{started.push(args);return {status:'awaiting_approval',jobId:'new',whatsapp:'approval_sent'};};
+  const message={id:'wamid.replace',from:'491234',body:'Die Produktbeschreibung passt nicht zum artikel. Finde ein artikel silpat matte dann passt die produktbeschreibung',replyToMessageId:null,payload:{}};
+  assert.equal(await startImagePostFromWhatsApp(message,db,start,async text=>{sent.push(text);return 'wamid.x';}),true);
+  assert.equal(started.length,1);assert.equal(started[0][2],undefined);assert.equal(started[0][3],'silpat matte');
+  const row=(await pg.query("SELECT status,feedback FROM daily_drafts WHERE slot='afternoon'")).rows[0];
+  assert.deepEqual(row,{status:'needs_input',feedback:'replaced_by_operator'});
+  assert.equal((await pg.query('SELECT count(*)::int AS n FROM product_selection_locks')).rows[0].n,0);
+  assert.match(sent[0],/Alten Entwurf.*gestoppt/);assert.ok(!sent.some(text=>/Content Studio/.test(text)));
+  // A replayed webhook delivery starts nothing again.
+  await startImagePostFromWhatsApp(message,db,start,async()=>'wamid.y');assert.equal(started.length,1);
+  // A correction that only mentions the text does not start a search.
+  const text=await startImagePostFromWhatsApp({...message,id:'wamid.text',body:'Schreib den Text stattdessen kürzer'},db,start,async()=>'wamid.z');
+  assert.equal(text,false);assert.equal(started.length,1);
+  assert.equal(state.scouts,1);
+});
+
+test('a forwarded Amazon link right after „Neuer Auftrag“ starts the new job instead of correcting the open draft',async t=>{
+  const {pg}=await retryFixture(t);
+  const {startImagePostFromWhatsApp}=require('../.test-build/lib/whatsapp/start-image-post');
+  const started=[],sent=[];
+  const db=()=>({query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))});
+  const start=async(...args)=>{started.push(args);return {status:'awaiting_approval',jobId:'new',whatsapp:'approval_sent'};};
+  const send=async text=>{sent.push(text);return 'wamid.s';};
+  await startImagePostFromWhatsApp({id:'wamid.new',from:'491234',body:'Neuer auftrag',replyToMessageId:null,payload:{}},db,start,send);
+  assert.match(sent[0],/Was soll ich bewerben\?/);assert.ok(!/Content Studio/.test(sent[0]));assert.equal(started.length,0);
+  const linkBody='WAIWO Silikon Backmatte 2er Set 42x30 cm hitzebeständig bis 250 °C https://www.amazon.de/dp/B0CM14MKY8';
+  await startImagePostFromWhatsApp({id:'wamid.link',from:'491234',body:linkBody,replyToMessageId:null,payload:{}},db,start,send,async()=>'B0CM14MKY8');
+  assert.equal(started.length,1);assert.equal(started[0][2],'B0CM14MKY8');
+  // Without the preceding request the link is only stored and asks for confirmation.
+  await pg.query("DELETE FROM whatsapp_events");
+  await startImagePostFromWhatsApp({id:'wamid.link2',from:'491234',body:linkBody,replyToMessageId:null,payload:{}},db,start,send,async()=>'B0CM14MKY8');
+  assert.equal(started.length,1);assert.match(sent.at(-1),/Produktlink erhalten/);
+});
+
+test('Amazon titles are HTML-decoded and umlaut mis-casing is repaired',()=>{
+  const {cleanAmazonTitle}=require('../.test-build/lib/product-resolver');
+  assert.equal(cleanAmazonTitle('Silikon Backmatte Backofen HitzebestäNdig Mit Noppen Wiederverwendbar FüR'),'Silikon Backmatte Backofen Hitzebeständig Mit Noppen Wiederverwendbar Für');
+  assert.equal(cleanAmazonTitle('Tortillapresse 10&#34; Orange &amp; Co &quot;Pro&quot;'),'Tortillapresse 10" Orange & Co "Pro"');
+  assert.equal(cleanAmazonTitle('<b>Matte</b>  Größe   M'),'Matte Größe M');
+});

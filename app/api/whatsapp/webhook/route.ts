@@ -126,10 +126,10 @@ export async function POST(request: Request) {
         try {
           const revised = await repo.reviseRequestedVideo(result.jobId);
           try { await requestContentApproval(revised.id); }
-          catch { try { await sendWhatsAppText(`Videoänderung für ${revised.opportunity.product.name} übernommen. Die neue Inhaltsfreigabe konnte nicht zugestellt werden; bitte im Content Studio prüfen. Die alte Kostenfreigabe ist ungültig. Keine Produktion.`); } catch {} }
+          catch { try { await sendWhatsAppText(`Videoänderung für ${revised.opportunity.product.name} übernommen. Die neue Inhaltsfreigabe konnte nicht zugestellt werden; antworte mit „Status“. Die alte Kostenfreigabe ist ungültig. Keine Produktion.`); } catch {} }
         } catch (error) {
           const message = error instanceof Error ? error.message : "Änderung nicht umsetzbar.";
-          try { await sendWhatsAppText(`Änderungswunsch gespeichert; Video noch nicht geändert: ${message}. Im Content Studio prüfen. Keine Produktion oder Veröffentlichung.`); }
+          try { await sendWhatsAppText(`Änderungswunsch gespeichert; Video noch nicht geändert: ${message}. Schreibe „Status“ für Details. Keine Produktion oder Veröffentlichung.`); }
           catch { console.error(JSON.stringify({ event: "video_revision_clarification_unknown", jobId: result.jobId })); }
         }
       }
