@@ -138,3 +138,11 @@ Pro Eintrag: Bild, kurze Überschrift (Amazon-Titel entschlüsselt/gekürzt), fr
 `rel="sponsored noopener noreferrer"`). Kategorienfilter über `?kategorie=<job.category>`, nur vorhandene Kategorien. Einträge ohne eigenes Blob-Bild oder ohne
 gültigen Amazon.de-Produktlink mit Tracking-Tag werden nicht gezeigt. Seitenweite Pflichtangabe: Affiliate-/Amazon-Partner-Hinweis. Code: `lib/landing/published.ts`,
 `app/produkte/page.tsx`. Nicht geprüft: Inhalt der Produktionsdatenbank (kein Zugriff); ob dort veröffentlichte Zeilen alle Felder besitzen, zeigt erst der Aufruf.
+
+### Landingpage-Ausbau (Look & Feel nach Referenzgrafik)
+- Datenquelle unverändert nur Lesen; zusätzlich `content_jobs.id` als `content_id`. Auszug = reine Kürzung der freigegebenen Caption (ohne Link-/Werbezeilen, nichts hinzugefügt).
+- Kategorien = `content_jobs.category` (general/kitchen/household/home_living/technology/leisure). **„Saisonales“ fehlt**: es gibt keine verlässliche Saison-/Themen-Kategorie, nur
+  Freitext (`trend`, Scout-`whyNow`); der Tageslauf setzt außerdem nur `household` oder `home_living`. Saisonales/Küche bräuchte eine gespeicherte Kategorie bei der Auswahl (kleiner Eingriff im Auswahlcode, keine neue Pipeline).
+- Klicktracking: Tabelle `landing_clicks` (Migration 025: Publikations-ID, content_id, Zeitpunkt; keine IP/Agent), `POST /api/landing/click` (nur Ids veröffentlichter Einträge, nur eigene Origin, nie das Ziel aus der Anfrage). Der Button führt direkt zum Amazon-Link; `sendBeacon` zählt nur.
+- Branding: nur `lib/landing/brand.ts` (Name, Instagram-Name aus der bestehenden Meta-Konfiguration, optional `LANDING_LOGO_URL`, `LANDING_IMPRINT_URL`, `LANDING_PRIVACY_URL`). Im Repository gibt es **kein Logo, keine Farben, kein Impressum, keine Datenschutzseite**;
+  Wortmarke als Text, Farben als CSS-Variablen in `app/produkte/landing.module.css`.
