@@ -1,6 +1,8 @@
 import type { Sql } from "../memory/db";
 import { amazonProduct } from "../amazon";
 import { cleanAmazonTitle } from "../product-resolver";
+import { BUILT_IN_CATEGORIES, labelFor, type Registry } from "../content/taxonomy";
+import { loadRegistry } from "../content/category-store";
 
 // Read-only view over what already exists: a Facebook publication that is `published`,
 // its stored image, the final approved caption, the saved affiliate link and the job category.
@@ -10,10 +12,8 @@ export type PublishedProduct = {
   category: string; categoryLabel: string; publishedAt: string;
 };
 
-export const CATEGORY_LABELS: Record<string, string> = {
-  general: "Allgemein", kitchen: "Küche", household: "Haushalt", home_living: "Home & Living", technology: "Technik", leisure: "Freizeit",
-};
-export const categoryLabel = (category: string) => CATEGORY_LABELS[category] ?? category;
+// The label comes from the controlled taxonomy (built-in names + operator-created categories); the key is what is stored.
+export const categoryLabel = (key: string, registry: Registry = BUILT_IN_CATEGORIES) => labelFor(key, registry);
 
 // Excerpt = a truncation of the approved caption (link and disclosure lines removed, nothing added or reworded).
 export function excerpt(caption: string, length = 180) {
@@ -61,13 +61,14 @@ export async function loadPublishedProducts(db: Sql, category?: string | null) {
     WHERE p.status='published' AND p.platform='facebook' AND p.image_url IS NOT NULL AND p.caption<>''
     ORDER BY COALESCE(pub.published_at,p.updated_at) DESC
     LIMIT 120`);
+  const registry = await loadRegistry(db).catch(() => BUILT_IN_CATEGORIES);
   const all: PublishedProduct[] = [];
   for (const row of result.rows) {
     if (!validImage(row.image_url) || !validAffiliate(row.affiliate_url)) continue;
     const name = shortName(row.name);
     if (!name) continue;
     all.push({ id: String(row.id), contentId: String(row.job_id), name, imageUrl: String(row.image_url), excerpt: excerpt(String(row.caption)), affiliateUrl: String(row.affiliate_url),
-      category: String(row.category), categoryLabel: categoryLabel(String(row.category)), publishedAt: new Date(String(row.published_at)).toISOString() });
+      category: String(row.category), categoryLabel: categoryLabel(String(row.category), registry), publishedAt: new Date(String(row.published_at)).toISOString() });
   }
   const categories = [...new Map(all.map(item => [item.category, item.categoryLabel])).entries()].map(([value, label]) => ({ value, label }));
   const items = category ? all.filter(item => item.category === category) : all;

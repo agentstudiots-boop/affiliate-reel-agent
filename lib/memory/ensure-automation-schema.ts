@@ -21,7 +21,8 @@ export async function ensureAutomationSchema(db: Database) {
       WHERE table_schema='public' AND table_name='daily_drafts' AND column_name='attempts') AS slot_retry,
     to_regclass('public.instagram_image_posts') IS NOT NULL AS instagram_images,
     to_regclass('public.whatsapp_routes') IS NOT NULL AS routes,
-    to_regclass('public.landing_clicks') IS NOT NULL AS clicks`);
-  if (ready.rows[0]?.slots === true && ready.rows[0]?.slot_key === true && ready.rows[0]?.stories === true && ready.rows[0]?.feedback === true && ready.rows[0]?.product_locks === true && ready.rows[0]?.chat_turns === true && ready.rows[0]?.slot_retry === true && ready.rows[0]?.instagram_images === true && ready.rows[0]?.routes === true && ready.rows[0]?.clicks === true) return;
+    to_regclass('public.landing_clicks') IS NOT NULL AS clicks,
+    to_regclass('public.content_categories') IS NOT NULL AS categories`);
+  if (ready.rows[0]?.slots === true && ready.rows[0]?.slot_key === true && ready.rows[0]?.stories === true && ready.rows[0]?.feedback === true && ready.rows[0]?.product_locks === true && ready.rows[0]?.chat_turns === true && ready.rows[0]?.slot_retry === true && ready.rows[0]?.instagram_images === true && ready.rows[0]?.routes === true && ready.rows[0]?.clicks === true && ready.rows[0]?.categories === true) return;
   await applyMigrations(db);
 }

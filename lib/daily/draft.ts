@@ -9,7 +9,6 @@ import { dailyNotificationTemplateConfigured, sendDailyNotificationTemplate } fr
 import { parseJob } from "@/lib/content/history";
 import { facebookPagePublicationError } from "@/lib/meta/publication-eligibility";
 import { imageBrief } from "@/lib/content/image-brief";
-import { isPumpkinCarvingProduct } from "@/lib/content/category";
 import { AMAZON_IDENTITY_MISSING, findAmazonProductByAsin } from "@/lib/product-resolver";
 import { ensureAutomationSchema } from "@/lib/memory/ensure-automation-schema";
 import { loadApprovedEditorialCorrections } from "@/lib/whatsapp/language-memory";
@@ -19,6 +18,8 @@ import { releaseProduct, reserveProduct } from "@/lib/daily/product-lock";
 import { facebookCaption } from "@/lib/meta/facebook-caption";
 import { bathtubMatUseCase, isBathtubMat } from "@/lib/content/bathtub-mat";
 import { PRODUCT_DATA_UNCERTAIN, productEvidence, unsupportedClaims } from "@/lib/content/claim-support";
+import { suggestCategory } from "@/lib/content/taxonomy";
+import { categoryLabel } from "@/lib/content/category-store";
 
 async function resolveRequestedProduct(value: string) {
   const asin = /^(?:[A-Z0-9]{10})$/.test(value) ? value : value.match(/^https:\/\/(?:www\.)?amazon\.de\/dp\/([A-Z0-9]{10})\/?$/)?.[1];
@@ -26,7 +27,8 @@ async function resolveRequestedProduct(value: string) {
   return findAmazonProductByAsin(asin);
 }
 
-export function dailyApprovalMessage(job:ReturnType<typeof parseJob>,day:string) {
+import { labelFor as labelOf } from "@/lib/content/taxonomy";
+export function dailyApprovalMessage(job:ReturnType<typeof parseJob>,day:string,categoryName?:string) {
   const revision=job.events.map(e=>e.data).reverse().find((data): data is {kind:string;instruction:{requires_new_generation:boolean}} => !!data && typeof data==='object' && 'kind' in data && data.kind==='semantic_revision');
   const costText=revision && !revision.instruction.requires_new_generation
     ? 'um die Textrevision freizugeben. Das bestehende Bild bleibt erhalten; keine neue Bildgenerierung'
@@ -41,7 +43,7 @@ export function dailyApprovalMessage(job:ReturnType<typeof parseJob>,day:string)
     .join('\n')}`:'';
   const referenceNotice=job.mode==='reference' && job.modelCalls>0
     ? 'Der KI-Bildentwurf wurde verworfen. Dies ist ein geprüfter Referenzentwurf; bitte Bildbeschreibung und Text besonders sorgfältig prüfen.\n\n':'';
-  const body=`Content-Freigabe · Bildpost ${day}\nProdukt: ${job.opportunity.product.name}\nTitel: ${job.content.title}\nFormat: ${job.content?.format || 'unbekannt'} · Facebook\n\n${referenceNotice}Beitragstext (geplante Facebook-Caption):\n${publicCaption}${visualBrief}\n\nASIN: ${job.opportunity.product.asin}\nProduktlink: ${job.opportunity.product.affiliateUrl}\nAntworte auf DIESE Nachricht mit „Freigeben“, ${costText}. Danach kommt eine ZWEITE WhatsApp für die Veröffentlichung. „Ablehnen“ stoppt den Auftrag, Änderungswünsche bitte als Text. Noch kein Post ist online.`;
+  const body=`Content-Freigabe · Bildpost ${day}\nProdukt: ${job.opportunity.product.name}\nKategorie: ${categoryName||labelOf(job.opportunity.category)} (so wird der Beitrag auf der Landingpage einsortiert)\nTitel: ${job.content.title}\nFormat: ${job.content?.format || 'unbekannt'} · Facebook\n\n${referenceNotice}Beitragstext (geplante Facebook-Caption):\n${publicCaption}${visualBrief}\n\nASIN: ${job.opportunity.product.asin}\nProduktlink: ${job.opportunity.product.affiliateUrl}\nAntworte auf DIESE Nachricht mit „Freigeben“, ${costText}. Danach kommt eine ZWEITE WhatsApp für die Veröffentlichung. „Ablehnen“ stoppt den Auftrag, Änderungswünsche bitte als Text (auch die Kategorie, z. B. „Kategorie bitte Küche“). Noch kein Post ist online.`;
   if(body.length>3900)throw Error('daily_approval_too_long');
   return body;
 }
@@ -62,7 +64,7 @@ export async function sendDailyApproval(jobId: string) {
     [(process.env.WHATSAPP_APPROVER_WA_ID || "").replace(/\D/g, "")],
   );
   if (!recent.rows.length) return false;
-  const body=dailyApprovalMessage(job,new Date(String(record.rows[0].day)).toISOString().slice(0,10));
+  const body=dailyApprovalMessage(job,new Date(String(record.rows[0].day)).toISOString().slice(0,10),await categoryLabel(db,job.opportunity.category));
   const claimed = await db.query(
     `UPDATE daily_drafts SET whatsapp_send_attempted_at=now() WHERE job_id=$1
      AND status='awaiting_approval' AND whatsapp_message_id IS NULL
@@ -254,7 +256,7 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
     const scoutUseCase = useCaseGaps.length ? "" : rawUseCase;
     const opportunity: Opportunity = {
       product: selectedProduct,
-      category: isPumpkinCarvingProduct(requestedProduct?.name || candidate?.resolvedProduct?.name || candidate?.name || "") || candidate?.category === "Wohnen" ? "home_living" : "household", useCaseKey: "seasonal-product-guide", targetPlatform: "facebook",
+      category: suggestCategory(selectedProduct.name, candidate?.category, candidate?.kind), useCaseKey: "seasonal-product-guide", targetPlatform: "facebook",
       useCase: isBathtubMat(selectedProduct.name) ? bathtubMatUseCase : scoutUseCase || `Das Produkt ${selectedProduct.name} im Alltag verwenden und die Eignung vor dem Kauf prüfen.`, trend: candidate?.whyNow || "", goal: "education", budget: "low", verifiedFacts: [],
     };
     stage = "content_planning";

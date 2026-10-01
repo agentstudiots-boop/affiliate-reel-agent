@@ -10,6 +10,8 @@ import { classifyWhatsAppReply } from "./intent";
 import { sendWhatsAppText, WhatsAppRejectedError } from "./client";
 import { instagramReelCaption } from "../meta/instagram-reel";
 import type { ContentJob } from "../content/schema";
+import { labelFor } from "../content/taxonomy";
+import { categoryLabel } from "../content/category-store";
 import { confirmContentEditorialFeedback } from "./language-memory";
 import { ensureAutomationSchema } from "../memory/ensure-automation-schema";
 
@@ -17,7 +19,7 @@ export function contentFingerprint(job: ContentJob) {
   return createHash("sha256").update(JSON.stringify({product:job.opportunity.product,content:job.content,marketing:job.marketing})).digest("hex");
 }
 
-export function contentApprovalMessage(job: ContentJob) {
+export function contentApprovalMessage(job: ContentJob, categoryName?: string) {
   if (!job.content) throw Error("Content-Entwurf fehlt.");
   const content=job.content;
   const detail=content.format==="video"
@@ -31,7 +33,7 @@ export function contentApprovalMessage(job: ContentJob) {
       ? "Diese Freigabe erlaubt genau eine kostenpflichtige Bildgenerierung; der Preis in Euro steht nicht vorab fest. Das fertige Bild und der Post kommen vor Veröffentlichung erneut per WhatsApp zur Prüfung. Keine Aktion im Content Studio nötig."
       : "Die spätere Veröffentlichung benötigt eine eigene WhatsApp-Freigabe.";
   const caption=content.format==="video" && job.opportunity.targetPlatform==="instagram" ? instagramReelCaption(job) : content.format==="text" ? "" : content.caption;
-  const message=`Inhaltsfreigabe · ${content.format} · ${job.opportunity.targetPlatform}\nProdukt: ${job.opportunity.product.name}\nASIN: ${job.opportunity.product.asin}\nTitel: ${content.title}\n${detail}\n${content.format==="text"?"":`Vollständiger Begleittext einschließlich Affiliate-Link:\n${caption}\n`}CTA: ${content.cta}\n${content.disclosure}\n\nAntworte auf DIESE Nachricht mit „Freigabe“, um genau diese Fassung zu genehmigen. Du kannst beliebig oft Änderungen als Text anfordern; jede neue Fassung kommt erneut zur Inhaltsfreigabe. „Ablehnen“ stoppt den Auftrag. ${next}`;
+  const message=`Inhaltsfreigabe · ${content.format} · ${job.opportunity.targetPlatform}\nProdukt: ${job.opportunity.product.name}\nKategorie: ${categoryName||labelFor(job.opportunity.category)}\nASIN: ${job.opportunity.product.asin}\nTitel: ${content.title}\n${detail}\n${content.format==="text"?"":`Vollständiger Begleittext einschließlich Affiliate-Link:\n${caption}\n`}CTA: ${content.cta}\n${content.disclosure}\n\nAntworte auf DIESE Nachricht mit „Freigabe“, um genau diese Fassung zu genehmigen. Du kannst beliebig oft Änderungen als Text anfordern; jede neue Fassung kommt erneut zur Inhaltsfreigabe. „Ablehnen“ stoppt den Auftrag. ${next}`;
   if (message.length>3900) throw Error("Der vollständige Entwurf ist für eine WhatsApp-Nachricht zu lang. Der Entwurf wird so nicht gesendet; antworte bitte mit „Text kürzer“, dann kürze ich ihn.");
   return message;
 }
@@ -47,7 +49,7 @@ export async function requestContentApproval(jobId:string) {
   if (job.status!=="awaiting_approval") throw Error("Nur ein fertiger Entwurf darf zur Freigabe gesendet werden.");
   const window=await db.query("SELECT 1 FROM whatsapp_events WHERE wa_id=$1 AND received_at>now()-interval '24 hours' LIMIT 1",[approver]);
   if(!window.rows.length)throw Error("WhatsApp-Servicefenster geschlossen. Bitte zunächst eine Nachricht an die verknüpfte Nummer senden und dann erneut anfragen.");
-  const message=contentApprovalMessage(job);
+  const message=contentApprovalMessage(job,await categoryLabel(db,job.opportunity.category));
   const hash=contentFingerprint(job);
   const claim=await db.transaction(async sql=>{
     const locked=await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE",[jobId]);

@@ -7,7 +7,7 @@ const {startProductSearch}=require('../.test-build/lib/whatsapp/start-image-post
 const {RouterUnavailable,routeSchema}=require('../.test-build/lib/whatsapp/route-llm');
 const {loadRouteContext}=require('../.test-build/lib/whatsapp/route-context');
 
-const route=(over={})=>({intent:'chitchat',draft_id:null,search_query:null,reject_current:false,operator_note:null,answer:null,image_instruction:null,clarification_question:null,confidence:0.95,ambiguity:'none',...over});
+const route=(over={})=>({intent:'chitchat',draft_id:null,search_query:null,reject_current:false,operator_note:null,answer:null,image_instruction:null,category_name:null,category_create:false,category_force_new:false,clarification_question:null,confidence:0.95,ambiguity:'none',...over});
 
 // A well-behaved model, simulated: sentence -> structured intent. The router itself is what is under test.
 const MODEL={
