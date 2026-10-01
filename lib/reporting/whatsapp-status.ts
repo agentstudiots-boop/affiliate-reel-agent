@@ -28,6 +28,7 @@ export async function latestImagePostsStatus(db: Database) {
       editorial_rate_limited: "Redaktionsmodell ausgelastet",
       editorial_model_failed: "Redaktionsmodell nicht erreichbar",
       content_review_failed: `redaktionelle Prüfung: ${String(row.detail || "nicht bestanden").replace(/\s+/g, " ").slice(0, 120)}`,
+      product_data_uncertain: `Produktdaten reichen für sichere Aussagen nicht aus: ${String(row.detail || "").replace(/\s+/g, " ").slice(0, 140)}`,
       marketing_format_mismatch: "Marketingformat passte nicht zum Inhalt",
       planning_failed: "Content-Planung nicht abgeschlossen",
     } as Record<string, string>)[String(row.reason || "")];

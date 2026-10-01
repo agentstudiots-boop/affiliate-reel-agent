@@ -18,6 +18,7 @@ import { createHash } from "node:crypto";
 import { releaseProduct, reserveProduct } from "@/lib/daily/product-lock";
 import { facebookCaption } from "@/lib/meta/facebook-caption";
 import { bathtubMatUseCase, isBathtubMat } from "@/lib/content/bathtub-mat";
+import { PRODUCT_DATA_UNCERTAIN, productEvidence, unsupportedClaims } from "@/lib/content/claim-support";
 
 async function resolveRequestedProduct(value: string) {
   const asin = /^(?:[A-Z0-9]{10})$/.test(value) ? value : value.match(/^https:\/\/(?:www\.)?amazon\.de\/dp\/([A-Z0-9]{10})\/?$/)?.[1];
@@ -246,10 +247,15 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
       await db.query("UPDATE daily_drafts SET status='needs_input',scout_report=jsonb_set(coalesce(scout_report,'{}'::jsonb),'{reason}',to_jsonb($2::text)),updated_at=now() WHERE job_id=$1", [jobId,"product_repeat_blocked"]);
       return {status:'needs_input' as const,jobId,reason:'product_repeat_blocked' as const};
     }
+    // The scout's idea is category-level. It may only steer the content if THIS article's data supports it.
+    const rawUseCase = candidate?.reelIdea?.trim();
+    const useCaseGaps = rawUseCase ? unsupportedClaims(rawUseCase, productEvidence(selectedProduct)) : [];
+    if (useCaseGaps.length) console.info(JSON.stringify({ event: "use_case_neutralized", jobId, claims: useCaseGaps.map(claim => claim.id) }));
+    const scoutUseCase = useCaseGaps.length ? "" : rawUseCase;
     const opportunity: Opportunity = {
       product: selectedProduct,
       category: isPumpkinCarvingProduct(requestedProduct?.name || candidate?.resolvedProduct?.name || candidate?.name || "") || candidate?.category === "Wohnen" ? "home_living" : "household", useCaseKey: "seasonal-product-guide", targetPlatform: "facebook",
-      useCase: isBathtubMat(selectedProduct.name) ? bathtubMatUseCase : candidate?.reelIdea?.trim() || `Das Produkt ${selectedProduct.name} im Alltag verwenden und die Eignung vor dem Kauf prüfen.`, trend: candidate?.whyNow || "", goal: "education", budget: "low", verifiedFacts: [],
+      useCase: isBathtubMat(selectedProduct.name) ? bathtubMatUseCase : scoutUseCase || `Das Produkt ${selectedProduct.name} im Alltag verwenden und die Eignung vor dem Kauf prüfen.`, trend: candidate?.whyNow || "", goal: "education", budget: "low", verifiedFacts: [],
     };
     stage = "content_planning";
     const repo = memoryRepository(db);
@@ -278,11 +284,12 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
       : job.error === EDITORIAL_RATE_LIMIT_ERROR ? "editorial_rate_limited" as const
       : job.error === EDITORIAL_MODEL_ERROR ? "editorial_model_failed" as const
       : job.error === "product_unresolved" ? "product_unresolved" as const
+      : job.error === PRODUCT_DATA_UNCERTAIN ? "product_data_uncertain" as const
       : job.review && !job.review.passed ? "content_review_failed" as const
       : job.status === "needs_input" && job.marketing ? "marketing_format_mismatch" as const : "planning_failed" as const;
     // Persist why the slot stopped; without it Status cannot explain an empty needs_input.
     const detail = reason === "publication_gate_failed" ? String(gateError).slice(0, 200)
-      : reason === "content_review_failed" ? job.review?.issues[0]?.slice(0, 200) : undefined;
+      : reason === "content_review_failed" || reason === "product_data_uncertain" ? job.review?.issues[0]?.slice(0, 200) : undefined;
     await db.query("UPDATE daily_drafts SET scout_report=jsonb_set(coalesce(scout_report,'{}'::jsonb),'{reason}',to_jsonb($2::text)) || jsonb_build_object('detail',$3::text),updated_at=now() WHERE job_id=$1",
       [jobId, reason, detail ?? null]);
     console.info(JSON.stringify({ event: "daily_draft_needs_input", jobId, reason }));

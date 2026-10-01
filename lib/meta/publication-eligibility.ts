@@ -1,3 +1,4 @@
+import { unsupportedClaimMessage, unsupportedProductClaims } from "../content/claim-support";
 import { jobProductError } from "../content/product-contract";
 import type { ContentJob } from "../content/schema";
 import { imageCreativePublicationError } from "../content/creative-quality";
@@ -16,6 +17,10 @@ export function facebookPagePublicationError(job: ContentJob): string | null {
     if (pumpkinError) return pumpkinError;
     const bathError = bathtubMatIssues(job.opportunity,job.content)[0];
     if (bathError) return bathError;
+  }
+  if (job.content.format === "image" || job.content.format === "text") {
+    const unsupported = unsupportedProductClaims(job.opportunity, job.content);
+    if (unsupported.length) return `${unsupportedClaimMessage(unsupported)} Der Beitrag wird nicht freigegeben.`;
   }
   if (job.opportunity.targetPlatform !== "facebook") return "Dieser Job wurde nicht für Facebook geplant. Lege für einen Seitenbeitrag einen neuen Plan mit Zielplattform Facebook an und gib ihn frei.";
   if (job.marketing?.primary !== "Facebook Post") return `Dieser Job ist als „${job.marketing?.primary || "ohne Marketingplan"}“ geplant. Für eine Facebook-Seite brauchst du einen neuen Plan mit Zielplattform Facebook und Ziel „Kaufinteresse“ oder „Erklären & informieren“. Gib diesen Plan anschließend frei.`;

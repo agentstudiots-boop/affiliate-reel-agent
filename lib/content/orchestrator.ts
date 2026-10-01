@@ -10,6 +10,7 @@ import { classifyOpportunity, pumpkinCreativeIssues } from "./category";
 import { interpretVideoRevision } from "../whatsapp/video-revision";
 import { evaluateImageCreativeQuality } from "./creative-quality";
 import { VISUAL_FUNCTION_RULE } from "./visual-coherence";
+import { PRODUCT_DATA_UNCERTAIN, unsupportedClaimMessage, unsupportedProductClaims } from "./claim-support";
 import { createGenerator } from "./model";
 import { contentSchema, opportunitySchema, reviewSchema, type AgentName, type Content, type ContentJob, type Decision, type Idea, type JobEvent, type JobStatus, type Opportunity, type Review } from "./schema";
 import { bathtubMatIssues } from "./bathtub-mat";
@@ -238,6 +239,14 @@ export async function runContentJob(raw: Opportunity, options: {
     if (job.marketing.primary !== plannedPlatform) await emit("orchestrator", "decision", `Marketingplattform „${plannedPlatform}“ passt nicht zur verbindlichen Zielplattform; ${job.marketing.primary} übernommen.`);
     const thematicIssues = [...pumpkinCreativeIssues(opportunity, job.content!, job.marketing), ...bathtubMatIssues(opportunity, job.content!)];
     if (thematicIssues.length) { job.review = { passed: false, score: 40, issues: thematicIssues }; await status("needs_input", thematicIssues.join(" ")); return job; }
+    // Hard rule: no property, function or use the concrete product data does not support. No guessing, no approval.
+    const unsupported = unsupportedProductClaims(opportunity, job.content!);
+    if (unsupported.length) {
+      const message = unsupportedClaimMessage(unsupported);
+      job.error = PRODUCT_DATA_UNCERTAIN; job.review = { passed: false, score: 35, issues: [message] };
+      await emit("orchestrator", "decision", `Produktdaten unsicher: ${message} Keine Freigabe.`, { claims: unsupported.map(claim => claim.id) });
+      await status("needs_input", message); return job;
+    }
     const platform = job.marketing.primary;
     const compatible = job.content!.format === "video" ? ["Instagram Reel", "Facebook Video"].includes(platform)
       : job.content!.format === "image" ? [job.content!.format === "image" && job.content!.layout === "carousel" ? "Instagram Carousel" : "Instagram Bild", "Facebook Post", "Gruppenbeitrag"].includes(platform)

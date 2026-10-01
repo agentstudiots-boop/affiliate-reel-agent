@@ -7,7 +7,7 @@ const {startProductSearch}=require('../.test-build/lib/whatsapp/start-image-post
 const {RouterUnavailable,routeSchema}=require('../.test-build/lib/whatsapp/route-llm');
 const {loadRouteContext}=require('../.test-build/lib/whatsapp/route-context');
 
-const route=(over={})=>({intent:'chitchat',draft_id:null,search_query:null,reject_current:false,operator_note:null,clarification_question:null,confidence:0.95,ambiguity:'none',...over});
+const route=(over={})=>({intent:'chitchat',draft_id:null,search_query:null,reject_current:false,operator_note:null,answer:null,clarification_question:null,confidence:0.95,ambiguity:'none',...over});
 
 // A well-behaved model, simulated: sentence -> structured intent. The router itself is what is under test.
 const MODEL={
@@ -213,4 +213,138 @@ test('signed webhook → router → model call → state → pipeline → reply,
   // Meta redelivers the same webhook: no second model call, no second search, no second reply.
   assert.equal((await handler.POST(request())).status,200);
   assert.equal(modelCalls.length,1);assert.equal(started.length,1);assert.equal(sent.length,1);
+});
+
+// ---- Fragepfad: Kontext, Antwort, Fail-safe -------------------------------------------------
+const answerRoute=(text,over={})=>route({intent:'question',answer:text,...over});
+
+test('free question without a quote, one clear active product: answered from stored data, nothing changes',async t=>{
+  const f=await fixture(t);
+  let seen;
+  const out=await routeOperatorMessage(f.msg('Warum hast du eigentlich dieses Produkt ausgewählt?'),f.deps({interpret:async(body,context)=>{seen=context;return answerRoute('Die Kuscheldecke stammt aus der Suche. Ein konkreter Auswahlgrund ist nicht gespeichert.');}}));
+  assert.deepEqual(out,{handled:true});
+  assert.equal(seen.focus.source,'single_open');assert.equal(seen.focus.asin,'B000000001');assert.equal(seen.focus.product,'Kuscheldecke');
+  assert.match(seen.focus.data_limits,/nur Titel und ASIN/);assert.ok(seen.focus.verified_product_data.some(line=>/Titel der Amazon-Produktseite: Kuscheldecke/.test(line)));
+  assert.ok(seen.focus.selection_basis.length>0);
+  assert.match(f.state.sent[0],/Kuscheldecke/);assert.equal(f.state.converse.length,0,'answered in the same call, no second model call');
+  assert.deepEqual(await f.draftStatus(),[{job:'awaiting_approval',draft:'awaiting_approval'}]);assert.equal(f.state.started.length,0);
+});
+
+test('free question as a direct reply to a concrete approval message uses exactly that product, also when it is already closed',async t=>{
+  const f=await fixture(t,{open:2});
+  let seen;
+  await routeOperatorMessage(f.msg('Warum hast du dieses Produkt gewählt?','wamid.in.q1','wamid.approval1'),f.deps({interpret:async(body,context)=>{seen=context;return answerRoute('Das ist die Heizdecke Premium.');}}));
+  assert.equal(seen.focus.source,'replying_to');assert.equal(seen.focus.product,'Heizdecke Premium');assert.equal(seen.focus.draft_id,f.jobs[1]);
+  // The quoted draft was stopped meanwhile: still resolved, with an honest state.
+  await f.pg.query("UPDATE daily_drafts SET status='needs_input',feedback='replaced_by_operator' WHERE job_id=$1",[f.jobs[1]]);
+  await f.pg.query("UPDATE content_jobs SET status='needs_input' WHERE id=$1",[f.jobs[1]]);
+  await routeOperatorMessage(f.msg('Warum hast du dieses Produkt gewählt?','wamid.in.q2','wamid.approval1'),f.deps({interpret:async(body,context)=>{seen=context;return answerRoute('Das war die Heizdecke; sie wurde inzwischen gestoppt.');}}));
+  assert.equal(seen.focus.draft_id,f.jobs[1]);assert.equal(seen.focus.state,'gestoppt/ersetzt');
+});
+
+test('two open products without a quote: no guessed focus, a short question instead of a wrong assignment',async t=>{
+  const f=await fixture(t,{open:2});
+  let seen;
+  const out=await routeOperatorMessage(f.msg('Die Beschreibung passt doch gar nicht zu diesem Produkt.'),f.deps({interpret:async(body,context)=>{seen=context;return route({intent:'clarify',clarification_question:null,confidence:0.9,ambiguity:'high'});}}));
+  assert.deepEqual(out,{handled:true});assert.equal(seen.focus,null);assert.equal(seen.candidate_job_ids.length,2);
+  assert.match(f.state.sent[0],/Welchen Entwurf meinst du\?/);assert.match(f.state.sent[0],/Kuscheldecke/);assert.match(f.state.sent[0],/Heizdecke Premium/);
+});
+
+test('an old, closed job never becomes the context while a newer product is open; latest recent is used only when nothing is open',async t=>{
+  const f=await fixture(t);
+  await f.pg.query("UPDATE content_jobs SET created_at=now()-interval '30 hours',updated_at=now()-interval '30 hours' WHERE id=$1",[f.jobs[0]]);
+  await f.pg.query("UPDATE daily_drafts SET status='needs_input',created_at=now()-interval '30 hours' WHERE job_id=$1",[f.jobs[0]]);
+  await f.pg.query("UPDATE content_jobs SET status='needs_input' WHERE id=$1",[f.jobs[0]]);
+  const none=await loadRouteContext(f.db,'491234','wamid.x',null);
+  assert.equal(none.focus,null,'a 30 hour old closed job is not an active context');
+  const fresh=await fixture(t);
+  await fresh.pg.query("UPDATE daily_drafts SET status='needs_input'");await fresh.pg.query("UPDATE content_jobs SET status='needs_input'");
+  const recent=await loadRouteContext(fresh.db,'491234','wamid.y',null);
+  assert.equal(recent.focus.source,'latest_recent');assert.equal(recent.focus.state,'gestoppt/ersetzt');
+});
+
+test('an unusable model answer or an empty inline answer falls back to the facts-based chat, never to a silent failure',async t=>{
+  const f=await fixture(t);
+  await routeOperatorMessage(f.msg('Warum dieses Produkt?'),f.deps({interpret:async()=>answerRoute(null)}));
+  assert.equal(f.state.converse.length,1);assert.match(f.state.converse[0].facts,/Besprochenes Produkt \(single_open\): „Kuscheldecke“ \(ASIN B000000001\)/);
+  assert.match(f.state.converse[0].facts,/nur Titel und ASIN/);
+});
+
+test('rate limiting (HTTP 429) is retried once after the advertised wait; the chat path logs its failure reason',async t=>{
+  const {interpretMessage}=require('../.test-build/lib/whatsapp/route-llm');
+  const saved=process.env.REPLICATE_API_TOKEN;process.env.REPLICATE_API_TOKEN='token-for-test';t.after(()=>{if(saved===undefined)delete process.env.REPLICATE_API_TOKEN;else process.env.REPLICATE_API_TOKEN=saved;});
+  const context={now:'',replying_to:null,open_items:[],recent_messages:[],recent_products:[],recent_instructions:[],focus:null,candidate_job_ids:[]};
+  let posts=0;const waits=[];
+  const request=async(url,init)=>{
+    if(init?.method==='POST'){posts++;if(posts===1)return new Response('{"retry_after":4}',{status:429});
+      return new Response(JSON.stringify({id:'abcdefghijkl2',status:'succeeded',output:JSON.stringify(route({intent:'status'}))}),{status:200});}
+    throw Error('unexpected GET');
+  };
+  const result=await interpretMessage('Was ist offen?',context,request,async ms=>{waits.push(ms);});
+  assert.equal(result.intent,'status');assert.equal(posts,2);assert.deepEqual(waits,[4000]);
+  posts=0;const failing=async()=>new Response('{}',{status:429});
+  await assert.rejects(interpretMessage('x',context,failing,async()=>{}),/router_http_429/);
+});
+
+// ---- Produktdaten: nur belegte Aussagen ---------------------------------------------------
+const {unsupportedClaims,productEvidence,unsupportedProductClaims,PRODUCT_DATA_UNCERTAIN}=require('../.test-build/lib/content/claim-support');
+const {cleanAmazonTitle}=require('../.test-build/lib/product-resolver');
+
+test('product data contradicting the generated use case is detected: rolling dough on an oven crisping mat',()=>{
+  const title='Silikon Backmatte Backunterlage Backofen Matte - Backen Knusprig Backformhundekekse HitzebestäNdig Mit Pyramiden Noppen Leicht Zu Reinigen Wiederverwendbar FüR';
+  const evidence=productEvidence({name:cleanAmazonTitle(title),productVerifiedName:cleanAmazonTitle(title)},[]);
+  const copy='Mit einer Silikon-Backmatte bleibt die Küche beim Backen sauber: Einfach Teig ausrollen, nach dem Backen die Matte abnehmen. Spülmaschinengeeignet, 42 cm breit.';
+  const ids=unsupportedClaims(copy,evidence).map(claim=>claim.id);
+  assert.ok(ids.includes('dough_work'));assert.ok(ids.includes('dishwasher'));assert.ok(ids.some(id=>id.startsWith('number:42cm')));
+  // What the title does support is not flagged.
+  assert.deepEqual(unsupportedClaims('Hitzebeständig, wiederverwendbar und leicht zu reinigen – knusprig backen.',evidence),[]);
+  // Operator-verified facts extend the evidence.
+  const withFact=productEvidence({name:'Backmatte',productVerifiedName:'Backmatte'},[{claim:'Auch zum Ausrollen von Teig geeignet',source:'https://example.com/p'}]);
+  assert.deepEqual(unsupportedClaims('Teig ausrollen',withFact),[]);
+});
+
+test('unsupported claims stop the plan: needs_input with product_data_uncertain, no approval, and the publication gate agrees',async()=>{
+  const {runContentJob}=require('../.test-build/lib/content/orchestrator');
+  const {opportunitySchema}=require('../.test-build/lib/content/schema');
+  const {facebookPagePublicationError}=require('../.test-build/lib/meta/publication-eligibility');
+  const opportunity=opportunitySchema.parse({product:{productVerifiedAt:new Date().toISOString(),productVerifiedName:'Backofen Matte Hitzebeständig',name:'Backofen Matte Hitzebeständig',sourceUrl:'https://www.amazon.de/dp/B0CM14MKY8',affiliateUrl:'https://www.amazon.de/dp/B0CM14MKY8?tag=alltaeglichle-21',asin:'B0CM14MKY8',price:'',targetGroup:'Hobbybäcker',benefits:'Eignung vor Kauf prüfen',notes:''},
+    useCase:'Teig ausrollen und danach spülmaschinengeeignet reinigen.',targetPlatform:'facebook',budget:'low'});
+  const job=await runContentJob(opportunity,{id:crypto.randomUUID(),mode:'reference',allowedFormats:['image'],loadLearning:async()=>undefined,onUpdate:async()=>{}});
+  if(job.status==='needs_input'){assert.equal(job.error,PRODUCT_DATA_UNCERTAIN);assert.match(job.review.issues[0],/Nicht durch die Produktdaten belegt/);}
+  else{ // the reference writer did not repeat the claim: the final gate must still refuse a draft that does
+    const tampered={...job,status:'approved',content:{...job.content,caption:`${job.content.caption} Einfach Teig ausrollen.`}};
+    assert.match(facebookPagePublicationError(tampered),/Nicht durch die Produktdaten belegt.*dough|Teig ausrollen/);
+  }
+});
+
+test('a scout idea the article does not support is neutralized before it reaches the content plan',async t=>{
+  const {PGlite}=require('@electric-sql/pglite');const loadRoute=require('./helpers/load-route.cjs');
+  const pg=new PGlite();t.after(()=>pg.close());
+  for(const name of fs.readdirSync('db/migrations').filter(n=>n.endsWith('.sql')).sort())await pg.exec(fs.readFileSync(`db/migrations/${name}`,'utf8'));
+  const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
+  const old=process.env.WHATSAPP_APPROVER_WA_ID;process.env.WHATSAPP_APPROVER_WA_ID='491234';t.after(()=>{if(old===undefined)delete process.env.WHATSAPP_APPROVER_WA_ID;else process.env.WHATSAPP_APPROVER_WA_ID=old;});
+  let seenUseCase=null;
+  const daily=loadRoute('lib/daily/draft.ts',{
+    '@/lib/orchestrator':{runProductScout:async()=>({candidates:[{kind:'Saisontrend',name:'Silikon Backmatte',category:'Küche',whyNow:'Backsaison',reelIdea:'Teig ausrollen, in der Spülmaschine reinigen und 250 °C Hitze zeigen.',
+      resolvedProduct:{name:'Backofen Matte Hitzebeständig',productVerifiedName:'Backofen Matte Hitzebeständig',productVerifiedAt:new Date().toISOString(),sourceUrl:'https://www.amazon.de/dp/B0CM14MKY8',affiliateUrl:'https://www.amazon.de/dp/B0CM14MKY8?tag=alltaeglichle-21',asin:'B0CM14MKY8',price:'',targetGroup:'Hobbybäcker',benefits:'Eignung vor Kauf prüfen',notes:''}}]}),
+      runContentJob:async(opportunity,options)=>{seenUseCase=opportunity.useCase;return {id:options.id,status:'needs_input',opportunity,events:[],error:'product_data_uncertain',review:{passed:false,score:35,issues:['Nicht durch die Produktdaten belegt: Teig ausrollen/kneten.']},modelCalls:0,totalTokens:0,revisions:0,mode:'reference'};}},
+    '@/lib/memory/db':{getDatabase:()=>db},
+    '@/lib/whatsapp/client':{WhatsAppRejectedError:Error,sendWhatsAppText:async()=>{throw Error('no message may be sent');},dailyNotificationTemplateConfigured:()=>false,sendDailyNotificationTemplate:async()=>{throw Error('no');}},
+  });
+  const result=await daily.createDailyDraft('2026-10-02','manual:x');
+  assert.doesNotMatch(seenUseCase,/ausrollen|Spülmaschine|250/);assert.match(seenUseCase,/Eignung vor dem Kauf prüfen/);
+  assert.equal(result.status,'needs_input');assert.equal(result.reason,'product_data_uncertain');
+  const row=(await pg.query("SELECT status,scout_report->>'reason' AS reason,scout_report->>'detail' AS detail FROM daily_drafts")).rows[0];
+  assert.deepEqual(row,{status:'needs_input',reason:'product_data_uncertain',detail:'Nicht durch die Produktdaten belegt: Teig ausrollen/kneten.'});
+  assert.equal((await pg.query('SELECT count(*)::int AS n FROM publication_requests')).rows[0].n,0);
+});
+
+test('a stale snapshot of another article cannot leak its properties into new content',()=>{
+  const oldSnapshotContent={title:'Kürbis-Schnitzset 10 Teile',caption:'Spülmaschinengeeignet, 10 Stück, lebensmittelecht und bis 250 °C hitzebeständig.'};
+  const newProduct={name:'Wäschekorb faltbar grau',productVerifiedName:'Wäschekorb faltbar grau',asin:'B000000009'};
+  const opportunity={product:newProduct,verifiedFacts:[]};
+  const ids=unsupportedProductClaims(opportunity,oldSnapshotContent).map(claim=>claim.id);
+  for(const id of ['dishwasher','food_safe','heat'])assert.ok(ids.includes(id),id);
+  assert.ok(ids.some(id=>id.startsWith('number:10stück')));
+  assert.deepEqual(unsupportedProductClaims(opportunity,{title:'Ordnung im Bad',caption:'Der Wäschekorb ist faltbar und grau.'}),[]);
 });

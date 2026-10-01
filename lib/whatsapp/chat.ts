@@ -26,7 +26,7 @@ export async function conversationalReply(body: string, history: History[], quot
     conversation: history.slice(-6).map(item => ({ operator: item.operator_text.slice(0, 700), assistant: item.reply_text.slice(0, 1000) })) });
   if (context.length > 9000) return "Die Nachricht ist für diesen Gesprächsweg zu lang. Bitte stelle die Frage kürzer; es wurde nichts geändert.";
   try {
-    const response = await request(`https://api.replicate.com/v1/models/${MODEL}/predictions`, {
+    const post = () => request(`https://api.replicate.com/v1/models/${MODEL}/predictions`, {
       method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Prefer: "wait=20", "Cancel-After": "40s" },
       redirect: "error", signal: AbortSignal.timeout(25000),
       body: JSON.stringify({ input: { max_completion_tokens: 550, reasoning_effort: "none", verbosity: "low",
@@ -34,7 +34,13 @@ export async function conversationalReply(body: string, history: History[], quot
         prompt: context,
       } }),
     });
-    if (!response.ok) throw Error("chat_provider_unavailable");
+    let response = await post();
+    if (response.status === 429) { // rejected before inference: one retry after the advertised wait is safe
+      const wait = Math.min(15, Math.max(2, Number((await response.text().catch(() => "")).match(/retry_after"?:\s*(\d+)/)?.[1]) || 8));
+      await new Promise(resolve => setTimeout(resolve, wait * 1000));
+      response = await post();
+    }
+    if (!response.ok) throw Error(`chat_http_${response.status}`);
     let prediction = await response.json() as { id?: string; status?: string; output?: unknown };
     if (!prediction.id || !/^[a-z0-9]{12,64}$/.test(prediction.id)) throw Error("chat_provider_unavailable");
     for (let attempt = 0; ["starting", "processing"].includes(prediction.status || "") && attempt < 8; attempt++) {
@@ -52,8 +58,8 @@ export async function conversationalReply(body: string, history: History[], quot
         ? prediction.output.join("") : "";
     if (prediction.status !== "succeeded" || !output.trim() || output.length > 5000) throw Error("chat_provider_unavailable");
     return output.trim().slice(0, 1800);
-  } catch {
-    console.warn(JSON.stringify({ event: "whatsapp_chat_unavailable", model: MODEL }));
+  } catch (error) {
+    console.warn(JSON.stringify({ event: "whatsapp_chat_unavailable", model: MODEL, reason: error instanceof Error ? error.message.slice(0, 40) : "unknown" }));
     return "Ich konnte gerade keine sichere Antwort formulieren. Der offene Auftrag und seine Freigaben bleiben unverändert. Bitte sende deine Frage als neue Nachricht; dieselbe Nachricht wird nicht erneut berechnet.";
   }
 }
