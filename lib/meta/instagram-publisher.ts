@@ -9,6 +9,15 @@ export function organicReelPayload(videoUrl: string, caption: string, shoppingUr
   return new URLSearchParams({ media_type: "REELS", video_url: videoUrl, caption, share_to_feed: "false" });
 }
 
+export function validInstagramImageUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password && !url.search
+      && url.hostname.endsWith(".public.blob.vercel-storage.com")
+      && /^\/generated\/instagram\/[0-9a-f-]{36}\/[a-f0-9]{64}\.jpg$/.test(url.pathname);
+  } catch { return false; }
+}
+
 export class InstagramPublishFailure extends Error {
   constructor(public phase: "connection" | "container" | "status" | "publish" | "permalink", public detail: string,
     public httpStatus = 0, public code = 0, public subcode = 0) { super("Instagram Graph API did not confirm the requested operation"); }
@@ -47,6 +56,16 @@ export async function instagramGraph(transport: typeof fetch = fetch) {
       }
       const result = await graph(`${instagramId}/media`,token.token,version,transport,"container",
         organicReelPayload(videoUrl, caption));
+      if (!/^\d+$/.test(result.id || "")) throw new InstagramPublishFailure("container","missing_container_id");
+      return result.id!;
+    },
+    // Feed image: Instagram accepts JPEG only. The caller converts the approved PNG.
+    async createImage(imageUrl: string, caption: string) {
+      if (!validInstagramImageUrl(imageUrl) || !caption.trim() || caption.length > 2200) {
+        throw new InstagramPublishFailure("container","invalid_media_or_caption");
+      }
+      const result = await graph(`${instagramId}/media`,token.token,version,transport,"container",
+        new URLSearchParams({ image_url: imageUrl, caption }));
       if (!/^\d+$/.test(result.id || "")) throw new InstagramPublishFailure("container","missing_container_id");
       return result.id!;
     },

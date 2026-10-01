@@ -32,14 +32,14 @@ export async function requestFacebookApproval(jobId:string){
   if(!recent.rows.length)return {publication,whatsapp:"approved_template_required" as const};
   await repo.claimWhatsAppSend(publication.id);
   try {
-    const messageId=await sendWhatsAppText(`Veröffentlichungsfreigabe für Facebook
+    const messageId=await sendWhatsAppText(`Veröffentlichungsfreigabe für Facebook und Instagram (gemeinsam)
 Produkt/Beitrag: ${publication.caption.slice(0,125)}
 Bild: ${publication.imageUrl}
 
 Beitrag:
 ${publication.caption.slice(0,1850)}
 
-Antworte auf DIESE Nachricht mit „Freigeben“ für genau einen Post oder „Ablehnen“. Änderungen bitte als Text. Ein bloßes „ja“ reicht nicht.`);
+Der Beitrag geht als Bildpost auf Facebook und Instagram; auf Instagram ist der Link im Text nicht klickbar. Keine Story. Antworte auf DIESE Nachricht mit „Freigeben“ für genau einen Post oder „Ablehnen“. Änderungen bitte als Text. Ein bloßes „ja“ reicht nicht.`);
     publication=await repo.bindMessage(publication.id,messageId);
     return {publication,approvalSent:true};
   } catch (error) {

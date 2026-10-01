@@ -15,7 +15,7 @@ import { createDailyDraft, sendDailyApproval, sendPendingDailyApprovals } from "
 import { startImagePostFromWhatsApp } from "@/lib/whatsapp/start-image-post";
 import { answerWhatsAppConversation } from "@/lib/whatsapp/chat";
 import { sendWhatsAppText } from "@/lib/whatsapp/client";
-import { sendStoryHandoff } from "@/lib/meta/story-handoff";
+import { publishInstagramImage, resumeInstagramImages } from "@/lib/meta/instagram-image";
 import { deliverWeeklyReport } from "@/lib/reporting/weekly";
 import { latestImagePostsStatus } from "@/lib/reporting/whatsapp-status";
 import { extractIncomingWhatsAppMessages, verifyMetaWebhookSignature, verifyWhatsAppChallenge } from "@/lib/whatsapp/security";
@@ -76,6 +76,8 @@ export async function POST(request: Request) {
         const claimed=await getDatabase().query("INSERT INTO whatsapp_events(message_id,wa_id,reply_to_message_id,body,payload) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING RETURNING message_id",[message.id,message.from,message.replyToMessageId,message.body,JSON.stringify(payload)]);
         if(claimed.rows.length){
           const correctionStatus=await recoverLatestInstruction(getDatabase(),message.from.replace(/\D/g,""),sendDailyApproval);
+          try { await resumeInstagramImages(); }
+          catch { console.error(JSON.stringify({ event: "instagram_image_resume_unavailable" })); }
           await recoverRunwayPreflightIncident();
           const status=await latestInstagramReelStatus();
           const imageStatus = await latestImagePostsStatus(getDatabase());
@@ -159,8 +161,9 @@ export async function POST(request: Request) {
           phase = "persist";
           await publicationRepo.published(claimed.id, posted.id, posted.permalink);
           console.info(JSON.stringify({ event: "facebook_publication", publicationId: claimed.id, status: "published" }));
-          try { await sendStoryHandoff(claimed.id); }
-          catch { console.warn(JSON.stringify({ event: "story_handoff_unavailable", publicationId: claimed.id })); }
+          // The same approval covers the Instagram feed image. It never retries an unknown result.
+          try { await publishInstagramImage(claimed.id); }
+          catch { console.error(JSON.stringify({ event: "instagram_image_unavailable", publicationId: claimed.id })); }
         } catch (error) {
           await publicationRepo.markUnknown(claimed.id);
           console.error(JSON.stringify({ event: "facebook_publication", publicationId: claimed.id, status: "unknown",

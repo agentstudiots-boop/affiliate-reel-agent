@@ -102,3 +102,25 @@ Entwürfe bis 48 h alt). Empfehlung: die Tagesnachricht **vor 09:00 MESZ** sende
 Abend-Slot im Fenster. Ohne diese Nachricht gibt es keine zugestellte Freigabe; das ist eine bewusste
 Einschränkung, kein Fehler. Planung Trend-Posts (Text+Bild, Instagram+Facebook, gemeinsame Freigabe, zusätzlich
 zu den zwei Tagesposts) erst nach Bestätigung des Tagesablaufs.
+
+## 01.10.2026: Instagram-Bildpost, keine Stories
+
+**Befund:** Instagram-Veröffentlichung existierte nur für Reels (`media_type=REELS`). Für Bildposts gab es keinen
+Instagram-Weg; die Veröffentlichungsfreigabe publizierte ausschließlich das Facebook-Foto. Das Bild wurde deshalb nie auf
+Instagram gepostet. (Logs des Tages wegen Vercel-Billing-Limit nicht lesbar; die Ursache folgt aus dem Code, nicht aus Logs.)
+Stories: Meta-Dokumentation – Instagram-Stories-API ohne Caption/Link, Facebook-Foto-Stories ignorieren Text. Betreiber
+entschied: **keine Story posten und keine Story-Vorlage senden**. `story-handoff` samt Aufruf und Test entfernt.
+
+**Neu:** `lib/meta/instagram-image.ts`, Migration `023_instagram_image_posts.sql`.
+Nach erfolgreicher Facebook-Veröffentlichung (dieselbe, gemeinsame Veröffentlichungsfreigabe) wird das freigegebene Bild
+einmalig auf Instagram gepostet: PNG laden (nur eigener Blob-Pfad), mit `sharp` zu JPEG (Instagram verlangt JPEG;
+Seitenverhältnis 4:5–1,91:1, sonst Fehlermeldung statt Zuschnitt), nach `generated/instagram/<job>/<sha>.jpg` hochladen,
+Container (`image_url`, Caption = Facebook-Caption mit „Werbung | Affiliate-Link" nach dem Einstieg und Produktlink),
+Status abfragen (max. ca. 24 s), `media_publish` genau einmal. Claim vor jedem Graph-Schreibzugriff; unklares
+Publish-Ergebnis wird `unknown` und nie wiederholt. Noch verarbeitender Container wird per „Status" einmalig
+veröffentlicht. Jeder Ausgang kommt als WhatsApp an den Betreiber. Der Link im Instagram-Text ist nicht klickbar.
+Veröffentlichungsfreigabe-Text nennt jetzt Facebook und Instagram gemeinsam.
+
+**Tests:** lokal 202/202 (u. a. echte JPEG-Konvertierung, Einmalpublish, abgelehnter Container, unklares Ergebnis,
+Seitenverhältnis). **Nicht belegt:** Instagram-Berechtigung/-Konto für Feed-Bilder, JPEG-Annahme durch Meta und Zustellung
+produktiv. Erste echte Probe: nächste Veröffentlichungsfreigabe.
