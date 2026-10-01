@@ -23,23 +23,29 @@ export function replacementRequest(body: string): ReplacementRequest | null {
   return other || find || findInstead ? {} : null;
 }
 
-// Stops the open draft the operator is replacing. Only drafts still waiting for the
-// content approval qualify; anything further along keeps its own approval gates.
-export async function supersedeOpenDraft(db: Database, replyToMessageId: string | null) {
+// Stops the open draft the operator is replacing (like „Ablehnen“): content stage or a not yet
+// attempted publication request. The exact ASIN stays locked for seven days so it is not offered
+// again right away; only the family lock is released so a similar but different product can follow.
+export async function supersedeOpenDraft(db: Database, replyToMessageId: string | null, jobId: string | null = null) {
   return db.transaction(async sql => {
-    const open = await sql.query(`SELECT d.job_id,j.snapshot->'opportunity'->'product'->>'name' AS name
-      FROM daily_drafts d JOIN content_jobs j ON j.id=d.job_id
-      WHERE d.status IN ('awaiting_approval','changes_requested') AND d.whatsapp_message_id IS NOT NULL
-        AND d.created_at>now()-interval '36 hours' AND j.status='awaiting_approval'
-        AND ($1::text IS NULL OR d.whatsapp_message_id=$1)
-      ORDER BY d.created_at DESC LIMIT 1 FOR UPDATE OF d`, [replyToMessageId]);
+    const open = await sql.query(`SELECT j.id AS job_id,j.snapshot->'opportunity'->'product'->>'name' AS name
+      FROM content_jobs j
+      LEFT JOIN daily_drafts d ON d.job_id=j.id AND d.status IN ('awaiting_approval','changes_requested') AND d.whatsapp_message_id IS NOT NULL
+      LEFT JOIN publication_requests p ON p.job_id=j.id AND p.platform='facebook' AND p.status IN ('pending','changes_requested')
+        AND p.whatsapp_message_id IS NOT NULL AND p.publish_attempted_at IS NULL
+      WHERE (d.job_id IS NOT NULL OR p.job_id IS NOT NULL) AND j.status IN ('awaiting_approval','approved')
+        AND j.updated_at>now()-interval '36 hours'
+        AND ($2::text IS NULL OR j.id::text=$2)
+        AND ($1::text IS NULL OR d.whatsapp_message_id=$1 OR p.whatsapp_message_id=$1)
+      ORDER BY j.updated_at DESC LIMIT 1 FOR UPDATE OF j`, [replyToMessageId, jobId]);
     const row = open.rows[0];
     if (!row) return null;
-    const jobId = String(row.job_id);
-    await sql.query("UPDATE daily_drafts SET status='needs_input',feedback='replaced_by_operator',updated_at=now() WHERE job_id=$1", [jobId]);
-    await sql.query("UPDATE content_jobs SET status='needs_input',updated_at=now() WHERE id=$1", [jobId]);
-    await sql.query("UPDATE content_approval_requests SET status='rejected',feedback='replaced_by_operator',decided_at=now() WHERE job_id=$1 AND status='pending'", [jobId]);
-    await sql.query("DELETE FROM product_selection_locks WHERE job_id=$1", [jobId]);
-    return { jobId, name: String(row.name || "") };
+    const id = String(row.job_id);
+    await sql.query("UPDATE daily_drafts SET status='needs_input',feedback='replaced_by_operator',updated_at=now() WHERE job_id=$1 AND status IN ('awaiting_approval','changes_requested','content_approved')", [id]);
+    await sql.query("UPDATE publication_requests SET status='rejected',feedback='replaced_by_operator',decided_at=now(),updated_at=now() WHERE job_id=$1 AND status IN ('preparing','pending','changes_requested') AND publish_attempted_at IS NULL", [id]);
+    await sql.query("UPDATE content_jobs SET status='needs_input',updated_at=now() WHERE id=$1", [id]);
+    await sql.query("UPDATE content_approval_requests SET status='rejected',feedback='replaced_by_operator',decided_at=now() WHERE job_id=$1 AND status='pending'", [id]);
+    await sql.query("DELETE FROM product_selection_locks WHERE job_id=$1 AND key LIKE 'family:%'", [id]);
+    return { jobId: id, name: String(row.name || "") };
   });
 }

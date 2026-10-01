@@ -12,7 +12,8 @@ import { requestVideoCostApproval } from "@/lib/production/request-cost-approval
 import { getDatabase } from "@/lib/memory/db";
 import { parseJob } from "@/lib/content/history";
 import { createDailyDraft, sendDailyApproval, sendPendingDailyApprovals } from "@/lib/daily/draft";
-import { startImagePostFromWhatsApp } from "@/lib/whatsapp/start-image-post";
+import { routeOperatorMessage } from "@/lib/whatsapp/router";
+import { startImagePostFromWhatsApp, startProductSearch } from "@/lib/whatsapp/start-image-post";
 import { answerWhatsAppConversation } from "@/lib/whatsapp/chat";
 import { sendWhatsAppText } from "@/lib/whatsapp/client";
 import { publishInstagramImage, resumeInstagramImages } from "@/lib/meta/instagram-image";
@@ -69,7 +70,8 @@ export async function POST(request: Request) {
     } catch { console.error(JSON.stringify({ event: "reel_continuation_unavailable" })); }
   });
   let failed = false;
-  for (const message of messages) {
+  for (const incoming of messages) {
+    let message = incoming;
     try {
       if (/^(status|weiter)[.!?]*$/i.test(message.body.trim())
         && message.from.replace(/\D/g, "") === (process.env.WHATSAPP_APPROVER_WA_ID || "").replace(/\D/g, "")) {
@@ -85,8 +87,23 @@ export async function POST(request: Request) {
         }
         continue;
       }
-      if (await startImagePostFromWhatsApp({ ...message, payload }, getDatabase, createDailyDraft, sendWhatsAppText)) continue;
-      if (await answerWhatsAppConversation({ ...message, payload })) continue;
+      // Free language first: one bounded interpretation, then deterministic execution through the existing gates.
+      let skipKeywordStages = false;
+      if (process.env.WHATSAPP_ROUTER_ENABLED !== "false") {
+        // The router must never block a message: any failure before it acts falls back to the keyword chain.
+        const routed = await routeOperatorMessage({ ...message, payload }, {
+          searchProduct: (input, request) => startProductSearch(input, { ...request, replyToMessageIdForReplace: null }, getDatabase(), createDailyDraft, sendWhatsAppText),
+          converse: (input, facts) => answerWhatsAppConversation(input, { force: true, facts }),
+        }).catch(error => {
+          console.error(JSON.stringify({ event: "whatsapp_route_failed", failureType: error instanceof Error ? error.name : "unknown" }));
+          return { handled: false as const } as Awaited<ReturnType<typeof routeOperatorMessage>>;
+        });
+        if (routed.handled) continue;
+        if (routed.message) { message = { ...message, body: routed.message.body, replyToMessageId: routed.message.replyToMessageId }; }
+        skipKeywordStages = !!routed.skipKeywordStages;
+      }
+      if (!skipKeywordStages && await startImagePostFromWhatsApp({ ...message, payload }, getDatabase, createDailyDraft, sendWhatsAppText)) continue;
+      if (!skipKeywordStages && await answerWhatsAppConversation({ ...message, payload })) continue;
       if (await handleContentApproval({ ...message, payload }, async jobId => {
         try {
           const record=await getDatabase().query("SELECT snapshot FROM content_jobs WHERE id=$1",[jobId]);

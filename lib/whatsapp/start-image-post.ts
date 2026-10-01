@@ -56,7 +56,7 @@ export async function startImagePostFromWhatsApp(input: IncomingWhatsAppMessage 
   const trusted = (process.env.WHATSAPP_APPROVER_WA_ID || "").replace(/\D/g, "");
   if (!trusted || input.from.replace(/\D/g, "") !== trusted) return true;
   const db=database();
-  if (!command && replacement) return replaceProduct(input, replacement, db, start, send);
+  if (!command && replacement) return startProductSearch(input, { search: replacement.search, replace: true, replyToMessageIdForReplace: input.replyToMessageId }, db, start, send);
   if (!command) return false;
   let sourceId=input.id;
   if (quotedNewProduct && !command?.link) {
@@ -129,28 +129,27 @@ export async function startImagePostFromWhatsApp(input: IncomingWhatsAppMessage 
   return true;
 }
 
-// Replacing the product of an open draft: stop the draft (like „Ablehnen“), then search the named product.
-async function replaceProduct(input: IncomingWhatsAppMessage & { payload: unknown }, request: { search?: string }, db: Database,
-  start: typeof import("../daily/draft").createDailyDraft, send: typeof sendWhatsAppText) {
+// Product search, optionally replacing an open draft (stop it like „Ablehnen“, then search).
+// A missing search term starts the open TrendScout search; the system chooses the product.
+export async function startProductSearch(input: IncomingWhatsAppMessage & { payload: unknown },
+  request: { search?: string | null; replaceDraftId?: string | null; replace?: boolean; replyToMessageIdForReplace?: string | null; note?: string | null },
+  db: Database, start: typeof import("../daily/draft").createDailyDraft, send: typeof sendWhatsAppText) {
   const claim = await db.query(
     "INSERT INTO whatsapp_events(message_id,wa_id,reply_to_message_id,body,payload) VALUES($1,$2,$3,$4,$5) ON CONFLICT(message_id) DO NOTHING RETURNING message_id",
     [input.id, input.from, input.replyToMessageId, input.body, JSON.stringify(input.payload)]);
   if (!claim.rows.length) return true;
-  if (!request.search) {
-    await send("Verstanden, du willst ein anderes Produkt. Welches soll ich suchen? Schreibe zum Beispiel „Finde stattdessen Silpat Backmatte“. Der aktuelle Entwurf bleibt bis dahin unverändert; es wurde nichts produziert oder veröffentlicht.");
-    return true;
-  }
-  const replaced = await supersedeOpenDraft(db, input.replyToMessageId);
+  const search = request.search?.trim() || undefined;
+  const replaced = request.replace || request.replaceDraftId ? await supersedeOpenDraft(db, request.replyToMessageIdForReplace ?? null, request.replaceDraftId ?? null) : null;
   const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const slot = `manual:${createHash("sha256").update(input.id).digest("hex")}`;
-  await send(`${replaced ? `Alten Entwurf${replaced.name ? ` („${replaced.name.slice(0, 60)}“)` : ""} gestoppt. ` : ""}Ich suche jetzt „${request.search}“ und schicke dir danach eine neue Inhaltsfreigabe. Das dauert einen Moment; es wurde nichts produziert oder veröffentlicht.`);
-  const result = await start(day, slot, undefined, request.search);
+  await send(`${replaced ? `Alten Entwurf${replaced.name ? ` („${replaced.name.slice(0, 60)}“)` : ""} gestoppt. ` : ""}Ich suche jetzt ${search ? `„${search}“` : "ein neues Produkt"} und schicke dir danach eine neue Inhaltsfreigabe.${request.note ? ` ${request.note}` : ""} Das dauert einen Moment; es wurde nichts produziert oder veröffentlicht.`);
+  const result = await start(day, slot, undefined, search);
   if (result.status === "failed" || result.status === "needs_input") {
-    const reason = result.reason === "product_unresolved" ? "Ich konnte dazu keine passende, sicher geprüfte Amazon-Produktseite finden. Nenne bitte eine genauere Produktart oder sende einen Amazon-Link mit „Neuer Auftrag“."
-      : result.reason === "product_repeat_blocked" ? "Dieses Produkt oder seine Produktfamilie wurde in den letzten sieben Tagen schon verwendet."
+    const reason = result.reason === "product_unresolved" ? "Ich konnte dazu keine passende, sicher geprüfte Amazon-Produktseite finden. Nenne bitte eine genauere Produktart oder sende einen Amazon-Link."
+      : result.reason === "product_repeat_blocked" ? "Dieses Produkt oder seine Produktfamilie wurde in den letzten sieben Tagen schon verwendet oder gerade abgelehnt."
       : result.reason === "amazon_verification_blocked" ? "Amazon hat die automatische Prüfung blockiert."
       : "Die Planung konnte nicht abgeschlossen werden. Schreibe „Status“ für den Grund.";
-    await send(`Suche nach „${request.search}“: ${reason} Nichts veröffentlicht.`);
+    await send(`Suche${search ? ` nach „${search}“` : ""}: ${reason} Nichts veröffentlicht.`);
   } else if (result.status === "awaiting_approval" && result.whatsapp !== "approval_sent") {
     await send("Der neue Entwurf ist gespeichert, die Freigabenachricht konnte noch nicht zugestellt werden. Schreibe „Status“, dann sende ich sie.");
   }

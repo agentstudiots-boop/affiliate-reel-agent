@@ -353,7 +353,7 @@ test('"Finde ein Artikel Silpat Matte" replaces the open draft and searches the 
   assert.equal(started.length,1);assert.equal(started[0][2],undefined);assert.equal(started[0][3],'silpat matte');
   const row=(await pg.query("SELECT status,feedback FROM daily_drafts WHERE slot='afternoon'")).rows[0];
   assert.deepEqual(row,{status:'needs_input',feedback:'replaced_by_operator'});
-  assert.equal((await pg.query('SELECT count(*)::int AS n FROM product_selection_locks')).rows[0].n,0);
+  assert.equal((await pg.query("SELECT count(*)::int AS n FROM product_selection_locks WHERE key LIKE 'family:%'")).rows[0].n,0);
   assert.match(sent[0],/Alten Entwurf.*gestoppt/);assert.ok(!sent.some(text=>/Content Studio/.test(text)));
   // A replayed webhook delivery starts nothing again.
   await startImagePostFromWhatsApp(message,db,start,async()=>'wamid.y');assert.equal(started.length,1);
