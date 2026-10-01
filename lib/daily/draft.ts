@@ -175,6 +175,15 @@ export function berlinDay(now = new Date()) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
 }
 
+// One structured line per slot step; fields are ids, states and clipped error text only.
+function slotLog(event: string, fields: Record<string, unknown>) {
+  console.info(JSON.stringify({ event, ...fields }));
+}
+function safeReason(error: unknown) {
+  const text = error instanceof Error ? error.message : String(error);
+  return text.replace(/https?:\/\/\S+/g, "<url>").replace(/[A-Za-z0-9_-]{32,}/g, "<redacted>").slice(0, 160);
+}
+
 // Each scheduled slot or explicit operator message has its own durable claim.
 // A retry of that slot/message never buys a second search or sends another approval.
 export async function createDailyDraft(day = berlinDay(), slot = "morning", productQuery?: string, productSearch?: string) {
@@ -190,9 +199,20 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
   );
   if (!claim.rows.length) {
     if (slot.startsWith("manual:")) return { status: "already_claimed" as const };
+    const existing = await db.query(
+      "SELECT job_id,status,attempts,whatsapp_message_id IS NOT NULL AS delivered,notification_message_id IS NOT NULL AS notified,updated_at FROM daily_drafts WHERE day=$1 AND slot=$2", [day, slot]);
+    const row = existing.rows[0];
+    const slotState = !row ? "unknown" : row.delivered || row.notified ? "done"
+      : ["claimed", "planning"].includes(String(row.status)) ? "in_progress" : "open";
     const retry = await reclaimScheduledSlot(db, day, slot, jobId);
-    if (!retry) return { status: "already_claimed" as const, ...(await resendPendingApproval(db, day, slot)) };
-  }
+    slotLog("daily_slot_claim", { day, slot, claim: retry ? "reclaimed" : "rejected", slotState,
+      status: row?.status, attempts: row?.attempts, jobId: String(row?.job_id ?? ""), attemptJobId: retry ? jobId : undefined });
+    if (!retry) {
+      if (slotState === "open" && Number(row?.attempts) >= MAX_SLOT_ATTEMPTS && ["failed", "needs_input"].includes(String(row?.status)))
+        console.error(JSON.stringify({ event: "daily_slot_exhausted", day, slot, status: row.status, attempts: row.attempts, jobId: String(row.job_id) }));
+      return { status: "already_claimed" as const, ...(await resendPendingApproval(db, day, slot)) };
+    }
+  } else slotLog("daily_slot_claim", { day, slot, claim: "accepted", jobId });
 
   let stage = "product_search";
   try {
@@ -222,6 +242,7 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
     const rotation = openSearch ? createHash("sha256").update(slot).digest().readUInt32BE(0)
       : new Date(`${day}T00:00:00Z`).getUTCDate() + (slot === "afternoon" ? 1 : 0);
     await db.query("UPDATE daily_drafts SET status='planning',scout_report=$2,updated_at=now() WHERE job_id=$1", [jobId, JSON.stringify(report ? {requestedSearch:productSearch,report}: { requestedProduct: productQuery })]);
+    slotLog("daily_slot_stage", { day, slot, jobId, stage: "product_found", candidates: candidates.length });
     stage = "product_verification";
     let requestedProduct: Awaited<ReturnType<typeof resolveRequestedProduct>> | null = null;
     if (productQuery) {
@@ -260,6 +281,7 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
       useCase: isBathtubMat(selectedProduct.name) ? bathtubMatUseCase : scoutUseCase || `Das Produkt ${selectedProduct.name} im Alltag verwenden und die Eignung vor dem Kauf prüfen.`, trend: candidate?.whyNow || "", goal: "education", budget: "low", verifiedFacts: [],
     };
     stage = "content_planning";
+    slotLog("daily_slot_stage", { day, slot, jobId, stage });
     const repo = memoryRepository(db);
     const approver=(process.env.WHATSAPP_APPROVER_WA_ID||"").replace(/\D/g,"");
     const corrections=await loadApprovedEditorialCorrections(db,approver,opportunity);
@@ -276,10 +298,14 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
     await db.query("UPDATE daily_drafts SET status=$2,updated_at=now() WHERE job_id=$1", [jobId, status]);
     if (status !== "awaiting_approval") await releaseProduct(db,jobId);
     if (status === "awaiting_approval") {
+      slotLog("daily_slot_stage", { day, slot, jobId, stage: "draft_saved" });
       stage = "whatsapp_send";
+      slotLog("daily_slot_stage", { day, slot, jobId, stage });
       // Meta accepts free-form texts only within the 24-hour service window.
       // An approved business-initiated template is a separate configuration step.
-      return { status, jobId, whatsapp: await deliverDailyApproval(db, jobId) };
+      const whatsapp = await deliverDailyApproval(db, jobId);
+      slotLog("daily_slot_whatsapp", { day, slot, jobId, whatsapp, slotCompleted: whatsapp === "approval_sent" || whatsapp === "notification_sent" });
+      return { status, jobId, whatsapp };
     }
     const reason = missingCaption ? "missing_caption" as const
       : gateError ? "publication_gate_failed" as const
@@ -299,7 +325,7 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
       ? job.review?.issues.slice(0, 3).map(issue => issue.slice(0, 180)) : undefined };
   } catch (error) {
     // Preserve the one-time claim. Ambiguous network outcomes must not retry.
-    console.error(JSON.stringify({event:"daily_draft_failed",jobId,stage,
+    console.error(JSON.stringify({event:"daily_draft_failed",day,slot,jobId,stage,reason:safeReason(error),
       errorType:error instanceof Error?error.name:"unknown"}));
     // A complete, validated plan must survive a failed WhatsApp send. Marking it
     // failed would let a retry plan a second draft next to a possibly delivered one.
