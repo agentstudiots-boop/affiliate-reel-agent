@@ -65,7 +65,7 @@ test('category filter uses the stored job category; categories list only what ex
   const household=await loadPublishedProducts(f.db,'household');
   assert.deepEqual(household.items.map(item=>item.name),['C','A']);
   assert.equal((await loadPublishedProducts(f.db,'technology')).items.length,0);
-  assert.equal(categoryLabel('unbekannt'),'unbekannt');
+  assert.equal(categoryLabel('unbekannt'),'Unbekannt');
 });
 
 test('headings are short, decoded and repaired Amazon titles',()=>{

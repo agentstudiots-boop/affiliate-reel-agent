@@ -20,6 +20,7 @@ export type RouterDeps = {
   send?: typeof sendWhatsAppText;
   searchProduct: (input: Message, request: { search: string | null; replaceDraftId: string | null; replace: boolean; note: string | null }) => Promise<boolean>;
   converse: (input: Message, facts: string) => Promise<boolean>;
+  setCategory?: (input: Message, request: { draftId: string; name: string | null; create: boolean; forceNew: boolean }) => Promise<boolean>;
 };
 
 // Literal gate words keep their exact, deterministic meaning and never reach the model.
@@ -135,6 +136,17 @@ export async function routeOperatorMessage(input: Message, deps: RouterDeps): Pr
       log({ ...base, action: replace ? "replace_product" : "search_product", pipeline: "product_search" });
       await mark(replace ? "replace_product" : "search_product");
       await deps.searchProduct(input, { search: route.search_query?.trim() || null, replaceDraftId: replace ? item!.draft_id : null, replace, note: route.operator_note });
+      return { handled: true };
+    }
+    case "set_category": {
+      if (!item) { log({ ...base, action: ambiguous ? "clarify_target" : "no_open_item" });
+        return reply(ambiguous ? whichQuestion(context) : "Dazu gibt es gerade keinen offenen Entwurf, dessen Kategorie ich ändern könnte. Es wurde nichts geändert.", "clarified"); }
+      if (item.stage !== "content_approval") { log({ ...base, action: "category_after_content_approval" });
+        return reply("Dieser Beitrag wartet schon auf die Veröffentlichungsfreigabe; die Kategorie lässt sich nur vor der Inhaltsfreigabe ändern. Es wurde nichts geändert.", "clarified"); }
+      if (!deps.setCategory) return reply("Die Kategorieänderung ist gerade nicht verfügbar. Es wurde nichts geändert.", "clarified");
+      log({ ...base, action: "set_category", pipeline: "category", category_name: route.category_name, category_create: route.category_create });
+      await mark("set_category");
+      await deps.setCategory(input, { draftId: item.draft_id, name: route.category_name?.trim() || null, create: route.category_create, forceNew: route.category_force_new });
       return { handled: true };
     }
     case "revise_image": case "revise_text": case "revise_both": {

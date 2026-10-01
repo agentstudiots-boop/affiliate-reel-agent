@@ -5,7 +5,8 @@ const text = z.string().min(1).max(2400);
 export const formatSchema = z.enum(["video", "image", "text"]);
 export const opportunitySchema = z.object({
   product: productSchema,
-  category: z.enum(["general", "kitchen", "household", "home_living", "technology", "leisure"]).default("general"),
+  // Stable technical key; display names and the allowed set live in taxonomy.ts and content_categories.
+  category: z.string().regex(/^[a-z][a-z0-9_]{1,39}$/).default("general"),
   useCaseKey: z.string().min(3).max(80).regex(/^[a-z0-9-]+$/).default("general"),
   targetPlatform: z.enum(["any", "facebook", "instagram"]).default("any"),
   useCase: z.string().min(12).max(1600),

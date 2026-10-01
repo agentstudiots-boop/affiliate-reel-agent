@@ -1,3 +1,4 @@
+import { classifyOpportunity } from "../content/category";
 import { requireJobProduct } from "../content/product-contract";
 import { bindAmazonProduct } from "../amazon";
 import { createHash } from "node:crypto";
@@ -20,6 +21,8 @@ export function memoryRepository(db: Database = getDatabase()) {
   return {
     async claim(id: string, opportunity: Opportunity, mode: "reference"|"ai") {
       try { opportunity = { ...opportunity, product: bindAmazonProduct(opportunity.product) }; } catch { /* Unresolved jobs are persisted blocked, never approved. */ }
+      // The stored category must already be final here: later saves keep content_jobs.category authoritative.
+      opportunity = classifyOpportunity(opportunity);
       const now = new Date().toISOString();
       const job: ContentJob = { version: 1, id, createdAt: now, updatedAt: now, status: "queued", mode, opportunity, events: [], revisions: 0, modelCalls: 0, totalTokens: 0 };
       await db.transaction(async sql => {
@@ -34,8 +37,10 @@ export function memoryRepository(db: Database = getDatabase()) {
     },
     async save(job: ContentJob) {
       await db.transaction(async sql => {
-        const locked = await sql.query("SELECT event_sequence,snapshot FROM content_jobs WHERE id=$1 FOR UPDATE",[job.id]);
+        const locked = await sql.query("SELECT event_sequence,snapshot,category FROM content_jobs WHERE id=$1 FOR UPDATE",[job.id]);
         if (!locked.rows.length) throw new Error("Job fehlt in Postgres.");
+        // The stored category (content_jobs.category) is authoritative: no later save may silently change it.
+        job.opportunity = { ...job.opportunity, category: String(locked.rows[0].category) };
         const previous = parseJob(locked.rows[0].snapshot).opportunity.product;
         // Link clearing is permitted for blocked jobs; rebinding an existing job is not.
         const identity = (p: typeof previous) => JSON.stringify([p.name,p.sourceUrl,p.asin,p.productUrl,p.trackingId,p.productVerifiedAt,p.productVerifiedName]);

@@ -13,6 +13,7 @@ import { getDatabase } from "@/lib/memory/db";
 import { parseJob } from "@/lib/content/history";
 import { createDailyDraft, sendDailyApproval, sendPendingDailyApprovals } from "@/lib/daily/draft";
 import { routeOperatorMessage } from "@/lib/whatsapp/router";
+import { changeCategory } from "@/lib/whatsapp/category-change";
 import type { Instruction } from "@/lib/whatsapp/instruction";
 import { startImagePostFromWhatsApp, startProductSearch } from "@/lib/whatsapp/start-image-post";
 import { answerWhatsAppConversation } from "@/lib/whatsapp/chat";
@@ -96,6 +97,7 @@ export async function POST(request: Request) {
         const routed = await routeOperatorMessage({ ...message, payload }, {
           searchProduct: (input, request) => startProductSearch(input, { ...request, replyToMessageIdForReplace: null }, getDatabase(), createDailyDraft, sendWhatsAppText),
           converse: (input, facts) => answerWhatsAppConversation(input, { force: true, facts }),
+          setCategory: (input, request) => changeCategory(input, request, { db: getDatabase(), sendApproval: sendDailyApproval }),
         }).catch(error => {
           console.error(JSON.stringify({ event: "whatsapp_route_failed", failureType: error instanceof Error ? error.name : "unknown" }));
           return { handled: false as const } as Awaited<ReturnType<typeof routeOperatorMessage>>;

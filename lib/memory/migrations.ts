@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { getDatabase, type Database } from "./db";
 
-const migrationNames = ["001_memory.sql", "002_production_gates.sql", "003_faceless_so.sql", "004_daily_drafts.sql", "005_publication_gate.sql", "006_daily_notification.sql", "007_publication_revisions.sql", "008_weekly_reports.sql", "009_original_visual_attempts.sql", "010_replicate_visual_provider.sql", "011_instagram_reel_publications.sql", "012_whatsapp_instructions.sql", "013_operator_language_examples.sql", "014_content_approval_requests.sql", "015_runway_story.sql", "016_multiple_drafts.sql", "017_story_handoffs.sql", "018_approved_editorial_feedback.sql", "019_daily_slot_key.sql", "020_product_selection_locks.sql", "021_whatsapp_chat.sql", "022_daily_slot_retry.sql", "023_instagram_image_posts.sql", "024_whatsapp_routes.sql", "025_landing_clicks.sql"] as const;
+const migrationNames = ["001_memory.sql", "002_production_gates.sql", "003_faceless_so.sql", "004_daily_drafts.sql", "005_publication_gate.sql", "006_daily_notification.sql", "007_publication_revisions.sql", "008_weekly_reports.sql", "009_original_visual_attempts.sql", "010_replicate_visual_provider.sql", "011_instagram_reel_publications.sql", "012_whatsapp_instructions.sql", "013_operator_language_examples.sql", "014_content_approval_requests.sql", "015_runway_story.sql", "016_multiple_drafts.sql", "017_story_handoffs.sql", "018_approved_editorial_feedback.sql", "019_daily_slot_key.sql", "020_product_selection_locks.sql", "021_whatsapp_chat.sql", "022_daily_slot_retry.sql", "023_instagram_image_posts.sql", "024_whatsapp_routes.sql", "025_landing_clicks.sql", "026_content_categories.sql"] as const;
 
 export type MigrationResult = {
   applied: string[];

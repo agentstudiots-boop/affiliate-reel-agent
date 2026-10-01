@@ -455,7 +455,7 @@ test('unapplied-correction status explains the reason in plain language without 
 // ---- Regression 01.10. 20:12: „ich will ein anderes Bild mit Halloween-Muffins“ → HTTP 429 im Parser ----
 test('the router understanding is final for a confident image change: no second model call, same safety gates',async t=>{
   const {routedImageInstruction}=require('../.test-build/lib/whatsapp/router');
-  const base={intent:'revise_image',draft_id:null,search_query:null,reject_current:false,operator_note:null,answer:null,clarification_question:null,confidence:0.99,ambiguity:'none',
+  const base={intent:'revise_image',draft_id:null,search_query:null,reject_current:false,operator_note:null,answer:null,category_name:null,category_create:false,category_force_new:false,clarification_question:null,confidence:0.99,ambiguity:'none',
     image_instruction:'Anderes Bild mit Halloween-Muffins und dezenter Halloween-Deko; das Grundkonzept des Bildes bleibt erhalten.'};
   const body='mach ein anderes bild mit halloween muffins und dezenter halloween deko das grundkonzept des bildes ist hervorragend';
   const ready=routedImageInstruction(base,body);
