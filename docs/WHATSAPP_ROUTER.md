@@ -129,3 +129,12 @@ läuft (Produkt unverändert, `keep_content_id`, keine Veröffentlichung, Pflich
 Textänderungen und unsichere Fälle nehmen weiter den geprüften Parser-Weg. (2) **Backoff bei 429:** bis zu zwei Wiederholungen nach der genannten Wartezeit
 (2–15 s, sicher, weil vor der Inferenz abgelehnt); danach der eigene Fehlercode `parser_rate_limited` mit ehrlicher WhatsApp-Meldung statt „Zugang
 funktioniert nicht“. Die inhaltliche Prüfung (z. B. Bildwunsch passt zum Produkt, `visual_context_mismatch`) bleibt aktiv.
+
+## Landingpage `/produkte` (read-only)
+Öffentliche, rein lesende Seite über bereits Gespeichertes; keine neue Tabelle, keine Pipeline, kein Agent, kein Schreibzugriff.
+Quelle: `publication_requests` (`status='published'`, `platform='facebook'`, `image_url`, finale Caption `caption`) ⋈ `content_jobs`
+(`category`, `snapshot.opportunity.product.name/affiliateUrl`) ⟕ `publications.published_at` (Sortierung, sonst `updated_at`), neueste zuerst, max. 120.
+Pro Eintrag: Bild, kurze Überschrift (Amazon-Titel entschlüsselt/gekürzt), freigegebener Beitragstext, Button „Produkt ansehen“ (gespeicherter Affiliate-Link,
+`rel="sponsored noopener noreferrer"`). Kategorienfilter über `?kategorie=<job.category>`, nur vorhandene Kategorien. Einträge ohne eigenes Blob-Bild oder ohne
+gültigen Amazon.de-Produktlink mit Tracking-Tag werden nicht gezeigt. Seitenweite Pflichtangabe: Affiliate-/Amazon-Partner-Hinweis. Code: `lib/landing/published.ts`,
+`app/produkte/page.tsx`. Nicht geprüft: Inhalt der Produktionsdatenbank (kein Zugriff); ob dort veröffentlichte Zeilen alle Felder besitzen, zeigt erst der Aufruf.
