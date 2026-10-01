@@ -6,14 +6,26 @@ import { cleanAmazonTitle } from "../product-resolver";
 // its stored image, the final approved caption, the saved affiliate link and the job category.
 // Nothing is written, nothing is duplicated.
 export type PublishedProduct = {
-  id: string; name: string; imageUrl: string; caption: string; affiliateUrl: string;
+  id: string; contentId: string; name: string; imageUrl: string; excerpt: string; affiliateUrl: string;
   category: string; categoryLabel: string; publishedAt: string;
 };
 
 export const CATEGORY_LABELS: Record<string, string> = {
-  general: "Allgemein", kitchen: "Küche", household: "Haushalt", home_living: "Wohnen & Deko", technology: "Technik", leisure: "Freizeit",
+  general: "Allgemein", kitchen: "Küche", household: "Haushalt", home_living: "Home & Living", technology: "Technik", leisure: "Freizeit",
 };
 export const categoryLabel = (category: string) => CATEGORY_LABELS[category] ?? category;
+
+// Excerpt = a truncation of the approved caption (link and disclosure lines removed, nothing added or reworded).
+export function excerpt(caption: string, length = 180) {
+  const text = caption.split(/\n+/).map(line => line.trim())
+    .filter(line => line && !/^werbung\b/i.test(line) && !/^produkt direkt ansehen/i.test(line) && !/https?:\/\//i.test(line)).join(" ");
+  if (text.length <= length) return text;
+  const window = text.slice(0, length);
+  const sentence = Math.max(window.lastIndexOf(". "), window.lastIndexOf("! "), window.lastIndexOf("? "));
+  if (sentence >= 60) return window.slice(0, sentence + 1);
+  const space = window.lastIndexOf(" ");
+  return `${window.slice(0, space > 60 ? space : length).replace(/[\s,;:–-]+$/, "")} …`;
+}
 
 // Short heading: decoded Amazon title shortened at a word boundary.
 export function shortName(value: unknown, length = 64) {
@@ -39,7 +51,7 @@ function validAffiliate(value: unknown) {
 
 export async function loadPublishedProducts(db: Sql, category?: string | null) {
   const result = await db.query(`
-    SELECT p.id,p.image_url,p.caption,j.category,
+    SELECT p.id,p.job_id,p.image_url,p.caption,j.category,
       COALESCE(pub.published_at,p.updated_at) AS published_at,
       j.snapshot->'opportunity'->'product'->>'name' AS name,
       j.snapshot->'opportunity'->'product'->>'affiliateUrl' AS affiliate_url
@@ -54,7 +66,7 @@ export async function loadPublishedProducts(db: Sql, category?: string | null) {
     if (!validImage(row.image_url) || !validAffiliate(row.affiliate_url)) continue;
     const name = shortName(row.name);
     if (!name) continue;
-    all.push({ id: String(row.id), name, imageUrl: String(row.image_url), caption: String(row.caption).trim(), affiliateUrl: String(row.affiliate_url),
+    all.push({ id: String(row.id), contentId: String(row.job_id), name, imageUrl: String(row.image_url), excerpt: excerpt(String(row.caption)), affiliateUrl: String(row.affiliate_url),
       category: String(row.category), categoryLabel: categoryLabel(String(row.category)), publishedAt: new Date(String(row.published_at)).toISOString() });
   }
   const categories = [...new Map(all.map(item => [item.category, item.categoryLabel])).entries()].map(([value, label]) => ({ value, label }));
