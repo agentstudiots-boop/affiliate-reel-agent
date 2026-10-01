@@ -145,10 +145,11 @@ export async function processOperatorInstruction(input:OperatorMessage,
       });
       notice=result.notice;dailyJobId=result.daily;
     }catch(error){
-      const allowed=['visual_context_mismatch','revision_not_available','revision_unchanged','stale_instruction_context','creative_review_failed','parser_auth_missing','parser_auth_rejected','parser_billing_required','parser_context_too_large','parser_unavailable'];
+      const allowed=['visual_context_mismatch','revision_not_available','revision_unchanged','stale_instruction_context','creative_review_failed','parser_auth_missing','parser_auth_rejected','parser_billing_required','parser_rate_limited','parser_context_too_large','parser_unavailable'];
       const code=error instanceof Error && allowed.includes(error.message)?error.message:'instruction_unclear';
       console.warn(JSON.stringify({event:'instruction_revision_blocked',code,dbCode:typeof error==='object'&&error!==null&&'code' in error?String(error.code):undefined}));
-      if(code.startsWith('parser_'))notice='Deine Anweisung wurde gespeichert, aber der Sprachmodell-Zugang funktioniert momentan nicht. Das ist ein technischer Fehler; du musst die Anweisung nicht anders formulieren. Es wurde nichts produziert oder veröffentlicht.';
+      if(code==='parser_rate_limited')notice='Der Sprachmodell-Zugang ist gerade kurz ausgelastet (Rate-Limit), auch nach Warten. Deine Anweisung ist gespeichert, aber noch nicht umgesetzt. Schicke sie in etwa einer Minute noch einmal; du musst nichts anders formulieren. Es wurde nichts produziert oder veröffentlicht.';
+      else if(code.startsWith('parser_'))notice='Deine Anweisung wurde gespeichert, aber der Sprachmodell-Zugang funktioniert momentan nicht. Das ist ein technischer Fehler; du musst die Anweisung nicht anders formulieren. Es wurde nichts produziert oder veröffentlicht.';
       if(code==='visual_context_mismatch')notice='Das Bildbriefing passt nicht zum bestehenden Produkt. Bitte beschreibe dessen Anwendung. Es wurde kein Bild erzeugt und nichts veröffentlicht.';
       if(code==='revision_not_available')notice='Diese Revision ist im aktuellen Auftragszustand nicht möglich. Schreibe „Status“ oder starte mit „Artikelsuche <Produkt>“ neu. Es wurde nichts produziert oder veröffentlicht.';
       await db.query("UPDATE whatsapp_instructions SET status='clarify',error_code=$2,updated_at=now() WHERE message_id=$1 AND status='parsed'",[input.id,code]);

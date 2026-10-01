@@ -6,12 +6,13 @@ import type { IncomingWhatsAppMessage } from "./security";
 import { loadRouteContext, type OpenItem, type RouteContext } from "./route-context";
 import { interpretMessage, routeSchema, RouterUnavailable, type Route } from "./route-llm";
 import { imagePostCommand } from "./start-image-post";
+import { validateInstruction, type Instruction } from "./instruction";
 import { operatorProductLink } from "./product-link";
 
 export type Message = IncomingWhatsAppMessage & { payload: unknown };
 // handled: the router answered or delegated completely. rewritten: continue the existing gated chain
 // with the resolved target (quoted approval message) and skip the keyword stages in front of it.
-export type RouterResult = { handled: true } | { handled: false; message?: Message; skipKeywordStages?: boolean };
+export type RouterResult = { handled: true } | { handled: false; message?: Message; skipKeywordStages?: boolean; instruction?: Instruction };
 
 export type RouterDeps = {
   database?: Database;
@@ -53,6 +54,20 @@ function target(route: Route, context: RouteContext): { item: OpenItem | null; a
 
 function whichQuestion(context: RouteContext) {
   return `Welchen Entwurf meinst du? ${context.open_items.slice(0, 3).map(item => `„${item.product.slice(0, 70)}“ (${stage(item)})`).join(" oder ")}. Antworte direkt auf dessen Freigabenachricht oder nenne das Produkt. Es wurde nichts geändert.`;
+}
+
+// Only a pure, confident image change for the existing product becomes a ready instruction.
+export function routedImageInstruction(route: Route, body: string): Instruction | undefined {
+  const wish = route.image_instruction?.trim();
+  if (classifyWhatsAppReply(body).intent !== "changes_requested") return undefined; // approve/reject words are never a revision
+  if (route.intent !== "revise_image" || !wish || wish.length < 8 || route.confidence < 0.9 || route.ambiguity === "high" || /https?:\/\/|www\./i.test(wish)) return undefined;
+  const checked = validateInstruction({
+    intent: "revise_image", confidence: route.confidence, keep_product: true, keep_content_id: true,
+    image_instruction: wish.slice(0, 1200), text_instruction: null, product_instruction: null,
+    requires_new_generation: true, requires_new_approval: true, publish_requested: false,
+    product_context_matches: true, text_operations: [],
+  }, body);
+  return checked.intent === "revise_image" ? checked : undefined;
 }
 
 function log(event: Record<string, unknown>) { console.info(JSON.stringify({ event: "whatsapp_route", ...event })); }
@@ -125,9 +140,12 @@ export async function routeOperatorMessage(input: Message, deps: RouterDeps): Pr
     case "revise_image": case "revise_text": case "revise_both": {
       if (!item) { log({ ...base, action: ambiguous ? "clarify_target" : "no_open_item" });
         return reply(ambiguous ? whichQuestion(context) : "Dazu gibt es gerade keinen offenen Entwurf. Nenne mir ein Produkt, das ich suchen soll, dann schicke ich dir eine neue Inhaltsfreigabe. Es wurde nichts geändert.", "clarified"); }
-      log({ ...base, action: "revise_existing", pipeline: "instruction" });
+      // With an unambiguous target and a precise image wish the router's understanding is final: no second paid
+      // parser call (which can hit the provider's rate limit). validateInstruction applies the same safety checks.
+      const instruction = route.intent === "revise_image" ? routedImageInstruction(route, input.body) : undefined;
+      log({ ...base, action: "revise_existing", pipeline: "instruction", second_model_call: !instruction });
       await mark("revise_existing");
-      return { handled: false, message: { ...input, replyToMessageId: item.approval_message_id }, skipKeywordStages: true };
+      return { handled: false, message: { ...input, replyToMessageId: item.approval_message_id }, skipKeywordStages: true, ...(instruction ? { instruction } : {}) };
     }
     case "reject_current": {
       if (!item) { log({ ...base, action: ambiguous ? "clarify_target" : "no_open_item" });
