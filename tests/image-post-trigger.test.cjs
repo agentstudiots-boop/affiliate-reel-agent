@@ -43,7 +43,7 @@ test('WhatsApp starts each explicit image post once, while replies stay with the
   assert.equal(calls.length,1);
   assert.equal(messages.length,0);
   assert.equal(await startImagePostFromWhatsApp({...message,id:'wamid.bad',body:'Bildpost example.com'},()=>db,start,send),true);
-  assert.equal(calls.length,1); assert.match(messages[0],/Bitte sende/);
+  assert.equal(calls.length,1); assert.match(messages[0],/Was soll ich bewerben/);
   for (const [index,body] of ['Artikelsuche Saugroboter','Artikelsuche Produktname Saugroboter',
     'Artikelsuche (Produktname Saugroboter)','Artikelsuche (Saugroboter)','Neue Artikelsuche: Saugroboter',
     'Such mir einen Saugroboter','Finde mir einen Saugroboter'].entries()) {
@@ -160,7 +160,7 @@ test('a quoted product link starts one separate job; an old approval cannot be r
   const onOldApproval={...reply,id:'wamid.old-quote',replyToMessageId:'wamid.old-approval'};
   await db.query("INSERT INTO whatsapp_events(message_id,wa_id,body,payload) VALUES('wamid.old-approval','491234','Freigabe','{}')");
   assert.equal(await startImagePostFromWhatsApp(onOldApproval,()=>db,start,send,resolve),true);
-  assert.equal(starts.length,1);assert.match(sends.at(-1),/Bitte sende/);
+  assert.equal(starts.length,1);assert.match(sends.at(-1),/Was soll ich bewerben/);
   assert.equal(await startImagePostFromWhatsApp({...onOldApproval,id:'wamid.direct-link',body:`Keinen bestehenden Auftrag, erstelle aus diesem Produktlink einen Affiliate Link ${short}`},()=>db,start,send,resolve),true);
   assert.equal(starts.length,2);
   assert.notEqual(starts[0][1],starts[1][1]);

@@ -54,10 +54,10 @@ export async function processOperatorInstruction(input:OperatorMessage,
     : await db.transaction(async sql=>{
     const added=await sql.query("INSERT INTO whatsapp_events(message_id,wa_id,reply_to_message_id,body,payload) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING RETURNING message_id",[input.id,input.from,input.replyToMessageId,input.body,JSON.stringify(input.payload)]);
     if(!added.rows.length)return null;
-    const targets=await sql.query(`SELECT j.id,j.snapshot,p.id AS publication_id FROM content_jobs j
+    const targets=await sql.query(`SELECT j.id,j.snapshot,p.id AS publication_id,GREATEST(j.updated_at,COALESCE(d.updated_at,j.updated_at)) AS last_activity FROM content_jobs j
       LEFT JOIN LATERAL (SELECT * FROM publication_requests WHERE job_id=j.id ORDER BY created_at DESC,revision DESC LIMIT 1) p ON true
       LEFT JOIN daily_drafts d ON d.job_id=j.id
-      WHERE j.status IN ('approved','awaiting_approval')
+      WHERE j.status IN ('approved','awaiting_approval') AND j.updated_at>now()-interval '36 hours'
       AND ((p.platform='facebook' AND p.status IN ('pending','changes_requested') AND p.whatsapp_message_id IS NOT NULL AND p.approver_wa_id=$2)
         OR (d.status IN ('awaiting_approval','changes_requested') AND d.whatsapp_message_id IS NOT NULL))
       AND ($1::text IS NULL OR p.whatsapp_message_id=$1 OR d.whatsapp_message_id=$1 OR EXISTS (SELECT 1 FROM whatsapp_instructions i JOIN whatsapp_events e ON e.message_id=i.message_id
@@ -71,8 +71,11 @@ export async function processOperatorInstruction(input:OperatorMessage,
       LEFT JOIN daily_drafts d ON d.whatsapp_message_id=e.reply_to_message_id
       LEFT JOIN approval_requests a ON a.whatsapp_message_id=e.reply_to_message_id WHERE e.wa_id=$1 AND e.message_id<>$2
       AND e.received_at>now()-interval '30 minutes' ORDER BY e.received_at DESC LIMIT 12`,[input.from,input.id]);
+    // A message minutes after the newest approval, while all other open drafts are hours old, belongs to the newest one.
+    const age=(row:{last_activity?:unknown})=>Date.now()-new Date(String(row.last_activity)).getTime();
+    const recentPick=!input.replyToMessageId&&targets.rows.length>1&&age(targets.rows[0])<60*60_000&&targets.rows.slice(1).every(row=>age(row)>6*60*60_000)?String(targets.rows[0].id):null;
     const targetId=input.replyToMessageId&&targets.rows.length===1?String(targets.rows[0].id):resolveInstructionTarget(input.body,
-      targets.rows.map(row=>({id:String(row.id),job:parseJob(row.snapshot)})),history.rows as {body:string;job_id?:unknown}[],!!competing.rows.length);
+      targets.rows.map(row=>({id:String(row.id),job:parseJob(row.snapshot)})),history.rows as {body:string;job_id?:unknown}[],!!competing.rows.length)||recentPick;
     const row=targets.rows.length<10?targets.rows.find(row=>row.id===targetId)||null:null;
     // An interrupted parse is never retried for the same inbound ID. A new
     // operator message can resolve the job after the bounded inference expires.
@@ -93,7 +96,7 @@ export async function processOperatorInstruction(input:OperatorMessage,
       if(!row?.publication_id&&!held.rows.length)throw Error('stale_instruction_context');
     }
     return {job,publicationId:job?row!.publication_id as string|null:null,
-      targetNotice:targets.rows.length?`Welchen Auftrag meinst du? ${targets.rows.map(row=>{const p=parseJob(row.snapshot).opportunity.product;return `${p.name.slice(0,90)} (ASIN ${p.asin})`;}).join(' oder ')}. Nenne bitte das Produkt oder antworte direkt auf dessen Freigabenachricht. Es wurde nichts produziert oder veröffentlicht.`:noOpenApprovalText};
+      targetNotice:targets.rows.length?`Welchen Auftrag meinst du? ${targets.rows.map(row=>{const p=parseJob(row.snapshot).opportunity.product;return `${p.name.slice(0,90)} ${p.asin?`(ASIN ${p.asin})`:''}`;}).join(' oder ')}. Nenne bitte das Produkt oder antworte direkt auf dessen Freigabenachricht. Es wurde nichts produziert oder veröffentlicht.`:noOpenApprovalText};
   });
   if(!claim)return true; // Durable dedup precedes inference and notifications.
   let instruction:Instruction=clarification();
@@ -121,7 +124,7 @@ export async function processOperatorInstruction(input:OperatorMessage,
           await sql.query("INSERT INTO job_events(job_id,sequence,agent,kind,occurred_at,payload) VALUES($1,$2,$3,$4,$5,$6)",[original.id,event.sequence,event.agent,event.kind,event.at,JSON.stringify(event)]);
           await sql.query("UPDATE daily_drafts SET status='needs_input',updated_at=now() WHERE job_id=$1",[original.id]);
           await sql.query("UPDATE whatsapp_instructions SET status='applied',updated_at=now() WHERE message_id=$1",[input.id]);
-          return {daily:null,notice:"Bitte wähle ein neues konkretes Amazon-Produkt im Content Studio. Der alte Auftrag bleibt gesperrt und seine Produktzuordnung unverändert."};
+          return {daily:null,notice:"Verstanden, der Entwurf wird nicht verwendet; das Produkt bleibt unverändert und der alte Entwurf ist gestoppt. Nenne mir das neue Produkt, zum Beispiel „Artikelsuche Silpat Backmatte“, oder sende einen Amazon-Link. Es wurde nichts produziert oder veröffentlicht."};
         }
         if(parserFailure)throw Error(parserFailure);
         if(!['revise_image','revise_text','revise_both'].includes(instruction.intent))throw Error('clarify');
@@ -138,7 +141,7 @@ export async function processOperatorInstruction(input:OperatorMessage,
         await sql.query("INSERT INTO job_events(job_id,sequence,agent,kind,occurred_at,payload) VALUES($1,$2,$3,$4,$5,$6)",[revised.id,event.sequence,event.agent,event.kind,event.at,JSON.stringify(event)]);
         const daily=await sql.query("UPDATE daily_drafts SET status='awaiting_approval',whatsapp_message_id=NULL,whatsapp_send_attempted_at=NULL,updated_at=now() WHERE job_id=$1 RETURNING job_id",[revised.id]);
         await sql.query("UPDATE whatsapp_instructions SET status='applied',updated_at=now() WHERE message_id=$1",[input.id]);
-        return {daily:daily.rows.length?revised.id:null,notice:"Änderung im selben Auftrag gespeichert. Bitte den überarbeiteten Plan im Content Studio prüfen und freigeben. Noch keine neue Medienproduktion oder Veröffentlichung."};
+        return {daily:daily.rows.length?revised.id:null,notice:"Änderung im selben Auftrag gespeichert. Du bekommst den überarbeiteten Entwurf gleich zur Freigabe per WhatsApp. Noch keine neue Medienproduktion oder Veröffentlichung."};
       });
       notice=result.notice;dailyJobId=result.daily;
     }catch(error){
@@ -147,7 +150,7 @@ export async function processOperatorInstruction(input:OperatorMessage,
       console.warn(JSON.stringify({event:'instruction_revision_blocked',code,dbCode:typeof error==='object'&&error!==null&&'code' in error?String(error.code):undefined}));
       if(code.startsWith('parser_'))notice='Deine Anweisung wurde gespeichert, aber der Sprachmodell-Zugang funktioniert momentan nicht. Das ist ein technischer Fehler; du musst die Anweisung nicht anders formulieren. Es wurde nichts produziert oder veröffentlicht.';
       if(code==='visual_context_mismatch')notice='Das Bildbriefing passt nicht zum bestehenden Produkt. Bitte beschreibe dessen Anwendung. Es wurde kein Bild erzeugt und nichts veröffentlicht.';
-      if(code==='revision_not_available')notice='Diese Revision ist im aktuellen Auftragszustand nicht möglich. Bitte den Auftrag im Content Studio prüfen. Es wurde nichts produziert oder veröffentlicht.';
+      if(code==='revision_not_available')notice='Diese Revision ist im aktuellen Auftragszustand nicht möglich. Schreibe „Status“ oder starte mit „Artikelsuche <Produkt>“ neu. Es wurde nichts produziert oder veröffentlicht.';
       await db.query("UPDATE whatsapp_instructions SET status='clarify',error_code=$2,updated_at=now() WHERE message_id=$1 AND status='parsed'",[input.id,code]);
     }
   }

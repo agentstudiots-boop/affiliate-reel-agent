@@ -46,7 +46,7 @@ export async function verifyAmazonProductPage(asin: string, request: typeof fetc
     }
     const rawTitle = html.match(/id=["']productTitle["'][^>]*>([\s\S]*?)<\/span>/i)?.[1]
       || html.match(/property=["']og:title["'][^>]*content=["']([^"']+)["']/i)?.[1];
-    const title = rawTitle?.replace(/<[^>]*>/g, " ").replace(/&(?:amp|quot|#39);/g, " ").replace(/\s+/g, " ").trim();
+    const title = rawTitle ? cleanAmazonTitle(rawTitle) : undefined;
     if (!title || title.length < 6 || /^Amazon(?:\.de)?\b/i.test(title)) {
       diagnostic("product_title_missing", response.status);
       throw new Error(PRODUCT_UNRESOLVED);
@@ -58,6 +58,19 @@ export async function verifyAmazonProductPage(asin: string, request: typeof fetc
     throw error instanceof Error && ["amazon_verification_blocked",AMAZON_IDENTITY_MISSING].includes(error.message)
       ? error : new Error(PRODUCT_UNRESOLVED);
   }
+}
+
+// Amazon titles arrive HTML-encoded and sometimes mis-cased around umlauts ("HitzebestäNdig", "FüR").
+export function cleanAmazonTitle(raw: string) {
+  const named: Record<string, string> = { amp: "&", quot: '"', apos: "'", nbsp: " ", lt: "<", gt: ">" };
+  return raw.replace(/<[^>]*>/g, " ")
+    .replace(/&(?:#(\d{1,6})|#x([0-9a-f]{1,5})|([a-z]{2,6}));/gi, (match, dec, hex, name) => {
+      if (name) return named[String(name).toLowerCase()] ?? " ";
+      const code = dec ? Number(dec) : parseInt(hex, 16);
+      return code > 31 && code < 0x2fff ? String.fromCodePoint(code) : " ";
+    })
+    .replace(/([äöüß])([A-Z])(?=[a-zäöüß]|\b)/g, (_match, low: string, up: string) => low + up.toLowerCase())
+    .replace(/\s+/g, " ").trim();
 }
 
 // Indexed title suggests a candidate; current Amazon HTML confirms identity.
