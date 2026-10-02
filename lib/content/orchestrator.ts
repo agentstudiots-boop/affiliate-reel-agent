@@ -166,7 +166,7 @@ export async function runContentJob(raw: Opportunity, options: {
       const baseline = baselineVerdict(opportunity.product.name, record);
       const modelVerdict = job.mode === "ai" && baseline.decision === "accept"
         ? await generate("orchestrator", STRATEGY_INSTRUCTION, { product: opportunity.product.name, category: opportunity.category, useCase: opportunity.useCase,
-          trend: opportunity.trend, chance: record.chance, assessment: record.assessment }, strategicVerdictSchema, () => baseline)
+          trend: opportunity.trend, chance: record.chance, assessment: record.assessment, trendAgent: record.agent ?? null }, strategicVerdictSchema, () => baseline)
         : null;
       const verdict = combineVerdicts(baseline, modelVerdict);
       await emit("orchestrator", "decision", `Strategic Quality Gate: ${verdict.decision === "accept" ? "geeignet" : "verworfen"}. ${verdict.reason}`, { verdict, assessment: record.assessment });
