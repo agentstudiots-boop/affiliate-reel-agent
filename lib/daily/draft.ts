@@ -17,6 +17,7 @@ import { createHash } from "node:crypto";
 import { releaseProduct, reserveProduct } from "@/lib/daily/product-lock";
 import { facebookCaption } from "@/lib/meta/facebook-caption";
 import { bathtubMatUseCase, isBathtubMat } from "@/lib/content/bathtub-mat";
+import { STRATEGY_REJECTED, type ChanceAssessment, type ContentChance } from "@/lib/content/strategy";
 import { PRODUCT_DATA_UNCERTAIN, productEvidence, unsupportedClaims } from "@/lib/content/claim-support";
 import { suggestCategory } from "@/lib/content/taxonomy";
 import { categoryLabel } from "@/lib/content/category-store";
@@ -133,6 +134,7 @@ async function reclaimScheduledSlot(db: Database, day: string, slot: string, job
        notification_message_id=NULL,notification_send_attempted_at=NULL,updated_at=now()
      WHERE day=$1 AND slot=$2 AND attempts<$4 AND whatsapp_message_id IS NULL
        AND notification_message_id IS NULL
+       AND COALESCE(scout_report->>'reason','') NOT IN ('no_quality_candidate','strategic_gate_rejected')
        AND (status IN ('failed','needs_input')
          OR (status IN ('claimed','planning') AND updated_at<now()-make_interval(mins=>$5)))
      RETURNING job_id`, [day, slot, jobId, MAX_SLOT_ATTEMPTS, STALE_CLAIM_MINUTES]);
@@ -216,7 +218,9 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
 
   let stage = "product_search";
   try {
-    const report = productQuery ? null : await runProductScout(productSearch,`${day}:${slot}`);
+    // Only scheduled slots are held to the content-chance quality gate; operator requests never are.
+    const scheduled = slot === "morning" || slot === "afternoon";
+    const report = productQuery ? null : await runProductScout(productSearch,`${day}:${slot}`,{ quality: scheduled });
     // Prefer seasonal ideas, then already researched evergreen candidates.
     // Neither category becomes affiliate content without exact product resolution.
     const openSearch = slot.startsWith("manual:") && !productQuery && !productSearch;
@@ -224,6 +228,14 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
       ? candidate.searchQuery.toLocaleLowerCase("de-DE")===productSearch.toLocaleLowerCase("de-DE")
       : openSearch || candidate.kind === "Saisontrend" || candidate.kind === "Dauerläufer") || [];
     const relevantCooldownBlocked = productSearch || openSearch ? report?.cooldownBlocked : report?.cooldownBlockedAutomatic;
+    // No candidate with a real content chance: no proposal is better than a pointless one. Terminal for this slot.
+    if (!productQuery && !candidates.length && !relevantCooldownBlocked && scheduled && report && "qualityBlocked" in report && Number(report.qualityBlocked) > 0) {
+      await db.query("UPDATE daily_drafts SET status='needs_input',scout_report=$2,updated_at=now() WHERE job_id=$1",
+        [jobId,JSON.stringify({report:{qualityRejected:"qualityRejected" in report?report.qualityRejected:[]},reason:"no_quality_candidate"})]);
+      await releaseProduct(db,jobId);
+      slotLog("daily_slot_no_quality_candidate", { day, slot, jobId, rejected: report.qualityBlocked });
+      return {status:'needs_input' as const,jobId,reason:'no_quality_candidate' as const};
+    }
     if (!productQuery && !candidates.length && relevantCooldownBlocked) {
       await db.query("UPDATE daily_drafts SET status='needs_input',scout_report=$2,updated_at=now() WHERE job_id=$1",
         [jobId,JSON.stringify({requestedSearch:productSearch,report,reason:"product_repeat_blocked"})]);
@@ -259,7 +271,9 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
     let candidate: typeof pool[number] | null = null;
     let selectedProduct = requestedProduct;
     const rotate = (items: typeof pool) => [...items.slice(rotation % (items.length || 1)), ...items.slice(0,rotation % (items.length || 1))];
+    const assessmentOf = (item: typeof pool[number]) => (item as { assessment?: ChanceAssessment }).assessment;
     const ordered = productSearch ? resolved : openSearch ? rotate(pool)
+      : scheduled && pool.every(item => assessmentOf(item)) ? [...pool].sort((a, b) => assessmentOf(b)!.score - assessmentOf(a)!.score)
       : [...rotate(pool.filter(item => item.kind === "Saisontrend")), ...rotate(pool.filter(item => item.kind === "Dauerläufer"))];
     for (const item of requestedProduct ? [] : ordered) {
       if (item.resolvedProduct && await reserveProduct(db,item.resolvedProduct,jobId)) {
@@ -278,6 +292,7 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
     const opportunity: Opportunity = {
       product: selectedProduct,
       category: suggestCategory(selectedProduct.name, candidate?.category, candidate?.kind), useCaseKey: "seasonal-product-guide", targetPlatform: "facebook",
+      ...(candidate && assessmentOf(candidate) ? { contentChance: { chance: (candidate as { chance?: ContentChance }).chance ?? null, assessment: assessmentOf(candidate)! } } : {}),
       useCase: isBathtubMat(selectedProduct.name) ? bathtubMatUseCase : scoutUseCase || `Das Produkt ${selectedProduct.name} im Alltag verwenden und die Eignung vor dem Kauf prüfen.`, trend: candidate?.whyNow || "", goal: "education", budget: "low", verifiedFacts: [],
     };
     stage = "content_planning";
@@ -313,11 +328,12 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
       : job.error === EDITORIAL_MODEL_ERROR ? "editorial_model_failed" as const
       : job.error === "product_unresolved" ? "product_unresolved" as const
       : job.error === PRODUCT_DATA_UNCERTAIN ? "product_data_uncertain" as const
+      : job.error === STRATEGY_REJECTED ? "strategic_gate_rejected" as const
       : job.review && !job.review.passed ? "content_review_failed" as const
       : job.status === "needs_input" && job.marketing ? "marketing_format_mismatch" as const : "planning_failed" as const;
     // Persist why the slot stopped; without it Status cannot explain an empty needs_input.
     const detail = reason === "publication_gate_failed" ? String(gateError).slice(0, 200)
-      : reason === "content_review_failed" || reason === "product_data_uncertain" ? job.review?.issues[0]?.slice(0, 200) : undefined;
+      : reason === "content_review_failed" || reason === "product_data_uncertain" || reason === "strategic_gate_rejected" ? job.review?.issues[0]?.slice(0, 200) : undefined;
     await db.query("UPDATE daily_drafts SET scout_report=jsonb_set(coalesce(scout_report,'{}'::jsonb),'{reason}',to_jsonb($2::text)) || jsonb_build_object('detail',$3::text),updated_at=now() WHERE job_id=$1",
       [jobId, reason, detail ?? null]);
     console.info(JSON.stringify({ event: "daily_draft_needs_input", jobId, reason }));

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { productSchema } from "../schema";
+import { contentChanceRecordSchema } from "./strategy";
 
 const text = z.string().min(1).max(2400);
 export const formatSchema = z.enum(["video", "image", "text"]);
@@ -14,6 +15,8 @@ export const opportunitySchema = z.object({
   goal: z.enum(["conversion", "education", "community"]).default("conversion"),
   budget: z.enum(["low", "balanced", "quality"]).default("balanced"),
   verifiedFacts: z.array(z.object({ claim: text, source: z.string().url() })).max(12).default([]),
+  // Set by the scheduled scout; absent for operator-requested products, which skip the strategic gate.
+  contentChance: contentChanceRecordSchema.optional(),
 });
 export type Opportunity = z.infer<typeof opportunitySchema>;
 export const ideaSchema = z.object({
