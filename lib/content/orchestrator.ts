@@ -12,6 +12,7 @@ import { evaluateImageCreativeQuality } from "./creative-quality";
 import { VISUAL_FUNCTION_RULE } from "./visual-coherence";
 import { PRODUCT_DATA_UNCERTAIN, unsupportedClaimMessage, unsupportedProductClaims } from "./claim-support";
 import { createGenerator } from "./model";
+import { STRATEGY_INSTRUCTION, STRATEGY_REJECTED, baselineVerdict, combineVerdicts, strategicVerdictSchema } from "./strategy";
 import { contentSchema, opportunitySchema, reviewSchema, type AgentName, type Content, type ContentJob, type Decision, type Idea, type JobEvent, type JobStatus, type Opportunity, type Review } from "./schema";
 import { bathtubMatIssues } from "./bathtub-mat";
 import type { Generator, ApprovedEditorialCorrection } from "./agent";
@@ -158,6 +159,24 @@ export async function runContentJob(raw: Opportunity, options: {
     const source = new URL(opportunity.product.sourceUrl);
     const affiliate = new URL(opportunity.product.affiliateUrl);
     if ([source, affiliate].some(url => url.protocol !== "https:" || url.username || url.password)) throw new Error("Bitte einen öffentlichen HTTPS-Produktlink ohne Zugangsdaten verwenden.");
+    // Jarvis strategic quality gate (scheduled proposals only): no content for a product without a real reason.
+    // Reference mode uses the deterministic verdict; AI mode lets the model judge and only ever tighten it.
+    if (opportunity.contentChance) {
+      const record = opportunity.contentChance;
+      const baseline = baselineVerdict(opportunity.product.name, record);
+      const modelVerdict = job.mode === "ai" && baseline.decision === "accept"
+        ? await generate("orchestrator", STRATEGY_INSTRUCTION, { product: opportunity.product.name, category: opportunity.category, useCase: opportunity.useCase,
+          trend: opportunity.trend, chance: record.chance, assessment: record.assessment }, strategicVerdictSchema, () => baseline)
+        : null;
+      const verdict = combineVerdicts(baseline, modelVerdict);
+      await emit("orchestrator", "decision", `Strategic Quality Gate: ${verdict.decision === "accept" ? "geeignet" : "verworfen"}. ${verdict.reason}`, { verdict, assessment: record.assessment });
+      if (verdict.decision === "reject") {
+        job.error = STRATEGY_REJECTED;
+        job.review = { passed: false, score: Math.min(40, record.assessment.score), issues: [verdict.reason.slice(0, 600)] };
+        await status("needs_input", "Kein Inhalt erzeugt: Der Kandidat besteht das strategische Qualitätsgate nicht.");
+        return job;
+      }
+    }
     const inspiration = analyzeProductInspiration(opportunity);
     const corrections = options.loadCorrections ? (await options.loadCorrections(opportunity)).slice(0,12) : [];
     if(corrections.length)await emit("orchestrator","decision","Bestätigte Betreiberkorrekturen als redaktionelle Beispiele für diesen Auftrag geladen.",{approvedEditorialCorrections:corrections});

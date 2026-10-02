@@ -1,7 +1,9 @@
 import { tavilySearch, tavilySources } from "@/lib/tavily";
+import type { ContentChance } from "@/lib/content/strategy";
+import { CHANCE_SEEDS, CONTENT_CHANCES } from "@/lib/agents/content-chances";
 
 type Kind = "Dauerläufer" | "Saisontrend" | "Aktueller Trend";
-type Seed = { name: string; category: string; kind: Kind; season: string; whyNow: string; reelIdea: string; targetGroup: string; benefitsToVerify: string[] };
+type Seed = { name: string; category: string; kind: Kind; season: string; whyNow: string; reelIdea: string; targetGroup: string; benefitsToVerify: string[]; chance?: ContentChance };
 
 const evergreen: Seed[] = [
   { name: "Hochwertige Küchenreibe", category: "Küche", kind: "Dauerläufer", season: "Ganzjährig", whyNow: "Praktisches Küchenwerkzeug mit dauerhaft verständlichem Nutzen.", reelIdea: "Nahaufnahme beim Reiben von Hartkäse oder Zitrusschale.", targetGroup: "Hobbyköche und Haushalte", benefitsToVerify: ["Klingenmaterial und Schärfe", "Reinigung und Handhabung"] },
@@ -34,6 +36,7 @@ function seasonalSeeds(month: number): Seed[] {
   ];
   if (month <= 10) return [
     { name: "Kürbis-Schnitzwerkzeug-Set", category: "Halloween", kind: "Saisontrend", season: "Halloween", whyNow: "Die Nachfrage nach Kürbis- und Halloween-Zubehör steigt vor Ende Oktober.", reelIdea: "Vom Kürbis zur fertigen Laterne als Vorher-Nachher-Sequenz.", targetGroup: "Familien und Halloween-Fans", benefitsToVerify: ["Lieferumfang", "Material und sichere Handhabung"] },
+    { name: "Halloween LED Kürbis Lichterkette", category: "Halloween", kind: "Saisontrend", season: "Halloween", whyNow: "Halloween-Dekoration wird vor Ende Oktober verstärkt gesucht.", reelIdea: "Dunkle Fensterbank vorher, leuchtende Halloween-Stimmung nachher.", targetGroup: "Familien und Halloween-Fans", benefitsToVerify: ["Stromversorgung und Länge", "Einsatz innen oder außen laut Hersteller"] },
     { name: "Wärmende Kuscheldecke", category: "Wohnen", kind: "Saisontrend", season: "Herbst", whyNow: "Gemütliche Wohnprodukte werden mit sinkenden Temperaturen relevanter.", reelIdea: "Materialstruktur und gemütliche Sofaszene zeigen.", targetGroup: "Haushalte und Geschenkekäufer", benefitsToVerify: ["Material und Maße", "Waschbarkeit"] },
   ];
   return [
@@ -61,7 +64,9 @@ export async function scoutProducts(productSearch?: string) {
   const signal = searchResults[0];
   const trendName = signal?.title?.slice(0, 110) || "Aktuell gefragtes Haushaltsprodukt";
   const trend: Seed = { name: trendName, category: "Aktuelles Suchsignal", kind: "Aktueller Trend", season: "Aktuell", whyNow: signal ? `Aktuelles Suchsignal: ${signal.title}` : "Aktueller Kandidat zur manuellen Prüfung.", reelIdea: "Das konkrete Alltagsproblem und die Anwendung in einer kurzen Vorher-Nachher-Sequenz zeigen.", targetGroup: "Interessierte Käufer in Deutschland", benefitsToVerify: ["Produkteigenschaften auf der Amazon-Seite", "Preis, Verfügbarkeit und Kundenhinweise"] };
-  const candidates = [...evergreen, ...seasonalSeeds(now.getUTCMonth() + 1), trend].map(seed => ({ ...seed, searchQuery: seed.name,
+  // Ideas start from a content chance; those without a recorded chance stay in the list only so the quality gate can reject them transparently.
+  const chanceIdeas: Seed[] = CHANCE_SEEDS.map(item => ({ ...item, kind: "Dauerläufer" as const, season: "Ganzjährig" }));
+  const candidates = [...evergreen, ...chanceIdeas, ...seasonalSeeds(now.getUTCMonth() + 1), trend].map(seed => ({ ...seed, chance: seed.chance ?? CONTENT_CHANCES[seed.name], searchQuery: seed.name,
     confidence: seed.kind === "Aktueller Trend" ? Math.round(Math.min(85, Math.max(35, (signal?.score ?? 0.5) * 100))) : 55 }));
   return { output: { summary: "Tavily hat aktuelle Websignale geliefert. Die Vorschläge wurden ohne kostenpflichtiges Sprachmodell mit einem Saisonkalender und festen Sicherheitsregeln zusammengestellt.", researchedAt: now.toISOString(), candidates }, sources: tavilySources(searchResults) };
 }

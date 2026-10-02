@@ -30,6 +30,8 @@ export async function latestImagePostsStatus(db: Database) {
       content_review_failed: `redaktionelle Prüfung: ${String(row.detail || "nicht bestanden").replace(/\s+/g, " ").slice(0, 120)}`,
       product_data_uncertain: `Produktdaten reichen für sichere Aussagen nicht aus: ${String(row.detail || "").replace(/\s+/g, " ").slice(0, 140)}`,
       marketing_format_mismatch: "Marketingformat passte nicht zum Inhalt",
+      no_quality_candidate: "kein Kandidat mit ausreichender Content-Chance; bewusst kein Vorschlag",
+      strategic_gate_rejected: `strategisch verworfen (Reichweite/Vertrauen): ${String(row.detail || "").replace(/\s+/g, " ").slice(0, 140)}`,
       planning_failed: "Content-Planung nicht abgeschlossen",
     } as Record<string, string>)[String(row.reason || "")];
     const reviewIssue = String(row.review_issue || "").replace(/\s+/g, " ").slice(0, 160);

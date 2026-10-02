@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { chanceSchema } from "./content/strategy";
 
 export const productSchema = z.object({
   asin: z.string().optional(),
@@ -27,6 +28,7 @@ export const trendCandidateSchema = z.object({
   benefitsToVerify: z.array(z.string()).min(2).max(5),
   searchQuery: z.string(),
   confidence: z.number().min(0).max(100),
+  chance: chanceSchema.optional(),
 });
 
 export const trendReportSchema = z.object({
