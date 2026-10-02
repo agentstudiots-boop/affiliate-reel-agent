@@ -2,7 +2,7 @@ import type { Sql } from "../memory/db";
 import { functionalGroup, type SelectionHistory } from "./strategy";
 
 type Row = { name: string | null; concept: string | null };
-const toEntry = (row: Row) => ({ group: row.name ? functionalGroup(row.name) : null, concept: row.concept });
+const toEntry = (row: Row) => ({ group: row.name ? functionalGroup(row.name) : null, concept: row.concept, name: row.name });
 
 // Read-only. A rejection teaches more than the ASIN: the product's functional group and content
 // concept weigh on similar candidates for the 7-day cooldown. System-internal rejections

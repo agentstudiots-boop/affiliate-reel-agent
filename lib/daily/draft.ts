@@ -17,7 +17,7 @@ import { createHash } from "node:crypto";
 import { releaseProduct, reserveProduct } from "@/lib/daily/product-lock";
 import { facebookCaption } from "@/lib/meta/facebook-caption";
 import { bathtubMatUseCase, isBathtubMat } from "@/lib/content/bathtub-mat";
-import { STRATEGY_REJECTED, type ChanceAssessment, type ContentChance } from "@/lib/content/strategy";
+import { STRATEGY_REJECTED, type AgentProvenance, type ChanceAssessment, type ContentChance } from "@/lib/content/strategy";
 import { PRODUCT_DATA_UNCERTAIN, productEvidence, unsupportedClaims } from "@/lib/content/claim-support";
 import { suggestCategory } from "@/lib/content/taxonomy";
 import { categoryLabel } from "@/lib/content/category-store";
@@ -272,8 +272,9 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
     let selectedProduct = requestedProduct;
     const rotate = (items: typeof pool) => [...items.slice(rotation % (items.length || 1)), ...items.slice(0,rotation % (items.length || 1))];
     const assessmentOf = (item: typeof pool[number]) => (item as { assessment?: ChanceAssessment }).assessment;
+    const priorityOf = (item: typeof pool[number]) => (item as { priority?: number }).priority ?? 99; // the trend agent's own ranking comes first
     const ordered = productSearch ? resolved : openSearch ? rotate(pool)
-      : scheduled && pool.every(item => assessmentOf(item)) ? [...pool].sort((a, b) => assessmentOf(b)!.score - assessmentOf(a)!.score)
+      : scheduled && pool.every(item => assessmentOf(item)) ? [...pool].sort((a, b) => (priorityOf(a) - priorityOf(b)) || assessmentOf(b)!.score - assessmentOf(a)!.score)
       : [...rotate(pool.filter(item => item.kind === "Saisontrend")), ...rotate(pool.filter(item => item.kind === "Dauerläufer"))];
     for (const item of requestedProduct ? [] : ordered) {
       if (item.resolvedProduct && await reserveProduct(db,item.resolvedProduct,jobId)) {
@@ -292,7 +293,8 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
     const opportunity: Opportunity = {
       product: selectedProduct,
       category: suggestCategory(selectedProduct.name, candidate?.category, candidate?.kind), useCaseKey: "seasonal-product-guide", targetPlatform: "facebook",
-      ...(candidate && assessmentOf(candidate) ? { contentChance: { chance: (candidate as { chance?: ContentChance }).chance ?? null, assessment: assessmentOf(candidate)! } } : {}),
+      ...(candidate && assessmentOf(candidate) ? { contentChance: { chance: (candidate as { chance?: ContentChance }).chance ?? null, assessment: assessmentOf(candidate)!,
+        ...((candidate as { agent?: AgentProvenance }).agent ? { agent: (candidate as { agent?: AgentProvenance }).agent } : {}) } } : {}),
       useCase: isBathtubMat(selectedProduct.name) ? bathtubMatUseCase : scoutUseCase || `Das Produkt ${selectedProduct.name} im Alltag verwenden und die Eignung vor dem Kauf prüfen.`, trend: candidate?.whyNow || "", goal: "education", budget: "low", verifiedFacts: [],
     };
     stage = "content_planning";

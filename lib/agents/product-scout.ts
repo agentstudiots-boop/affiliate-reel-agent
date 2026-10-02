@@ -45,6 +45,13 @@ function seasonalSeeds(month: number): Seed[] {
   ];
 }
 
+// Static bootstrap/fallback ideas (no network). Ideas start from a content chance; those without a recorded chance
+// stay in the list only so the quality gate can reject them transparently.
+export function seedIdeas(now = new Date()) {
+  const chanceIdeas: Seed[] = CHANCE_SEEDS.map(item => ({ ...item, kind: "Dauerläufer" as const, season: "Ganzjährig" }));
+  return [...evergreen, ...chanceIdeas, ...seasonalSeeds(now.getUTCMonth() + 1)].map(seed => ({ ...seed, chance: seed.chance ?? CONTENT_CHANCES[seed.name], searchQuery: seed.name, confidence: 55 }));
+}
+
 export async function scoutProducts(productSearch?: string) {
   const now = new Date();
   if (productSearch) {
@@ -64,9 +71,7 @@ export async function scoutProducts(productSearch?: string) {
   const signal = searchResults[0];
   const trendName = signal?.title?.slice(0, 110) || "Aktuell gefragtes Haushaltsprodukt";
   const trend: Seed = { name: trendName, category: "Aktuelles Suchsignal", kind: "Aktueller Trend", season: "Aktuell", whyNow: signal ? `Aktuelles Suchsignal: ${signal.title}` : "Aktueller Kandidat zur manuellen Prüfung.", reelIdea: "Das konkrete Alltagsproblem und die Anwendung in einer kurzen Vorher-Nachher-Sequenz zeigen.", targetGroup: "Interessierte Käufer in Deutschland", benefitsToVerify: ["Produkteigenschaften auf der Amazon-Seite", "Preis, Verfügbarkeit und Kundenhinweise"] };
-  // Ideas start from a content chance; those without a recorded chance stay in the list only so the quality gate can reject them transparently.
-  const chanceIdeas: Seed[] = CHANCE_SEEDS.map(item => ({ ...item, kind: "Dauerläufer" as const, season: "Ganzjährig" }));
-  const candidates = [...evergreen, ...chanceIdeas, ...seasonalSeeds(now.getUTCMonth() + 1), trend].map(seed => ({ ...seed, chance: seed.chance ?? CONTENT_CHANCES[seed.name], searchQuery: seed.name,
-    confidence: seed.kind === "Aktueller Trend" ? Math.round(Math.min(85, Math.max(35, (signal?.score ?? 0.5) * 100))) : 55 }));
+  const candidates = [...seedIdeas(now), { ...trend, searchQuery: trend.name,
+    confidence: Math.round(Math.min(85, Math.max(35, (signal?.score ?? 0.5) * 100))) }];
   return { output: { summary: "Tavily hat aktuelle Websignale geliefert. Die Vorschläge wurden ohne kostenpflichtiges Sprachmodell mit einem Saisonkalender und festen Sicherheitsregeln zusammengestellt.", researchedAt: now.toISOString(), candidates }, sources: tavilySources(searchResults) };
 }

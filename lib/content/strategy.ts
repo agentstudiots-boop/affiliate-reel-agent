@@ -35,8 +35,26 @@ export const assessmentSchema = z.object({
 }).strict();
 export type ChanceAssessment = z.infer<typeof assessmentSchema>;
 
+// Provenance of a chance found by the trend agent: structured, so later reviewers never parse free text.
+export const agentProvenanceSchema = z.object({
+  source: z.enum(["trend_agent", "seed"]),
+  kind: z.enum(["product_opportunity", "topic_opportunity"]),
+  title: z.string().max(160),
+  rationale: z.string().max(500),
+  targetNeed: z.string().max(240),
+  shareReason: z.string().max(240),
+  trustRationale: z.string().max(300),
+  reachRationale: z.string().max(300),
+  novelty: z.enum(["low", "medium", "high"]),
+  formatSuggestion: z.enum(["image", "video", "text"]),
+  confidence: z.number().min(0).max(100),
+  priority: z.number().int().min(1).max(99).nullable(),
+  evidence: z.array(z.object({ title: z.string().max(200), url: z.string().url() })).max(4),
+}).strict();
+export type AgentProvenance = z.infer<typeof agentProvenanceSchema>;
+
 // What is stored on the opportunity and shown to later reviewers.
-export const contentChanceRecordSchema = z.object({ chance: chanceSchema.nullable(), assessment: assessmentSchema }).strict();
+export const contentChanceRecordSchema = z.object({ chance: chanceSchema.nullable(), assessment: assessmentSchema, agent: agentProvenanceSchema.optional() }).strict();
 export type ContentChanceRecord = z.infer<typeof contentChanceRecordSchema>;
 
 export const PASS_SCORE = 60;
@@ -69,9 +87,9 @@ export function functionalGroup(name: string): string | null {
 
 export type SelectionHistory = {
   // Products the operator rejected or replaced within the cooldown window, with their group/concept.
-  rejected: { group: string | null; concept: string | null }[];
+  rejected: { group: string | null; concept: string | null; name?: string | null }[];
   // Products already proposed or published within the cooldown window.
-  recent: { group: string | null; concept: string | null }[];
+  recent: { group: string | null; concept: string | null; name?: string | null }[];
 };
 export const emptyHistory = (): SelectionHistory => ({ rejected: [], recent: [] });
 
@@ -82,7 +100,20 @@ export function performanceAdjustment(): number {
   return 0;
 }
 
-export function assessContentChance(name: string, chance: ContentChance | null | undefined, history: SelectionHistory = emptyHistory()): ChanceAssessment {
+const CONCEPT_STOP = new Set(["und", "der", "die", "das", "mit", "für", "fuer", "the", "and", "for", "set"]);
+const conceptTokens = (value: string) => new Set(fold(value).split(/[^a-z0-9]+/).filter(token => token.length >= 3 && !CONCEPT_STOP.has(token)));
+// Same or very similar content concept: identical slug, or strong token overlap (also across spelling variants).
+export function sameConcept(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  if (fold(a) === fold(b)) return true;
+  const x = conceptTokens(a), y = conceptTokens(b);
+  if (!x.size || !y.size) return false;
+  const shared = [...x].filter(token => y.has(token)).length;
+  return shared >= 2 && shared / Math.min(x.size, y.size) >= 0.75 || shared / new Set([...x, ...y]).size >= 0.6;
+}
+
+export function assessContentChance(name: string, chance: ContentChance | null | undefined, history: SelectionHistory = emptyHistory(),
+  extraPenalties: ChanceAssessment["penalties"] = []): ChanceAssessment {
   const group = chance?.group ?? functionalGroup(name);
   const reasons: string[] = [];
   const penalties: ChanceAssessment["penalties"] = [];
@@ -116,8 +147,9 @@ export function assessContentChance(name: string, chance: ContentChance | null |
   } else if (group && history.recent.some(item => item.group === group)) {
     penalties.push({ reason: "Gleiche Produktgruppe wurde kürzlich vorgeschlagen", points: -RECENT_GROUP_PENALTY });
   }
-  if (history.recent.some(item => item.concept && item.concept === chance.concept)
-    || history.rejected.some(item => item.concept && item.concept === chance.concept)) {
+  penalties.push(...extraPenalties);
+  if (history.recent.some(item => sameConcept(item.concept, chance.concept))
+    || history.rejected.some(item => sameConcept(item.concept, chance.concept))) {
     penalties.push({ reason: "Gleiches Content-Konzept kürzlich verwendet oder abgelehnt", points: -100 });
   }
   for (const penalty of penalties) { score += penalty.points; reasons.push(penalty.reason); }

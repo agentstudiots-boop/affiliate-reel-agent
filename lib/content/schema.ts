@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { productSchema } from "../schema";
-import { contentChanceRecordSchema } from "./strategy";
+import { CHANCE_TYPES, contentChanceRecordSchema } from "./strategy";
 
 const text = z.string().min(1).max(2400);
 export const formatSchema = z.enum(["video", "image", "text"]);
@@ -66,7 +66,7 @@ export const marketingSchema = z.object({
   publishingChecks: z.array(text).min(2).max(8),
 });
 export type Marketing = z.infer<typeof marketingSchema>;
-export type AgentName = "creative" | "video" | "image" | "text" | "marketing" | "orchestrator";
+export type AgentName = "trend" | "creative" | "video" | "image" | "text" | "marketing" | "orchestrator";
 export type JobStatus = "queued" | "checking" | "ideating" | "selecting" | "producing" | "reviewing" | "revising" | "marketing" | "awaiting_approval" | "needs_input" | "failed" | "interrupted" | "approved";
 export type JobEvent = { sequence: number; at: string; agent: AgentName; kind: "status" | "response" | "decision" | "error"; message: string; data?: unknown };
 export type Decision = { ideaId: string; format: Content["format"]; reason: string; ranking: { ideaId: string; score: number; rationale: string }[] };
@@ -77,3 +77,55 @@ export type ContentJob = {
   revisions: number; modelCalls: number; totalTokens: number; error?: string;
 };
 export const terminalStatuses: JobStatus[] = ["awaiting_approval", "needs_input", "failed", "interrupted", "approved"];
+
+// ---- Trend/strategy agent contract (Jarvis ⇄ agent). `topic_opportunity` is accepted for later topic posts; not produced yet. ----
+export const OPPORTUNITY_KINDS = ["product_opportunity", "topic_opportunity"] as const;
+const level = z.enum(["low", "medium", "high"]);
+
+export const evidenceItemSchema = z.object({ title: z.string().max(200), url: z.string().url(), snippet: z.string().max(400), direction: z.string().max(40) });
+export type EvidenceItem = z.infer<typeof evidenceItemSchema>;
+
+export const trendOpportunitySchema = z.object({
+  kind: z.enum(OPPORTUNITY_KINDS),
+  title: z.string().min(3).max(120),
+  productIdea: z.string().max(90).nullable(),        // generic product type / search phrase; null for topics
+  chanceType: z.enum(CHANCE_TYPES),
+  contentChance: z.string().min(10).max(300),        // what the chance is
+  hook: z.string().min(10).max(240),
+  rationale: z.string().min(10).max(500),
+  targetNeed: z.string().min(3).max(240),
+  formatSuggestion: z.enum(["image", "video", "text"]),
+  visualPotential: level,
+  entertainmentPotential: level,
+  signals: z.object({ demonstrable: z.boolean(), beforeAfter: z.boolean(), wow: z.boolean(), fun: z.boolean(),
+    impulse: z.boolean(), gift: z.boolean(), aesthetic: z.boolean(), broadAppeal: z.boolean() }).strict(),
+  shareReason: z.string().max(240),
+  trustRationale: z.string().min(5).max(300),
+  reachRationale: z.string().min(5).max(300),
+  timing: z.object({ season: z.string().max(40).nullable(), relevance: z.enum(["none", "low", "high"]) }).strict(),
+  novelty: level,
+  similarityNote: z.string().max(240),
+  concept: z.string().min(2).max(60),
+  group: z.string().max(40).nullable(),
+  confidence: z.number().min(0).max(100),
+  evidenceUrls: z.array(z.string()).max(6),
+  priority: z.number().int().min(1).max(8),
+}).strict();
+export type TrendOpportunity = z.infer<typeof trendOpportunitySchema>;
+
+export const trendReportSchema = z.object({
+  summary: z.string().max(500),
+  opportunities: z.array(trendOpportunitySchema).max(8),
+  noGoodCandidate: z.boolean(),
+  rejectedIdeas: z.array(z.object({ idea: z.string().max(120), reason: z.string().max(240) }).strict()).max(8),
+}).strict();
+export type TrendReport = z.infer<typeof trendReportSchema>;
+
+export type TrendBrief = {
+  today: string; season: string; slot: string;
+  evidence: EvidenceItem[];
+  history: { rejected: { name: string | null; concept: string | null }[]; recent: { name: string | null; concept: string | null }[] };
+  seedIdeas: { name: string; hook: string | null }[];
+  maxOpportunities: number;
+};
+
