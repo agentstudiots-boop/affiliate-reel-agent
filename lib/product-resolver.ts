@@ -1,5 +1,6 @@
 import { amazonProduct, bindAmazonProduct, requireProduct, PRODUCT_UNRESOLVED } from "./amazon";
 import { tavilySearch } from "./tavily";
+import { guardedFetch } from "./affiliate-guard";
 import type { Product } from "./types";
 import type { Database } from "./memory/db";
 import { parseJob } from "./content/history";
@@ -8,7 +9,7 @@ export const AMAZON_IDENTITY_MISSING = "amazon_identity_missing";
 
 // Search indexes may retain deleted listings. A live detail page with its own
 // title and ASIN must be readable before an affiliate draft can be proposed.
-export async function verifyAmazonProductPage(asin: string, request: typeof fetch = fetch): Promise<string> {
+export async function verifyAmazonProductPage(asin: string, request: typeof fetch = guardedFetch()): Promise<string> {
   if (!/^[A-Z0-9]{10}$/.test(asin)) throw new Error(PRODUCT_UNRESOLVED);
   const diagnostic = (stage: string, status?: number) => console.info(JSON.stringify({
     event: "amazon_live_verification", stage, ...(status === undefined ? {} : { status }),

@@ -1,4 +1,5 @@
 import { amazonProduct } from "../amazon";
+import { guardedFetch } from "../affiliate-guard";
 
 // Only these exact hosts and paths can be used as product identity input.
 // A link preview, search page or arbitrary redirect is never a product proof.
@@ -15,7 +16,7 @@ export function operatorProductLink(body: string): string | null {
   } catch { return null; }
 }
 
-export async function asinFromOperatorLink(link: string, request: typeof fetch = fetch): Promise<string> {
+export async function asinFromOperatorLink(link: string, request: typeof fetch = guardedFetch()): Promise<string> {
   const direct = amazonProduct(link);
   if (direct) return direct.asin;
   if (operatorProductLink(link) !== link) throw Error("product_link_unresolved");
