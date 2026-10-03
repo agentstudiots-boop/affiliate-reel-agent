@@ -186,3 +186,21 @@ test('a failed Replicate prediction logs its provider reason without leaking the
   const request=async()=>new Response(JSON.stringify({id:'abcdefghijkl1',status:'failed',error:'Invalid input: audio_file r8_secrettoken123 unsupported'}),{status:201});
   await assert.rejects(transcribeAudio(AUDIO,'audio/ogg',{request,sleep:async()=>{}}),e=>e.code==='provider_failed'&&/replicate prediction failed: Invalid input/.test(e.detail)&&!/secrettoken/.test(e.detail));
 });
+
+test('Replicate E006 on the original label retries the same audio with another label and returns the transcript',async t=>{
+  const {transcribeAudio}=require('../.test-build/lib/whatsapp/transcribe');
+  const old={o:process.env.OPENAI_API_KEY,r:process.env.REPLICATE_API_TOKEN};
+  delete process.env.OPENAI_API_KEY;process.env.REPLICATE_API_TOKEN='r8_token';
+  t.after(()=>{if(old.o===undefined)delete process.env.OPENAI_API_KEY;else process.env.OPENAI_API_KEY=old.o;if(old.r===undefined)delete process.env.REPLICATE_API_TOKEN;else process.env.REPLICATE_API_TOKEN=old.r;});
+  t.mock.method(console,'warn',()=>{});t.mock.method(console,'info',()=>{});
+  const sent=[];
+  const request=async(url,init)=>{const input=JSON.parse(init.body).input;sent.push(input.audio_file.slice(0,20));
+    return input.audio_file.startsWith('data:audio/ogg')?new Response(JSON.stringify({id:'abcdefghijkl1',status:'failed',error:'The input was invalid (E006)'}),{status:201})
+      :new Response(JSON.stringify({id:'abcdefghijkl2',status:'succeeded',output:{text:'Status bitte'}}),{status:201});};
+  assert.equal(await transcribeAudio(AUDIO,'audio/ogg; codecs=opus',{request,sleep:async()=>{}}),'Status bitte');
+  assert.deepEqual(sent.map(v=>v.slice(0,15)),['data:audio/ogg;','data:audio/mpeg']);
+  // an HTTP refusal (wrong model, no credit) is not retried with other labels
+  let calls=0;
+  await assert.rejects(transcribeAudio(AUDIO,'audio/ogg',{request:async()=>{calls++;return new Response('{}',{status:402});},sleep:async()=>{}}),e=>e.code==='provider_failed');
+  assert.equal(calls,1);
+});
