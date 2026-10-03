@@ -52,10 +52,16 @@ export function seedIdeas(now = new Date()) {
   return [...evergreen, ...chanceIdeas, ...seasonalSeeds(now.getUTCMonth() + 1)].map(seed => ({ ...seed, chance: seed.chance ?? CONTENT_CHANCES[seed.name], searchQuery: seed.name, confidence: 55 }));
 }
 
+// The web signal is optional context. A research outage must not take down product selection.
+async function optionalSearch(options: Parameters<typeof tavilySearch>[0]) {
+  try { return await tavilySearch(options); }
+  catch (error) { console.warn(JSON.stringify({ event: "scout_research_unavailable", reason: error instanceof Error ? error.name : "unknown" })); return [] as Awaited<ReturnType<typeof tavilySearch>>; }
+}
+
 export async function scoutProducts(productSearch?: string) {
   const now = new Date();
   if (productSearch) {
-    const searchResults = await tavilySearch({ query: `${productSearch} Produktvergleich Deutschland Anwendung Kaufberatung`, maxResults: 6 });
+    const searchResults = await optionalSearch({ query: `${productSearch} Produktvergleich Deutschland Anwendung Kaufberatung`, maxResults: 6 });
     const candidate: Seed = {
       name: productSearch, category: "Gezielte Artikelsuche", kind: "Dauerläufer", season: "Auf Anfrage",
       whyNow: `Gezielte Suche nach ${productSearch} auf Wunsch des Betreibers; kein belegter Trend.`,
@@ -67,7 +73,7 @@ export async function scoutProducts(productSearch?: string) {
       researchedAt:now.toISOString(),candidates:[{...candidate,searchQuery:productSearch,confidence:50}]},
       sources:tavilySources(searchResults)};
   }
-  const searchResults = await tavilySearch({ query: "Deutschland aktuelle Produkttrends Haushalt Küche Geschenke saisonale Produkte", timeRange: "month", maxResults: 10 });
+  const searchResults = await optionalSearch({ query: "Deutschland aktuelle Produkttrends Haushalt Küche Geschenke saisonale Produkte", timeRange: "month", maxResults: 10 });
   const signal = searchResults[0];
   const trendName = signal?.title?.slice(0, 110) || "Aktuell gefragtes Haushaltsprodukt";
   const trend: Seed = { name: trendName, category: "Aktuelles Suchsignal", kind: "Aktueller Trend", season: "Aktuell", whyNow: signal ? `Aktuelles Suchsignal: ${signal.title}` : "Aktueller Kandidat zur manuellen Prüfung.", reelIdea: "Das konkrete Alltagsproblem und die Anwendung in einer kurzen Vorher-Nachher-Sequenz zeigen.", targetGroup: "Interessierte Käufer in Deutschland", benefitsToVerify: ["Produkteigenschaften auf der Amazon-Seite", "Preis, Verfügbarkeit und Kundenhinweise"] };

@@ -17,6 +17,7 @@ test('WhatsApp status explains a saved review failure without starting another j
   await pg.query("INSERT INTO daily_drafts(day,slot,job_id,status) VALUES('2026-09-29','manual:test',$1,'needs_input')",[id]);
   const status=loadRoute('lib/reporting/whatsapp-status.ts',{
     '../memory/ensure-automation-schema':{ensureAutomationSchema:async()=>{}},
+    '../daily/slots':require('../.test-build/lib/daily/slots'),
   });
   const text=await status.latestImagePostsStatus({query:(q,v)=>pg.query(q,v)});
   assert.match(text,/MEDION Saugroboter: needs_input \(redaktionelle Prüfung: Bild zeigt ein unpassendes Werkzeug\.\)/);

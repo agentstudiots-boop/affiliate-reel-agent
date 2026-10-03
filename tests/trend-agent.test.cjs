@@ -159,7 +159,7 @@ test('no good candidate from the trend agent: no forced affiliate post, no job, 
   const daily=dailyWith(w,t,{research,generate:async()=>{calls++;return report([],{noGoodCandidate:true,rejectedIdeas:[{idea:'Mini Messbecher',reason:'Kein Hook, austauschbar'}]});}},state);
   const first=await daily.createDailyDraft('2026-10-02','morning');
   assert.deepEqual([first.status,first.reason],['needs_input','no_quality_candidate']);
-  assert.equal(state.messages.length,0);assert.equal((await w.pg.query('SELECT count(*)::int AS n FROM content_jobs')).rows[0].n,0);
+  assert.equal(state.messages.length,1,'only the short notice, no draft');assert.match(state.messages[0],/keinen Vorschlag/);assert.equal((await w.pg.query('SELECT count(*)::int AS n FROM content_jobs')).rows[0].n,0);
   assert.equal((await daily.createDailyDraft('2026-10-02','morning')).status,'already_claimed');assert.equal(calls,1);
   const report1=(await w.pg.query("SELECT scout_report FROM daily_drafts WHERE slot='morning'")).rows[0].scout_report;
   assert.match(JSON.stringify(report1),/Kein Hook, austauschbar/);

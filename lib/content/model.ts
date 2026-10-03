@@ -85,7 +85,8 @@ export function createGenerator(options: { mode: "reference" | "ai"; signal?: Ab
       }
       const output=predictionText(prediction?.output);
       if(prediction.status!=="succeeded"||!output||output.length>28000)throw new Error("Modellantwort fehlt oder ist unklar.");
-      return schema.parse(JSON.parse(output));
+      // Models sometimes wrap the JSON in a markdown fence despite the instruction; the content is still validated by the schema.
+      return schema.parse(JSON.parse(output.trim().replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,"")));
     }catch(error){
       if(options.signal?.aborted)throw error;
       console.warn(JSON.stringify({event:"editorial_model_failed",agent,model:MODEL,reason:failureCategory(error)}));

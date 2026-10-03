@@ -93,7 +93,9 @@ export type SelectionHistory = {
 };
 export const emptyHistory = (): SelectionHistory => ({ rejected: [], recent: [] });
 
-const TRUST_RISK = /heilt|garantiert|wunder|nie wieder|bestes\s+\w+\s+der welt|klinisch|bewiesen|100\s?%|krebs|schmerzfrei|abnehm/i;
+// Only our own hook text is checked (never the third-party Amazon title: "abnehmbar", "Wunderkerzen" or "100 % Baumwolle" are
+// ordinary product words). The patterns target promises, not vocabulary: health, guarantee, proof and weight-loss claims.
+const TRUST_RISK = /\bheilt\b|\bheilung\b|\bheilt?\w* .{0,20}(?:schmerz|krankheit)|garantiert|\bgarantie\b|wundermittel|wirkt wunder|\bklinisch\b|wissenschaftlich bewiesen|\bbewiesen(?:e|er|en)? wirk|\bkrebs\b|schmerzfrei|\babnehmen\b|bestes\s+\w+\s+der welt|100\s?%\s?(?:wirksam|sicher|zuverl)/i;
 
 export function performanceAdjustment(): number {
   // Placeholder for the feedback loop. Intentionally neutral until enough real reach, click and conversion data exist.
@@ -154,7 +156,9 @@ export function assessContentChance(name: string, chance: ContentChance | null |
   }
   for (const penalty of penalties) { score += penalty.points; reasons.push(penalty.reason); }
   score = Math.max(0, Math.min(100, score));
-  const passed = hasHook && qualifies && chance.broadAppeal && score >= PASS_SCORE;
+  const trustRisk = TRUST_RISK.test(chance.hook);
+  if (trustRisk) reasons.push("Der Hook enthält Heils-, Garantie- oder Superlativ-Versprechen.");
+  const passed = hasHook && qualifies && chance.broadAppeal && score >= PASS_SCORE && !trustRisk;
   return { score, passed, reasons: reasons.slice(0, 10), penalties, group };
 }
 
@@ -176,7 +180,8 @@ export const STRATEGY_INSTRUCTION = `Du bist Jarvis, die strategische Qualitäts
 export function baselineVerdict(name: string, record: ContentChanceRecord): StrategicVerdict {
   const { chance, assessment } = record;
   if (!chance) return { decision: "reject", reason: "Keine Content-Chance belegt.", reachPotential: 0, trustRisk: false, betterChanceHint: null };
-  const trustRisk = TRUST_RISK.test(`${chance.hook} ${name}`);
+  void name;
+  const trustRisk = TRUST_RISK.test(chance.hook);
   if (trustRisk) return { decision: "reject", reason: "Der Hook enthält Heils-, Garantie- oder Superlativ-Versprechen, die Vertrauen gefährden.", reachPotential: assessment.score, trustRisk, betterChanceHint: null };
   if (!assessment.passed) return { decision: "reject", reason: `Content-Chance reicht nicht (Score ${assessment.score}/${PASS_SCORE}): ${assessment.reasons.slice(0, 3).join(" ")}`, reachPotential: assessment.score, trustRisk, betterChanceHint: null };
   return { decision: "accept", reason: `Konkreter Anlass: ${chance.hook}`, reachPotential: assessment.score, trustRisk, betterChanceHint: null };

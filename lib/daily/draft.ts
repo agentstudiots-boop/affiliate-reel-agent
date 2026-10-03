@@ -188,7 +188,7 @@ function safeReason(error: unknown) {
 
 // Each scheduled slot or explicit operator message has its own durable claim.
 // A retry of that slot/message never buys a second search or sends another approval.
-export async function createDailyDraft(day = berlinDay(), slot = "morning", productQuery?: string, productSearch?: string) {
+async function planDailyDraft(day: string, slot: string, productQuery?: string, productSearch?: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error("Ungültiger Tag.");
   if (!/^(morning|afternoon|manual:[A-Za-z0-9._:-]{1,160})$/.test(slot)) throw new Error("Ungültiger Auslöser.");
   if(productSearch && (productQuery || productSearch.length>90 || !/^[\p{L}\p{N}][\p{L}\p{N}\s.,+&-]*$/u.test(productSearch)))throw Error("Ungültiger Suchbegriff.");
@@ -352,4 +352,51 @@ export async function createDailyDraft(day = berlinDay(), slot = "morning", prod
     await releaseProduct(db,jobId);
     return { status: "failed" as const, jobId, reason: "internal_error" as const };
   }
+}
+
+
+// ---- Operator notice: a scheduled slot that ends without a proposal never dies silently ----------------------
+const TERMINAL_REASONS = new Set(["no_quality_candidate", "strategic_gate_rejected"]);
+function slotNoticeText(slot: string, result: { status: string; reason?: string }) {
+  const name = slot === "morning" ? "Vormittag" : "Nachmittag";
+  const why = ({
+    no_quality_candidate: "Kein Kandidat hatte genug Content-Potenzial. Bewusst kein Vorschlag statt eines schwachen Beitrags.",
+    strategic_gate_rejected: "Der Kandidat hat die strategische Prüfung (Reichweite/Vertrauen) nicht bestanden.",
+    product_unresolved: "Ich konnte keine sicher verifizierte Amazon-Produktseite finden.",
+    amazon_verification_blocked: "Amazon hat die automatische Produktprüfung blockiert.",
+    amazon_identity_missing: "Die Amazon-Seite enthielt keinen eindeutigen ASIN-Nachweis.",
+    product_repeat_blocked: "Alle passenden Produkte wurden in den letzten 7 Tagen verwendet oder abgelehnt.",
+    product_data_uncertain: "Die Produktdaten belegen die geplanten Aussagen nicht.",
+    editorial_rate_limited: "Das Redaktionsmodell war ausgelastet.",
+    editorial_model_failed: "Das Redaktionsmodell hat keinen prüfbaren Entwurf geliefert.",
+    publication_gate_failed: "Der Entwurf war nicht freigabefähig.",
+    content_review_failed: "Der Entwurf hat die redaktionelle Prüfung nicht bestanden.",
+    missing_caption: "Der Beitragstext fehlte.",
+  } as Record<string, string>)[result.reason || ""] || (result.status === "failed" ? "Es gab einen technischen Fehler." : "Die Planung konnte nicht abgeschlossen werden.");
+  const retry = !TERMINAL_REASONS.has(result.reason || "") ? " Ich versuche es beim nächsten Lauf noch einmal." : "";
+  return `Für den ${name}-Slot gibt es gerade keinen Vorschlag: ${why} Es wurde nichts erzeugt oder veröffentlicht.${retry} Mit „Artikelsuche <Produkt>“ startest du selbst einen Vorschlag, „Status“ zeigt Details.`;
+}
+
+// At most one notice per slot (marker in daily_drafts.feedback, which a retry does not reset); only inside the 24 h window.
+async function notifySlotOutcome(day: string, slot: string, result: { status: string; reason?: string }) {
+  try {
+    const db = getDatabase();
+    const approver = (process.env.WHATSAPP_APPROVER_WA_ID || "").replace(/\D/g, "");
+    const open = approver ? await db.query("SELECT 1 FROM whatsapp_events WHERE wa_id=$1 AND received_at>now()-interval '24 hours' LIMIT 1", [approver]) : { rows: [] };
+    if (!open.rows.length) { slotLog("daily_slot_notice", { day, slot, notice: "window_closed", reason: result.reason }); return; }
+    // A first, possibly transient failure is retried by the next cron call; the operator hears about it from the second failed attempt on.
+    const state = await db.query("SELECT attempts FROM daily_drafts WHERE day=$1 AND slot=$2", [day, slot]);
+    if (!TERMINAL_REASONS.has(result.reason || "") && Number(state.rows[0]?.attempts ?? 1) < 2) { slotLog("daily_slot_notice", { day, slot, notice: "deferred_retry_pending", reason: result.reason }); return; }
+    const claimed = await db.query("UPDATE daily_drafts SET feedback='slot_notice_sent' WHERE day=$1 AND slot=$2 AND feedback='' RETURNING job_id", [day, slot]);
+    if (!claimed.rows.length) return;
+    try { await sendWhatsAppText(slotNoticeText(slot, result)); slotLog("daily_slot_notice", { day, slot, notice: "sent", reason: result.reason }); }
+    catch { await db.query("UPDATE daily_drafts SET feedback='' WHERE day=$1 AND slot=$2 AND feedback='slot_notice_sent'", [day, slot]); throw new Error("send_failed"); }
+  } catch { console.error(JSON.stringify({ event: "daily_slot_notice_failed", day, slot })); }
+}
+
+export async function createDailyDraft(day = berlinDay(), slot = "morning", productQuery?: string, productSearch?: string) {
+  const result = await planDailyDraft(day, slot, productQuery, productSearch);
+  if ((slot === "morning" || slot === "afternoon") && (result.status === "needs_input" || result.status === "failed") && "jobId" in result)
+    await notifySlotOutcome(day, slot, { status: result.status, reason: "reason" in result ? String(result.reason) : undefined });
+  return result;
 }
