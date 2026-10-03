@@ -65,8 +65,13 @@ async function viaReplicate(bytes: Uint8Array, mime: string, hints: boolean, tok
     body: JSON.stringify({ input: hints ? { audio_file: audio, language: "de", prompt: HINT } : { audio_file: audio } }),
   });
   let response = await post();
-  // 429 is a refusal before any processing: one retry after the advertised wait is safe.
-  if (response.status === 429) { await sleep(8_000); response = await post(); }
+  // 429 is a refusal before any processing, so waiting and asking again is safe. Accounts with little credit are limited to
+  // 6 creations per minute with burst 1: honour the advertised wait (bounded), at most twice.
+  for (let attempt = 0; response.status === 429 && attempt < 2; attempt++) {
+    const advised = Number((await response.clone().json().catch(() => ({})) as { retry_after?: unknown }).retry_after);
+    await sleep(Math.min(Math.max(Number.isFinite(advised) ? advised : 0, 11), 20) * 1_000);
+    response = await post();
+  }
   if (!response.ok) throw await refusal("replicate", response);
   let prediction = await response.json() as { id?: string; status?: string; output?: unknown; error?: unknown };
   // GETs only observe the same prediction; there is never a second paid POST.
@@ -102,6 +107,7 @@ async function replicateWithVariants(bytes: Uint8Array, mime: string, token: str
       last = error;
       if (!(error instanceof TranscriptionError) || !/prediction failed/.test(error.detail || "")) throw error;
       console.warn(JSON.stringify({ event: "voice_transcription_variant_failed", variant: index + 1, detail: error.detail }));
+      await sleep(11_000);
     }
   }
   throw last;
