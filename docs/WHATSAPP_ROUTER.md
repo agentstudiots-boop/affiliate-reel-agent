@@ -158,9 +158,12 @@ gültigen Amazon.de-Produktlink mit Tracking-Tag werden nicht gezeigt. Seitenwei
 
 Eine WhatsApp-Sprachnachricht des Betreibers wird nur in Text umgewandelt und läuft danach durch dieselbe Verarbeitung wie eine getippte Nachricht (gleiche Nachrichten-ID, gleicher Antwortbezug `context.id`). Es gibt keinen eigenen Befehlspfad.
 
-Ablauf: Webhook (`type: "audio"`) → `lib/whatsapp/voice.ts` (nur Betreiber; Abruf über Graph-API, nur Meta-Hosts, max. 4 MB) → `lib/whatsapp/transcribe.ts` (OpenAI `gpt-4o-mini-transcribe`, falls `OPENAI_API_KEY` gesetzt, sonst Replicate) → Rückmeldung „🎤 Verstanden: …“ → normale Textverarbeitung (Router, „Artikelsuche …“, Freigabe, „Weiter“, „Status“, Änderungswünsche).
+Genau ein Pfad: Webhook (`type: "audio"`) → `lib/whatsapp/voice.ts` (nur Betreiber; Abruf über Graph-API, nur Meta-Hosts, max. 4 MB) → `lib/whatsapp/audio.ts` (Format aus den **Bytes** bestimmen, validieren, konvertieren) → `lib/whatsapp/transcribe.ts` → Rückmeldung „🎤 Verstanden: …“ → normale Textverarbeitung (Router, „Artikelsuche …“, Freigabe, „Weiter“, „Status“, Änderungswünsche).
 
-- Unverständliches, leeres oder fehlgeschlagenes Audio: verständliche Rückmeldung, **keine** Aktion.
+**Audioformat.** WhatsApp-Sprachnachrichten sind Ogg-Container mit Opus-Codec (mono). Das Transkriptionsmodell hinter Replicate (`openai/gpt-4o-transcribe`) lehnte diese Dateien ab (E006 / „Audio file might be corrupted or unsupported“). Deshalb wird Ogg/Opus mit einem WASM-Decoder (`ogg-opus-decoder`, libopus) wirklich dekodiert und als 16-kHz-Mono-PCM-WAV (`audio/wav`) übergeben. Keine Umbenennung, keine falschen MIME-Typen. Bereits gültiges WAV/MP3/FLAC wird mit seinem echten Typ durchgereicht; andere Formate (z. B. AAC/M4A, Ogg Vorbis) werden mit klarer Meldung abgelehnt. Maximal 120 Sekunden. Das Paket ist in `next.config.ts` als `serverExternalPackages` eingetragen (sein Worker-Code ist nicht bündelbar); Vercel nimmt es über das File-Tracing mit.
+
+- Unverständliches, leeres, stilles, zu langes, nicht lesbares oder fehlgeschlagenes Audio: verständliche Rückmeldung, **keine** Aktion. Der Anbieter wird bei ungültigem Audio gar nicht erst aufgerufen.
+- Diagnose-Logs ohne Inhalt: `voice_audio_inspected` (Container, Codec, Kanäle, Rate, Dauer, Größe), `voice_audio_rejected`, `voice_message_failed` mit Anbieter/HTTP-Status/Fehlergrund.
 - Doppelte Webhook-Zustellung: Tabelle `whatsapp_voice_messages` (nur Nachrichten-ID, Status, Fehlercode; kein Audio, kein Transkript) verhindert zweiten Abruf und zweite Transkription. Wirft die Textverarbeitung, wird die Nachricht für den Meta-Retry freigegeben.
-- Optional: `WHATSAPP_TRANSCRIPTION_MODEL` (nur Replicate-Pfad, Standard `openai/gpt-4o-transcribe`, nicht gegen Produktion verifiziert).
+- Anbieter: `OPENAI_API_KEY` (dann `gpt-4o-mini-transcribe`, Datei als `voice.wav`), sonst `REPLICATE_API_TOKEN`. Optional `WHATSAPP_TRANSCRIPTION_MODEL` (nur Replicate). Bei Replicate-429 wird die genannte Wartezeit abgewartet (höchstens zwei Wiederholungen).
 - Das Transkript wird – wie jede Textnachricht – von der bestehenden Pipeline als Nachrichtentext gespeichert.

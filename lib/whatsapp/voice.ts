@@ -22,6 +22,8 @@ const MESSAGES: Record<string, string> = {
   provider_failed: "Die Transkription deiner Sprachnachricht ist gerade fehlgeschlagen. Bitte sende sie noch einmal oder schreib mir den Auftrag.",
   timeout: "Die Transkription deiner Sprachnachricht hat zu lange gedauert. Bitte sende sie noch einmal oder schreib mir den Auftrag.",
   unintelligible: "Ich konnte deine Sprachnachricht nicht sicher verstehen. Bitte sprich sie noch einmal ein oder schreib mir den Auftrag.",
+  unsupported_format: "Dieses Audioformat kann ich nicht verarbeiten. Bitte nimm eine normale WhatsApp-Sprachnachricht auf oder schreib mir den Auftrag.",
+  unreadable: "Ich konnte die Audiodatei nicht lesen. Bitte sprich sie noch einmal ein oder schreib mir den Auftrag.",
   media_unavailable: "Ich konnte die Sprachnachricht nicht von WhatsApp abrufen. Bitte sende sie noch einmal oder schreib mir den Auftrag.",
 };
 

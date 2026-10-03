@@ -10,7 +10,11 @@ const startPost=require('../.test-build/lib/whatsapp/start-image-post');
 
 const env={META_APP_SECRET:'voice-secret',WHATSAPP_PHONE_NUMBER_ID:'123456',WHATSAPP_APPROVER_WA_ID:'491234',WHATSAPP_ACCESS_TOKEN:'wa-voice-token',
   OPENAI_API_KEY:'openai-voice-key',WHATSAPP_ROUTER_ENABLED:'false'};
-const AUDIO=Buffer.from('OggS-fake-voice-bytes');
+const {whatsappVoiceNote,speechLike,page}=require('./helpers/ogg-opus.cjs');
+const {inspectAudio,prepareAudio}=require('../.test-build/lib/whatsapp/audio');
+// Real Ogg/Opus voice note as WhatsApp sends it (mono, 16 kHz, 20 ms frames), not a placeholder.
+const AUDIO=whatsappVoiceNote(4,speechLike);
+const wavFacts=b=>{const v=new DataView(b.buffer,b.byteOffset,b.byteLength);return {riff:Buffer.from(b.slice(0,4)).toString(),wave:Buffer.from(b.slice(8,12)).toString(),format:v.getUint16(20,true),channels:v.getUint16(22,true),rate:v.getUint32(24,true),bits:v.getUint16(34,true),data:v.getUint32(40,true),total:b.length};};
 
 // Real route, real signature check, real voice layer, real transcription client, real text pipeline pieces for the
 // searched command. Only network (Graph media, OpenAI, Graph send) and heavy downstream workflows are replaced.
@@ -20,7 +24,7 @@ async function fixture(t,{transcripts={},mediaStatus=200,openaiStatus=200,audioB
   const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
   const old=Object.fromEntries(Object.keys(env).map(k=>[k,process.env[k]]));Object.assign(process.env,env);
   t.after(()=>{for(const k of Object.keys(env)){if(old[k]===undefined)delete process.env[k];else process.env[k]=old[k];}});
-  const log={sent:[],instructions:[],approvals:[],resumes:0,drafts:[],transcribed:0,downloads:0,tokenHosts:[]};
+  const log={files:[],sent:[],instructions:[],approvals:[],resumes:0,drafts:[],transcribed:0,downloads:0,tokenHosts:[]};
   t.mock.method(global,'fetch',async(url,init={})=>{
     const u=String(url);
     if(u.includes('/messages')){log.sent.push(JSON.parse(init.body).text.body);return new Response(JSON.stringify({messages:[{id:'wamid.out'}]}),{status:200});}
@@ -30,7 +34,7 @@ async function fixture(t,{transcripts={},mediaStatus=200,openaiStatus=200,audioB
     }
     if(u.startsWith('https://lookaside.fbsbx.com/')){log.downloads++;log.tokenHosts.push(init.headers.Authorization);return new Response(audioBytes,{status:200});}
     if(u==='https://api.openai.com/v1/audio/transcriptions'){
-      log.transcribed++;
+      log.transcribed++;{const file=init.body.get('file');log.files.push({name:file.name,type:file.type,bytes:new Uint8Array(await file.arrayBuffer())});}
       if(openaiStatus!==200)return new Response('{}',{status:openaiStatus});
       return new Response(JSON.stringify({text:transcripts[init.body.get('file').size]??transcripts.default}),{status:200});
     }
@@ -187,35 +191,118 @@ test('a failed Replicate prediction logs its provider reason without leaking the
   await assert.rejects(transcribeAudio(AUDIO,'audio/ogg',{request,sleep:async()=>{}}),e=>e.code==='provider_failed'&&/replicate prediction failed: Invalid input/.test(e.detail)&&!/secrettoken/.test(e.detail));
 });
 
-test('Replicate E006 on the original label retries the same audio with another label and returns the transcript',async t=>{
-  const {transcribeAudio}=require('../.test-build/lib/whatsapp/transcribe');
+const replicateOnly=t=>{
   const old={o:process.env.OPENAI_API_KEY,r:process.env.REPLICATE_API_TOKEN};
   delete process.env.OPENAI_API_KEY;process.env.REPLICATE_API_TOKEN='r8_token';
   t.after(()=>{if(old.o===undefined)delete process.env.OPENAI_API_KEY;else process.env.OPENAI_API_KEY=old.o;if(old.r===undefined)delete process.env.REPLICATE_API_TOKEN;else process.env.REPLICATE_API_TOKEN=old.r;});
   t.mock.method(console,'warn',()=>{});t.mock.method(console,'info',()=>{});
-  const sent=[];
-  const request=async(url,init)=>{const input=JSON.parse(init.body).input;sent.push(input.audio_file.slice(0,20));
-    return input.audio_file.startsWith('data:audio/ogg')?new Response(JSON.stringify({id:'abcdefghijkl1',status:'failed',error:'The input was invalid (E006)'}),{status:201})
-      :new Response(JSON.stringify({id:'abcdefghijkl2',status:'succeeded',output:{text:'Status bitte'}}),{status:201});};
-  assert.equal(await transcribeAudio(AUDIO,'audio/ogg; codecs=opus',{request,sleep:async()=>{}}),'Status bitte');
-  assert.deepEqual(sent.map(v=>v.slice(0,15)),['data:audio/ogg;','data:audio/mpeg']);
-  // an HTTP refusal (wrong model, no credit) is not retried with other labels
-  let calls=0;
-  await assert.rejects(transcribeAudio(AUDIO,'audio/ogg',{request:async()=>{calls++;return new Response('{}',{status:402});},sleep:async()=>{}}),e=>e.code==='provider_failed');
-  assert.equal(calls,1);
+};
+
+test('format is determined from the real bytes: WhatsApp voice note is Ogg/Opus, mono, 16 kHz',()=>{
+  const info=inspectAudio(AUDIO);
+  assert.deepEqual({container:info.container,codec:info.codec,channels:info.channels,sampleRate:info.sampleRate},{container:'ogg',codec:'opus',channels:1,sampleRate:16000});
+  assert.ok(Math.abs(info.seconds-4)<0.05,String(info.seconds));
+  // the file name / declared MIME type play no role
+  assert.equal(inspectAudio(Buffer.from(AUDIO)).codec,'opus');
+  assert.equal(inspectAudio(Buffer.from('RIFF\0\0\0\0WAVEfmt ')).container,'wav');
+  assert.equal(inspectAudio(Buffer.from('not audio at all')).container,'unknown');
 });
 
-test('a throttled Replicate account (429, burst 1) waits the advised time before the next attempt',async t=>{
+test('Ogg/Opus is really decoded and re-encoded as 16 kHz mono PCM WAV with the signal intact',async()=>{
+  const out=await prepareAudio(AUDIO);
+  assert.equal(out.mime,'audio/wav');
+  const facts=wavFacts(out.bytes);
+  assert.deepEqual({riff:facts.riff,wave:facts.wave,format:facts.format,channels:facts.channels,rate:facts.rate,bits:facts.bits},{riff:'RIFF',wave:'WAVE',format:1,channels:1,rate:16000,bits:16});
+  assert.equal(facts.total,44+facts.data);assert.ok(Math.abs(facts.data/2/16000-4)<0.1,'about four seconds of samples');
+  // content, not just a header: energy and the 150 Hz-harmonic fundamental survive the codec round trip
+  const pcm=new Int16Array(out.bytes.buffer.slice(out.bytes.byteOffset+44,out.bytes.byteOffset+out.bytes.length));
+  const rms=Math.sqrt(pcm.reduce((sum,v)=>sum+(v/32768)**2,0)/pcm.length);assert.ok(rms>0.02,String(rms));
+  const goertzel=hz=>{let re=0,im=0;for(let n=0;n<pcm.length;n++){const w=2*Math.PI*hz*n/16000;re+=pcm[n]*Math.cos(w);im-=pcm[n]*Math.sin(w);}return Math.hypot(re,im);};
+  assert.ok(goertzel(150)>goertzel(1234)*5,'voiced fundamental dominates an unrelated frequency');
+});
+
+test('the provider receives the converted WAV with its true MIME type and file name (OpenAI path)',async t=>{
+  const f=await fixture(t,{transcripts:{default:'Status'}});
+  await f.post(f.payload('wamid.fmt'));
+  assert.equal(f.log.files.length,1);
+  assert.equal(f.log.files[0].type,'audio/wav');assert.equal(f.log.files[0].name,'voice.wav');
+  assert.deepEqual({rate:wavFacts(f.log.files[0].bytes).rate,channels:wavFacts(f.log.files[0].bytes).channels,format:wavFacts(f.log.files[0].bytes).format},{rate:16000,channels:1,format:1});
+});
+
+test('the Replicate path sends exactly one audio/wav data URI, never relabelled Ogg',async t=>{
   const {transcribeAudio}=require('../.test-build/lib/whatsapp/transcribe');
-  const old={o:process.env.OPENAI_API_KEY,r:process.env.REPLICATE_API_TOKEN};
-  delete process.env.OPENAI_API_KEY;process.env.REPLICATE_API_TOKEN='r8_token';
-  t.after(()=>{if(old.o===undefined)delete process.env.OPENAI_API_KEY;else process.env.OPENAI_API_KEY=old.o;if(old.r===undefined)delete process.env.REPLICATE_API_TOKEN;else process.env.REPLICATE_API_TOKEN=old.r;});
-  t.mock.method(console,'warn',()=>{});t.mock.method(console,'info',()=>{});
+  replicateOnly(t);
+  const posts=[];
+  const request=async(url,init)=>{posts.push(JSON.parse(init.body).input);return new Response(JSON.stringify({id:'abcdefghijkl1',status:'succeeded',output:{text:'Status bitte'}}),{status:201});};
+  assert.equal(await transcribeAudio(AUDIO,'audio/ogg; codecs=opus',{request,sleep:async()=>{}}),'Status bitte');
+  assert.equal(posts.length,1);
+  assert.match(posts[0].audio_file,/^data:audio\/wav;base64,UklGR/);   // "RIFF"
+  const wav=Buffer.from(posts[0].audio_file.split(',')[1],'base64');assert.equal(wavFacts(new Uint8Array(wav)).rate,16000);
+});
+
+test('a failed prediction is a failure: one POST, no retries with other labels, no action',async t=>{
+  const {transcribeAudio}=require('../.test-build/lib/whatsapp/transcribe');
+  replicateOnly(t);
+  let posts=0;
+  await assert.rejects(transcribeAudio(AUDIO,'audio/ogg',{request:async()=>{posts++;return new Response(JSON.stringify({id:'abcdefghijkl1',status:'failed',error:'E006'}),{status:201});},sleep:async()=>{}}),e=>e.code==='provider_failed');
+  assert.equal(posts,1);
+});
+
+test('a throttled Replicate account (429) waits the advised time, then succeeds',async t=>{
+  const {transcribeAudio}=require('../.test-build/lib/whatsapp/transcribe');
+  replicateOnly(t);
   const waits=[];let posts=0;
   const request=async()=>{posts++;
-    if(posts===1)return new Response(JSON.stringify({id:'abcdefghijkl1',status:'failed',error:'E006'}),{status:201});
-    if(posts===2)return new Response(JSON.stringify({detail:'throttled',retry_after:9}),{status:429});
+    if(posts===1)return new Response(JSON.stringify({detail:'throttled',retry_after:14}),{status:429});
     return new Response(JSON.stringify({id:'abcdefghijkl3',status:'succeeded',output:{text:'Weiter bitte'}}),{status:201});};
   assert.equal(await transcribeAudio(AUDIO,'audio/ogg',{request,sleep:async ms=>{waits.push(ms)}}),'Weiter bitte');
-  assert.deepEqual(waits,[11000,11000]);assert.equal(posts,3);
+  assert.deepEqual(waits,[14000]);assert.equal(posts,2);
+});
+
+test('"Status" by voice runs the normal Status command from the real Ogg/Opus note',async t=>{
+  const f=await fixture(t,{transcripts:{default:'Status.'}});
+  await f.post(f.payload('wamid.statusvoice'));
+  assert.ok(f.log.sent.some(s=>/Verstanden: „Status\.“/.test(s)));
+  assert.ok(f.log.sent.some(s=>/Status-Text/.test(s)));
+  assert.equal(f.log.instructions.length,0);assert.equal(f.log.resumes,0);
+});
+
+test('a longer spoken order (28 s, ~80 words) arrives complete and unchanged at the instruction pipeline',async t=>{
+  const order='Hallo Jarvis, ich möchte den Beitrag für den Saugroboter noch einmal überarbeiten. Der Einstieg soll ruhiger klingen und mit einer Alltagssituation beginnen, zum Beispiel mit einem Samstagmorgen, an dem alle zuhause sind und der Boden schon wieder voller Krümel ist. Danach bitte erklären, wie der Roboter die Arbeit übernimmt, und am Ende nur die Dinge nennen, die auf der Produktseite stehen. Keine Versprechen und keine erfundenen Zahlen.';
+  const long=whatsappVoiceNote(28,speechLike);
+  const f=await fixture(t,{transcripts:{default:order},audioBytes:long});
+  await f.post(f.payload('wamid.longvoice',true,{replyTo:'wamid.draft.long'}));
+  assert.deepEqual(f.log.instructions,[{body:order,replyTo:'wamid.draft.long',id:'wamid.longvoice'}]);
+  assert.equal(wavFacts(f.log.files[0].bytes).data/2/16000>27,true);
+  assert.equal(f.log.sent.filter(s=>/Verstanden/.test(s)).length,1);
+});
+
+test('invalid or broken audio never reaches the provider and executes nothing',async t=>{
+  const cases={
+    'garbage after an Ogg signature':Buffer.concat([Buffer.from('OggS'),Buffer.alloc(200,7)]),
+    'truncated mid-stream':AUDIO.subarray(0,60),
+    'Ogg Vorbis, not Opus':page([Buffer.concat([Buffer.from([1]),Buffer.from('vorbis'),Buffer.alloc(30)])],{seq:0,granule:0,flags:2}),
+    'AAC in MP4 container':Buffer.concat([Buffer.alloc(4),Buffer.from('ftypM4A '),Buffer.alloc(100)]),
+    'random bytes':Buffer.from(Array.from({length:500},(_,i)=>(i*37)%251)),
+    'digital silence':whatsappVoiceNote(2,()=>0),
+  };
+  for(const [name,bytes] of Object.entries(cases)){
+    const f=await fixture(t,{transcripts:{default:'Freigabe'},audioBytes:bytes});
+    t.mock.method(console,'warn',()=>{});
+    const response=await f.post(f.payload('wamid.broken'));
+    assert.equal(response.status,200,name);
+    assert.equal(f.log.transcribed,0,name+': provider must not be called');
+    assert.equal(f.log.approvals.length+f.log.instructions.length+f.log.drafts.length+f.log.resumes,0,name);
+    assert.equal(f.log.sent.length,1,name);assert.match(f.log.sent[0],/Es wurde nichts ausgeführt/,name);
+    assert.equal((await voiceRow(f,'wamid.broken')).status,'failed',name);
+    // redelivery: still exactly one notice
+    await f.post(f.payload('wamid.broken'));assert.equal(f.log.sent.length,1,name);
+  }
+});
+
+test('audio longer than the limit is refused before any provider call',async t=>{
+  const f=await fixture(t,{transcripts:{default:'Freigabe'},audioBytes:whatsappVoiceNote(130,speechLike)});
+  await f.post(f.payload('wamid.toolong'));
+  assert.equal(f.log.transcribed,0);assert.equal(f.log.approvals.length,0);
+  assert.match(f.log.sent[0],/zu lang/);
 });

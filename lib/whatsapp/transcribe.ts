@@ -1,6 +1,8 @@
 // Speech-to-text for operator voice messages. The result is plain text that enters the normal message pipeline;
 // nothing here interprets commands.
-export type TranscriptionFailure = "not_configured" | "too_large" | "provider_failed" | "timeout" | "unintelligible";
+import { AudioError, prepareAudio } from "./audio";
+
+export type TranscriptionFailure = "not_configured" | "too_large" | "provider_failed" | "timeout" | "unintelligible" | "unsupported_format" | "unreadable";
 export class TranscriptionError extends Error {
   constructor(readonly code: TranscriptionFailure, readonly detail: string | null = null) { super(code); this.name = "TranscriptionError"; }
 }
@@ -20,6 +22,7 @@ async function refusal(provider: string, response: Response): Promise<Transcript
 export const MAX_AUDIO_BYTES = 4 * 1024 * 1024;
 const HINT = "Jarvis, Artikelsuche, Freigabe, Freigeben, Ablehnen, Status, Weiter, Entwurf, Kategorie, Amazon, Facebook, Instagram, Bild, Text.";
 const REPLICATE_MODEL = () => process.env.WHATSAPP_TRANSCRIPTION_MODEL?.trim() || "openai/gpt-4o-transcribe";
+const EXTENSION: Record<string, string> = { "audio/wav": "wav", "audio/mpeg": "mp3", "audio/flac": "flac" };
 const OPENAI_MODEL = "gpt-4o-mini-transcribe";
 
 // Typical hallucinations of speech models on silence/noise. A transcript that is only this is never acted upon.
@@ -49,7 +52,7 @@ async function viaOpenAI(bytes: Uint8Array, mime: string, key: string, request: 
   form.set("language", "de");
   form.set("prompt", HINT);
   form.set("response_format", "json");
-  form.set("file", new Blob([bytes as BlobPart], { type: mime || "audio/ogg" }), "voice.ogg");
+  form.set("file", new Blob([bytes as BlobPart], { type: mime }), `voice.${EXTENSION[mime] ?? "wav"}`);
   const response = await request("https://api.openai.com/v1/audio/transcriptions", {
     method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form, redirect: "error", signal: AbortSignal.timeout(45_000),
   });
@@ -57,12 +60,12 @@ async function viaOpenAI(bytes: Uint8Array, mime: string, key: string, request: 
   return textOf(await response.json().catch(() => null));
 }
 
-async function viaReplicate(bytes: Uint8Array, mime: string, hints: boolean, token: string, request: typeof fetch, sleep: (ms: number) => Promise<void>) {
+async function viaReplicate(bytes: Uint8Array, mime: string, token: string, request: typeof fetch, sleep: (ms: number) => Promise<void>) {
   const audio = `data:${mime};base64,${Buffer.from(bytes).toString("base64")}`;
   const post = () => request(`https://api.replicate.com/v1/models/${REPLICATE_MODEL()}/predictions`, {
     method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Prefer: "wait=30", "Cancel-After": "60s" },
     redirect: "error", signal: AbortSignal.timeout(50_000),
-    body: JSON.stringify({ input: hints ? { audio_file: audio, language: "de", prompt: HINT } : { audio_file: audio } }),
+    body: JSON.stringify({ input: { audio_file: audio, language: "de", prompt: HINT } }),
   });
   let response = await post();
   // 429 is a refusal before any processing, so waiting and asking again is safe. Accounts with little credit are limited to
@@ -90,38 +93,26 @@ async function viaReplicate(bytes: Uint8Array, mime: string, hints: boolean, tok
   return textOf(prediction.output);
 }
 
-// Replicate derives the file extension from the data-URI MIME type, and the model rejects some of them (E006 "input was
-// invalid") although the audio itself is fine. Same audio, differently labelled, at most three bounded attempts; a failed
-// prediction is not billed. The variant that worked is logged.
-const REPLICATE_VARIANTS: { mime: string | null; hints: boolean }[] = [
-  { mime: null, hints: true }, { mime: "audio/mpeg", hints: true }, { mime: "audio/mpeg", hints: false },
-];
-async function replicateWithVariants(bytes: Uint8Array, mime: string, token: string, request: typeof fetch, sleep: (ms: number) => Promise<void>) {
-  let last: unknown;
-  for (const [index, variant] of REPLICATE_VARIANTS.entries()) {
-    try {
-      const raw = await viaReplicate(bytes, variant.mime ?? ((mime || "audio/ogg").split(";")[0] || "audio/ogg"), variant.hints, token, request, sleep);
-      if (index > 0) console.info(JSON.stringify({ event: "voice_transcription_variant", variant: index + 1 }));
-      return raw;
-    } catch (error) {
-      last = error;
-      if (!(error instanceof TranscriptionError) || !/prediction failed/.test(error.detail || "")) throw error;
-      console.warn(JSON.stringify({ event: "voice_transcription_variant_failed", variant: index + 1, detail: error.detail }));
-      await sleep(11_000);
-    }
-  }
-  throw last;
-}
-
+// One path: validate and, where needed, convert the WhatsApp audio (real decode, no relabelling) → transcribe.
 // Provider order: a configured OpenAI key (documented transcription API), otherwise the existing Replicate token.
-export async function transcribeAudio(bytes: Uint8Array, mime: string, deps: Deps = {}): Promise<string> {
+export async function transcribeAudio(bytes: Uint8Array, _declaredMime: string, deps: Deps = {}): Promise<string> {
   if (!bytes.byteLength || bytes.byteLength > MAX_AUDIO_BYTES) throw new TranscriptionError(bytes.byteLength ? "too_large" : "unintelligible");
   const request = deps.request ?? fetch;
   const sleep = deps.sleep ?? (ms => new Promise<void>(resolve => setTimeout(resolve, ms)));
   const openai = process.env.OPENAI_API_KEY?.trim(), replicate = process.env.REPLICATE_API_TOKEN?.trim();
   if (!openai && !replicate) throw new TranscriptionError("not_configured");
+  let audio;
+  try { audio = await prepareAudio(bytes); }
+  catch (error) {
+    if (!(error instanceof AudioError)) throw new TranscriptionError("unreadable", "audio preparation");
+    console.warn(JSON.stringify({ event: "voice_audio_rejected", reason: error.code, detail: error.detail }));
+    throw new TranscriptionError(error.code === "unsupported_format" ? "unsupported_format" : error.code === "too_long" ? "too_large"
+      : error.code === "silent" ? "unintelligible" : "unreadable", error.detail);
+  }
+  // Facts about the real file, for diagnosis. No content.
+  console.info(JSON.stringify({ event: "voice_audio_inspected", ...audio.info, sentAs: audio.mime, sentBytes: audio.bytes.length }));
   let raw: unknown;
-  try { raw = openai ? await viaOpenAI(bytes, mime, openai, request) : await replicateWithVariants(bytes, mime, replicate!, request, sleep); }
+  try { raw = openai ? await viaOpenAI(audio.bytes, audio.mime, openai, request) : await viaReplicate(audio.bytes, audio.mime, replicate!, request, sleep); }
   catch (error) {
     if (error instanceof TranscriptionError) throw error;
     throw new TranscriptionError(error instanceof Error && /timeout|aborted/i.test(`${error.name} ${error.message}`) ? "timeout" : "provider_failed",
