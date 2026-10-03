@@ -57,12 +57,12 @@ async function viaOpenAI(bytes: Uint8Array, mime: string, key: string, request: 
   return textOf(await response.json().catch(() => null));
 }
 
-async function viaReplicate(bytes: Uint8Array, mime: string, token: string, request: typeof fetch, sleep: (ms: number) => Promise<void>) {
-  const audio = `data:${(mime || "audio/ogg").split(";")[0]};base64,${Buffer.from(bytes).toString("base64")}`;
+async function viaReplicate(bytes: Uint8Array, mime: string, hints: boolean, token: string, request: typeof fetch, sleep: (ms: number) => Promise<void>) {
+  const audio = `data:${mime};base64,${Buffer.from(bytes).toString("base64")}`;
   const post = () => request(`https://api.replicate.com/v1/models/${REPLICATE_MODEL()}/predictions`, {
     method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Prefer: "wait=30", "Cancel-After": "60s" },
     redirect: "error", signal: AbortSignal.timeout(50_000),
-    body: JSON.stringify({ input: { audio_file: audio, language: "de", prompt: HINT } }),
+    body: JSON.stringify({ input: hints ? { audio_file: audio, language: "de", prompt: HINT } : { audio_file: audio } }),
   });
   let response = await post();
   // 429 is a refusal before any processing: one retry after the advertised wait is safe.
@@ -85,6 +85,28 @@ async function viaReplicate(bytes: Uint8Array, mime: string, token: string, requ
   return textOf(prediction.output);
 }
 
+// Replicate derives the file extension from the data-URI MIME type, and the model rejects some of them (E006 "input was
+// invalid") although the audio itself is fine. Same audio, differently labelled, at most three bounded attempts; a failed
+// prediction is not billed. The variant that worked is logged.
+const REPLICATE_VARIANTS: { mime: string | null; hints: boolean }[] = [
+  { mime: null, hints: true }, { mime: "audio/mpeg", hints: true }, { mime: "audio/mpeg", hints: false },
+];
+async function replicateWithVariants(bytes: Uint8Array, mime: string, token: string, request: typeof fetch, sleep: (ms: number) => Promise<void>) {
+  let last: unknown;
+  for (const [index, variant] of REPLICATE_VARIANTS.entries()) {
+    try {
+      const raw = await viaReplicate(bytes, variant.mime ?? ((mime || "audio/ogg").split(";")[0] || "audio/ogg"), variant.hints, token, request, sleep);
+      if (index > 0) console.info(JSON.stringify({ event: "voice_transcription_variant", variant: index + 1 }));
+      return raw;
+    } catch (error) {
+      last = error;
+      if (!(error instanceof TranscriptionError) || !/prediction failed/.test(error.detail || "")) throw error;
+      console.warn(JSON.stringify({ event: "voice_transcription_variant_failed", variant: index + 1, detail: error.detail }));
+    }
+  }
+  throw last;
+}
+
 // Provider order: a configured OpenAI key (documented transcription API), otherwise the existing Replicate token.
 export async function transcribeAudio(bytes: Uint8Array, mime: string, deps: Deps = {}): Promise<string> {
   if (!bytes.byteLength || bytes.byteLength > MAX_AUDIO_BYTES) throw new TranscriptionError(bytes.byteLength ? "too_large" : "unintelligible");
@@ -93,7 +115,7 @@ export async function transcribeAudio(bytes: Uint8Array, mime: string, deps: Dep
   const openai = process.env.OPENAI_API_KEY?.trim(), replicate = process.env.REPLICATE_API_TOKEN?.trim();
   if (!openai && !replicate) throw new TranscriptionError("not_configured");
   let raw: unknown;
-  try { raw = openai ? await viaOpenAI(bytes, mime, openai, request) : await viaReplicate(bytes, mime, replicate!, request, sleep); }
+  try { raw = openai ? await viaOpenAI(bytes, mime, openai, request) : await replicateWithVariants(bytes, mime, replicate!, request, sleep); }
   catch (error) {
     if (error instanceof TranscriptionError) throw error;
     throw new TranscriptionError(error instanceof Error && /timeout|aborted/i.test(`${error.name} ${error.message}`) ? "timeout" : "provider_failed",
