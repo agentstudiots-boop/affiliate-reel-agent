@@ -2,7 +2,19 @@
 // nothing here interprets commands.
 export type TranscriptionFailure = "not_configured" | "too_large" | "provider_failed" | "timeout" | "unintelligible";
 export class TranscriptionError extends Error {
-  constructor(readonly code: TranscriptionFailure) { super(code); this.name = "TranscriptionError"; }
+  constructor(readonly code: TranscriptionFailure, readonly detail: string | null = null) { super(code); this.name = "TranscriptionError"; }
+}
+
+// Provider refusals are logged with provider, HTTP status and a short sanitized reason (never keys, never audio or text).
+async function refusal(provider: string, response: Response): Promise<TranscriptionError> {
+  let reason = "";
+  try {
+    const body = await response.json() as { error?: unknown; detail?: unknown; title?: unknown };
+    const nested = body.error && typeof (body.error as { message?: unknown }).message === "string" ? (body.error as { message: string }).message : "";
+    const raw = typeof body.detail === "string" ? body.detail : typeof body.title === "string" ? body.title : nested;
+    reason = raw.replace(/(?:sk-|r8_|Bearer\s+)[A-Za-z0-9_-]+/g, "[redacted]").replace(/\s+/g, " ").slice(0, 160);
+  } catch { /* body is optional */ }
+  return new TranscriptionError("provider_failed", `${provider} http ${response.status}${reason ? `: ${reason}` : ""}`);
 }
 
 export const MAX_AUDIO_BYTES = 4 * 1024 * 1024;
@@ -41,7 +53,7 @@ async function viaOpenAI(bytes: Uint8Array, mime: string, key: string, request: 
   const response = await request("https://api.openai.com/v1/audio/transcriptions", {
     method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form, redirect: "error", signal: AbortSignal.timeout(45_000),
   });
-  if (!response.ok) throw new TranscriptionError("provider_failed");
+  if (!response.ok) throw await refusal("openai", response);
   return textOf(await response.json().catch(() => null));
 }
 
@@ -55,7 +67,7 @@ async function viaReplicate(bytes: Uint8Array, mime: string, token: string, requ
   let response = await post();
   // 429 is a refusal before any processing: one retry after the advertised wait is safe.
   if (response.status === 429) { await sleep(8_000); response = await post(); }
-  if (!response.ok) throw new TranscriptionError("provider_failed");
+  if (!response.ok) throw await refusal("replicate", response);
   let prediction = await response.json() as { id?: string; status?: string; output?: unknown };
   // GETs only observe the same prediction; there is never a second paid POST.
   for (let attempt = 0; ["starting", "processing"].includes(prediction.status || "") && prediction.id && /^[a-z0-9]{12,64}$/.test(prediction.id) && attempt < 12; attempt++) {
@@ -66,7 +78,7 @@ async function viaReplicate(bytes: Uint8Array, mime: string, token: string, requ
     if (next.id !== prediction.id) throw new TranscriptionError("provider_failed");
     prediction = next;
   }
-  if (prediction.status !== "succeeded") throw new TranscriptionError("provider_failed");
+  if (prediction.status !== "succeeded") throw new TranscriptionError("provider_failed", `replicate prediction ${prediction.status || "unknown"}`);
   return textOf(prediction.output);
 }
 
@@ -81,7 +93,8 @@ export async function transcribeAudio(bytes: Uint8Array, mime: string, deps: Dep
   try { raw = openai ? await viaOpenAI(bytes, mime, openai, request) : await viaReplicate(bytes, mime, replicate!, request, sleep); }
   catch (error) {
     if (error instanceof TranscriptionError) throw error;
-    throw new TranscriptionError(error instanceof Error && /timeout|aborted/i.test(`${error.name} ${error.message}`) ? "timeout" : "provider_failed");
+    throw new TranscriptionError(error instanceof Error && /timeout|aborted/i.test(`${error.name} ${error.message}`) ? "timeout" : "provider_failed",
+      error instanceof Error ? `${openai ? "openai" : "replicate"} ${error.name}` : "unknown");
   }
   const text = usableTranscript(raw);
   if (!text) throw new TranscriptionError("unintelligible");
