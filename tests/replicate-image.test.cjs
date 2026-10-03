@@ -123,7 +123,12 @@ test('Replicate HTTP failures are classified without leaking provider response o
           return new Response(JSON.stringify({detail:'private-test-token prompt user secret; aspect_ratio invalid'}),{status});
         },
       });
-      await assert.rejects(provider.render(approved),/Kein automatischer zweiter Versuch/);
+      // A refusal while creating the prediction (4xx) means no image exists and nothing was charged: marked definite so the
+      // caller may release the one-attempt gate. A 5xx stays ambiguous: no automatic second attempt.
+      const definite=[401,402,403,404,422,429].includes(status);
+      await assert.rejects(provider.render(approved),error=>error.definite===definite&&error.category===category
+        &&(definite?/Replicate hat die Bildanfrage abgelehnt.*nichts berechnet/s.test(error.message):/Kein automatischer zweiter Versuch/.test(error.message))
+        &&!/private-test-token|user secret/.test(error.message));
       const record=JSON.parse(logged);
       assert.equal(posts,1);assert.equal(record.httpStatus,status);assert.equal(record.category,category);
       assert.equal(record.predictionId,null);assert.equal(record.phase,'create');

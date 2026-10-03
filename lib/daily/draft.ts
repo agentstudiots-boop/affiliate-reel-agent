@@ -302,7 +302,11 @@ async function planDailyDraft(day: string, slot: string, productQuery?: string, 
     const repo = memoryRepository(db);
     const approver=(process.env.WHATSAPP_APPROVER_WA_ID||"").replace(/\D/g,"");
     const corrections=await loadApprovedEditorialCorrections(db,approver,opportunity);
-    const mode=corrections.length && process.env.REPLICATE_API_TOKEN?.trim() ? "ai" as const : "reference" as const;
+    // The model-written draft is tried once per slot. If it failed (provider outage, off-schema answer), the retry uses the
+    // deterministic reference draft instead of repeating the same failure until the attempts are used up.
+    const attempt = Number((await db.query("SELECT attempts FROM daily_drafts WHERE job_id=$1", [jobId])).rows[0]?.attempts ?? 1);
+    const mode=corrections.length && process.env.REPLICATE_API_TOKEN?.trim() && (attempt<2 || !scheduled) ? "ai" as const : "reference" as const;
+    if (attempt >= 2 && scheduled && corrections.length) slotLog("daily_slot_stage", { day, slot, jobId, stage: "reference_mode_after_failed_attempt" });
     await repo.claim(jobId, opportunity, mode);
     const job = await runContentJob(opportunity, { id: jobId, mode, allowedFormats: ["image"],
       loadCorrections:async()=>corrections, loadLearning: value => repo.learn(value), onUpdate: value => repo.save(value) });

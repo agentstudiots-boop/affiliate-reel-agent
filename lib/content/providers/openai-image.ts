@@ -14,7 +14,8 @@ const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 const TIMEOUT_MS = 110_000;
 
 export class OriginalVisualError extends Error {
-  constructor(message = "Originalbild konnte nicht sicher erzeugt und gespeichert werden.") { super(message); }
+  // `definite`: the provider rejected the request before any image was created (no cost, safe to try again).
+  constructor(message = "Originalbild konnte nicht sicher erzeugt und gespeichert werden.", readonly definite = false, readonly category = "unknown") { super(message); }
 }
 
 // The image agent already decided the visual idea. This prompt only renders it.
