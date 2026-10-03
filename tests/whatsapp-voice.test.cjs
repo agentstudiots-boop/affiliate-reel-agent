@@ -177,3 +177,12 @@ test('a provider refusal is logged with provider and status, but without keys or
   assert.match(line,/"code":"provider_failed"/);assert.match(line,/openai http 401/);
   assert.doesNotMatch(line,/openai-voice-key|wa-voice-token/);
 });
+
+test('a failed Replicate prediction logs its provider reason without leaking the token',async t=>{
+  const {transcribeAudio}=require('../.test-build/lib/whatsapp/transcribe');
+  const old={o:process.env.OPENAI_API_KEY,r:process.env.REPLICATE_API_TOKEN};
+  delete process.env.OPENAI_API_KEY;process.env.REPLICATE_API_TOKEN='r8_secrettoken123';
+  t.after(()=>{if(old.o===undefined)delete process.env.OPENAI_API_KEY;else process.env.OPENAI_API_KEY=old.o;if(old.r===undefined)delete process.env.REPLICATE_API_TOKEN;else process.env.REPLICATE_API_TOKEN=old.r;});
+  const request=async()=>new Response(JSON.stringify({id:'abcdefghijkl1',status:'failed',error:'Invalid input: audio_file r8_secrettoken123 unsupported'}),{status:201});
+  await assert.rejects(transcribeAudio(AUDIO,'audio/ogg',{request,sleep:async()=>{}}),e=>e.code==='provider_failed'&&/replicate prediction failed: Invalid input/.test(e.detail)&&!/secrettoken/.test(e.detail));
+});

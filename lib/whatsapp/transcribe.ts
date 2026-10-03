@@ -68,7 +68,7 @@ async function viaReplicate(bytes: Uint8Array, mime: string, token: string, requ
   // 429 is a refusal before any processing: one retry after the advertised wait is safe.
   if (response.status === 429) { await sleep(8_000); response = await post(); }
   if (!response.ok) throw await refusal("replicate", response);
-  let prediction = await response.json() as { id?: string; status?: string; output?: unknown };
+  let prediction = await response.json() as { id?: string; status?: string; output?: unknown; error?: unknown };
   // GETs only observe the same prediction; there is never a second paid POST.
   for (let attempt = 0; ["starting", "processing"].includes(prediction.status || "") && prediction.id && /^[a-z0-9]{12,64}$/.test(prediction.id) && attempt < 12; attempt++) {
     await sleep(1_500);
@@ -78,7 +78,10 @@ async function viaReplicate(bytes: Uint8Array, mime: string, token: string, requ
     if (next.id !== prediction.id) throw new TranscriptionError("provider_failed");
     prediction = next;
   }
-  if (prediction.status !== "succeeded") throw new TranscriptionError("provider_failed", `replicate prediction ${prediction.status || "unknown"}`);
+  if (prediction.status !== "succeeded") {
+    const reason = typeof prediction.error === "string" ? prediction.error.replace(/(?:sk-|r8_|Bearer\s+)[A-Za-z0-9_-]+/g, "[redacted]").replace(/\s+/g, " ").slice(0, 200) : "";
+    throw new TranscriptionError("provider_failed", `replicate prediction ${prediction.status || "unknown"}${reason ? `: ${reason}` : ""}`);
+  }
   return textOf(prediction.output);
 }
 
