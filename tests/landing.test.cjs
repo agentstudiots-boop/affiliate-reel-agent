@@ -2,16 +2,17 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {PGlite}=require('@electric-sql/pglite');
-const {loadPublishedProducts,shortName,categoryLabel,excerpt}=require('../.test-build/lib/landing/published');
+const {loadPublishedProducts,shortName,categoryLabel}=require('../.test-build/lib/landing/published');
+const {describeProduct}=require('../.test-build/lib/landing/description');
 
 async function fixture(t){
   const pg=new PGlite();t.after(()=>pg.close());
   for(const name of fs.readdirSync('db/migrations').filter(n=>n.endsWith('.sql')).sort())await pg.exec(fs.readFileSync(`db/migrations/${name}`,'utf8'));
   let n=0;
-  const add=async({status='published',category='household',name='Silikon Backmatte',affiliate='https://www.amazon.de/dp/B000000001?tag=alltaeglichle-21',image=true,caption='Fertiger Beitragstext.',publishedAt,updatedAt='2026-09-20T10:00:00Z'}={})=>{
+  const add=async({status='published',category='household',name='Silikon Backmatte',affiliate='https://www.amazon.de/dp/B000000001?tag=alltaeglichle-21',image=true,caption='Fertiger Beitragstext.',publishedAt,updatedAt='2026-09-20T10:00:00Z',verifiedName,asin,verifiedFacts=[]}={})=>{
     n++;const id=crypto.randomUUID();
     await pg.query("INSERT INTO products(id,name,source_url) VALUES($1,$2,'https://www.amazon.de/dp/B000000001')",[`p${n}`,name]);
-    const opportunity={product:{name,affiliateUrl:affiliate,asin:'B000000001'}};
+    const opportunity={product:{name,productVerifiedName:verifiedName||name,affiliateUrl:affiliate,asin:asin||affiliate.match(/\/dp\/([A-Z0-9]{10})/)?.[1]||'B000000001'},verifiedFacts};
     await pg.query(`INSERT INTO content_jobs(id,product_id,category,use_case_key,goal,target_platform,trend,opportunity,status,snapshot,created_at,updated_at)
       VALUES($1,$2,$3,'k','post','facebook','t',$4,'approved',$5,now(),now())`,[id,`p${n}`,category,JSON.stringify(opportunity),JSON.stringify({opportunity})]);
     const request=crypto.randomUUID();
@@ -24,7 +25,7 @@ async function fixture(t){
   return {pg,add,db:{query:(q,v)=>pg.query(q,v)}};
 }
 
-test('only published Facebook products are shown, newest publication first, with stored image, final caption and saved affiliate link',async t=>{
+test('only published Facebook products are shown, newest publication first, with stored image, ASIN and saved affiliate link; the Facebook caption is never shown',async t=>{
   const f=await fixture(t);
   await f.add({name:'Älteres Produkt',publishedAt:'2026-09-25T08:00:00Z',caption:'Text alt'});
   await f.add({name:'Neueres Produkt',publishedAt:'2026-09-30T08:00:00Z',caption:'Text neu\nzweite Zeile',affiliate:'https://www.amazon.de/dp/B000000002?tag=alltaeglichle-21'});
@@ -32,11 +33,12 @@ test('only published Facebook products are shown, newest publication first, with
   for(const status of ['pending','approved','publishing','unknown','rejected','changes_requested','preparing'])await f.add({name:`Nicht veröffentlicht ${status}`,status,publishedAt:'2026-10-01T08:00:00Z'});
   const {items}=await loadPublishedProducts(f.db);
   assert.deepEqual(items.map(item=>item.name),['Neueres Produkt','Ohne publications-Zeile','Älteres Produkt']);
-  assert.equal(items[0].excerpt,'Text neu zweite Zeile');
+  assert.equal(items[0].asin,'B000000002');
+  assert.ok(!JSON.stringify(items).includes('Text neu'),'the social caption is not used as product description');
   assert.equal(items[0].affiliateUrl,'https://www.amazon.de/dp/B000000002?tag=alltaeglichle-21');
   assert.match(items[0].imageUrl,/^https:\/\/s\.public\.blob\.vercel-storage\.com\/generated\/facebook\//);
   // Only the fields the page needs leave the database layer: no approver, message ids, hashes or post ids.
-  assert.deepEqual(Object.keys(items[0]).sort(),['affiliateUrl','category','categoryLabel','contentId','excerpt','id','imageUrl','name','publishedAt']);
+  assert.deepEqual(Object.keys(items[0]).sort(),['affiliateUrl','asin','category','categoryLabel','contentId','description','id','imageUrl','name','publishedAt']);
   assert.match(items[0].contentId,/^[0-9a-f-]{36}$/);
   assert.ok(!JSON.stringify(items).match(/491234|wamid|meta\d|hash/));
 });
@@ -74,13 +76,31 @@ test('headings are short, decoded and repaired Amazon titles',()=>{
   assert.equal(shortName('Tortillapresse 10&#34; Orange &amp; Co'),'Tortillapresse 10" Orange & Co');
 });
 
-test('the excerpt is only a truncation of the approved caption: no links, no disclosure line, nothing added',()=>{
-  const caption='Backen ohne Sauerei – so bleibt die Küche blitzsauber.\nWerbung | Affiliate-Link\nProdukt direkt ansehen: https://www.amazon.de/dp/B0CM14MKY8?tag=alltaeglichle-21\n\nMit einer Silikon-Backmatte bleibt die Küche beim Backen sauber. Ideal für alle, die Backen lieben, aber Putzen nicht! Noch ein weiterer Satz, der den Auszug über die Länge hinaus verlängert und abgeschnitten wird.\n\nJetzt entdecken!';
-  const text=excerpt(caption);
-  assert.ok(text.length<=181);assert.ok(!/https?:|Werbung|Affiliate|ansehen/i.test(text));
-  const source=new Set(caption.split(/\s+/));for(const word of text.replace(/ …$/,'').split(/\s+/))assert.ok(source.has(word),`word from the approved text: ${word}`);
-  assert.equal(excerpt('Kurzer Text.'),'Kurzer Text.');
-  assert.match(excerpt('Wort '.repeat(80)),/ …$/);
+test('the description comes from verified product data only: Amazon title segments and sourced facts, never the Facebook caption or promo words',async t=>{
+  const f=await fixture(t);
+  await f.add({name:'Halloween Kürbis Silikon Backformen, 2er-Set, Antihaft, perfekte Halloween-Backideen, spülmaschinenfest',verifiedName:'Halloween Kürbis Silikon Backformen, 2er-Set, Antihaft, perfekte Halloween-Backideen, spülmaschinenfest',
+    caption:'Wer möchte auf der Halloween-Party mit selbstgemachten Leckereien überraschen?\nWerbung | Affiliate-Link',publishedAt:'2026-10-01T08:00:00Z',
+    verifiedFacts:[{claim:'Material: Silikon',source:'https://www.amazon.de/dp/B000000001'}]});
+  const [item]=(await loadPublishedProducts(f.db)).items;
+  assert.deepEqual(item.description,{type:'Halloween Kürbis Silikon Backformen',features:['2er-Set','Antihaft','spülmaschinenfest'],facts:[{claim:'Material: Silikon',source:'https://www.amazon.de/dp/B000000001'}]});
+  assert.ok(!JSON.stringify(item).match(/Party|Leckereien|Werbung|perfekt/i),'no caption text, no promo wording');
+  // Titles without separators give a plain product name and no invented features.
+  assert.deepEqual(describeProduct({name:'Silikon Backmatte Backunterlage Backofen Matte'}),{type:'Silikon Backmatte Backunterlage Backofen Matte',features:[],facts:[]});
+  // A possibly cut-off last segment (stored title cap) is never shown; unsourced or non-https facts are dropped.
+  const longTitle='Ofenfeste Auflaufform, '+'Keramik mit Griffen, '.repeat(6)+'Spülmaschinen';
+  assert.ok(longTitle.length>=150);assert.ok(!describeProduct({name:longTitle}).features.includes('Spülmaschinen'));
+  assert.deepEqual(describeProduct({name:'X Produkt',verifiedFacts:[{claim:'a',source:'http://x.example'},{claim:'b'},{source:'https://x.example'}]}).facts,[]);
+});
+
+test('the button must lead to the stored product: ASIN of the link has to match the stored ASIN and be a detail page',async t=>{
+  const f=await fixture(t);
+  await f.add({name:'Passt',affiliate:'https://www.amazon.de/dp/B000000001?tag=alltaeglichle-21',asin:'B000000001'});
+  await f.add({name:'Falsche ASIN',affiliate:'https://www.amazon.de/dp/B000000009?tag=alltaeglichle-21',asin:'B000000001'});
+  await f.add({name:'Suche',affiliate:'https://www.amazon.de/s?k=x&tag=alltaeglichle-21',asin:'B000000001'});
+  await f.add({name:'Kategorie',affiliate:'https://www.amazon.de/b?node=1&tag=alltaeglichle-21',asin:'B000000001'});
+  await f.add({name:'Bestseller',affiliate:'https://www.amazon.de/gp/bestsellers/kitchen?tag=alltaeglichle-21',asin:'B000000001'});
+  const {items}=await loadPublishedProducts(f.db);
+  assert.deepEqual(items.map(item=>[item.name,item.asin]),[['Passt','B000000001']]);
 });
 
 test('click counting: only published items count, the target is never taken from the request, foreign origins are refused, failures stay silent',async t=>{

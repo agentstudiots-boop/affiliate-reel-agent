@@ -38,6 +38,12 @@
 .body h3 { margin: 0; font-size: 18px; line-height: 1.28; color: var(--ink); font-weight: 650; }
 .body p { margin: 0; font-size: 14.5px; line-height: 1.55; color: #3e4c46; overflow-wrap: anywhere; flex: 1; }
 .body time { font-size: 12.5px; color: var(--muted); }
+.facts { flex: 1; display: flex; flex-direction: column; gap: 8px; font-size: 14.5px; line-height: 1.5; color: #3e4c46; }
+.facts ul { margin: 0; padding-left: 18px; }
+.facts li { overflow-wrap: anywhere; }
+.body .facts p { flex: none; }
+.factsHead { font-weight: 600; color: var(--ink) !important; }
+.factsNote { font-size: 13px !important; color: var(--muted) !important; }
 .button { display: block; text-align: center; margin-top: 4px; padding: 13px 18px; background: var(--green); color: #fff !important; border-radius: 12px; text-decoration: none; font-weight: 600; font-size: 15px; }
 .button:hover { background: var(--green-dark); }
 .empty { color: var(--muted); padding: 24px 0; }

@@ -52,7 +52,7 @@ test('daily cron produces one saved image brief, requires a WhatsApp window, and
   assert.equal(manual.status,'needs_input');
   assert.equal((await pg.query("SELECT count(*)::int AS n FROM daily_drafts WHERE day='2026-09-25'")).rows[0].n,3);
   assert.equal(scouts,6);
-  assert.equal(messages.length,0);
+  assert.equal(messages.filter(m=>/Beitragstext|Content-Freigabe/.test(m)).length,0,'no draft approval was sent; at most short slot notices');
   assert.equal((await pg.query('SELECT count(*)::int AS n FROM publication_requests')).rows[0].n,0);
 });
 
@@ -316,7 +316,7 @@ test('outside the 24 h window the approved template is sent once, never counts a
 
 test('a plan rejected by the publication gate is stored with its reason and explained by Status',async t=>{
   const {pg,daily,state}=await retryFixture(t);
-  const {latestImagePostsStatus}=loadRoute('lib/reporting/whatsapp-status.ts',{'../memory/ensure-automation-schema':{ensureAutomationSchema:async()=>{}}});
+  const {latestImagePostsStatus}=loadRoute('lib/reporting/whatsapp-status.ts',{'../memory/ensure-automation-schema':{ensureAutomationSchema:async()=>{}},'../daily/slots':require('../.test-build/lib/daily/slots')});
   const gated=loadRoute('lib/daily/draft.ts',{
     '@/lib/orchestrator':{runProductScout:async()=>({candidates:[{kind:'Saisontrend',name:'Kuscheldecke',category:'Wohnen',whyNow:'Herbst',reelIdea:'x',
       resolvedProduct:{name:'Kuscheldecke',productVerifiedName:'Kuscheldecke',productVerifiedAt:new Date().toISOString(),sourceUrl:'https://www.amazon.de/dp/B000000001',affiliateUrl:'https://www.amazon.de/dp/B000000001?tag=alltaeglichle-21',price:'',targetGroup:'',benefits:'',notes:''}}]}),

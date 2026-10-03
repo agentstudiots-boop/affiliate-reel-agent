@@ -55,9 +55,15 @@ export function LandingView({ data, wanted }: { data: Awaited<ReturnType<typeof 
                   </div>
                   <div className={styles.body}>
                     <h3>{item.name}</h3>
-                    {item.excerpt && <p>{item.excerpt}</p>}
-                    <time dateTime={item.publishedAt}>{dateFormat.format(new Date(item.publishedAt))}</time>
-                    <TrackedLink id={item.id} href={item.affiliateUrl} className={styles.button}>Produkt ansehen <span aria-hidden="true">→</span></TrackedLink>
+                    <div className={styles.facts}>
+                      {item.description.features.length > 0 && <>
+                        <p className={styles.factsHead}>Laut Produkttitel:</p>
+                        <ul>{item.description.features.map(feature => <li key={feature}>{feature}</li>)}</ul>
+                      </>}
+                      {item.description.facts.length > 0 && <ul>{item.description.facts.map(fact => <li key={fact.claim}>{fact.claim}</li>)}</ul>}
+                      <p className={styles.factsNote}>Preis, Maße, Lieferumfang und aktuelle Details stehen auf der Amazon-Produktseite.</p>
+                    </div>
+                    <TrackedLink id={item.id} href={item.affiliateUrl} className={styles.button}>Bei Amazon ansehen <span aria-hidden="true">→</span></TrackedLink>
                   </div>
                 </li>
               ))}
@@ -77,7 +83,7 @@ export function LandingView({ data, wanted }: { data: Awaited<ReturnType<typeof 
           </nav>
         </div>
         <p id="affiliate-hinweis" className={styles.disclosure}>
-          <strong>Affiliate-Hinweis:</strong> Die Links zu „Produkt ansehen“ sind Affiliate-Links (Werbung). Wenn du über einen solchen Link etwas kaufst, kann ich eine Provision erhalten.
+          <strong>Affiliate-Hinweis:</strong> Die Links zu „Bei Amazon ansehen“ sind Affiliate-Links (Werbung). Wenn du über einen solchen Link etwas kaufst, kann ich eine Provision erhalten.
           Als Amazon-Partner verdiene ich an qualifizierten Verkäufen.
         </p>
       </footer>

@@ -28,8 +28,14 @@ export function researchQueries(now: Date): ResearchQuery[] {
   ];
 }
 
+// Explicit contract result for Jarvis: success | no_candidate | unavailable | research_unavailable | timeout | rate_limited | invalid_response | failed
+export type DiscoveryOutcome = "success" | "no_candidate" | "unavailable" | "research_unavailable" | "timeout" | "rate_limited" | "invalid_response" | "failed";
+const OUTCOME_OF: Record<string, DiscoveryOutcome> = { agent_unavailable: "unavailable", research_unavailable: "research_unavailable", timeout: "timeout",
+  rate_limited: "rate_limited", invalid_response: "invalid_response", agent_error: "failed" };
+
 export type DiscoveryResult = {
   source: "trend_agent" | "seed_fallback";
+  outcome: DiscoveryOutcome;
   candidates: CandidateFromTrend[];
   topics: TrendOpportunity[];
   noGoodCandidate: boolean;
@@ -57,15 +63,20 @@ export async function discoverOpportunities(input: {
   research: ResearchFn;
   generate: Generator | null;   // null: no model available → seed fallback
   maxOpportunities?: number;
+  deadlineMs?: number;          // hard ceiling for the whole discovery so it can never exhaust the cron invocation
 }): Promise<DiscoveryResult> {
   const started = Date.now();
-  const base = { candidates: [], topics: [], noGoodCandidate: false, summary: "", evidenceCount: 0, queries: { ok: 0, failed: 0 }, dropped: [], rejectedIdeas: [] };
+  const base = { outcome: "failed" as DiscoveryOutcome, candidates: [], topics: [], noGoodCandidate: false, summary: "", evidenceCount: 0, queries: { ok: 0, failed: 0 }, dropped: [], rejectedIdeas: [] };
   const fallback = (failure: string, extra: Partial<DiscoveryResult> = {}): DiscoveryResult =>
-    ({ ...base, source: "seed_fallback", failure, durationMs: Date.now() - started, ...extra });
+    ({ ...base, source: "seed_fallback", failure, outcome: OUTCOME_OF[failure] ?? "failed", durationMs: Date.now() - started, ...extra });
   if (!input.generate) return fallback("agent_unavailable");
 
   // 1. Research. Individual failures are tolerated; no evidence at all means no dynamic discovery.
-  const settled = await Promise.allSettled(researchQueries(input.now).map(async query => ({ query, results: await input.research(query) })));
+  const deadline = <T,>(work: Promise<T>) => new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("timeout: discovery deadline")), input.deadlineMs ?? 100_000);
+    work.then(value => { clearTimeout(timer); resolve(value); }, error => { clearTimeout(timer); reject(error); });
+  });
+  const settled = await Promise.allSettled(researchQueries(input.now).map(async query => ({ query, results: await deadline(input.research(query)) })));
   const evidence: EvidenceItem[] = [];
   const seen = new Set<string>();
   for (const item of settled) {
@@ -88,15 +99,15 @@ export async function discoverOpportunities(input: {
     today: input.now.toISOString().slice(0, 10), season, slot: input.slot, evidence,
     history: { rejected: input.history.rejected.slice(0, 12).map(item => ({ name: item.name ?? null, concept: item.concept })),
       recent: input.history.recent.slice(0, 20).map(item => ({ name: item.name ?? null, concept: item.concept })) },
-    seedIdeas: input.seedIdeas.slice(0, 24), maxOpportunities: input.maxOpportunities ?? 6,
+    seedIdeas: input.seedIdeas.slice(0, 24), maxOpportunities: input.maxOpportunities ?? 4,
   };
   let raw: unknown;
-  try { raw = await trendAgent(brief, input.generate); }
+  try { raw = await deadline(trendAgent(brief, input.generate)); }
   catch (error) { return fallback(failureKind(error), { queries, evidenceCount: evidence.length }); }
 
   // 3. Jarvis-side intake: structure, claims, duplicates. Unusable output degrades to the seeds.
   const intake = intakeTrendReport(raw, evidence);
   if (!intake.ok) return fallback("invalid_response", { queries, evidenceCount: evidence.length });
-  return { source: "trend_agent", candidates: intake.candidates, topics: intake.topics, noGoodCandidate: intake.noGoodCandidate, summary: intake.summary ?? "",
+  return { source: "trend_agent", outcome: intake.noGoodCandidate ? "no_candidate" : "success", candidates: intake.candidates, topics: intake.topics, noGoodCandidate: intake.noGoodCandidate, summary: intake.summary ?? "",
     evidenceCount: evidence.length, queries, dropped: intake.dropped, rejectedIdeas: intake.rejectedIdeas, durationMs: Date.now() - started };
 }

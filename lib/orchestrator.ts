@@ -31,8 +31,9 @@ function webSources(sources: Awaited<ReturnType<typeof scoutProducts>>["sources"
 export type TrendDeps = { research?: ResearchFn; generate?: Generator | null };
 const defaultResearch: ResearchFn = ({ query, timeRange }) => tavilySearch({ query, timeRange, maxResults: 6 });
 // The trend agent needs the editorial model; without a token the static seed ideas are used.
+// The model timeout starts with the model call, not with the research that precedes it.
 const defaultGenerate = (): Generator | null => process.env.REPLICATE_API_TOKEN?.trim()
-  ? createGenerator({ mode: "ai", signal: AbortSignal.timeout(75_000) }) : null;
+  ? ((agent, instruction, input, schema, reference) => createGenerator({ mode: "ai", signal: AbortSignal.timeout(75_000) })(agent, instruction, input, schema, reference)) as Generator : null;
 
 export async function runProductScout(productSearch?: string, selectionKey?: string, options: { quality?: boolean; trend?: TrendDeps } = {}) {
   const db = getDatabase();
@@ -46,7 +47,7 @@ export async function runProductScout(productSearch?: string, selectionKey?: str
       seedIdeas: seedIdeas(now).filter(seed => seed.chance).map(seed => ({ name: seed.name, hook: seed.chance?.hook ?? null })),
       research: options.trend?.research ?? defaultResearch,
       generate: options.trend && "generate" in options.trend ? options.trend.generate ?? null : defaultGenerate() });
-    console.info(JSON.stringify({ event: "trend_discovery", slot: selectionKey, source: discovery.source, failure: discovery.failure, evidence: discovery.evidenceCount,
+    console.info(JSON.stringify({ event: "trend_discovery", slot: selectionKey, source: discovery.source, outcome: discovery.outcome, failure: discovery.failure, evidence: discovery.evidenceCount,
       queries: discovery.queries, proposed: discovery.candidates.length, topics: discovery.topics.length, noGoodCandidate: discovery.noGoodCandidate,
       dropped: discovery.dropped.slice(0, 6), ms: discovery.durationMs }));
   }
@@ -111,7 +112,7 @@ export async function runProductScout(productSearch?: string, selectionKey?: str
     candidates: checked.filter(item => !item.blocked).map(item => item.candidate),
     cooldownBlocked: blocked.length,
     qualityBlocked: qualityRejected.length,
-    trend: discovery ? { source: discovery.source, failure: discovery.failure ?? null, evidence: discovery.evidenceCount, queries: discovery.queries,
+    trend: discovery ? { source: discovery.source, outcome: discovery.outcome, failure: discovery.failure ?? null, evidence: discovery.evidenceCount, queries: discovery.queries,
       proposed: discovery.candidates.length, topicOpportunities: discovery.topics.map(topic => ({ title: topic.title, hook: topic.hook, concept: topic.concept })).slice(0, 4) } : null,
     qualityRejected: qualityRejected.slice(0, 12),
     cooldownBlockedSeasonal: blocked.filter(candidate=>candidate.kind === "Saisontrend").length,

@@ -144,7 +144,7 @@ test('operator-requested products carry no content chance and skip the gate',asy
 
 // --- Daily slot: no forced content ---------------------------------------------------------
 class Rejected extends Error{}
-test('no sufficiently good candidate: the scheduled slot sends nothing, creates no job and is not retried',async t=>{
+test('no sufficiently good candidate: the scheduled slot sends no draft (one short notice), creates no job and is not retried',async t=>{
   const pg=new PGlite();t.after(()=>pg.close());
   for(const name of fs.readdirSync('db/migrations').filter(n=>n.endsWith('.sql')).sort())await pg.exec(fs.readFileSync(`db/migrations/${name}`,'utf8'));
   const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
@@ -159,7 +159,8 @@ test('no sufficiently good candidate: the scheduled slot sends nothing, creates 
   });
   const first=await daily.createDailyDraft('2026-10-02','morning');
   assert.deepEqual([first.status,first.reason],['needs_input','no_quality_candidate']);
-  assert.deepEqual(state.quality,[true]);assert.equal(state.messages.length,0);
+  assert.deepEqual(state.quality,[true]);
+  assert.equal(state.messages.length,1,'no draft; exactly one short notice that no proposal was made');assert.match(state.messages[0],/keinen Vorschlag/);assert.ok(!/Beitragstext|ASIN/.test(state.messages[0]));
   assert.equal((await pg.query('SELECT count(*)::int AS n FROM content_jobs')).rows[0].n,0);
   // The next cron call in the window does not buy a second search for the same, unchanged outcome.
   assert.equal((await daily.createDailyDraft('2026-10-02','morning')).status,'already_claimed');assert.equal(state.scouts,1);
@@ -168,4 +169,19 @@ test('no sufficiently good candidate: the scheduled slot sends nothing, creates 
   // An operator-requested search is never held to the gate.
   await daily.createDailyDraft('2026-10-02','manual:abc');assert.equal(state.quality.at(-1),false);
   const row=(await pg.query("SELECT scout_report->>'reason' AS reason FROM daily_drafts WHERE slot='morning'")).rows[0];assert.equal(row.reason,'no_quality_candidate');
+});
+
+test('regression 2026-10-03: ordinary words in the Amazon title ("abnehmbar", "Wunder", "100 %") never trigger the trust gate; real promises in our hook still do',async()=>{
+  const hook='Verfilzter Pullover vorher, glatter Stoff nachher';
+  const chance={type:'problem_solver',hook,concept:'lint-removal',group:'textile_care',demonstrable:true,beforeAfter:true,wow:false,fun:false,impulse:false,gift:false,aesthetic:false,broadAppeal:true,seasonalFit:false};
+  const title='MPM - LR-027-86 - Fusselrasierer - Reiniger für Textilien, Kleidung, mit abnehmbarem Behälter, Wunderkerzen-Optik, 100% Edelstahl';
+  const record={chance,assessment:S.assessContentChance(title,chance,S.emptyHistory())};
+  assert.equal(record.assessment.passed,true);
+  assert.equal(S.baselineVerdict(title,record).decision,'accept');
+  const product={name:title,productVerifiedName:title,productVerifiedAt:'2026-10-03T07:00:00.000Z',sourceUrl:'https://www.amazon.de/dp/B000000041',asin:'B000000041',affiliateUrl:'https://www.amazon.de/dp/B000000041?tag=alltaeglichle-21',price:'',targetGroup:'Haushalte',benefits:'Eigenschaften vor Kauf prüfen',notes:''};
+  const job=await runContentJob({product,category:'household',useCaseKey:'seasonal-product-guide',targetPlatform:'facebook',useCase:'Das Produkt im Alltag verwenden und die Eignung vor dem Kauf prüfen.',trend:'',goal:'education',budget:'low',verifiedFacts:[],contentChance:record},{mode:'reference',allowedFormats:['image']});
+  assert.notEqual(job.error,S.STRATEGY_REJECTED);
+  // A promise in OUR hook is rejected already at scout level (before any Amazon lookup).
+  for(const bad of ['Heilt Verspannungen garantiert','Nie wieder Fusseln – klinisch bewiesen','Abnehmen ohne Sport'])
+    assert.equal(S.assessContentChance('x',{...chance,hook:bad},S.emptyHistory()).passed,false,bad);
 });
