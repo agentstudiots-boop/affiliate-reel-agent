@@ -87,7 +87,7 @@ export async function resolveVoiceMessage(incoming: IncomingWhatsAppMessage, dep
   } catch (error) {
     const code: TranscriptionFailure | "media_unavailable" = error instanceof TranscriptionError ? error.code
       : error instanceof Error && error.message === "media_unavailable" ? "media_unavailable" : "provider_failed";
-    console.error(JSON.stringify({ event: "voice_message_failed", messageId: incoming.id, code }));
+    console.error(JSON.stringify({ event: "voice_message_failed", messageId: incoming.id, code, ...(error instanceof TranscriptionError && error.detail ? { detail: error.detail } : {}) }));
     await finish(db, incoming.id, "failed", code);
     await tell(`${MESSAGES[code] ?? MESSAGES.provider_failed} Es wurde nichts ausgeführt.`);
     return { ok: false, reason: "failed" };

@@ -168,3 +168,12 @@ test('usableTranscript rejects silence hallucinations and accepts real commands'
   for(const bad of ['','  ','.','Vielen Dank fürs Zuschauen!','Untertitel der Amara.org-Community','Musik',null,'x'.repeat(2001)])assert.equal(usableTranscript(bad),null,String(bad));
   assert.equal(usableTranscript(' Freigabe. '),'Freigabe.');
 });
+
+test('a provider refusal is logged with provider and status, but without keys or content',async t=>{
+  const f=await fixture(t,{openaiStatus:401});
+  const lines=[];t.mock.method(console,'error',v=>lines.push(String(v)));
+  await f.post(f.payload('wamid.diag'));
+  const line=lines.find(l=>l.includes('voice_message_failed'));
+  assert.match(line,/"code":"provider_failed"/);assert.match(line,/openai http 401/);
+  assert.doesNotMatch(line,/openai-voice-key|wa-voice-token/);
+});
