@@ -23,6 +23,8 @@ export type IncomingWhatsAppMessage = {
   from: string;
   body: string;
   replyToMessageId: string | null;
+  // Voice/audio message: `body` is empty until the audio has been transcribed by the voice layer.
+  audio?: { mediaId: string; mimeType: string };
 };
 
 export function extractIncomingWhatsAppMessages(payload: unknown, expectedPhoneNumberId: string): IncomingWhatsAppMessage[] {
@@ -46,17 +48,25 @@ export function extractIncomingWhatsAppMessages(payload: unknown, expectedPhoneN
       for (const item of messages) {
         if (!item || typeof item !== "object") continue;
         const message = item as Record<string, unknown>;
-        if (message.type !== "text" || typeof message.id !== "string" || typeof message.from !== "string") continue;
+        if (typeof message.id !== "string" || typeof message.from !== "string") continue;
+        const context = message.context;
+        const replyTo = context && typeof context === "object" && typeof (context as Record<string, unknown>).id === "string"
+          ? String((context as Record<string, unknown>).id) : null;
+        if (message.type === "audio") {
+          const audio = message.audio as Record<string, unknown> | undefined;
+          if (audio && typeof audio.id === "string" && /^[A-Za-z0-9_-]{5,100}$/.test(audio.id))
+            result.push({ id: message.id, from: message.from, body: "", replyToMessageId: replyTo,
+              audio: { mediaId: audio.id, mimeType: typeof audio.mime_type === "string" ? audio.mime_type.slice(0, 80) : "audio/ogg" } });
+          continue;
+        }
+        if (message.type !== "text") continue;
         const text = message.text;
         if (!text || typeof text !== "object" || typeof (text as Record<string, unknown>).body !== "string") continue;
-        const context = message.context;
         result.push({
           id: message.id,
           from: message.from,
           body: String((text as Record<string, unknown>).body),
-          replyToMessageId: context && typeof context === "object" && typeof (context as Record<string, unknown>).id === "string"
-            ? String((context as Record<string, unknown>).id)
-            : null,
+          replyToMessageId: replyTo,
         });
       }
     }

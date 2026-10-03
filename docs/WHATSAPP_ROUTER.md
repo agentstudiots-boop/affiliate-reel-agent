@@ -153,3 +153,14 @@ gültigen Amazon.de-Produktlink mit Tracking-Tag werden nicht gezeigt. Seitenwei
 - **Neue Kategorie nur auf ausdrückliche Anweisung** („Mach dafür eine neue Kategorie Backen“, `category_create`); ähnliche Namen zusätzlich nur nach Bestätigung (`category_force_new`).
 - **Änderung per WhatsApp** („Kategorie bitte Küche“): Intent `set_category` → `lib/whatsapp/category-change.ts` → `setJobCategory`. Wirkt nur auf den fokussierten Entwurf, nur in der Inhaltsfreigabe; ändert weder Produkt, ASIN, Link, Bild noch Text, veröffentlicht nichts, setzt die Freigabe zurück und sendet die aktualisierte Inhaltsfreigabe.
 - Die Inhaltsfreigabe zeigt `Kategorie: …`. Die Landingpage `/produkte` nutzt nur die gespeicherte Kategorie; neue veröffentlichte Kategorien erscheinen automatisch als Chip. Historische Produkte werden nicht umkategorisiert.
+
+## Sprachnachrichten
+
+Eine WhatsApp-Sprachnachricht des Betreibers wird nur in Text umgewandelt und läuft danach durch dieselbe Verarbeitung wie eine getippte Nachricht (gleiche Nachrichten-ID, gleicher Antwortbezug `context.id`). Es gibt keinen eigenen Befehlspfad.
+
+Ablauf: Webhook (`type: "audio"`) → `lib/whatsapp/voice.ts` (nur Betreiber; Abruf über Graph-API, nur Meta-Hosts, max. 4 MB) → `lib/whatsapp/transcribe.ts` (OpenAI `gpt-4o-mini-transcribe`, falls `OPENAI_API_KEY` gesetzt, sonst Replicate) → Rückmeldung „🎤 Verstanden: …“ → normale Textverarbeitung (Router, „Artikelsuche …“, Freigabe, „Weiter“, „Status“, Änderungswünsche).
+
+- Unverständliches, leeres oder fehlgeschlagenes Audio: verständliche Rückmeldung, **keine** Aktion.
+- Doppelte Webhook-Zustellung: Tabelle `whatsapp_voice_messages` (nur Nachrichten-ID, Status, Fehlercode; kein Audio, kein Transkript) verhindert zweiten Abruf und zweite Transkription. Wirft die Textverarbeitung, wird die Nachricht für den Meta-Retry freigegeben.
+- Optional: `WHATSAPP_TRANSCRIPTION_MODEL` (nur Replicate-Pfad, Standard `openai/gpt-4o-transcribe`, nicht gegen Produktion verifiziert).
+- Das Transkript wird – wie jede Textnachricht – von der bestehenden Pipeline als Nachrichtentext gespeichert.

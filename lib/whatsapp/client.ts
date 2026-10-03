@@ -19,6 +19,11 @@ const accessToken = () => process.env.WHATSAPP_ACCESS_TOKEN || process.env.WHATT
 const phoneNumberId = () => process.env.WHATSAPP_PHONE_NUMBER_ID || process.env.WHATTSAPP_PHONE_NUMBER_ID;
 const businessAccountId = () => process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || process.env.WHATTSAPP_BUSINESS_ACCOUNT_ID;
 
+// Read access for inbound media (voice messages). The token never leaves the Meta/WhatsApp hosts.
+export function whatsappMediaAccess() {
+  return { token: accessToken() || "", version: graphVersion() };
+}
+
 export function whatsappConfig() {
   return {
     accessToken: !!accessToken(),

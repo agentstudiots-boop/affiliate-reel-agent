@@ -19,6 +19,7 @@ import type { Instruction } from "@/lib/whatsapp/instruction";
 import { startImagePostFromWhatsApp, startProductSearch } from "@/lib/whatsapp/start-image-post";
 import { answerWhatsAppConversation } from "@/lib/whatsapp/chat";
 import { sendWhatsAppText } from "@/lib/whatsapp/client";
+import { completeVoice, releaseVoice, resolveVoiceMessage } from "@/lib/whatsapp/voice";
 import { publishInstagramImage, resumeInstagramImages } from "@/lib/meta/instagram-image";
 import { deliverWeeklyReport } from "@/lib/reporting/weekly";
 import { latestImagePostsStatus } from "@/lib/reporting/whatsapp-status";
@@ -75,7 +76,18 @@ export async function POST(request: Request) {
   let failed = false;
   for (const incoming of messages) {
     let message = incoming;
+    let voice = false;
+    let voiceFailed = false;
     try {
+      if (incoming.audio) {
+        // Voice: audio → text only. From here on the transcript travels through the unchanged text pipeline with the
+        // original message id and reply context, so there is no separate command path.
+        const resolved = await resolveVoiceMessage(incoming, { db: getDatabase() });
+        if (!resolved.ok) continue;
+        voice = true;
+        message = { ...incoming, body: resolved.body, audio: undefined };
+        if (/^(status|weiter)[.!?]*$/i.test(message.body.trim())) keepPolling = true;
+      }
       if (/^(status|weiter)[.!?]*$/i.test(message.body.trim())
         && message.from.replace(/\D/g, "") === (process.env.WHATSAPP_APPROVER_WA_ID || "").replace(/\D/g, "")) {
         const claimed=await getDatabase().query("INSERT INTO whatsapp_events(message_id,wa_id,reply_to_message_id,body,payload) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING RETURNING message_id",[message.id,message.from,message.replyToMessageId,message.body,JSON.stringify(payload)]);
@@ -205,7 +217,13 @@ export async function POST(request: Request) {
       }
     } catch (error) {
       failed = true;
+      voiceFailed = true;
       console.error(JSON.stringify({ event: "whatsapp_approval_message_failed", messageId: message.id, failureType: error instanceof Error ? error.name : "unknown" }));
+    } finally {
+      if (voice) {
+        try { if (voiceFailed) await releaseVoice(getDatabase(), incoming.id); else await completeVoice(getDatabase(), incoming.id); }
+        catch { console.error(JSON.stringify({ event: "voice_state_unsaved", messageId: incoming.id })); }
+      }
     }
   }
   // An inbound operator message opens the 24 h service window. Deliver any
