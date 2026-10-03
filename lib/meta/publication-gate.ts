@@ -190,6 +190,10 @@ export function publicationRepository(db: Database = getDatabase()) {
       const result = await db.query("UPDATE publication_requests SET whatsapp_send_attempted_at=now() WHERE id=$1 AND status='pending' AND image_url IS NOT NULL AND whatsapp_send_attempted_at IS NULL RETURNING id", [id]);
       if (!result.rows[0]) throw new PublicationConflictError("WhatsApp bereits gesendet oder Ergebnis unklar.");
     },
+    // Only for a provider refusal before any image existed: frees the one-attempt gate so the operator can approve again.
+    async releaseVisualAttempt(jobId: string) {
+      await db.query("DELETE FROM original_visual_attempts WHERE job_id=$1 AND status='attempted'", [jobId]);
+    },
     async releaseRejectedWhatsAppSend(id: string) {
       const result = await db.query(
         "UPDATE publication_requests SET whatsapp_send_attempted_at=NULL,updated_at=now() WHERE id=$1 AND status='pending' AND whatsapp_message_id IS NULL AND whatsapp_send_attempted_at IS NOT NULL RETURNING id",

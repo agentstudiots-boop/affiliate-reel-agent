@@ -139,7 +139,10 @@ export function createReplicateImageProvider(key: string, model = DEFAULT_REPLIC
         ...(failure?.httpStatus ? { httpStatus: failure.httpStatus } : {}), category,
         ...(failure?.detail ? { detail: failure.detail } : {}),
       }));
-      throw new OriginalVisualError("Replicate-Bildversuch fehlgeschlagen oder Ergebnis unklar. Kein automatischer zweiter Versuch.");
+      // A refusal while creating the prediction means that no image exists and nothing was charged: safe to try again later.
+      const definite = !!failure?.httpStatus && phase === "create" && [401, 402, 403, 404, 422, 429].includes(failure.httpStatus);
+      if (definite) throw new OriginalVisualError(`Replicate hat die Bildanfrage abgelehnt (${failure?.detail || category}). Es wurde kein Bild erzeugt und nichts berechnet.`, true, category);
+      throw new OriginalVisualError("Replicate-Bildversuch fehlgeschlagen oder Ergebnis unklar. Kein automatischer zweiter Versuch.", false, category);
     }
   } };
 }

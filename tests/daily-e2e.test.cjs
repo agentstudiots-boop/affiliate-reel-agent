@@ -14,7 +14,7 @@ const opportunity=(over={})=>({kind:'product_opportunity',title:'Pizza mit der S
   concept:'pizza-scissors',group:null,confidence:80,evidenceUrls:['https://example.org/gadgets'],priority:1,...over});
 
 // Whole chain with the real code: cron route → daily draft → scout → trend discovery → real model client → Amazon check → content → approval → WhatsApp.
-async function world(t,{modelOutput,modelStatus=200,tavily=true,whatsappWindow=true}={}){
+async function world(t,{modelOutput,modelStatus=200,tavily=true,whatsappWindow=true,corrections=false}={}){
   const pg=new PGlite();t.after(()=>pg.close());
   for(const name of fs.readdirSync('db/migrations').filter(n=>n.endsWith('.sql')).sort())await pg.exec(fs.readFileSync(`db/migrations/${name}`,'utf8'));
   const db={query:(q,v)=>pg.query(q,v),exec:q=>pg.exec(q),transaction:fn=>pg.transaction(tx=>fn({query:(q,v)=>tx.query(q,v),exec:q=>tx.exec(q)}))};
@@ -22,6 +22,13 @@ async function world(t,{modelOutput,modelStatus=200,tavily=true,whatsappWindow=t
   const old={};for(const [k,v] of Object.entries(env)){old[k]=process.env[k];process.env[k]=v;}
   t.after(()=>{for(const [k,v] of Object.entries(old)){if(v===undefined)delete process.env[k];else process.env[k]=v;}});
   if(whatsappWindow)await pg.query("INSERT INTO whatsapp_events(message_id,wa_id,intent,payload) VALUES('in.1','491234','changes_requested','{}')");
+  if(corrections){   // an approved operator correction makes scheduled content jobs run in AI mode
+    await pg.query("INSERT INTO whatsapp_events(message_id,wa_id,intent,payload) VALUES('in.corr','491234','changes_requested','{}'),('conf.corr','491234','approve','{}')");
+    await pg.query("INSERT INTO products(id,name,source_url) VALUES('pc','Alt','https://www.amazon.de/dp/B000000999')");
+    const old=crypto.randomUUID();
+    await pg.query("INSERT INTO content_jobs(id,product_id,category,use_case_key,goal,target_platform,trend,opportunity,status,snapshot,created_at,updated_at) VALUES($1,'pc','general','x','education','facebook','','{}','approved','{}',now()-interval '30 days',now())",[old]);
+    await pg.query("INSERT INTO operator_language_examples(operator_wa_id,source_message_id,confirmation_message_id,operator_message,interpreted_intent,structured_instruction,product_context,content_id) VALUES('491234','in.corr','conf.corr','Bitte das Motiv ruhiger gestalten','revise_image','{}','{}',$1)",[old]);
+  }
   const calls={replicate:0,tavily:0,messages:[],lookups:[]};
   t.mock.method(globalThis,'fetch',async(url)=>{
     const u=String(url);
@@ -129,4 +136,17 @@ test('E2E: a draft saved while the WhatsApp window is closed is reported by Stat
   assert.match(status,/noch nicht zugestellt/);
   t.mock.timers.setTime(new Date('2026-10-03T16:30:00Z').getTime());   // 18:30 Berlin, afternoon slot never ran
   assert.match(await latestImagePostsStatus(w.db),/Heute Nachmittag: kein Lauf registriert/);
+});
+
+test('E2E: if the model-written (AI mode) draft fails, the next invocation of the slot produces the reference draft instead of repeating the failure',async t=>{
+  const events=logs(t);
+  const w=await world(t,{modelStatus:500,corrections:true});
+  const first=await (await w.cron('2026-10-03T07:30:00Z')).json();
+  assert.equal(first.status,'needs_input');assert.equal(first.reason,'editorial_model_failed');
+  assert.equal(w.calls.messages.length,0,'first, possibly transient failure: no notice yet, a retry follows');
+  const second=await (await w.cron('2026-10-03T08:30:00Z')).json();
+  assert.deepEqual([second.status,second.whatsapp],['awaiting_approval','approval_sent'],JSON.stringify(second));
+  assert.equal(w.calls.messages.length,1);assert.match(w.calls.messages[0],/Beitragstext/);
+  assert.ok(events('daily_slot_stage').some(e=>e.stage==='reference_mode_after_failed_attempt'));
+  assert.equal((await w.pg.query("SELECT attempts,status FROM daily_drafts WHERE slot='morning'")).rows[0].status,'awaiting_approval');
 });

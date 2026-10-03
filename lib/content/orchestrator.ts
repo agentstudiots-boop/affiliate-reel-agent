@@ -164,10 +164,18 @@ export async function runContentJob(raw: Opportunity, options: {
     if (opportunity.contentChance) {
       const record = opportunity.contentChance;
       const baseline = baselineVerdict(opportunity.product.name, record);
-      const modelVerdict = job.mode === "ai" && baseline.decision === "accept"
-        ? await generate("orchestrator", STRATEGY_INSTRUCTION, { product: opportunity.product.name, category: opportunity.category, useCase: opportunity.useCase,
-          trend: opportunity.trend, chance: record.chance, assessment: record.assessment, trendAgent: record.agent ?? null }, strategicVerdictSchema, () => baseline)
-        : null;
+      // The model may only tighten the deterministic verdict. If it is unavailable or answers off-schema, the baseline stands:
+      // a provider hiccup in this optional second opinion must never end the slot.
+      let modelVerdict = null;
+      if (job.mode === "ai" && baseline.decision === "accept") {
+        try {
+          modelVerdict = await generate("orchestrator", STRATEGY_INSTRUCTION, { product: opportunity.product.name, category: opportunity.category, useCase: opportunity.useCase,
+            trend: opportunity.trend, chance: record.chance, assessment: record.assessment, trendAgent: record.agent ?? null }, strategicVerdictSchema, () => baseline);
+        } catch (error) {
+          options.signal?.throwIfAborted();
+          console.warn(JSON.stringify({ event: "strategy_model_unavailable", jobId: job.id, failureType: error instanceof Error ? error.name : "unknown" }));
+        }
+      }
       const verdict = combineVerdicts(baseline, modelVerdict);
       await emit("orchestrator", "decision", `Strategic Quality Gate: ${verdict.decision === "accept" ? "geeignet" : "verworfen"}. ${verdict.reason}`, { verdict, assessment: record.assessment });
       if (verdict.decision === "reject") {

@@ -8,6 +8,7 @@ import { productionRepository } from "@/lib/production/repository";
 import { publicationRepository } from "@/lib/meta/publication-gate";
 import { FacebookPublishFailure, publishFacebookPhoto } from "@/lib/meta/publisher";
 import { requestFacebookApproval } from "@/lib/meta/request-publication";
+import { publicationPreparationFailureText, resumeApprovedDailyPublications } from "@/lib/meta/resume-publication";
 import { requestVideoCostApproval } from "@/lib/production/request-cost-approval";
 import { getDatabase } from "@/lib/memory/db";
 import { parseJob } from "@/lib/content/history";
@@ -79,6 +80,10 @@ export async function POST(request: Request) {
         && message.from.replace(/\D/g, "") === (process.env.WHATSAPP_APPROVER_WA_ID || "").replace(/\D/g, "")) {
         const claimed=await getDatabase().query("INSERT INTO whatsapp_events(message_id,wa_id,reply_to_message_id,body,payload) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING RETURNING message_id",[message.id,message.from,message.replyToMessageId,message.body,JSON.stringify(payload)]);
         if(claimed.rows.length){
+          if (/^weiter[.!?]*$/i.test(message.body.trim())) {
+            try { await resumeApprovedDailyPublications(getDatabase()); }
+            catch { console.error(JSON.stringify({ event: "daily_publication_resume_unavailable" })); }
+          }
           const correctionStatus=await recoverLatestInstruction(getDatabase(),message.from.replace(/\D/g,""),sendDailyApproval);
           try { await resumeInstagramImages(); }
           catch { console.error(JSON.stringify({ event: "instagram_image_resume_unavailable" })); }
@@ -142,7 +147,11 @@ export async function POST(request: Request) {
         // The incoming reply opens a 24-hour customer-service window. The
         // separate publication request is sent once and has its own decision.
         try { await requestFacebookApproval(result.dailyJobId); }
-        catch { console.error(JSON.stringify({event:"daily_publication_preparation_unknown",jobId:result.dailyJobId})); }
+        catch (error) {
+          // Never silent: the operator learns why no image / publication request followed the approval.
+          console.error(JSON.stringify({event:"daily_publication_preparation_failed",jobId:result.dailyJobId,failureType:error instanceof Error?error.name:"unknown",reason:error instanceof Error?error.message.slice(0,200):undefined}));
+          try { await sendWhatsAppText(publicationPreparationFailureText(error)); } catch { console.error(JSON.stringify({event:"daily_publication_failure_notice_unsent",jobId:result.dailyJobId})); }
+        }
       }
       if (result.handled && "productionRunId" in result && result.intent === "changes_requested" && "jobId" in result && typeof result.jobId === "string") {
         try {

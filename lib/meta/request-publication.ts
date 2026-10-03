@@ -24,7 +24,17 @@ export async function requestFacebookApproval(jobId:string){
   const claim=await repo.claimVisual(jobId,imageProviderStatus().model,provider.name);
   let publication=claim.existing;
   if(!publication){
-    const asset=await provider.render(claim.job);
+    let asset;
+    try { asset=await provider.render(claim.job); }
+    catch(error){
+      const definite=typeof error==="object"&&error!==null&&"definite" in error&&error.definite===true;
+      console.error(JSON.stringify({event:"original_visual_failed",jobId,definite,category:typeof error==="object"&&error!==null&&"category" in error?String(error.category):"unknown"}));
+      if(definite){
+        await repo.releaseVisualAttempt(jobId);
+        throw new PublicationConflictError(`${error instanceof Error?error.message:"Bildanfrage abgelehnt."} Antworte mit „Weiter“, sobald das behoben ist; dann starte ich die Bildgenerierung erneut.`);
+      }
+      throw new PublicationConflictError(error instanceof Error?error.message:"Bildversuch fehlgeschlagen oder Ergebnis unklar. Kein automatischer zweiter Versuch.");
+    }
     publication=await repo.prepareWithVisual(jobId,approver,asset);
   }
   if(publication.status!=="pending"||publication.whatsappMessageId)return {publication};
