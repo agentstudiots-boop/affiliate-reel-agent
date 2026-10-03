@@ -204,3 +204,18 @@ test('Replicate E006 on the original label retries the same audio with another l
   await assert.rejects(transcribeAudio(AUDIO,'audio/ogg',{request:async()=>{calls++;return new Response('{}',{status:402});},sleep:async()=>{}}),e=>e.code==='provider_failed');
   assert.equal(calls,1);
 });
+
+test('a throttled Replicate account (429, burst 1) waits the advised time before the next attempt',async t=>{
+  const {transcribeAudio}=require('../.test-build/lib/whatsapp/transcribe');
+  const old={o:process.env.OPENAI_API_KEY,r:process.env.REPLICATE_API_TOKEN};
+  delete process.env.OPENAI_API_KEY;process.env.REPLICATE_API_TOKEN='r8_token';
+  t.after(()=>{if(old.o===undefined)delete process.env.OPENAI_API_KEY;else process.env.OPENAI_API_KEY=old.o;if(old.r===undefined)delete process.env.REPLICATE_API_TOKEN;else process.env.REPLICATE_API_TOKEN=old.r;});
+  t.mock.method(console,'warn',()=>{});t.mock.method(console,'info',()=>{});
+  const waits=[];let posts=0;
+  const request=async()=>{posts++;
+    if(posts===1)return new Response(JSON.stringify({id:'abcdefghijkl1',status:'failed',error:'E006'}),{status:201});
+    if(posts===2)return new Response(JSON.stringify({detail:'throttled',retry_after:9}),{status:429});
+    return new Response(JSON.stringify({id:'abcdefghijkl3',status:'succeeded',output:{text:'Weiter bitte'}}),{status:201});};
+  assert.equal(await transcribeAudio(AUDIO,'audio/ogg',{request,sleep:async ms=>{waits.push(ms)}}),'Weiter bitte');
+  assert.deepEqual(waits,[11000,11000]);assert.equal(posts,3);
+});
