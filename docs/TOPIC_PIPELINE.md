@@ -196,3 +196,69 @@ verfügbar“. Bei Teilerfolg getrennte Blöcke „Erfolgreich (live)“ und „
 Angebunden: Facebook-/Instagram-Bildpost (Affiliate, Bild), Instagram-Reel (Affiliate, Video; vorher keine
 aktive Erfolgsmeldung) und unklarer Facebook-Versuch (vorher stumm). Die neuen Plattform-Adapter nutzen
 denselben Formatierer.
+
+## Phase 2 – Format Router, Visual Content Engine, Karussell, Replicate
+
+### Content Format Router (`lib/formats/router.ts`)
+
+Entscheidet das tatsächlich produzierte Format: `TEXT`, `SINGLE_IMAGE`, `CAROUSEL`, `STANDARD_VIDEO`,
+`AVATAR_VIDEO`. Der Scout empfiehlt nur (`suggested_format`, +5 Punkte).
+
+Rangfolge: **1. manuelle WhatsApp-Anweisung** → 2. Executive-Vorgabe (`ExecutiveDirective`, nur vorbereitet,
+nicht verdrahtet) → 3. Router → 4. Scout-Empfehlung.
+
+Bewertung je Format aus den Themenwerten (Nutzwert, Videoeignung, Viralität, visuelles Potenzial,
+Interaktion, Trendtyp), Plattform-Eignung (z. B. YouTube Shorts nur Video), Ziel (Reichweite/Vertrauen) und
+Kosten (2 Punkte je Kosteneinheit, bei starken Reichweitenthemen 1). Bei vergleichbarem Nutzen
+(±5 Punkte) gewinnt die günstigere Form. Nicht umsetzbar: Provider nicht verfügbar, Avatar-Kontingent
+leer, über Budget, ausgeschlossen. Günstiges Affiliate-Produkt (`productPriceClass: "low"`) → höchstens
+Karussell. „zu teuer“ → höchstens Bild. Ist ein manueller Wunsch nicht umsetzbar, wird die nächstbilligere
+Form gewählt und der Grund (`manualNotHonoured`) zurückgemeldet. `TEXT` ist immer möglich.
+
+Kostenklassen (relativ, keine Euro-Beträge): Text 1, Bild 2, Karussell 4, Video 7, Avatar-Video 10.
+
+WhatsApp-Wünsche (`lib/formats/override.ts`, deterministisch): Karussell, Video, Nur Bild, Nur Text,
+HeyGen/Avatar, Kein Avatar, Kein Video, „N Slides“ (auf 3–7 begrenzt), zu teuer, ohne Produkt,
+weniger werblich, mehr Humor, sachlicher, kürzer, anderer Aufhänger, neues Thema. Spätere Wünsche
+ergänzen frühere (`mergeOverrides`).
+
+### Visual Content Engine (`lib/visual/`)
+
+- `engine.ts` führt die Router-Entscheidung aus und degradiert bei Ausfall entlang
+  `Avatar → Video → Karussell → Bild → Text` (nie teurer, nie in ausgeschlossene Formate).
+- Renderer: `TextRenderer`, `SingleImageRenderer`, `CarouselRenderer` (Phase 3: Video-Renderer).
+- Provider stehen hinter `ImageProvider`; Replicate-spezifischer Code liegt nur in `lib/visual/providers/`.
+- Dry-Run: keine Provider-Aufrufe; meldet geplante Slides und wie viele Bilder erzeugt würden.
+
+### Karussell
+
+- `CarouselPlanner` erzeugt zuerst einen Plan: Hook → Problem → Punkte → (Lösung) → CTA. Die Anzahl folgt
+  den tatsächlich vorhandenen Inhaltspunkten (3–7), sonst dem Betreiberwunsch. Zu viele Punkte für die
+  gewünschte Länge werden zusammengefasst statt still verworfen.
+- Jede Slide: `slide_number`, `purpose`, `headline`, `supporting_text`, `visual_type`, `visual_brief`,
+  `requires_generated_image`, `cta`.
+- Generierte Bilder nur, wo sie etwas bringen (Hook ab visuellem Potenzial 40, Problem ab 60, Lösung ab 75),
+  höchstens 3 je Karussell; alle anderen Slides sind lokale Textgrafiken (SVG, keine Kosten).
+- Gemeinsamer Style Brief (`style.ts`): Bildsprache, Typografie, Layout, Bildstil, Tonalität, Farben. Das
+  Repository definiert keine Markenfarben; verwendet wird eine als `neutral_default` gekennzeichnete Palette,
+  ersetzbar über `TOPIC_BRAND_PALETTE="#hex,#hex,#hex"` (Hintergrund, Text, Akzent).
+- Fehler: Jede Slide hat einen eigenen Idempotenzschlüssel. Schlägt nur Slide 3 fehl, wird nur Slide 3
+  wiederholt; fertige Slides werden wiederverwendet. Bleibt das Bild endgültig aus, wird die Slide zur
+  Textgrafik (Status `degraded`), das Karussell bleibt nutzbar.
+
+### Replicate (`lib/visual/providers/replicate.ts`)
+
+Nutzt die vorhandenen, geprüften Helfer der bestehenden Integration (HTTP-Klassifizierung, ID- und
+Output-URL-Prüfung, begrenzter PNG-Download) und dieselben Variablen (`REPLICATE_API_TOKEN`,
+`REPLICATE_IMAGE_MODEL`). Bilder landen unter `generated/topics/<contentId>/<sha256>.png` im Blob-Store.
+
+| Fall | Verhalten |
+| --- | --- |
+| 429 / 5xx beim Anlegen | nichts angenommen → erneuter Versuch mit Backoff (max. 3) |
+| Timeout vor Prediction-ID | Ergebnis des bezahlten POST unklar → **kein** automatischer zweiter POST |
+| Timeout/5xx beim Abfragen | Prediction-ID gespeichert → nächster Versuch fragt dieselbe Prediction ab |
+| 401/402/403/422 | endgültig, kein Retry |
+| failed/canceled, ungültiges Asset | endgültig; Renderer degradiert |
+
+Job-Ledger (`ledger.ts`, Migration `030_visual_jobs.sql`): `visual_jobs` je Idempotenzschlüssel
+(Content-ID + Rolle + Brief-Fingerprint) und `provider_usage` für Budget/Kontingente.
