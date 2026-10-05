@@ -23,6 +23,7 @@ import { completeVoice, releaseVoice, resolveVoiceMessage } from "@/lib/whatsapp
 import { publishInstagramImage, resumeInstagramImages } from "@/lib/meta/instagram-image";
 import { deliverWeeklyReport } from "@/lib/reporting/weekly";
 import { latestImagePostsStatus } from "@/lib/reporting/whatsapp-status";
+import { formatPublishReport } from "@/lib/publishing/report";
 import { extractIncomingWhatsAppMessages, verifyMetaWebhookSignature, verifyWhatsAppChallenge } from "@/lib/whatsapp/security";
 
 export const runtime = "nodejs";
@@ -209,6 +210,10 @@ export async function POST(request: Request) {
           catch { console.error(JSON.stringify({ event: "instagram_image_unavailable", publicationId: claimed.id })); }
         } catch (error) {
           await publicationRepo.markUnknown(claimed.id);
+          // Never silent: the operator learns that this approved post is not confirmed live (no automatic second attempt).
+          try { await sendWhatsAppText(formatPublishReport({ category: "affiliate", format: "SINGLE_IMAGE", outcomes: [{ platform: "facebook", status: "unknown" }],
+            note: "Instagram wurde deshalb nicht gestartet. Antworte mit „Status“." })); }
+          catch { console.error(JSON.stringify({ event: "facebook_publication_report_unsent", publicationId: claimed.id })); }
           console.error(JSON.stringify({ event: "facebook_publication", publicationId: claimed.id, status: "unknown",
             phase: error instanceof FacebookPublishFailure ? error.phase : phase,
             detail: error instanceof FacebookPublishFailure ? error.detail : "unclassified",

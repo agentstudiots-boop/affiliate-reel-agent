@@ -4,6 +4,7 @@ import { getDatabase, type Database } from "../memory/db";
 import { parseJob } from "../content/history";
 import { requireProduct } from "../amazon";
 import { sendWhatsAppText } from "../whatsapp/client";
+import { formatPublishReport, type PlatformOutcome } from "../publishing/report";
 import { ensureAutomationSchema } from "../memory/ensure-automation-schema";
 import { facebookCaption } from "./facebook-caption";
 import { instagramGraph, InstagramPublishFailure } from "./instagram-publisher";
@@ -41,6 +42,16 @@ async function defaultToJpeg(png: Buffer) {
 async function defaultUpload(path: string, bytes: Buffer) {
   const blob = await put(path, bytes, { access: "public", addRandomSuffix: false, contentType: "image/jpeg" });
   return blob.url;
+}
+
+// Affiliate image posts: Facebook first (already published here), then Instagram under the same approval.
+async function report(db: Database, publicationId: string, instagram: PlatformOutcome, note?: string) {
+  let facebook: PlatformOutcome = { platform: "facebook", status: "published", url: null };
+  try {
+    const row = (await db.query("SELECT status,permalink FROM publication_requests WHERE id=$1", [publicationId])).rows[0];
+    facebook = { platform: "facebook", status: row?.status === "published" ? "published" : "unknown", url: row?.permalink ? String(row.permalink) : null };
+  } catch { /* the report still names Instagram's outcome; Facebook stays without link */ }
+  return formatPublishReport({ category: "affiliate", format: "SINGLE_IMAGE", outcomes: [facebook, instagram], note });
 }
 
 async function note(send: typeof sendWhatsAppText, text: string) {
@@ -88,7 +99,8 @@ export async function publishInstagramImage(publicationId: string, deps: Instagr
       ? `${error.detail}${error.code ? ` code ${error.code}` : ""}${error.httpStatus ? ` http ${error.httpStatus}` : ""}`
       : error instanceof Error ? error.message : "unknown";
     await fail("failed", error instanceof InstagramPublishFailure ? error.phase : phase, detail);
-    await note(send, `Der Facebook-Post ist online, aber der Instagram-Beitrag wurde nicht veröffentlicht (${error instanceof InstagramPublishFailure ? error.phase : phase}: ${detail}). Es wurde nichts doppelt gepostet. Antworte mit „Status“, nach Behebung prüfe ich es erneut.`);
+    await note(send, await report(db, publicationId, { platform: "instagram", status: "failed", detail: `${error instanceof InstagramPublishFailure ? error.phase : phase}: ${detail}` },
+      "Es wurde nichts doppelt gepostet. Antworte mit „Status“, nach Behebung prüfe ich es erneut."));
     return { status: "failed" as const, detail };
   }
 }
@@ -106,12 +118,12 @@ export async function finishInstagramImage(publicationId: string, deps: Required
   }
   if (state === "ERROR") {
     await db.query("UPDATE instagram_image_posts SET status='failed',error_phase='status',error_detail='container_error',updated_at=now() WHERE publication_id=$1", [publicationId]);
-    await note(send, "Der Facebook-Post ist online. Instagram hat das Bild abgelehnt (Container-Fehler). Es wurde nichts auf Instagram veröffentlicht.");
+    await note(send, await report(db, publicationId, { platform: "instagram", status: "failed", detail: "Instagram hat das Bild abgelehnt (Container-Fehler)" }));
     return { status: "failed" as const };
   }
   if (state === "PROCESSING") {
     await db.query("UPDATE instagram_image_posts SET status='processing',updated_at=now() WHERE publication_id=$1", [publicationId]);
-    await note(send, "Der Facebook-Post ist online. Instagram verarbeitet das Bild noch. Antworte später mit „Status“, dann veröffentliche ich es einmalig.");
+    await note(send, await report(db, publicationId, { platform: "instagram", status: "processing" }, "Antworte später mit „Status“, dann veröffentliche ich es einmalig."));
     return { status: "processing" as const };
   }
   const attempt = await db.query(`UPDATE instagram_image_posts SET status='publishing',publish_attempted_at=now(),updated_at=now()
@@ -124,16 +136,14 @@ export async function finishInstagramImage(publicationId: string, deps: Required
     const detail = error instanceof InstagramPublishFailure ? `${error.detail}${error.code ? ` code ${error.code}` : ""}` : "unclassified";
     await db.query("UPDATE instagram_image_posts SET status=$2,error_phase='publish',error_detail=$3,updated_at=now() WHERE publication_id=$1", [publicationId, unknownResult ? "unknown" : "failed", detail.slice(0, 120)]);
     console.error(JSON.stringify({ event: "instagram_image_post", publicationId, status: unknownResult ? "unknown" : "failed", phase: "publish", detail }));
-    await note(send, unknownResult
-      ? "Der Facebook-Post ist online. Beim Instagram-Beitrag ist das Ergebnis unklar. Bitte prüfe Instagram; ich poste nicht erneut."
-      : `Der Facebook-Post ist online. Instagram hat die Veröffentlichung abgelehnt (${detail}). Es wurde nichts auf Instagram gepostet.`);
+    await note(send, await report(db, publicationId, unknownResult ? { platform: "instagram", status: "unknown" } : { platform: "instagram", status: "failed", detail: `Instagram hat abgelehnt: ${detail}` }));
     return { status: unknownResult ? "unknown" as const : "failed" as const };
   }
   let permalink: string | null = null;
   try { permalink = await graph.permalink(mediaId); } catch { /* the post is live; the link is optional */ }
   await db.query("UPDATE instagram_image_posts SET status='published',media_id=$2,permalink=$3,updated_at=now() WHERE publication_id=$1", [publicationId, mediaId, permalink]);
   console.info(JSON.stringify({ event: "instagram_image_post", publicationId, status: "published", hasPermalink: !!permalink }));
-  await note(send, permalink ? `Instagram-Beitrag veröffentlicht: ${permalink}` : "Instagram-Beitrag veröffentlicht. Der Beitragslink konnte noch nicht abgefragt werden.");
+  await note(send, await report(db, publicationId, { platform: "instagram", status: "published", url: permalink }));
   return { status: "published" as const, permalink };
 }
 

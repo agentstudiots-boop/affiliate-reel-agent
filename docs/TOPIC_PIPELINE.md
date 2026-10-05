@@ -147,3 +147,52 @@ Eine optionale Modell-Zweitmeinung kann das Urteil nur verschärfen (`combineTop
 WhatsApp-Freigabe bereits an Freigabe-ID und Inhalts-Hash. Lücke geschlossen: Der Instagram-Bildpost
 verwendet die Facebook-Freigabe nur noch, wenn die Caption exakt der freigegebenen entspricht
 (`approval_mismatch` sonst).
+
+## Publish-Rückmeldung per WhatsApp (`lib/publishing/report.ts`)
+
+Nach jedem Veröffentlichungsversuch eine Nachricht mit zwei getrennten Klassifikationen in der Überschrift:
+**Content-Kategorie** (Themen-Post | Affiliate-Post) und **Content-Format** (Bild | Karussell | Video |
+Video (Avatar) | Text), z. B. „Themen-Post, Video veröffentlicht“, „Affiliate-Post, Bild teilweise
+veröffentlicht“, „… nicht veröffentlicht“, „… noch nicht bestätigt veröffentlicht“.
+
+Darunter je tatsächlich veröffentlichter Plattform: Name – Status – direkter Link. Ein Link erscheint nur,
+wenn die Plattform-API eine https-URL auf der eigenen Plattform-Domain mit Beitragspfad geliefert hat;
+sonst steht „Link nicht verfügbar“. Bei Teilerfolg getrennte Blöcke „Erfolgreich (live)“ und
+„Nicht erfolgreich (nicht live)“ (fehlgeschlagen, Ergebnis unklar, wird verarbeitet, blockiert).
+
+Angebunden: Facebook-/Instagram-Bildpost (Affiliate, Bild), Instagram-Reel (Affiliate, Video – vorher gab
+es keine aktive Erfolgsmeldung), unklarer Facebook-Versuch (vorher stumm). Die neuen Plattform-Adapter
+nutzen denselben Formatierer.
+
+## Publish-Rückmeldung per WhatsApp (`lib/publishing/report.ts`)
+
+### Architektur-Klarstellung
+
+Die zentrale Rückmeldekomponente **trifft keine eigenen Entscheidungen**. Sie
+
+- **sammelt** nur die Ergebnisse, die die bestehenden Router, Adapter und Publisher bereits ermittelt haben
+  (Content-Kategorie, Content-Format, Status je Plattform, von der Plattform gelieferte Beitrags-URL),
+- **vereinheitlicht** sie in ein gemeinsames Ergebnisformat und
+- **formatiert** daraus eine einheitliche WhatsApp-Rückmeldung des Orchestrators.
+
+Sie entscheidet nicht, ob, wo oder was veröffentlicht wird, löst keine Wiederholungen oder Fallbacks aus,
+bestimmt weder Kategorie noch Format und ändert keinen Veröffentlichungsstatus. Diese Entscheidungen bleiben
+bei den bestehenden Routern und Adaptern sowie der Freigabeschranke (`approval-gate.ts`). Ihre einzige Regel
+ist eine Darstellungsregel: Ein Link wird nur angezeigt, wenn die Plattform eine https-URL auf ihrer eigenen
+Domain geliefert hat, sonst „Link nicht verfügbar“. Es wird nichts konstruiert oder erfunden. Ziel ist eine
+zentrale, konsistente Rückmeldung ohne neue Entscheidungslogik.
+
+### Format
+
+Überschrift mit zwei getrennten Klassifikationen: **Content-Kategorie** (Themen-Post | Affiliate-Post) und
+**Content-Format** (Bild | Karussell | Video | Video (Avatar) | Text), z. B. „Themen-Post, Video
+veröffentlicht“, „Affiliate-Post, Bild teilweise veröffentlicht“, „… nicht veröffentlicht“, „… noch nicht
+bestätigt veröffentlicht“.
+
+Darunter je tatsächlich veröffentlichter Plattform: Name – Status – direkter Link bzw. „Link nicht
+verfügbar“. Bei Teilerfolg getrennte Blöcke „Erfolgreich (live)“ und „Nicht erfolgreich (nicht live)“
+(fehlgeschlagen, Ergebnis unklar, wird verarbeitet, blockiert).
+
+Angebunden: Facebook-/Instagram-Bildpost (Affiliate, Bild), Instagram-Reel (Affiliate, Video; vorher keine
+aktive Erfolgsmeldung) und unklarer Facebook-Versuch (vorher stumm). Die neuen Plattform-Adapter nutzen
+denselben Formatierer.
