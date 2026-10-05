@@ -38,6 +38,7 @@
     "lib/visual/**/*.ts",
     "lib/distribution/**/*.ts",
     "lib/topic-pipeline/**/*.ts",
+    "lib/publishing/**/*.ts",
     "lib/tavily.ts"
   ]
 }

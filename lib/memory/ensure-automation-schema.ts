@@ -24,7 +24,8 @@ export async function ensureAutomationSchema(db: Database) {
     to_regclass('public.landing_clicks') IS NOT NULL AS clicks,
     to_regclass('public.content_categories') IS NOT NULL AS categories,
     to_regclass('public.whatsapp_voice_messages') IS NOT NULL AS voice,
-    to_regclass('public.topic_history') IS NOT NULL AS topics`);
-  if (ready.rows[0]?.slots === true && ready.rows[0]?.slot_key === true && ready.rows[0]?.stories === true && ready.rows[0]?.feedback === true && ready.rows[0]?.product_locks === true && ready.rows[0]?.chat_turns === true && ready.rows[0]?.slot_retry === true && ready.rows[0]?.instagram_images === true && ready.rows[0]?.routes === true && ready.rows[0]?.clicks === true && ready.rows[0]?.categories === true && ready.rows[0]?.voice === true && ready.rows[0]?.topics === true) return;
+    to_regclass('public.topic_history') IS NOT NULL AS topics,
+    to_regclass('public.publish_attempts') IS NOT NULL AS publish_gate`);
+  if (ready.rows[0]?.slots === true && ready.rows[0]?.slot_key === true && ready.rows[0]?.stories === true && ready.rows[0]?.feedback === true && ready.rows[0]?.product_locks === true && ready.rows[0]?.chat_turns === true && ready.rows[0]?.slot_retry === true && ready.rows[0]?.instagram_images === true && ready.rows[0]?.routes === true && ready.rows[0]?.clicks === true && ready.rows[0]?.categories === true && ready.rows[0]?.voice === true && ready.rows[0]?.topics === true && ready.rows[0]?.publish_gate === true) return;
   await applyMigrations(db);
 }

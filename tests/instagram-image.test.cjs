@@ -88,3 +88,12 @@ test('an image outside the Instagram aspect range is reported instead of cropped
   assert.ok(validInstagramImageUrl(ok));
   for(const bad of ['http'+ok.slice(5),ok.replace('.jpg','.png'),ok+'?x=1','https://evil.example/generated/instagram/x.jpg','https://s.public.blob.vercel-storage.com/other/x.jpg'])assert.ok(!validInstagramImageUrl(bad),bad);
 });
+
+test('Instagram never posts a caption that differs from the approved one (approval bound to content)',async t=>{
+  const f=await fixture(t);
+  await f.pg.query("UPDATE publication_requests SET caption=caption||' (alte Fassung)' WHERE id=$1",[f.publicationId]);
+  const result=await publishInstagramImage(f.publicationId,f.deps());
+  assert.equal(result.status,'failed');
+  assert.match(result.detail,/approval_mismatch/);
+  assert.equal(f.calls.create.length,0);assert.equal(f.calls.publish,0);
+});

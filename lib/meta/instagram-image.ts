@@ -65,12 +65,14 @@ export async function publishInstagramImage(publicationId: string, deps: Instagr
   };
   let phase: InstagramPublishFailure["phase"] | "prepare" = "prepare";
   try {
-    const data = await db.query(`SELECT p.image_url,j.snapshot FROM publication_requests p JOIN content_jobs j ON j.id=p.job_id WHERE p.id=$1`, [publicationId]);
+    const data = await db.query(`SELECT p.image_url,p.caption,p.whatsapp_message_id,p.decided_at,j.snapshot FROM publication_requests p JOIN content_jobs j ON j.id=p.job_id WHERE p.id=$1`, [publicationId]);
     const row = data.rows[0];
     if (!row?.image_url) throw new Error("source_image_missing");
     const job = parseJob(row.snapshot);
     requireProduct(job.opportunity.product);
     const caption = facebookCaption(job);
+    // Hard approval binding: Instagram reuses the Facebook approval only for exactly the approved text and image.
+    if (caption !== String(row.caption) || !row.whatsapp_message_id || !row.decided_at) throw new Error("approval_mismatch: Text weicht von der Freigabe ab");
     const png = await (deps.loadImage ?? defaultLoadImage)(String(row.image_url));
     const jpeg = await (deps.toJpeg ?? defaultToJpeg)(png);
     const sha = createHash("sha256").update(jpeg).digest("hex");

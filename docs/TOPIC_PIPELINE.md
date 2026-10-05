@@ -108,3 +108,42 @@ Eine optionale Modell-Zweitmeinung kann das Urteil nur verschärfen (`combineTop
 - `topic_runs` – Lauf, Slot-Schlüssel (idempotent je Slot), Quellenzustand, Ergebnis, gewähltes Thema
 - `topic_candidates` – Kandidat + Gate-Urteil je Lauf
 - `topic_history` – Verlauf für Cooldowns, idempotent über `(topic_id, status, origin)`
+
+## Zentrale Freigabeschranke (harte Invariante)
+
+`lib/publishing/approval-gate.ts`, Migration `029_publish_approvals.sql`.
+
+> Kein Veröffentlichungsversuch – Cron, Retry, Fallback oder Plattform-Adapter – erreicht eine Plattform,
+> solange keine ausdrückliche Freigabe einer aktiven Freigabeinstanz für genau diese Content-ID, Version
+> und diesen Fingerprint vorliegt.
+
+- **Bindung:** Freigabe gilt für `(content_id, version, fingerprint)`. Der Fingerprint (SHA-256 über
+  kanonisches JSON) umfasst Hook, Caption, Body, CTA, Links, Assets (URL + Hash), Disclosures und alle
+  Plattformvarianten. Schlüsselreihenfolge ändert ihn nicht, jede inhaltliche Änderung schon.
+- **Automatische Invalidierung:** `registerContentVersion` legt bei jeder Änderung (neuer Hook, neues Asset,
+  andere Caption, anderer Link, geänderter Plattformtext, zusätzliche Plattform) eine neue Version an und setzt
+  alle früheren offenen/erteilten Freigaben auf `invalidated`. Wird abweichender Inhalt direkt veröffentlicht,
+  verwirft `authorizePublish` die bestehende Freigabe und blockiert. Eine alte Freigabenachricht kann eine
+  neue Version nicht freigeben.
+- **Nur WhatsApp freigibt:** `ACTIVE_APPROVAL_AUTHORITIES = ["whatsapp_operator"]` (eingefroren). Eine Freigabe
+  braucht den vertrauenswürdigen Absender (`WHATSAPP_APPROVER_WA_ID`), eine Antwort auf genau diese
+  Freigabenachricht und das wörtliche „Freigeben“. „Passt so“ & Co. zählen als Änderungswunsch.
+- **Executive-Agent:** nur Schnittstelle (`ApprovalAuthority`, `executive_agent` als Wert). Er ist nirgends
+  verdrahtet und kann weder eine Entscheidung speichern noch eine gespeicherte Freigabe zum Veröffentlichen
+  nutzen. Aktivierung ist ausschließlich eine geprüfte Codeänderung, keine Umgebungsvariable.
+- **Kein Publish bei:** fehlender Version, `pending` (keine Antwort), `rejected`, `changes_requested`,
+  `invalidated`, inaktiver Instanz, unvollständigem Nachweis, nicht freigegebener Plattform.
+- **Datenbank erzwingt mit:** `CHECK` – eine Freigabe ohne Instanz, Anfrage-/Entscheidungsnachricht und
+  Zeitpunkt ist nicht speicherbar. Eindeutiger Index – je Version und Plattform höchstens ein aktiver Versuch
+  (`claimed`/`published`/`unknown`). `failed` (eindeutige Ablehnung durch die Plattform) erlaubt einen neuen
+  Versuch derselben freigegebenen Version, `unknown` nie.
+- **Permit:** Nur `authorizePublish` stellt ein `PublishPermit` aus (Identität registriert, eingefroren; Kopien
+  sind ungültig). Jeder Publisher ruft unmittelbar vor dem Netzwerkaufruf `assertPermitMatches` mit dem
+  exakt ausgehenden Inhalt auf.
+- **Protokoll:** Jeder Versuch, auch jeder blockierte, steht in `publish_attempts`.
+- Ein Test stellt sicher, dass außerhalb von `lib/publishing/` niemand diese Tabellen schreibt.
+
+**Bestehende Meta-Wege:** Facebook-Bild (`claimPublish`) und Instagram-Reel (`checkPublication`) binden die
+WhatsApp-Freigabe bereits an Freigabe-ID und Inhalts-Hash. Lücke geschlossen: Der Instagram-Bildpost
+verwendet die Facebook-Freigabe nur noch, wenn die Caption exakt der freigegebenen entspricht
+(`approval_mismatch` sonst).
