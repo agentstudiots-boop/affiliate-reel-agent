@@ -7,7 +7,7 @@ import { functionalGroup, sameConcept, type AgentProvenance, type ChanceAssessme
 // (topic-based posts) but not produced yet.
 
 // Research and editorial chances must never carry product facts, prices or promises.
-const FORBIDDEN = /\d[\d.,]*\s?(?:€|eur\b|euro)|€\s?\d|\b\d{1,3}\s?%\s?(?:rabatt|reduziert|günstiger|sparen)|rabatt|gutschein|angebot des tages|testsieger|stiftung warentest|garantiert|garantie|heilt|heilung|schmerzfrei|ohne nebenwirkungen|klinisch|bewiesen|nie wieder|ich habe .{0,30}getestet|wir haben .{0,30}getestet|amazon'?s choice|bestseller/i;
+export const UNSUPPORTED_CLAIM_PATTERN = /\d[\d.,]*\s?(?:€|eur\b|euro)|€\s?\d|\b\d{1,3}\s?%\s?(?:rabatt|reduziert|günstiger|sparen)|rabatt|gutschein|angebot des tages|testsieger|stiftung warentest|garantiert|garantie|heilt|heilung|schmerzfrei|ohne nebenwirkungen|klinisch|bewiesen|nie wieder|ich habe .{0,30}getestet|wir haben .{0,30}getestet|amazon'?s choice|bestseller/i;
 const URLISH = /https?:\/\/|www\.|\bB0[A-Z0-9]{8}\b|amazon\./i;
 
 export type DroppedOpportunity = { title: string; reason: string };
@@ -32,7 +32,7 @@ export function intakeTrendReport(raw: unknown, evidence: EvidenceItem[]) {
   for (const item of [...report.opportunities].sort((a, b) => a.priority - b.priority)) {
     const drop = (reason: string) => dropped.push({ title: item.title.slice(0, 80), reason });
     const text = [item.title, item.productIdea ?? "", item.contentChance, item.hook, item.rationale, item.targetNeed, item.shareReason, item.trustRationale, item.reachRationale].join(" ");
-    if (FORBIDDEN.test(text)) { drop("unbelegte Preis-, Test-, Garantie- oder Heilaussage"); continue; }
+    if (UNSUPPORTED_CLAIM_PATTERN.test(text)) { drop("unbelegte Preis-, Test-, Garantie- oder Heilaussage"); continue; }
     if (URLISH.test(`${item.title} ${item.productIdea ?? ""}`)) { drop("Link oder ASIN statt Produktidee"); continue; }
     const concept = slug(item.concept);
     if (concept.length < 2) { drop("Content-Konzept fehlt"); continue; }

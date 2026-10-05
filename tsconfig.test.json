@@ -31,6 +31,13 @@
     "lib/whatsapp/**/*.ts",
     "lib/reporting/**/*.ts",
     "lib/automation/**/*.ts",
-    "lib/landing/**/*.ts"
+    "lib/landing/**/*.ts",
+    "lib/observability/**/*.ts",
+    "lib/topics/**/*.ts",
+    "lib/formats/**/*.ts",
+    "lib/visual/**/*.ts",
+    "lib/distribution/**/*.ts",
+    "lib/topic-pipeline/**/*.ts",
+    "lib/tavily.ts"
   ]
 }
