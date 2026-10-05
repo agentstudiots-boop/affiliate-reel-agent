@@ -1,17 +1,17 @@
 import { FALLBACK_CHAIN, type ContentFormat } from "../formats/catalog";
 import { emitEvent } from "../observability/events";
-import { carouselRenderer, singleImageRenderer, textRenderer, type RenderContext, type RenderInput, type Renderer } from "./renderers";
+import { avatarVideoRenderer, carouselRenderer, singleImageRenderer, standardVideoRenderer, textRenderer, type RenderContext, type RenderInput, type Renderer } from "./renderers";
 import type { ProductionResult } from "./types";
 
 // Visual Content Engine: executes the router's decision. It does not choose topics or publish.
 // If a renderer is unavailable or fails, it degrades along FALLBACK_CHAIN (never to a more expensive format and
 // never to an excluded one). TEXT needs no provider, so production always ends with a usable result.
 
-export const PHASE2_RENDERERS: Renderer[] = [textRenderer, singleImageRenderer, carouselRenderer];
+export const DEFAULT_RENDERERS: Renderer[] = [textRenderer, singleImageRenderer, carouselRenderer, standardVideoRenderer, avatarVideoRenderer];
 
 export async function produceContent(request: RenderInput & { format: ContentFormat; exclude?: ContentFormat[] },
   context: RenderContext & { renderers?: Renderer[] }): Promise<ProductionResult> {
-  const renderers = new Map((context.renderers ?? PHASE2_RENDERERS).map(renderer => [renderer.format, renderer]));
+  const renderers = new Map((context.renderers ?? DEFAULT_RENDERERS).map(renderer => [renderer.format, renderer]));
   const chain = [request.format, ...FALLBACK_CHAIN[request.format]].filter(format => format === request.format || !request.exclude?.includes(format));
   const fallbacks: ProductionResult["fallbacks"] = [];
   const errors: string[] = [];
@@ -33,7 +33,8 @@ export async function produceContent(request: RenderInput & { format: ContentFor
       if (next) { fallbacks.push({ from: format, to: next, reason: outcome.error ?? "fehlgeschlagen" }); emitEvent("production_fallback", { contentId: request.contentId, from: format, to: next, reason: outcome.error }, "warn"); }
       continue;
     }
-    const status = request.dryRun ? "dry_run" : outcome.status === "degraded" || fallbacks.length ? "degraded" : "completed";
+    // A started video job is not a failure: it is resumed later with the same provider job id.
+    const status = request.dryRun ? "dry_run" : outcome.status === "in_progress" ? "in_progress" : outcome.status === "degraded" || fallbacks.length ? "degraded" : "completed";
     const result: ProductionResult = { contentId: request.contentId, requestedFormat: request.format, producedFormat: format, status, assets: outcome.assets,
       carousel: outcome.carousel, video: outcome.video, fallbacks, errors,
       dryRun: request.dryRun ? { wouldGenerateImages: outcome.wouldGenerateImages ?? 0, wouldUseAvatar: !!outcome.wouldUseAvatar, wouldUseStandardVideo: !!outcome.wouldUseStandardVideo, notes: outcome.notes } : null };

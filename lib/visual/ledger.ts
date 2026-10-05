@@ -10,7 +10,7 @@ import type { GeneratedAsset } from "./types";
 
 export type JobKind = "image" | "avatar_video" | "standard_video";
 export type LedgerJob = { key: string; contentId: string; role: string; kind: JobKind; provider: string; status: "running" | "succeeded" | "failed";
-  attempts: number; providerJobId: string | null; asset: GeneratedAsset | null; errorCategory: string | null; retryable: boolean; briefHash: string; updatedAt: number };
+  attempts: number; providerJobId: string | null; asset: GeneratedAsset | null; errorCategory: string | null; retryable: boolean; briefHash: string; updatedAt: number; createdAt: number };
 
 export type ClaimResult =
   | { action: "start"; job: LedgerJob }
@@ -58,7 +58,7 @@ export function memoryLedger(clock: () => number = Date.now): JobLedger & { jobs
         existing.status = "running"; existing.attempts += 1; existing.updatedAt = clock(); existing.errorCategory = null;
         return { action: "start", job: existing };
       }
-      const job: LedgerJob = { ...input, status: "running", attempts: 1, providerJobId: null, asset: null, errorCategory: null, retryable: false, updatedAt: clock() };
+      const job: LedgerJob = { ...input, status: "running", attempts: 1, providerJobId: null, asset: null, errorCategory: null, retryable: false, updatedAt: clock(), createdAt: clock() };
       jobs.set(input.key, job);
       return { action: "start", job };
     },
@@ -73,7 +73,7 @@ export function memoryLedger(clock: () => number = Date.now): JobLedger & { jobs
 const fromRow = (row: Record<string, unknown>): LedgerJob => ({ key: String(row.idempotency_key), contentId: String(row.content_id), role: String(row.role), kind: row.kind as JobKind,
   provider: String(row.provider), status: row.status as LedgerJob["status"], attempts: Number(row.attempts), providerJobId: row.provider_job_id ? String(row.provider_job_id) : null,
   asset: (row.asset as GeneratedAsset | null) ?? null, errorCategory: row.error_category ? String(row.error_category) : null, retryable: !!row.retryable,
-  briefHash: String(row.brief_hash), updatedAt: new Date(String(row.updated_at)).getTime() });
+  briefHash: String(row.brief_hash), updatedAt: new Date(String(row.updated_at)).getTime(), createdAt: new Date(String(row.created_at)).getTime() });
 
 export function postgresLedger(db: Sql): JobLedger {
   return {

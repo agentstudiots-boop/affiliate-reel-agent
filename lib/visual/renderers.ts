@@ -6,6 +6,7 @@ import type { JobLedger } from "./ledger";
 import { imagePromptFromBrief, type StyleBrief } from "./style";
 import { renderTextGraphic } from "./text-graphic";
 import type { GeneratedAsset, ImageProvider, SlideResult } from "./types";
+import { monthOf, remainingQuota, runVideoJob, type QuotaStore, type VideoProvider } from "./video";
 
 // Renderers sit below the format router. Each one knows its format and talks only to provider interfaces.
 
@@ -16,9 +17,11 @@ export type ProductionCopy = {
   videoScript: string;
 };
 export type RenderInput = { contentId: string; copy: ProductionCopy; style: StyleBrief; slides?: number | null; dryRun: boolean; visualPotential: number };
-export type RenderContext = { ledger: JobLedger; imageProvider: ImageProvider | null; sleep?: (ms: number) => Promise<void>; maxAttempts?: number };
+export type RenderContext = { ledger: JobLedger; imageProvider: ImageProvider | null; sleep?: (ms: number) => Promise<void>; maxAttempts?: number;
+  avatarProvider?: VideoProvider | null; standardVideoProvider?: VideoProvider | null; avatarQuota?: { store: QuotaStore; limit: number } | null;
+  videoTiming?: { pollIntervalMs?: number; maxWaitMs?: number; stuckAfterMs?: number }; now?: () => Date };
 export type RenderOutcome = {
-  status: "completed" | "degraded" | "failed" | "dry_run";
+  status: "completed" | "degraded" | "failed" | "dry_run" | "in_progress";
   assets: { role: string; asset: GeneratedAsset }[];
   carousel?: CarouselPlan & { slideResults: SlideResult[] };
   video?: { script: string; provider: string | null; jobId: string | null };
@@ -112,3 +115,40 @@ export const carouselRenderer: Renderer = {
     return input.dryRun ? { ...outcome, notes: [`${plan.slide_count} Slides geplant (${plan.count_reason}), ${plan.generated_images} davon mit generiertem Bild`] } : outcome;
   },
 };
+
+// Shared by AvatarVideoRenderer and StandardVideoRenderer; they differ only in provider and quota.
+async function renderVideo(kind: "avatar" | "standard", input: RenderInput, context: RenderContext): Promise<RenderOutcome> {
+  const provider = kind === "avatar" ? context.avatarProvider : context.standardVideoProvider;
+  const label = kind === "avatar" ? "Avatar-Video" : "Video";
+  if (input.dryRun) return { status: "dry_run", assets: [], notes: [`Würde ein ${label} über ${provider?.name ?? "—"} erzeugen`], wouldUseAvatar: kind === "avatar", wouldUseStandardVideo: kind === "standard",
+    video: { script: input.copy.videoScript, provider: provider?.name ?? null, jobId: null } };
+  if (!provider) return { status: "failed", assets: [], error: `${kind}_provider_unavailable`, notes: [] };
+  const result = await runVideoJob({ contentId: input.contentId, role: kind === "avatar" ? "avatar-video" : "standard-video", title: input.copy.title, script: input.copy.videoScript,
+    visualPrompt: imagePromptFromBrief(input.style, input.copy.imageMotif), aspect: "9:16" },
+  { ledger: context.ledger, provider, quota: kind === "avatar" ? context.avatarQuota ?? null : null, sleep: context.sleep, now: context.now, ...context.videoTiming });
+  if (result.state === "completed") return { status: "completed", assets: [{ role: "video", asset: result.asset }], video: { script: input.copy.videoScript, provider: provider.name, jobId: result.jobId }, notes: result.reused ? ["Vorhandenes Video wiederverwendet"] : [] };
+  if (result.state === "in_progress") return { status: "in_progress", assets: [], video: { script: input.copy.videoScript, provider: provider.name, jobId: result.jobId }, notes: [`${label} wird noch erzeugt; wird beim nächsten Lauf fortgesetzt, nicht neu gestartet`] };
+  return { status: "failed", assets: [], error: `${kind === "avatar" ? "heygen" : "video"}_${result.category}`, notes: [] };
+}
+
+export const avatarVideoRenderer: Renderer = {
+  format: "AVATAR_VIDEO",
+  available(context) {
+    if (!context.avatarProvider) return { ok: false, reason: "kein Avatar-Provider" };
+    const status = context.avatarProvider.available();
+    if (!status.ok) return status;
+    if (!context.avatarQuota) return { ok: false, reason: "Avatar-Kontingent nicht konfiguriert" };
+    return { ok: true };
+  },
+  render: (input, context) => renderVideo("avatar", input, context),
+};
+
+export const standardVideoRenderer: Renderer = {
+  format: "STANDARD_VIDEO",
+  available: context => context.standardVideoProvider ? context.standardVideoProvider.available() : { ok: false, reason: "kein Video-Provider" },
+  render: (input, context) => renderVideo("standard", input, context),
+};
+
+export async function avatarQuotaRemaining(quota: { store: QuotaStore; limit: number }, provider: string, now = new Date()) {
+  return remainingQuota(quota.limit, await quota.store.usage(provider, monthOf(now)));
+}

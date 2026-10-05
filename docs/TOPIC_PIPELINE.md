@@ -262,3 +262,53 @@ Output-URL-Prüfung, begrenzter PNG-Download) und dieselben Variablen (`REPLICAT
 
 Job-Ledger (`ledger.ts`, Migration `030_visual_jobs.sql`): `visual_jobs` je Idempotenzschlüssel
 (Content-ID + Rolle + Brief-Fingerprint) und `provider_usage` für Budget/Kontingente.
+
+## Phase 3 – Video, HeyGen / AvatarVideoProvider, Kontingent, Fallbacks
+
+Ablauf: Format Router → `AVATAR_VIDEO` → `AvatarVideoRenderer` → `VideoProvider` (HeyGen). HeyGen-spezifischer
+Code liegt ausschließlich in `lib/visual/providers/heygen.ts`; Scout, Jarvis und Router importieren ihn nicht.
+`STANDARD_VIDEO` ist getrennt modelliert (`StandardVideoRenderer`, Adapter auf die bestehende Runway-Anbindung,
+nur mit `TOPIC_STANDARD_VIDEO_PROVIDER=runway`), damit später andere Video-Provider ergänzt werden können.
+
+- **Kontingent:** HeyGen gilt als begrenzte Ressource. Ohne `HEYGEN_MONTHLY_VIDEO_LIMIT` wird kein Avatar-Video
+  produziert. Lokaler Zähler `provider_usage` (geplant, erfolgreich, fehlgeschlagen, je Monat, idempotent je
+  Job). Vor jedem Anlegen wird geprüft und reserviert; fehlgeschlagene Jobs zählen nicht, hängende Jobs
+  vorsichtshalber schon. Kein HeyGen-Aufruf ohne vorherige Formatentscheidung.
+- **Fehler:** Timeout beim Anlegen (Ergebnis unklar → kein zweiter POST), 429 (`rate_limited`), 401/403
+  (`auth`, endgültig), Kontingent erschöpft (lokal ohne API-Aufruf oder von HeyGen gemeldet), Job `failed`,
+  Job hängt (`job_stuck`, Standard 30 min), API down (beim Abfragen vorübergehend), ungültige Antwort.
+- **Keine doppelte Generierung:** Videos laufen länger als ein Funktionsaufruf. Nach `maxWaitMs` bleibt der Job
+  mit seiner Provider-ID `running` (`in_progress`) und wird beim nächsten Lauf per ID weiter abgefragt, nie neu
+  angelegt. Fertige Videos werden in den Blob-Store kopiert (Provider-URLs laufen ab) und wiederverwendet.
+- **Fallback:** Fällt HeyGen aus → `STANDARD_VIDEO` → `CAROUSEL` → `SINGLE_IMAGE` → `TEXT`; die Pipeline bricht
+  nicht ab.
+- **Nicht live geprüft:** HeyGen-Endpunkte (`POST /v2/video/generate`, `GET /v1/video_status.get`) sind nach
+  öffentlicher Dokumentation umgesetzt und nur mit Mocks getestet. Benötigt: `HEYGEN_API_KEY`,
+  `HEYGEN_AVATAR_ID`, `HEYGEN_VOICE_ID`, `HEYGEN_MONTHLY_VIDEO_LIMIT` (PENDING_USER_INPUT).
+
+## Phase 3 – Video, AvatarVideoProvider, Kontingent, Fallbacks
+
+Ablauf: Format Router → `AVATAR_VIDEO` → `AvatarVideoRenderer` → `VideoProvider`-Schnittstelle (`kind: avatar_video`).
+Der Renderer kennt keinen Anbieter. **HeyGen ist nur der aktuell vorhandene Adapter**
+(`lib/visual/providers/heygen.ts`) und jederzeit durch einen anderen Avatar-Anbieter ersetzbar oder ergänzbar,
+ohne Router, Engine, Scout oder Jarvis zu ändern. Kein Modul außerhalb von `lib/visual/providers/` enthält
+HeyGen-spezifischen Code; ohne konfigurierten Avatar-Adapter wählt der Router `AVATAR_VIDEO` nie.
+
+`STANDARD_VIDEO` ist davon getrennt (`StandardVideoRenderer`, eigener `VideoProvider` mit `kind: standard_video`).
+Aktueller Adapter: die bestehende Runway-Anbindung, nur mit `TOPIC_STANDARD_VIDEO_PROVIDER=runway`. Es wird nicht
+vorausgesetzt, dass ein Avatar-Anbieter Videos erzeugt.
+
+- **Kontingent:** Avatar-Videos sind eine begrenzte Ressource. Lokaler Zähler `provider_usage` (geplant,
+  erfolgreich, fehlgeschlagen, je Monat und Anbieter, idempotent je Job), weil Anbieter-Kontingente nicht
+  zuverlässig abfragbar sind. Vor jedem Anlegen: Prüfen und Reservieren. Fehlgeschlagene Jobs zählen nicht,
+  hängende vorsichtshalber schon. Kein Avatar-Aufruf ohne vorherige Formatentscheidung.
+- **Fehler:** Timeout beim Anlegen (Ergebnis unklar → kein zweiter POST), 429, Auth-Fehler (endgültig),
+  Kontingent erschöpft (lokal ohne API-Aufruf oder vom Anbieter gemeldet), Job fehlgeschlagen, Job hängt
+  (Standard 30 min), API down beim Abfragen (vorübergehend), ungültige Antwort.
+- **Keine doppelte Generierung:** Nach `maxWaitMs` bleibt ein laufender Job mit seiner Anbieter-ID `in_progress`
+  und wird später per ID weiter abgefragt, nie neu angelegt. Fertige Videos werden in den Blob-Store kopiert
+  (Anbieter-URLs laufen ab) und wiederverwendet.
+- **Fallback:** Avatar → Standard-Video → Karussell → Bild → Text. Die Pipeline bricht nicht ab.
+- **HeyGen-Adapter, nicht live geprüft:** `POST /v2/video/generate`, `GET /v1/video_status.get` nach öffentlicher
+  Dokumentation, nur mit Mocks getestet. Benötigt `HEYGEN_API_KEY`, `HEYGEN_AVATAR_ID`, `HEYGEN_VOICE_ID`,
+  `HEYGEN_MONTHLY_VIDEO_LIMIT` (PENDING_USER_INPUT). Ohne Limit kein Avatar-Video.

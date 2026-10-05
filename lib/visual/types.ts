@@ -37,7 +37,7 @@ export interface ImageProvider {
   generate(brief: ImageBrief, options: { contentId: string; role: string; resumeJobId?: string | null; onJobCreated?: (jobId: string) => Promise<void> }): Promise<GeneratedAsset>;
 }
 
-export type ProductionStatus = "completed" | "partial" | "degraded" | "failed" | "dry_run";
+export type ProductionStatus = "completed" | "partial" | "degraded" | "failed" | "dry_run" | "in_progress";
 export type ProductionResult = {
   contentId: string;
   requestedFormat: ContentFormat;
