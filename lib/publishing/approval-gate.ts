@@ -193,3 +193,26 @@ export async function approvalState(db: Sql, contentId: string) {
   return { version: latest.version, fingerprint: latest.fingerprint, status: String(approval?.status ?? "none"), authority: approval?.authority ?? null,
     requestMessageId: approval?.request_message_id ?? null, decidedAt: approval?.decided_at ?? null };
 }
+
+// Read-only preview for dry runs and status: would this exact content be publishable on this platform right now?
+// Never claims an attempt and never changes state.
+export async function previewPublish(db: Sql, content: PublishableContent, platform: string): Promise<{ allowed: boolean; reason: PublishBlockReason | "approved" }> {
+  const latest = await latestVersion(db, content.contentId);
+  if (!latest) return { allowed: false, reason: "no_content_version" };
+  if (latest.fingerprint !== contentFingerprint(content)) return { allowed: false, reason: "content_changed_since_approval" };
+  const approval = (await db.query("SELECT status,authority,decision_message_id FROM publish_approvals WHERE content_id=$1 AND version=$2", [content.contentId, latest.version])).rows[0];
+  const status = String(approval?.status ?? "");
+  if (status === "pending") return { allowed: false, reason: "approval_pending" };
+  if (status === "rejected") return { allowed: false, reason: "approval_rejected" };
+  if (status === "changes_requested") return { allowed: false, reason: "changes_requested" };
+  if (status !== "approved") return { allowed: false, reason: approval ? "approval_invalidated" : "no_approval" };
+  if (!isActiveAuthority(approval.authority)) return { allowed: false, reason: "authority_inactive" };
+  if (!latest.platforms.includes(platform)) return { allowed: false, reason: "platform_not_in_approved_version" };
+  const attempt = await db.query("SELECT 1 FROM publish_attempts WHERE content_id=$1 AND version=$2 AND platform=$3 AND status IN ('claimed','published','unknown') LIMIT 1", [content.contentId, latest.version, platform]);
+  return attempt.rows.length ? { allowed: false, reason: "already_attempted" } : { allowed: true, reason: "approved" };
+}
+
+export async function contentIdForRequestMessage(db: Sql, requestMessageId: string): Promise<{ contentId: string; version: number } | null> {
+  const row = (await db.query("SELECT content_id,version FROM publish_approvals WHERE request_message_id=$1", [requestMessageId])).rows[0];
+  return row ? { contentId: String(row.content_id), version: Number(row.version) } : null;
+}

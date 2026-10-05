@@ -312,3 +312,108 @@ vorausgesetzt, dass ein Avatar-Anbieter Videos erzeugt.
 - **HeyGen-Adapter, nicht live geprüft:** `POST /v2/video/generate`, `GET /v1/video_status.get` nach öffentlicher
   Dokumentation, nur mit Mocks getestet. Benötigt `HEYGEN_API_KEY`, `HEYGEN_AVATAR_ID`, `HEYGEN_VOICE_ID`,
   `HEYGEN_MONTHLY_VIDEO_LIMIT` (PENDING_USER_INPUT). Ohne Limit kein Avatar-Video.
+
+## Phase 4 – Master Content, Plattform-Adapter, WhatsApp-Ablauf, Status
+
+### Ablauf (`lib/topic-pipeline/orchestrator.ts`, einziger Verbinder aller Ebenen)
+
+1. **Themenvorschlag** (Cron `/api/cron/topic-scout`, je Stunde idempotent): Scout → Jarvis-Gate → Router →
+   Text (Referenz- oder KI-Modus) → **Dry-Run-Produktionsplan** (keine Kosten). WhatsApp-Vorschlag mit
+   Kategorie, Format, Kosten, Plan, Quellen, Modus.
+2. **„Freigeben“ auf den Vorschlag = nur Produktionsfreigabe.** Produktion über die Visual Engine; Textgrafiken
+   werden zu PNG gerastert. Laufende Videos: Stufe `in_production`, Fortsetzung per Cron/„Status“ ohne neuen
+   Anbieter-Auftrag.
+3. **Master Content** → fünf Plattformvarianten → neue Version in der Freigabeschranke →
+   **Veröffentlichungsfreigabe** (eigene Nachricht, zeigt Link, Kennzeichnung, Medien, Plattformen).
+4. **„Freigeben“ auf genau diese Fassung** → `publishAll` über die Schranke → Rückmeldung
+   „Themen-Post/Affiliate-Post, Format …“ mit Status und Link je Plattform. Bei ausgeschalteter
+   Live-Veröffentlichung (Standard) nur Probelauf, nichts wird gepostet.
+
+Wünsche auf Vorschlag oder Freigabe (deterministisch): Format, Slides, Kein Avatar, Weniger werblich, Mehr Humor,
+Anderer Aufhänger (neue Hook-Variante, erneut von Jarvis geprüft), Neues Thema (verwirft, nächstes Thema),
+Ohne Produkt. Nach der Produktion erzeugt jede Änderung eine neue Version (alte Freigabe ungültig) und eine
+neue Freigabenachricht; fertige Bilder/Slides werden über das Job-Ledger wiederverwendet. Webhook-Wiederholungen
+und fremde Absender werden ignoriert. Der bestehende semantische Router bleibt für Produkt-Entwürfe zuständig;
+Antworten auf Themen-Nachrichten werden vor ihm erkannt, damit er sie nicht als fremde Entwürfe deutet.
+
+### Optionale Produktkopplung (nicht fest verdrahtet)
+
+- Standard: **Themen-Post ohne Produkt und ohne Affiliate-Link.**
+- Nur auf ausdrücklichen WhatsApp-Wunsch („Such mir dazu ein passendes Produkt“, optional „… wie eine Heizdecke“)
+  beauftragt der Orchestrator den **bestehenden Produkt-Trendscout** (`seedIdeas`/`scoutProducts`, hinter der
+  Schnittstelle `ProductSuggester`) und schickt **höchstens drei** Kandidaten mit kurzer Begründung.
+- Erst die Auswahl „Produkt N“ übernimmt ein Produkt. Die Amazon-Seite wird wie in der Produkt-Pipeline geprüft
+  (`findAmazonProduct`), dann wird der Affiliate-Link mit Kennzeichnung „Werbung | Affiliate-Link“ eingefügt.
+  Veröffentlicht wird weiterhin erst nach der separaten Freigabe genau dieser Fassung.
+- Ohne Auswahl kein Link: `buildMasterContent` verwirft Affiliate-Daten ohne WhatsApp-Nachweis
+  (Nachrichten-ID) oder mit unzulässiger URL.
+- **Sensible Themen** (Katastrophen, Unfälle, Gewalt, Skandale, Promi-Klatsch, erhöhtes Risiko): keine
+  Produktvorschläge, der Scout wird gar nicht gefragt; eine Auswahl wird erneut geprüft und abgelehnt.
+- Weder Scout noch Orchestrator wählen jemals selbst ein Produkt oder einen Link.
+
+### Master Content (`lib/distribution/master-content.ts`)
+
+`topic`, `hook`, `message`, `body`, `cta`, `assets`, `carousel`, `video`, `caption`, `hashtags`,
+`source_references`, `campaign`, `affiliate_data`, `disclosures`, `selected_format`, `category`.
+Kennzeichnungen: „Werbung | Affiliate-Link“ bei Affiliate-Daten, „Bild mit KI erstellt“ bei generierten Medien.
+
+### Plattform-Adapter (`lib/distribution/platforms/adapters.ts`)
+
+`InstagramAdapter`, `FacebookAdapter`, `TikTokAdapter`, `YouTubeAdapter`, `XAdapter`: Textlänge (X 280 mit
+t.co-Linklänge), Titel (YouTube ≤ 100), Hashtags (2–5), CTA, Linkstrategie, Medienformat, Seitenverhältnis,
+Kennzeichnung. Formattransformation:
+
+| Master | Instagram | Facebook | TikTok | YouTube Shorts | X |
+| --- | --- | --- | --- | --- | --- |
+| Text | – (braucht Medium) | Text | – | – | Text |
+| Bild | Bild 4:5 | Bild | Foto-Slideshow 9:16 | – | Text + Bild |
+| Karussell | echtes Karussell | Album | Foto-Slideshow | – (keine Videoableitung) | Text + max. 4 Bilder |
+| Video/Avatar | Reel 9:16 | Video | Video | Short | Video |
+
+Linkstrategie zentral (`lib/distribution/link-policy.ts`, überschreibbar mit `TOPIC_LINK_POLICY`, Kennzeichnung
+nie abschaltbar): Facebook/X Link im Text, Instagram/TikTok/YouTube „Link im Profil“ (Ziel: bestehende
+Landingpage `/produkte`, `TOPIC_LANDING_URL`). Themen-Posts verlinken auf Facebook/X die Quelle.
+
+### Veröffentlichung (`lib/distribution/publish.ts`)
+
+Jede Plattform isoliert; ein Ausfall stoppt die anderen nicht. Jeder Live-Versuch läuft über
+`authorizePublish` + `assertPermitMatches`. Standard ist der Dry-Run (`TOPIC_LIVE_PUBLISHING` nicht `true`):
+er zeigt je Plattform Format, Linkstrategie, Freigabestatus und fehlende Zugänge, ohne etwas zu beanspruchen.
+
+Live-Clients: nur Facebook-Foto über die bestehende `publishFacebookPhoto`-Anbindung. Instagram (Karussell/Reel
+der Themen-Pipeline), TikTok, YouTube und X haben vollständige Adapter und Dry-Run, aber noch keinen Live-Client
+(PENDING_USER_INPUT, siehe unten).
+
+### Status
+
+„Status“ ergänzt die bestehende Antwort um: Pipeline an/aus, Live an/aus, Scout-Gesundheit, letzter
+(erfolgreicher) Lauf, Trendquellen ok/gestört, Replicate/Avatar/Video verfügbar (inkl. Kontingent), letzter Bild-,
+Karussell-, Videojob, Plattformadapter und Live-Zugänge, offene Vorschläge/Freigaben, letzter Fehler.
+
+### Umgebungsvariablen (neu)
+
+| Variable | Zweck | Standard |
+| --- | --- | --- |
+| `TOPIC_PIPELINE_ENABLED` | Themen-Pipeline (Cron, WhatsApp-Antworten) einschalten | aus |
+| `TOPIC_LIVE_PUBLISHING` | echte Veröffentlichung statt Probelauf | aus |
+| `TOPIC_COPY_MODE` | `ai` = ein Modellaufruf für Texte (Replicate), sonst Referenzmodus | Referenz |
+| `TOPIC_PLATFORMS` | z. B. `instagram,facebook` | alle fünf |
+| `TOPIC_LANDING_URL` | Ziel des Profil-Links | – |
+| `TOPIC_LINK_POLICY` | JSON-Overrides der Linkregeln | – |
+| `TOPIC_BRAND_PALETTE` | `#bg,#text,#akzent` | neutrale Palette |
+| `TOPIC_SOURCE_GOOGLE_NEWS` / `_GOOGLE_TRENDS` / `_WIKIPEDIA` | `false` schaltet Quelle ab | an |
+| `TOPIC_STANDARD_VIDEO_PROVIDER` | `runway` schaltet Standard-Video frei | aus |
+| `HEYGEN_API_KEY`, `HEYGEN_AVATAR_ID`, `HEYGEN_VOICE_ID`, `HEYGEN_MONTHLY_VIDEO_LIMIT` | Avatar-Adapter | – |
+
+Wiederverwendet: `TAVILY_API_KEY`, `REPLICATE_API_TOKEN`, `REPLICATE_IMAGE_MODEL`, `RUNWAYML_API_SECRET`,
+`META_*`, `WHATSAPP_*`, `CRON_SECRET`, `DATABASE_URL`.
+
+Für Live-Clients später nötig (PENDING_USER_INPUT): TikTok (`TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`,
+`TIKTOK_ACCESS_TOKEN`, Content Posting API), YouTube (`YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`,
+`YOUTUBE_REFRESH_TOKEN`), X (`X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET`).
+
+### Einschalten (PENDING_USER_APPROVAL, nicht durchgeführt)
+
+1. PR mergen, deployen (Migrationen 028–031 laufen automatisch).
+2. `TOPIC_PIPELINE_ENABLED=true` setzen; Cron-Eintrag für `/api/cron/topic-scout` in `vercel.json` ergänzen.
+3. Erst nach Probeläufen ggf. `TOPIC_LIVE_PUBLISHING=true`.
