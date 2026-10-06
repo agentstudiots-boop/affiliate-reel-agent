@@ -3,8 +3,9 @@ import type { Generator } from "../content/agent";
 import { loadSelectionHistory } from "../content/selection-history";
 import { buildMasterContent, type AffiliateData, type MasterContent } from "../distribution/master-content";
 import { PLATFORM_ADAPTERS, type PlatformVariant } from "../distribution/platforms/adapters";
-import { liveTopicPublishingEnabled, publishAll, publishableContent, type PlatformPublisher, type PublishRun } from "../distribution/publish";
-import { PLATFORMS, FORMAT_LABEL, type Platform } from "../formats/catalog";
+import { liveTopicPublishingEnabled, publishAll, publishableContent, reconcilePublishing, storedOutcomes, type PlatformPublisher, type PublishOutcome, type PublishRun } from "../distribution/publish";
+import { activePlatforms } from "../capabilities";
+import { FORMAT_LABEL, PLATFORM_LABEL, type Platform } from "../formats/catalog";
 import { emptyOverride, hasOverride, mergeOverrides, parseFormatInstruction, type FormatOverride } from "../formats/override";
 import { decideFormat, type FormatDecision } from "../formats/router";
 import type { Database } from "../memory/db";
@@ -63,7 +64,10 @@ export type TopicContentRow = {
 };
 
 const now = (deps: TopicPipelineDeps) => (deps.now ?? (() => new Date()))();
-const platformsOf = (deps: TopicPipelineDeps) => deps.platforms ?? (process.env.TOPIC_PLATFORMS ? process.env.TOPIC_PLATFORMS.split(",").map(item => item.trim()).filter((item): item is Platform => (PLATFORMS as readonly string[]).includes(item)) : [...PLATFORMS]);
+// Activated platforms come from the central capability check (TOPIC_PLATFORMS); deps can only narrow them.
+const platformsOf = (deps: TopicPipelineDeps) => deps.platforms ? deps.platforms.filter(platform => activePlatforms().includes(platform)) : activePlatforms();
+// Live publishing only with TOPIC_LIVE_PUBLISHING=true; deps.liveEnabled can switch it off, never on.
+const liveFor = (deps: TopicPipelineDeps) => deps.liveEnabled !== false && liveTopicPublishingEnabled();
 
 async function load(db: Database, contentId: string): Promise<TopicContentRow | null> {
   const row = (await db.query("SELECT * FROM topic_contents WHERE content_id=$1", [contentId])).rows[0];
@@ -156,7 +160,7 @@ async function requestPublishApproval(deps: TopicPipelineDeps, row: TopicContent
   const variants = PLATFORM_ADAPTERS.filter(adapter => platformsOf(deps).includes(adapter.platform)).map(adapter => adapter.render(master));
   const version = await registerContentVersion(deps.db, publishableContent(master, variants));
   const plan = await publishAll(deps.db, { master, variants, publishers: deps.publishers ?? [], origin: "approval_preview", dryRun: true });
-  const live = deps.liveEnabled ?? liveTopicPublishingEnabled();
+  const live = liveFor(deps);
   const messageId = await deps.send(publishApprovalText(master, variants, plan.plan, version.version, live));
   await bindApprovalRequest(deps.db, row.content_id, version.version, messageId);
   const updated: TopicContentRow = { ...row, production, format: production.producedFormat, category: master.category, master: { master, variants, version: version.version }, stage: "awaiting_publish_approval" };
@@ -310,6 +314,11 @@ async function onProductReply(deps: TopicPipelineDeps, row: TopicContentRow, mes
 }
 
 async function onPublishReply(deps: TopicPipelineDeps, row: TopicContentRow, message: { id: string; from: string; body: string; replyToMessageId: string | null }) {
+  // Deterministic command: retry only definitely failed platforms of the already approved version.
+  if (/^(wiederholen|erneut versuchen)[.!]?$/i.test(message.body.trim()) && ["not_published", "partially_published", "publishing", "published"].includes(row.stage)) {
+    await retryFailedPlatforms(deps, row.content_id, message.id);
+    return;
+  }
   const intent = classifyWhatsAppReply(message.body).intent;
   let decision: string | null = null;
   try {
@@ -331,25 +340,59 @@ async function onPublishReply(deps: TopicPipelineDeps, row: TopicContentRow, mes
   await applyWish(deps, row, message, "publish");
 }
 
-async function publish(deps: TopicPipelineDeps, row: TopicContentRow, approvalMessageId: string) {
+async function publish(deps: TopicPipelineDeps, row: TopicContentRow, approvalMessageId: string, only?: Platform[]) {
   if (!row.master) return;
   await save(deps.db, { ...row, stage: "publishing" });
   await recordTopicHistory(deps.db, row.candidate.candidate, "approved", approvalMessageId);
-  const dryRun = !(deps.liveEnabled ?? liveTopicPublishingEnabled());
-  const run: PublishRun = await publishAll(deps.db, { master: row.master.master, variants: row.master.variants, publishers: deps.publishers ?? [], origin: "whatsapp_approval", dryRun });
+  const run: PublishRun = await publishAll(deps.db, { master: row.master.master, variants: row.master.variants, publishers: deps.publishers ?? [], origin: only ? "retry_failed" : "whatsapp_approval",
+    dryRun: !liveFor(deps), only });
   const format = row.master.master.selected_format as ReportFormat;
   const category = row.master.master.category;
   if (run.dryRun) {
     await save(deps.db, { ...row, stage: "not_published", last_error: "dry_run" });
     await deps.send([`Probelauf (Dry-Run): ${category === "affiliate" ? "Affiliate-Post" : "Themen-Post"}, ${FORMAT_LABEL[format]} – nichts veröffentlicht`, "",
-      ...run.plan.map(entry => `• ${entry.platform}: ${entry.publishable ? `${entry.mediaFormat}, Link: ${entry.linkStrategy}` : "nicht vorgesehen"} – ${entry.reason}`),
+      ...run.plan.map(entry => `• ${PLATFORM_LABEL[entry.platform]}: ${entry.publishable ? `${entry.mediaFormat}, Link: ${entry.linkStrategy}` : "nicht vorgesehen"} – ${entry.reason}`),
       "", "Live-Veröffentlichung ist ausgeschaltet (TOPIC_LIVE_PUBLISHING). Deine Freigabe gilt nur für genau diese Fassung."].join("\n"));
     return;
   }
-  const live = run.outcomes.filter(item => item.status === "published").length;
-  const stage: Stage = !run.outcomes.length || !live ? "not_published" : live === run.outcomes.length ? "published" : "partially_published";
+  await reportStored(deps, row, approvalMessageId);
+}
+
+// Report and stage are always computed from the stored per-platform results, so retries and reconciliation never
+// mark a successful platform as failed.
+async function reportStored(deps: TopicPipelineDeps, row: TopicContentRow, historyOrigin: string) {
+  if (!row.master) return;
+  const outcomes: PublishOutcome[] = await storedOutcomes(deps.db, row.master.master, row.master.variants);
+  const live = outcomes.filter(item => item.status === "published").length;
+  const pending = outcomes.some(item => item.status === "processing");
+  const stage: Stage = pending ? "publishing" : !outcomes.length || !live ? "not_published" : live === outcomes.length ? "published" : "partially_published";
   await save(deps.db, { ...row, stage });
-  if (live) await recordTopicHistory(deps.db, row.candidate.candidate, "published", approvalMessageId);
-  await deps.send(formatPublishReport({ category, format, outcomes: run.outcomes,
-    note: row.master.variants.some(variant => !variant.publishable) ? `Nicht vorgesehen: ${row.master.variants.filter(variant => !variant.publishable).map(variant => `${variant.platform} (${variant.skipReason})`).join(", ")}` : null }));
+  if (live) await recordTopicHistory(deps.db, row.candidate.candidate, "published", historyOrigin);
+  const failed = outcomes.some(item => item.status === "failed");
+  await deps.send(formatPublishReport({ category: row.master.master.category, format: row.master.master.selected_format as ReportFormat, outcomes,
+    note: [row.master.variants.some(variant => !variant.publishable) ? `Nicht vorgesehen: ${row.master.variants.filter(variant => !variant.publishable).map(variant => `${PLATFORM_LABEL[variant.platform]} (${variant.skipReason})`).join(", ")}` : null,
+      failed ? "Antworte auf die Freigabenachricht mit „Wiederholen“, um nur die fehlgeschlagenen Plattformen erneut zu versuchen." : null,
+      pending ? "Noch in Verarbeitung; ich melde mich, sobald die Plattform bestätigt (oder bei „Status“)." : null].filter(Boolean).join("\n") || null }));
+}
+
+// Retry exactly the platforms whose last attempt for the approved version definitely failed. Published, processing
+// or unclear platforms are untouched. The publish gate re-checks the approval and all switches.
+export async function retryFailedPlatforms(deps: TopicPipelineDeps, contentId: string, triggerMessageId: string) {
+  const row = await load(deps.db, contentId);
+  if (!row?.master) return { retried: [] as Platform[] };
+  const failed = (await storedOutcomes(deps.db, row.master.master, row.master.variants)).filter(item => item.status === "failed").map(item => item.platform as Platform);
+  if (!failed.length) { await deps.send("Es gibt keine fehlgeschlagene Plattform, die erneut versucht werden kann. Es wurde nichts veröffentlicht."); return { retried: [] }; }
+  await publish(deps, row, triggerMessageId, failed);
+  return { retried: failed };
+}
+
+// Completes asynchronous publishes (TikTok, YouTube, Instagram reels) by asking the platforms; sends the final
+// report once nothing is processing any more. Called by cron and "Status".
+export async function reconcileTopicPublications(deps: TopicPipelineDeps) {
+  const settled = await reconcilePublishing(deps.db, deps.publishers ?? []);
+  for (const contentId of [...new Set(settled.map(item => item.contentId))]) {
+    const row = await load(deps.db, contentId);
+    if (row?.master) await reportStored(deps, row, `reconcile:${contentId}`);
+  }
+  return settled.length;
 }

@@ -18,6 +18,15 @@ export function validInstagramImageUrl(value: string) {
   } catch { return false; }
 }
 
+// Topic pipeline media (lib/distribution): JPEG images and MP4 videos stored under generated/topics/ in the Blob store.
+export function validTopicMediaUrl(value: string, kind: "image" | "video") {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password && !url.search && url.hostname.endsWith(".public.blob.vercel-storage.com")
+      && (kind === "image" ? /^\/generated\/topics\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\.jpg$/ : /^\/generated\/topics\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\.mp4$/).test(url.pathname);
+  } catch { return false; }
+}
+
 export class InstagramPublishFailure extends Error {
   constructor(public phase: "connection" | "container" | "status" | "publish" | "permalink", public detail: string,
     public httpStatus = 0, public code = 0, public subcode = 0) { super("Instagram Graph API did not confirm the requested operation"); }
@@ -66,6 +75,26 @@ export async function instagramGraph(transport: typeof fetch = fetch) {
       }
       const result = await graph(`${instagramId}/media`,token.token,version,transport,"container",
         new URLSearchParams({ image_url: imageUrl, caption }));
+      if (!/^\d+$/.test(result.id || "")) throw new InstagramPublishFailure("container","missing_container_id");
+      return result.id!;
+    },
+    // Topic pipeline (additive): image (optionally as carousel item), carousel parent, reel. Same token, same graph helper.
+    async createTopicImage(imageUrl: string, caption: string, carouselItem = false) {
+      if (!validTopicMediaUrl(imageUrl, "image") || (!carouselItem && (!caption.trim() || caption.length > 2200))) throw new InstagramPublishFailure("container","invalid_media_or_caption");
+      const form = carouselItem ? new URLSearchParams({ image_url: imageUrl, is_carousel_item: "true" }) : new URLSearchParams({ image_url: imageUrl, caption });
+      const result = await graph(`${instagramId}/media`,token.token,version,transport,"container",form);
+      if (!/^\d+$/.test(result.id || "")) throw new InstagramPublishFailure("container","missing_container_id");
+      return result.id!;
+    },
+    async createTopicCarousel(childIds: string[], caption: string) {
+      if (childIds.length < 2 || childIds.length > 10 || !childIds.every(id => /^\d+$/.test(id)) || !caption.trim() || caption.length > 2200) throw new InstagramPublishFailure("container","invalid_carousel");
+      const result = await graph(`${instagramId}/media`,token.token,version,transport,"container",new URLSearchParams({ media_type: "CAROUSEL", children: childIds.join(","), caption }));
+      if (!/^\d+$/.test(result.id || "")) throw new InstagramPublishFailure("container","missing_container_id");
+      return result.id!;
+    },
+    async createTopicReel(videoUrl: string, caption: string) {
+      if (!validTopicMediaUrl(videoUrl, "video") || !caption.trim() || caption.length > 2200) throw new InstagramPublishFailure("container","invalid_media_or_caption");
+      const result = await graph(`${instagramId}/media`,token.token,version,transport,"container",new URLSearchParams({ media_type: "REELS", video_url: videoUrl, caption, share_to_feed: "true" }));
       if (!/^\d+$/.test(result.id || "")) throw new InstagramPublishFailure("container","missing_container_id");
       return result.id!;
     },

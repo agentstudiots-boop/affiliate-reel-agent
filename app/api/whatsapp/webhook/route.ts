@@ -24,7 +24,7 @@ import { publishInstagramImage, resumeInstagramImages } from "@/lib/meta/instagr
 import { deliverWeeklyReport } from "@/lib/reporting/weekly";
 import { latestImagePostsStatus } from "@/lib/reporting/whatsapp-status";
 import { formatPublishReport } from "@/lib/publishing/report";
-import { handleTopicReply, resumeTopicProductions } from "@/lib/topic-pipeline/orchestrator";
+import { handleTopicReply, reconcileTopicPublications, resumeTopicProductions } from "@/lib/topic-pipeline/orchestrator";
 import { topicPipelineStatus } from "@/lib/topic-pipeline/status";
 import { extractIncomingWhatsAppMessages, verifyMetaWebhookSignature, verifyWhatsAppChallenge } from "@/lib/whatsapp/security";
 
@@ -111,8 +111,11 @@ export async function POST(request: Request) {
             // Loaded lazily: the topic pipeline wiring must never be able to break the existing status command.
             const { topicPipelineDeps } = await import("@/lib/agents/topic-runtime");
             const deps = topicPipelineDeps();
-            if (process.env.TOPIC_PIPELINE_ENABLED === "true") await resumeTopicProductions(deps);
-            topicStatus = `\n\n${await topicPipelineStatus(getDatabase(), deps.render, deps.publishers)}`;
+            if (process.env.TOPIC_PIPELINE_ENABLED === "true") {
+              await resumeTopicProductions(deps);
+              await reconcileTopicPublications(deps); // asks platforms about pending posts; never publishes anew
+            }
+            topicStatus = `\n\n${await topicPipelineStatus(getDatabase(), deps.render)}`;
           } catch { console.error(JSON.stringify({ event: "topic_status_unavailable" })); }
           await sendWhatsAppText(`Aktuelle Bildpost-Aufträge:\n${imageStatus}${correctionStatus?`\n\nLetzte Korrektur: ${correctionStatus}`:''}\n\nLetzter Instagram-Reel-Auftrag: ${status}${topicStatus}`);
         }

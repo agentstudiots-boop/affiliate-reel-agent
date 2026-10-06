@@ -27,7 +27,8 @@ export async function ensureAutomationSchema(db: Database) {
     to_regclass('public.topic_history') IS NOT NULL AS topics,
     to_regclass('public.publish_attempts') IS NOT NULL AS publish_gate,
     to_regclass('public.provider_usage') IS NOT NULL AS visual_jobs,
-    to_regclass('public.topic_contents') IS NOT NULL AS topic_contents`);
-  if (ready.rows[0]?.slots === true && ready.rows[0]?.slot_key === true && ready.rows[0]?.stories === true && ready.rows[0]?.feedback === true && ready.rows[0]?.product_locks === true && ready.rows[0]?.chat_turns === true && ready.rows[0]?.slot_retry === true && ready.rows[0]?.instagram_images === true && ready.rows[0]?.routes === true && ready.rows[0]?.clicks === true && ready.rows[0]?.categories === true && ready.rows[0]?.voice === true && ready.rows[0]?.topics === true && ready.rows[0]?.publish_gate === true && ready.rows[0]?.visual_jobs === true && ready.rows[0]?.topic_contents === true) return;
+    to_regclass('public.topic_contents') IS NOT NULL AS topic_contents,
+    EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='publish_attempts' AND column_name='remote_ids') AS publish_results`);
+  if (ready.rows[0]?.slots === true && ready.rows[0]?.slot_key === true && ready.rows[0]?.stories === true && ready.rows[0]?.feedback === true && ready.rows[0]?.product_locks === true && ready.rows[0]?.chat_turns === true && ready.rows[0]?.slot_retry === true && ready.rows[0]?.instagram_images === true && ready.rows[0]?.routes === true && ready.rows[0]?.clicks === true && ready.rows[0]?.categories === true && ready.rows[0]?.voice === true && ready.rows[0]?.topics === true && ready.rows[0]?.publish_gate === true && ready.rows[0]?.visual_jobs === true && ready.rows[0]?.topic_contents === true && ready.rows[0]?.publish_results === true) return;
   await applyMigrations(db);
 }

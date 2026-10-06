@@ -6,6 +6,10 @@ const G = require('../.test-build/lib/publishing/approval-gate');
 const A = require('../.test-build/lib/publishing/authority');
 const { setEventSink } = require('../.test-build/lib/observability/events');
 const pgliteDatabase = require('./helpers/pglite-db.cjs');
+const { liveEnv } = require('./helpers/live-env.cjs');
+// The gate also requires the live switch, platform activation and credentials: switched on for this file.
+const restoreEnv = liveEnv();
+process.on('exit', restoreEnv);
 
 setEventSink(() => {});
 const OPERATOR = '491701234567';
@@ -185,4 +189,48 @@ test('no module outside lib/publishing records approvals or bypasses the gate', 
   } };
   walk(root);
   assert.deepEqual(offenders, []);
+});
+
+const { withEnv } = require('./helpers/live-env.cjs');
+
+test('invariant: valid approval alone is not enough — live switch, platform activation and credentials are enforced by the gate', async () => {
+  const db = await pgliteDatabase();
+  try {
+    await approved(db);
+    for (const [env, expected] of [[{ TOPIC_LIVE_PUBLISHING: undefined }, 'live_publishing_disabled'], [{ TOPIC_LIVE_PUBLISHING: 'yes' }, 'live_publishing_disabled'],
+      [{ TOPIC_PLATFORMS: 'facebook,x' }, 'platform_not_enabled'], [{ META_INSTAGRAM_USER_ID: undefined }, 'credentials_missing'], [{ BLOB_READ_WRITE_TOKEN: undefined }, 'credentials_missing']]) {
+      const restore = withEnv(env);
+      try { await assert.rejects(G.authorizePublish(db, { content: content(), platform: 'instagram', origin: 'cron' }), reason(expected), JSON.stringify(env)); }
+      finally { restore(); }
+    }
+    // With everything in place the same approval works; nothing was claimed by the blocked attempts.
+    const permit = await G.authorizePublish(db, { content: content(), platform: 'instagram', origin: 'approval' });
+    assert.equal(permit.version, 1);
+    assert.equal((await db.query("SELECT count(*)::int AS n FROM publish_attempts WHERE status='blocked'")).rows[0].n, 5);
+  } finally { await db.close(); }
+});
+
+test('invariant: a second "Freigeben" changes nothing; repeated publish calls never claim twice; processing blocks re-publishing', async () => {
+  const db = await pgliteDatabase();
+  try {
+    await approved(db);
+    await assert.rejects(G.recordApprovalDecision(db, { authority: 'whatsapp_operator', trustedWaId: OPERATOR, evidence: evidence('Freigeben', 'wamid.request.1') }), /not_pending/);
+    const permit = await G.authorizePublish(db, { content: content(), platform: 'instagram', origin: 'approval' });
+    await G.recordRemoteId(db, permit, 'container:42');
+    await G.completePublishAttempt(db, permit, 'processing', { externalId: 'container:42' });
+    for (let i = 0; i < 3; i++) await assert.rejects(G.authorizePublish(db, { content: content(), platform: 'instagram', origin: 'cron' }), reason('already_attempted'));
+    const open = await G.openAttempts(db);
+    assert.deepEqual(open.map(item => [item.platform, item.status, item.remoteIds]), [['instagram', 'processing', ['container:42']]]);
+    await G.settleAttempt(db, open[0].id, 'published', { externalId: '999', url: 'https://www.instagram.com/p/1/' });
+    const stored = await G.platformAttempt(db, 'tc_demo', 'instagram');
+    assert.deepEqual([stored.status, stored.externalId, stored.url], ['published', '999', 'https://www.instagram.com/p/1/']);
+    // Reconciliation never re-opens a published attempt; an unclear attempt only becomes published on confirmation.
+    await G.settleAttempt(db, open[0].id, 'failed');
+    assert.equal((await G.platformAttempt(db, 'tc_demo', 'instagram')).status, 'published');
+    const fb = await G.authorizePublish(db, { content: content(), platform: 'facebook', origin: 'approval' });
+    await G.completePublishAttempt(db, fb, 'unknown');
+    await G.settleAttempt(db, fb.attemptId, 'failed');
+    assert.equal((await G.platformAttempt(db, 'tc_demo', 'facebook')).status, 'unknown');
+    await assert.rejects(G.authorizePublish(db, { content: content(), platform: 'facebook', origin: 'retry' }), reason('already_attempted'));
+  } finally { await db.close(); }
 });

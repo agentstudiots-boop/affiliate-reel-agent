@@ -4,7 +4,6 @@ const L = '../.test-build/lib';
 const { buildMasterContent, AFFILIATE_DISCLOSURE } = require(`${L}/distribution/master-content`);
 const { renderForPlatform, PLATFORM_ADAPTERS } = require(`${L}/distribution/platforms/adapters`);
 const { publishAll, publishableContent, PlatformPublishError } = require(`${L}/distribution/publish`);
-const { facebookPhotoPublisher } = require(`${L}/distribution/publishers`);
 const { runTopicPipeline, handleTopicReply } = require(`${L}/topic-pipeline/orchestrator`);
 const { topicPipelineStatus } = require(`${L}/topic-pipeline/status`);
 const { productCouplingBlocked, suggestProducts, productRequest, productSelection } = require(`${L}/topic-pipeline/product-coupling`);
@@ -15,6 +14,9 @@ const { calendarSource, evergreenSource } = require(`${L}/topics/sources/offline
 const { runTopicScout } = require(`${L}/topics/scout`);
 const { setEventSink } = require(`${L}/observability/events`);
 const pgliteDatabase = require('./helpers/pglite-db.cjs');
+const { liveEnv, withEnv } = require('./helpers/live-env.cjs');
+const restoreEnv = liveEnv();
+process.on('exit', restoreEnv);
 
 setEventSink(() => {});
 const NOW = new Date('2026-10-05T07:00:00Z');
@@ -84,10 +86,13 @@ test('no affiliate link without the operator\'s explicit choice, and never on a 
 function fakePublisher(platform, behaviour = 'ok') {
   const calls = [];
   return { calls, platform, configured: () => behaviour === 'missing' ? { ok: false, missing: [`${platform.toUpperCase()}_TOKEN`] } : { ok: true, missing: [] }, supports: () => true,
-    async publish(variant) { calls.push(variant.platform);
+    async publish(variant, master, context) { calls.push(variant.platform);
       if (behaviour === 'down') throw new PlatformPublishError(true, 'HTTP 503');
       if (behaviour === 'unknown') throw new Error('timeout');
-      return { externalId: `${platform}-1`, url: behaviour === 'nourl' ? null : `https://www.${platform === 'x' ? 'x' : platform}.com/p/1` }; } };
+      await context.onRemoteId(`${platform}-remote`);
+      if (behaviour === 'processing') return { state: 'processing', externalId: `${platform}-1`, url: null };
+      return { state: 'published', externalId: `${platform}-1`, url: behaviour === 'nourl' ? null : `https://www.${platform === 'x' ? 'x' : platform}.com/p/1` }; },
+    async status() { return behaviour === 'processing' ? { state: 'published', externalId: `${platform}-1`, url: `https://www.${platform}.com/p/1` } : { state: 'processing' }; } };
 }
 async function approvedContent(db, m, variants) {
   const content = publishableContent(m, variants);
@@ -102,14 +107,16 @@ test('dry run shows what would be published without any publisher call or claim'
     const m = master();
     const variants = PLATFORM_ADAPTERS.map(adapter => adapter.render(m));
     await approvedContent(db, m, variants);
-    const publishers = ['instagram', 'facebook', 'tiktok', 'x'].map(p => fakePublisher(p, p === 'tiktok' ? 'missing' : 'ok'));
-    const run = await publishAll(db, { master: m, variants, publishers, origin: 'test', dryRun: true });
+    const publishers = ['instagram', 'facebook', 'tiktok', 'x'].map(p => fakePublisher(p));
+    const restore = withEnv({ TIKTOK_ACCESS_TOKEN: undefined });
+    let run;
+    try { run = await publishAll(db, { master: m, variants, publishers, origin: 'test', dryRun: true }); } finally { restore(); }
     assert.equal(run.dryRun, true);
     assert.equal(run.outcomes.length, 0);
     assert.ok(publishers.every(publisher => publisher.calls.length === 0));
     const plan = Object.fromEntries(run.plan.map(entry => [entry.platform, entry]));
     assert.equal(plan.instagram.wouldPublish, true);
-    assert.match(plan.tiktok.reason, /Zugang fehlt: TIKTOK_TOKEN/);
+    assert.match(plan.tiktok.reason, /Zugang fehlt: TIKTOK_ACCESS_TOKEN oder TIKTOK_REFRESH_TOKEN/);
     assert.equal(plan.youtube.wouldPublish, false);
     assert.equal((await db.query("SELECT count(*)::int AS n FROM publish_attempts WHERE status='claimed'")).rows[0].n, 0);
   } finally { await db.close(); }
@@ -121,18 +128,22 @@ test('one platform down, missing credentials or unclear result: the others still
     const m = master();
     const variants = PLATFORM_ADAPTERS.map(adapter => adapter.render(m));
     await approvedContent(db, m, variants);
-    const publishers = [fakePublisher('instagram'), fakePublisher('facebook', 'nourl'), fakePublisher('tiktok', 'down'), fakePublisher('x', 'missing')];
-    const run = await publishAll(db, { master: m, variants, publishers, origin: 'test', dryRun: false });
+    const publishers = [fakePublisher('instagram'), fakePublisher('facebook', 'nourl'), fakePublisher('tiktok', 'down'), fakePublisher('x')];
+    const restore = withEnv({ X_ACCESS_TOKEN: undefined });
+    let run;
+    try { run = await publishAll(db, { master: m, variants, publishers, origin: 'test', dryRun: false }); } finally { restore(); }
     const by = Object.fromEntries(run.outcomes.map(item => [item.platform, item]));
     assert.equal(by.instagram.status, 'published'); assert.equal(by.facebook.status, 'published');
-    assert.equal(by.tiktok.status, 'failed'); assert.match(by.x.detail, /Zugangsdaten fehlen/);
+    assert.equal(by.tiktok.status, 'failed'); assert.equal(by.x.status, 'blocked'); assert.match(by.x.detail, /Zugangsdaten fehlen/);
+    assert.equal(publishers[3].calls.length, 0, 'no call without credentials');
     assert.equal(by.youtube, undefined, 'deliberately not provided format is not a failure');
     const report = require(`${L}/publishing/report`).formatPublishReport({ category: m.category, format: 'CAROUSEL', outcomes: run.outcomes });
     assert.match(report, /^Themen-Post, Karussell teilweise veröffentlicht/);
     assert.match(report, /• Facebook – veröffentlicht – Link nicht verfügbar/);
-    // A second run cannot double-post the successful platforms (one claim per version and platform).
+    // A second run cannot double-post the successful platforms: their stored result is reported, no call.
     const again = await publishAll(db, { master: m, variants, publishers, origin: 'retry', dryRun: false });
-    assert.equal(again.outcomes.find(item => item.platform === 'instagram').status, 'blocked');
+    const instagram = again.outcomes.find(item => item.platform === 'instagram');
+    assert.deepEqual([instagram.status, instagram.reused, instagram.url], ['published', true, 'https://www.instagram.com/p/1']);
     assert.equal(publishers[0].calls.length, 1);
   } finally { await db.close(); }
 });
@@ -148,23 +159,6 @@ test('without approval nothing is published even when live publishing is on', as
     assert.equal(run.outcomes[0].status, 'blocked');
     assert.equal(ig.calls.length, 0);
   } finally { await db.close(); }
-});
-
-test('the Facebook publisher reuses the existing photo API and classifies its errors', async () => {
-  const saved = { ...process.env };
-  process.env.META_SYSTEM_USER_TOKEN = 't'; process.env.META_PAGE_ID = '123';
-  try {
-    const m = master({ format: 'SINGLE_IMAGE', assets: [{ role: 'main-image', asset: png(1) }], carousel: null });
-    const variant = renderForPlatform(m, 'facebook');
-    const calls = [];
-    const publisher = facebookPhotoPublisher(async (url, text) => { calls.push({ url, text }); return { id: '1_2', permalink: 'https://www.facebook.com/1_2' }; });
-    assert.equal(publisher.supports(variant), true);
-    const result = await publisher.publish(variant, m, {});
-    assert.deepEqual(result, { externalId: '1_2', url: 'https://www.facebook.com/1_2' });
-    assert.equal(calls[0].text, variant.text);
-    delete process.env.META_PAGE_ID;
-    assert.deepEqual(publisher.configured().missing, ['META_PAGE_ID']);
-  } finally { process.env = saved; }
 });
 
 // ---------- end to end through WhatsApp ----------
@@ -313,12 +307,13 @@ test('Status gives a readable topic pipeline summary without raw logs', async ()
   try {
     const h = harness(db);
     await runTopicPipeline(h.deps, { slotKey: 's1' });
-    const text = await topicPipelineStatus(db, h.deps.render, h.publishers);
+    const text = await topicPipelineStatus(db, h.deps.render);
     assert.match(text, /Themen-Scout: gesund/);
     assert.match(text, /Trendquellen ok: Kalender, Evergreen/);
     assert.match(text, /Bilder \(Replicate\): verfügbar/);
     assert.match(text, /Avatar-Video: nicht verfügbar/);
-    assert.match(text, /Plattformadapter: Instagram, Facebook, TikTok, YouTube Shorts, X bereit/);
+    assert.match(text, /Plattformen und Anbieter:\n• Instagram: bereit/);
+    assert.match(text, /• HeyGen \(Avatar-Video\): blockiert – HEYGEN_API_KEY/);
     assert.match(text, /Offen: 1 Themenvorschlag/);
     assert.doesNotMatch(text, /\{|\}|"event"/);
   } finally { await db.close(); }
@@ -352,4 +347,57 @@ test('signed webhook: a reply to a topic proposal reaches the topic pipeline, ne
   assert.equal((await handler.POST(request)).status, 200);
   assert.match(h.sent.at(-1), /Überarbeitung 2/);
   assert.match(h.sent.at(-1), /Format: Einzelbild · Kosten: niedrig · Entscheidung: dein Wunsch/);
+});
+
+async function throughPublishApproval(h) {
+  await runTopicPipeline(h.deps, { slotKey: `s-${Math.random()}` });
+  await h.reply('Freigeben', h.lastId());          // production approval
+  const approval = h.lastId();
+  await h.reply('Freigeben', approval);            // publish approval
+  return approval;
+}
+
+test('multi-publisher: a failing platform never marks others as failed; "Wiederholen" retries only the failed one, no double posts', async () => {
+  const db = await pgliteDatabase();
+  try {
+    const h = harness(db, { behaviour: { tiktok: 'down' } });
+    const approval = await throughPublishApproval(h);
+    const first = h.sent.at(-1);
+    assert.match(first, /teilweise veröffentlicht/);
+    assert.match(first, /• TikTok – fehlgeschlagen \(HTTP 503\)/);
+    assert.match(first, /„Wiederholen“/);
+    const counts = () => Object.fromEntries(h.publishers.map(publisher => [publisher.platform, publisher.calls.length]));
+    const before = counts();
+    // TikTok recovers; the retry touches only TikTok.
+    h.publishers.find(publisher => publisher.platform === 'tiktok').publish = async (variant, master, context) => { await context.onRemoteId('tt'); return { state: 'published', externalId: 'tt-1', url: 'https://www.tiktok.com/@a/video/1' }; };
+    await h.reply('Wiederholen', approval);
+    const after = counts();
+    for (const platform of ['instagram', 'facebook', 'x']) assert.equal(after[platform], before[platform], `${platform} not published again`);
+    const report = h.sent.at(-1);
+    assert.match(report, /• TikTok – veröffentlicht – https:\/\/www\.tiktok\.com\/@a\/video\/1/);
+    assert.match(report, /• Instagram – veröffentlicht/);
+    const rows = (await db.query("SELECT platform, status, external_id, url FROM publish_attempts WHERE status<>'blocked' ORDER BY platform, created_at")).rows;
+    assert.equal(rows.filter(row => row.status === 'published').length, new Set(rows.filter(row => row.status === 'published').map(row => row.platform)).size, 'at most one published row per platform');
+    assert.ok(rows.some(row => row.platform === 'tiktok' && row.status === 'failed'));
+    assert.ok(rows.every(row => row.status !== 'published' || row.external_id));
+    // A second retry finds nothing to retry and publishes nothing.
+    await h.reply('Wiederholen', approval);
+    assert.match(h.sent.at(-1), /keine fehlgeschlagene Plattform/);
+    assert.deepEqual(counts(), { ...after });
+  } finally { await db.close(); }
+});
+
+test('asynchronous platforms: "processing" is completed by reconciliation, never by publishing again', async () => {
+  const db = await pgliteDatabase();
+  try {
+    const h = harness(db, { behaviour: { tiktok: 'processing' } });
+    await throughPublishApproval(h);
+    assert.match(h.sent.at(-1), /• TikTok – wird noch verarbeitet/);
+    const { reconcileTopicPublications } = require(`${L}/topic-pipeline/orchestrator`);
+    const settled = await reconcileTopicPublications(h.deps);
+    assert.equal(settled, 1);
+    assert.match(h.sent.at(-1), /• TikTok – veröffentlicht – https:\/\/www\.tiktok\.com\/p\/1/);
+    assert.equal(h.publishers.find(publisher => publisher.platform === 'tiktok').calls.length, 1);
+    assert.equal(await reconcileTopicPublications(h.deps), 0);
+  } finally { await db.close(); }
 });

@@ -3,6 +3,7 @@ import type { Database, Sql } from "../memory/db";
 import { classifyWhatsAppReply } from "../whatsapp/intent";
 import { emitEvent } from "../observability/events";
 import { isActiveAuthority, type ApprovalAuthorityKind, type DecisionEvidence } from "./authority";
+import { livePublishCapability } from "../capabilities";
 
 // Central publish barrier (hard invariant).
 //
@@ -38,7 +39,8 @@ export class PublishBlockedError extends Error {
   }
 }
 export type PublishBlockReason = "no_content_version" | "no_approval" | "approval_pending" | "approval_rejected" | "changes_requested" | "approval_invalidated"
-  | "content_changed_since_approval" | "authority_inactive" | "approval_incomplete" | "platform_not_in_approved_version" | "already_attempted" | "permit_mismatch" | "permit_forged";
+  | "content_changed_since_approval" | "authority_inactive" | "approval_incomplete" | "platform_not_in_approved_version" | "already_attempted" | "permit_mismatch" | "permit_forged"
+  | "live_publishing_disabled" | "platform_not_enabled" | "credentials_missing";
 
 export class ApprovalDecisionError extends Error {
   constructor(public readonly reason: string) { super(`approval_decision_refused:${reason}`); this.name = "ApprovalDecisionError"; }
@@ -158,9 +160,12 @@ export async function authorizePublish(db: Database, input: { content: Publishab
     if (!isActiveAuthority(approval.authority)) return { block: "authority_inactive" as const, version: latest.version };
     if (approval.fingerprint !== fingerprint || !approval.request_message_id || !approval.decision_message_id || !approval.decided_at) return { block: "approval_incomplete" as const, version: latest.version };
     if (!variant || !latest.platforms.includes(platform)) return { block: "platform_not_in_approved_version" as const, version: latest.version };
+    // Live switch, platform activation and credentials are part of the invariant, not a caller convention.
+    const live = livePublishCapability(platform);
+    if (!live.ok) return { block: live.reason, version: latest.version };
     const attemptId = randomUUID();
     const claimed = await sql.query(`INSERT INTO publish_attempts(id,content_id,version,platform,origin,status) VALUES($1,$2,$3,$4,$5,'claimed')
-      ON CONFLICT (content_id, version, platform) WHERE status IN ('claimed','published','unknown') DO NOTHING RETURNING id`,
+      ON CONFLICT (content_id, version, platform) WHERE status IN ('claimed','processing','published','unknown') DO NOTHING RETURNING id`,
       [attemptId, content.contentId, latest.version, platform, origin.slice(0, 60)]);
     if (!claimed.rows.length) return { block: "already_attempted" as const, version: latest.version };
     return { permit: { contentId: content.contentId, version: latest.version, platform, fingerprint, variantFingerprint: variant, attemptId } as PublishPermit };
@@ -180,10 +185,43 @@ export function assertPermitMatches(permit: PublishPermit, content: PublishableC
 }
 
 // failed = definite rejection by the platform, nothing published → the same approved version may be tried again.
-// unknown = may have been published → never retried automatically.
-export async function completePublishAttempt(db: Sql, permit: PublishPermit, status: "published" | "failed" | "unknown", detail: { externalId?: string; reason?: string } = {}) {
-  await db.query("UPDATE publish_attempts SET status=$2, external_id=$3, reason=$4, updated_at=now() WHERE id=$1 AND status='claimed'",
-    [permit.attemptId, status, detail.externalId ?? null, (detail.reason ?? "").slice(0, 200) || null]);
+// unknown = may have been published → never retried automatically. processing = accepted, platform still working.
+export async function completePublishAttempt(db: Sql, permit: PublishPermit, status: "published" | "processing" | "failed" | "unknown",
+  detail: { externalId?: string; url?: string | null; reason?: string } = {}) {
+  await db.query("UPDATE publish_attempts SET status=$2, external_id=$3, url=$4, reason=$5, updated_at=now() WHERE id=$1 AND status='claimed'",
+    [permit.attemptId, status, detail.externalId ?? null, detail.url ?? null, (detail.reason ?? "").slice(0, 200) || null]);
+}
+
+// Every remote object created during a publish (container, upload, post) is recorded immediately, so an
+// interrupted attempt can be reconciled by asking the platform instead of publishing again.
+export async function recordRemoteId(db: Sql, permit: PublishPermit, remoteId: string) {
+  await db.query("UPDATE publish_attempts SET remote_ids=remote_ids||$2::jsonb, updated_at=now() WHERE id=$1 AND status='claimed'", [permit.attemptId, JSON.stringify([remoteId.slice(0, 200)])]);
+}
+
+export type AttemptRecord = { id: string; contentId: string; version: number; platform: string; status: string; externalId: string | null; url: string | null; remoteIds: string[]; reason: string | null };
+const attemptRow = (row: Record<string, unknown>): AttemptRecord => ({ id: String(row.id), contentId: String(row.content_id), version: Number(row.version), platform: String(row.platform),
+  status: String(row.status), externalId: row.external_id ? String(row.external_id) : null, url: row.url ? String(row.url) : null, remoteIds: (row.remote_ids as string[]) ?? [], reason: row.reason ? String(row.reason) : null });
+
+// The live (non-blocked) attempt of a platform for the latest version: published, processing, unknown or the last failed one.
+export async function platformAttempt(db: Sql, contentId: string, platform: string): Promise<AttemptRecord | null> {
+  const latest = await latestVersion(db, contentId);
+  if (!latest) return null;
+  const row = (await db.query(`SELECT * FROM publish_attempts WHERE content_id=$1 AND version=$2 AND platform=$3 AND status<>'blocked'
+    ORDER BY (status IN ('claimed','processing','published','unknown')) DESC, created_at DESC LIMIT 1`, [contentId, latest.version, platform])).rows[0];
+  return row ? attemptRow(row) : null;
+}
+
+export async function openAttempts(db: Sql, limit = 20): Promise<AttemptRecord[]> {
+  const rows = await db.query("SELECT * FROM publish_attempts WHERE status IN ('processing','unknown') AND jsonb_array_length(remote_ids)+(CASE WHEN external_id IS NULL THEN 0 ELSE 1 END)>0 AND updated_at>now()-interval '7 days' ORDER BY updated_at LIMIT $1", [limit]);
+  return rows.rows.map(attemptRow);
+}
+
+// Reconciliation after asking the platform: processing → published/failed/unknown; unknown → published only when the
+// platform confirms the post. Never re-opens a published attempt.
+export async function settleAttempt(db: Sql, attemptId: string, status: "published" | "failed" | "unknown" | "processing", detail: { externalId?: string; url?: string | null; reason?: string } = {}) {
+  const from = status === "published" ? ["processing", "unknown"] : ["processing"];
+  await db.query(`UPDATE publish_attempts SET status=$2, external_id=COALESCE($3,external_id), url=COALESCE($4,url), reason=COALESCE($5,reason), updated_at=now()
+    WHERE id=$1 AND status = ANY($6::text[])`, [attemptId, status, detail.externalId ?? null, detail.url ?? null, detail.reason ?? null, from]);
 }
 
 export async function approvalState(db: Sql, contentId: string) {
@@ -208,8 +246,10 @@ export async function previewPublish(db: Sql, content: PublishableContent, platf
   if (status !== "approved") return { allowed: false, reason: approval ? "approval_invalidated" : "no_approval" };
   if (!isActiveAuthority(approval.authority)) return { allowed: false, reason: "authority_inactive" };
   if (!latest.platforms.includes(platform)) return { allowed: false, reason: "platform_not_in_approved_version" };
-  const attempt = await db.query("SELECT 1 FROM publish_attempts WHERE content_id=$1 AND version=$2 AND platform=$3 AND status IN ('claimed','published','unknown') LIMIT 1", [content.contentId, latest.version, platform]);
-  return attempt.rows.length ? { allowed: false, reason: "already_attempted" } : { allowed: true, reason: "approved" };
+  const attempt = await db.query("SELECT 1 FROM publish_attempts WHERE content_id=$1 AND version=$2 AND platform=$3 AND status IN ('claimed','processing','published','unknown') LIMIT 1", [content.contentId, latest.version, platform]);
+  if (attempt.rows.length) return { allowed: false, reason: "already_attempted" };
+  const live = livePublishCapability(platform);
+  return live.ok ? { allowed: true, reason: "approved" } : { allowed: false, reason: live.reason };
 }
 
 export async function contentIdForRequestMessage(db: Sql, requestMessageId: string): Promise<{ contentId: string; version: number } | null> {

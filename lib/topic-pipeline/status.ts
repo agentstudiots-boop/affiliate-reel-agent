@@ -1,6 +1,6 @@
-import { PLATFORM_LABEL } from "../formats/catalog";
+import { capabilityLines } from "../capabilities";
 import type { Database } from "../memory/db";
-import { liveTopicPublishingEnabled, type PlatformPublisher } from "../distribution/publish";
+import { liveTopicPublishingEnabled } from "../distribution/publish";
 import { latestTopicRun } from "../topics/repository";
 import type { SourceHealth } from "../topics/schema";
 import { providerAvailability } from "../visual/availability";
@@ -14,7 +14,7 @@ const ERROR_LABEL: Record<string, string> = { timeout: "Zeitüberschreitung", ra
   invalid_response: "unerwartete Antwort", not_configured: "nicht eingerichtet", unknown: "Fehler" };
 const time = (value: unknown) => value ? new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(String(value))) : "–";
 
-export async function topicPipelineStatus(db: Database, render: RenderContext, publishers: PlatformPublisher[] = []): Promise<string> {
+export async function topicPipelineStatus(db: Database, render: RenderContext): Promise<string> {
   const lines: string[] = [];
   const enabled = process.env.TOPIC_PIPELINE_ENABLED === "true";
   lines.push(`Themen-Pipeline: ${enabled ? "aktiv" : "ausgeschaltet"} · Live-Veröffentlichung: ${liveTopicPublishingEnabled() ? "an" : "aus (nur Probelauf)"}`);
@@ -47,8 +47,8 @@ export async function topicPipelineStatus(db: Database, render: RenderContext, p
       lines.push(`${label[key]}: ${job ? `${job.status === "succeeded" ? "erfolgreich" : job.status === "running" ? "läuft" : `fehlgeschlagen (${job.error_category ?? "–"})`} · ${time(job.updated_at)}` : "noch keiner"}`);
     }
   } catch { /* table may not exist yet */ }
-  const access = publishers.map(publisher => { const state = publisher.configured(); return `${PLATFORM_LABEL[publisher.platform]} ${state.ok ? "ok" : "fehlt"}`; });
-  lines.push(`Plattformadapter: Instagram, Facebook, TikTok, YouTube Shorts, X bereit${access.length ? ` · Live-Zugänge: ${access.join(", ")}` : ""}`);
+  // Central capability check: per platform/provider ready, dry run only, blocked (missing variable names) or not activated.
+  lines.push("Plattformen und Anbieter:", ...capabilityLines().map(line => `• ${line}`));
   try {
     const open = await db.query("SELECT count(*) FILTER (WHERE stage='proposed')::int AS proposals, count(*) FILTER (WHERE stage='awaiting_publish_approval')::int AS approvals, count(*) FILTER (WHERE stage='in_production')::int AS producing FROM topic_contents");
     const row = open.rows[0] ?? {};
