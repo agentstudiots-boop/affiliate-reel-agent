@@ -24,6 +24,7 @@ import { publishInstagramImage, resumeInstagramImages } from "@/lib/meta/instagr
 import { deliverWeeklyReport } from "@/lib/reporting/weekly";
 import { latestImagePostsStatus } from "@/lib/reporting/whatsapp-status";
 import { formatPublishReport } from "@/lib/publishing/report";
+import { publishApprovedAffiliateImage } from "@/lib/distribution/affiliate";
 import { handleTopicReply, reconcileTopicPublications, resumeTopicProductions, routeTopicMessage } from "@/lib/topic-pipeline/orchestrator";
 import { topicPipelineStatus } from "@/lib/topic-pipeline/status";
 import { extractIncomingWhatsAppMessages, verifyMetaWebhookSignature, verifyWhatsAppChallenge } from "@/lib/whatsapp/security";
@@ -221,27 +222,23 @@ export async function POST(request: Request) {
         }
       }
       if (result.handled && "publicationId" in result && typeof result.publicationId === "string" && result.intent === "approve" && result.platform === "facebook") {
+        // Second approval of an affiliate image post → the shared distribution layer (same multi-publisher, approval gate
+        // and platform publishers as topic posts). Facebook and the Instagram feed image run isolated; the existing
+        // claims, caption checks and "never repeat an unclear result" rules apply inside the publishers.
         const publicationRepo = publicationRepository();
-        const claimed = await publicationRepo.claimPublish(result.publicationId);
-        let phase = "publish";
         try {
-          const posted = await publishFacebookPhoto(claimed.imageUrl!, claimed.caption);
-          phase = "persist";
-          await publicationRepo.published(claimed.id, posted.id, posted.permalink);
-          console.info(JSON.stringify({ event: "facebook_publication", publicationId: claimed.id, status: "published" }));
-          // The same approval covers the Instagram feed image. It never retries an unknown result.
-          try { await publishInstagramImage(claimed.id); }
-          catch { console.error(JSON.stringify({ event: "instagram_image_unavailable", publicationId: claimed.id })); }
+          const run = await publishApprovedAffiliateImage(result.publicationId, { db: getDatabase(), send: sendWhatsAppText,
+            affiliate: { publications: () => publicationRepo, photo: publishFacebookPhoto,
+              instagramImage: publicationId => publishInstagramImage(publicationId, { db: getDatabase(), send: async () => "report_via_distribution" }) } });
+          console.info(JSON.stringify({ event: "affiliate_distribution", publicationId: result.publicationId,
+            outcomes: (run?.outcomes ?? []).map(item => ({ platform: item.platform, status: item.status, reused: !!item.reused })) }));
         } catch (error) {
-          await publicationRepo.markUnknown(claimed.id);
           // Never silent: the operator learns that this approved post is not confirmed live (no automatic second attempt).
-          try { await sendWhatsAppText(formatPublishReport({ category: "affiliate", format: "SINGLE_IMAGE", outcomes: [{ platform: "facebook", status: "unknown" }],
-            note: "Instagram wurde deshalb nicht gestartet. Antworte mit „Status“." })); }
-          catch { console.error(JSON.stringify({ event: "facebook_publication_report_unsent", publicationId: claimed.id })); }
-          console.error(JSON.stringify({ event: "facebook_publication", publicationId: claimed.id, status: "unknown",
-            phase: error instanceof FacebookPublishFailure ? error.phase : phase,
-            detail: error instanceof FacebookPublishFailure ? error.detail : "unclassified",
-            ...(error instanceof FacebookPublishFailure ? {httpStatus:error.httpStatus,code:error.code,subcode:error.subcode} : {}) }));
+          try { await sendWhatsAppText(formatPublishReport({ category: "affiliate", format: "SINGLE_IMAGE", outcomes: [{ platform: "facebook", status: "unknown" }, { platform: "instagram", status: "unknown" }],
+            note: "Verteilung nicht abgeschlossen. Antworte mit „Status“." })); }
+          catch { console.error(JSON.stringify({ event: "facebook_publication_report_unsent", publicationId: result.publicationId })); }
+          console.error(JSON.stringify({ event: "affiliate_distribution_failed", publicationId: result.publicationId,
+            failureType: error instanceof Error ? error.name : "unknown", phase: error instanceof FacebookPublishFailure ? error.phase : "distribution" }));
         }
       }
     } catch (error) {

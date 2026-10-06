@@ -127,8 +127,17 @@ export function capabilityOf(id: string, env: Env = process.env): ServiceCapabil
 }
 
 // The one question the publish gate asks: may this platform be published live right now?
-export function livePublishCapability(platform: string, env: Env = process.env): { ok: true } | { ok: false; reason: "live_publishing_disabled" | "platform_not_enabled" | "credentials_missing"; missing: string[] } {
+// Content origins that share the distribution layer. "product_pipeline" = affiliate posts of the existing product
+// pipeline; "topic_pipeline" = topic posts (default).
+export type ContentOrigin = "topic_pipeline" | "product_pipeline";
+// Facebook and Instagram are the product pipeline's existing live channels: after its own explicit WhatsApp publication
+// approval they publish today, without TOPIC_* switches, through the existing Meta connection checks. That behaviour is
+// kept exactly. Every other platform for affiliate posts follows the same rules as topic posts.
+export const PRODUCT_PIPELINE_LIVE_CHANNELS: readonly string[] = Object.freeze(["facebook", "instagram"]);
+
+export function livePublishCapability(platform: string, env: Env = process.env, origin: ContentOrigin = "topic_pipeline"): { ok: true } | { ok: false; reason: "live_publishing_disabled" | "platform_not_enabled" | "credentials_missing"; missing: string[] } {
   if (!(PLATFORMS as readonly string[]).includes(platform)) return { ok: false, reason: "platform_not_enabled", missing: [] };
+  if (origin === "product_pipeline" && PRODUCT_PIPELINE_LIVE_CHANNELS.includes(platform)) return { ok: true };
   const capability = capabilityOf(platform, env);
   if (!capability.enabled) return { ok: false, reason: "platform_not_enabled", missing: [] };
   if (capability.missing.length) return { ok: false, reason: "credentials_missing", missing: capability.missing };

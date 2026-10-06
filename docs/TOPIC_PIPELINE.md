@@ -376,6 +376,30 @@ Je Plattform ein Publisher mit getrennten Schritten **Upload/Vorbereitung → Pu
 - **Dry-Run ist Standard.** Er zeigt je Plattform Format, Linkstrategie und den Grund, warum nicht live
   veröffentlicht würde (Freigabe, Schalter, fehlende Variable), ohne Netzwerkaufruf und ohne etwas zu beanspruchen.
 
+### Gemeinsame Distribution für Themen- und Affiliate-Posts (`lib/distribution/affiliate.ts`)
+
+Themen- und Affiliate-Posts laufen durch **dieselbe** Schicht: `publishAll` (Multi-Publisher), die zentrale
+Freigabeschranke (`authorizePublish`) und dieselben Plattform-Publisher (`defaultPublishers()`). Unterschiede bestehen nur
+in Inhalt (Master Content, `source_ref` auf den freigegebenen Produkt-Datensatz), Link-/Disclosure-Regeln (die
+freigegebene Caption der Produkt-Pipeline bleibt unverändert) und Format.
+
+- **Affiliate-Bildpost:** Webhook („Freigeben“ auf die Veröffentlichungsanfrage) → `publishApprovedAffiliateImage` →
+  Master + Varianten (Facebook, dann Instagram; exakt die freigegebene Caption) → `adoptProductApproval` (dieselbe
+  WhatsApp-Antwort wird über `recordApprovalDecision` geprüft) → `publishAll` → Facebook-/Instagram-Publisher, die die
+  bestehenden Schritte (`claimPublish`/`publishFacebookPhoto`/`published`/`markUnknown`, `publishInstagramImage`) als
+  plattformspezifischen Teil nutzen → zentraler Bericht. Facebook und Instagram sind isoliert: Instagram läuft auch, wenn
+  Facebook fehlschlägt oder unklar ist.
+- **Affiliate-Reel:** Fortsetzung (`continueReel`) → `publishApprovedAffiliateReel` → `publishAll` → Instagram-Publisher
+  legt den Container an (bestehender Schritt); Abfragen/Veröffentlichen/Bericht bleiben in der bestehenden Fortsetzung.
+- **Live-Entscheidung je Plattform:** Facebook/Instagram eines Affiliate-Posts sind wie bisher nach der eigenen
+  Produkt-Freigabe live (`PRODUCT_PIPELINE_LIVE_CHANNELS`); jede andere Plattform eines Affiliate-Posts folgt denselben
+  Regeln wie Themen-Posts (`TOPIC_LIVE_PUBLISHING`, `TOPIC_PLATFORMS`, Zugangsdaten).
+- **Freigabeumfang unverändert:** Die Produkt-Freigabe nennt nur Facebook (+ Instagram-Bild) bzw. das Instagram-Reel.
+  TikTok, YouTube Shorts und X sind über dieselben Publisher erreichbar, werden aber unter dieser Freigabe nie
+  veröffentlicht (Plan: „braucht eine eigene Freigabe“). Eine eigene Erweiterungsfreigabe ist noch nicht gebaut.
+- Versionsübergreifend gilt: Eine Plattform mit aktivem Versuch (`claimed`/`processing`/`published`/`unknown`) wird
+  auch für eine spätere Fassung nicht erneut veröffentlicht.
+
 ### Credential- und Capability-Prüfung (`lib/capabilities/index.ts`)
 
 Eine Stelle kennt alle Dienste, ihre Pflicht- und optionalen Variablen und meldet je Dienst: aktiviert?, vorhanden,

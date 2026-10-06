@@ -4,6 +4,7 @@ import { InstagramPublishFailure, instagramGraph } from "../../meta/instagram-pu
 import { FacebookPublishFailure, publishFacebookPhoto } from "../../meta/publisher";
 import { PlatformPublishError, type PlatformPublisher, type RemoteStatus } from "../publish";
 import { assetOf, jpegCopy, sleep as defaultSleep, type MediaDeps } from "./media";
+import { legacyFacebookPublish, legacyInstagramPublish, legacyInstagramStatus, type LegacyAffiliateDeps } from "./legacy-affiliate";
 
 // Instagram and Facebook publishers. They reuse the existing Meta infrastructure (connection check, page token,
 // graph helpers, failure types) instead of a parallel client.
@@ -30,7 +31,9 @@ function facebookError(error: unknown, beforePublish: boolean): PlatformPublishE
   return new PlatformPublishError(beforePublish, "Ergebnis unklar");
 }
 
-export type InstagramDeps = MediaDeps & { graph?: () => Promise<InstagramGraph>; sleep?: (ms: number) => Promise<void>; pollAttempts?: number; pollIntervalMs?: number };
+export type InstagramDeps = MediaDeps & { graph?: () => Promise<InstagramGraph>; sleep?: (ms: number) => Promise<void>; pollAttempts?: number; pollIntervalMs?: number;
+  // Affiliate posts (master.source_ref) reuse the product pipeline's approved records; see legacy-affiliate.ts.
+  affiliate?: LegacyAffiliateDeps };
 
 export function instagramPublisher(deps: InstagramDeps = {}): PlatformPublisher {
   const graph = deps.graph ?? (() => instagramGraph());
@@ -57,6 +60,7 @@ export function instagramPublisher(deps: InstagramDeps = {}): PlatformPublisher 
     configured: () => missingOf("instagram"),
     supports: variant => ["image", "carousel", "reel"].includes(variant.mediaFormat) && variant.assetRefs.length > 0,
     async publish(variant, master, context) {
+      if (master.source_ref) return legacyInstagramPublish(master, variant, deps.affiliate ?? {});
       // 1. Upload/prepare: JPEG copies and containers. Nothing is visible yet; errors here are definite.
       let api: InstagramGraph, containerId: string;
       try {
@@ -82,6 +86,8 @@ export function instagramPublisher(deps: InstagramDeps = {}): PlatformPublisher 
       return finish(api, containerId);
     },
     async status(remoteId): Promise<RemoteStatus> {
+      const affiliate = await legacyInstagramStatus(remoteId, deps.affiliate ?? {});
+      if (affiliate) return affiliate;
       const api = await graph();
       if (remoteId.startsWith("container:")) {
         const containerId = remoteId.slice("container:".length);
@@ -96,7 +102,7 @@ export function instagramPublisher(deps: InstagramDeps = {}): PlatformPublisher 
   };
 }
 
-export type FacebookDeps = { graph?: () => Promise<FacebookGraph>; photo?: typeof publishFacebookPhoto };
+export type FacebookDeps = { graph?: () => Promise<FacebookGraph>; photo?: typeof publishFacebookPhoto; affiliate?: LegacyAffiliateDeps };
 
 export function facebookPublisher(deps: FacebookDeps = {}): PlatformPublisher {
   const graph = deps.graph ?? (() => facebookPageGraph());
@@ -106,6 +112,10 @@ export function facebookPublisher(deps: FacebookDeps = {}): PlatformPublisher {
     configured: () => missingOf("facebook"),
     supports: variant => ["text", "image", "album", "video"].includes(variant.mediaFormat),
     async publish(variant, master, context) {
+      if (master.source_ref) {
+        if (master.source_ref.kind !== "facebook_publication" || variant.mediaFormat !== "image") throw new PlatformPublishError(true, `Format ${variant.mediaFormat} für diesen Auftrag nicht vorgesehen`);
+        return legacyFacebookPublish(master, deps.affiliate ?? {});
+      }
       if (variant.mediaFormat === "image") {
         const asset = assetOf(master, variant.assetRefs[0]);
         if (!asset?.url) throw new PlatformPublishError(true, "Bild fehlt");

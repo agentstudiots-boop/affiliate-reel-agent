@@ -2,7 +2,7 @@ import type { Database } from "../memory/db";
 import type { Platform } from "../formats/catalog";
 import { emitEvent } from "../observability/events";
 import { assertPermitMatches, authorizePublish, completePublishAttempt, openAttempts, platformAttempt, previewPublish, PublishBlockedError, recordRemoteId, settleAttempt, type PublishableContent, type PublishPermit } from "../publishing/approval-gate";
-import { livePublishCapability, liveSwitchOn } from "../capabilities";
+import { livePublishCapability, liveSwitchOn, type ContentOrigin } from "../capabilities";
 import type { PlatformOutcome } from "../publishing/report";
 import type { MasterContent } from "./master-content";
 import type { PlatformVariant } from "./platforms/adapters";
@@ -15,7 +15,7 @@ import type { PlatformVariant } from "./platforms/adapters";
 // adapter; the remote id of every created object is reported immediately (onRemoteId) so an interrupted publish can
 // be reconciled by status() instead of being repeated.
 export type PublisherResult = { state: "published" | "processing"; externalId: string; url: string | null };
-export type RemoteStatus = { state: "published" | "processing" | "failed"; externalId?: string; url?: string | null; detail?: string };
+export type RemoteStatus = { state: "published" | "processing" | "failed" | "unknown"; externalId?: string; url?: string | null; detail?: string };
 export type PublishContext = { permit: PublishPermit; onRemoteId: (remoteId: string) => Promise<void> };
 export class PlatformPublishError extends Error {
   // definite: the platform rejected the request (nothing published) → a later retry of the same approved version is allowed.
@@ -30,9 +30,12 @@ export interface PlatformPublisher {
   status?(remoteId: string): Promise<RemoteStatus>;
 }
 
+// Affiliate posts of the product pipeline carry a source_ref to their approved record; everything else is a topic post.
+export const contentOrigin = (master: MasterContent): ContentOrigin => master.source_ref ? "product_pipeline" : "topic_pipeline";
+
 export function publishableContent(master: MasterContent, variants: PlatformVariant[]): PublishableContent {
   return {
-    contentId: master.content_id, hook: master.hook, caption: master.caption, body: master.body, cta: master.cta,
+    contentId: master.content_id, ...(master.source_ref ? { origin: contentOrigin(master) } : {}), hook: master.hook, caption: master.caption, body: master.body, cta: master.cta,
     links: [...new Set([...(master.affiliate_data ? [master.affiliate_data.affiliateUrl] : []), ...variants.flatMap(variant => variant.links)])].sort(),
     assets: master.assets.map(asset => ({ role: asset.role, kind: asset.kind, url: asset.url, sha256: asset.sha256 })),
     disclosures: master.disclosures,
@@ -44,7 +47,7 @@ export function publishableContent(master: MasterContent, variants: PlatformVari
 export const liveTopicPublishingEnabled = () => liveSwitchOn();
 
 export type PublishPlanEntry = { platform: Platform; publishable: boolean; mediaFormat: string; linkStrategy: string; links: string[]; wouldPublish: boolean; reason: string };
-export type PublishOutcome = PlatformOutcome & { externalId?: string | null; reused?: boolean };
+export type PublishOutcome = PlatformOutcome & { externalId?: string | null; reused?: boolean; blockReason?: string };
 export type PublishRun = { dryRun: boolean; outcomes: PublishOutcome[]; plan: PublishPlanEntry[] };
 
 const GATE_REASON: Record<string, string> = {
@@ -61,8 +64,15 @@ const GATE_REASON: Record<string, string> = {
 export async function publishAll(db: Database, input: { master: MasterContent; variants: PlatformVariant[]; publishers: PlatformPublisher[]; origin: string;
   dryRun?: boolean; only?: Platform[] }): Promise<PublishRun> {
   const content = publishableContent(input.master, input.variants);
+  const origin = contentOrigin(input.master);
   // A caller can only make the run safer: dryRun=false never overrides a switched-off live switch.
-  const dryRun = input.dryRun === true || !liveTopicPublishingEnabled();
+  // Topic posts: the whole run is live only with TOPIC_LIVE_PUBLISHING=true. Affiliate posts additionally keep their
+  // existing live channels (Facebook/Instagram after the product pipeline's own approval); every other platform of an
+  // affiliate post follows the topic rules. The decision is made per platform by the same capability check the gate uses.
+  const switchOn = liveTopicPublishingEnabled();
+  const runLive = input.dryRun !== true && (switchOn || origin === "product_pipeline");
+  const liveFor = (platform: Platform) => runLive && (switchOn || livePublishCapability(platform, process.env, origin).ok);
+  let liveAttempts = 0;
   const outcomes: PublishOutcome[] = [];
   const plan: PublishPlanEntry[] = [];
   for (const variant of input.variants) {
@@ -74,9 +84,9 @@ export async function publishAll(db: Database, input: { master: MasterContent; v
       continue; // a deliberately skipped platform (e.g. carousel on YouTube) is not a failed one
     }
     const publisher = input.publishers.find(item => item.platform === variant.platform);
-    if (dryRun) {
+    if (!liveFor(variant.platform)) {
       const gate = await previewPublish(db, content, variant.platform).catch(() => ({ allowed: false, reason: "no_content_version" as const }));
-      const capability = livePublishCapability(variant.platform);
+      const capability = livePublishCapability(variant.platform, process.env, origin);
       const missing = capability.ok ? [] : capability.missing;
       const supported = publisher ? publisher.supports(variant) : false;
       const reason = !supported ? `Format ${variant.mediaFormat} vom Publisher nicht unterstützt` : missing.length ? `Zugang fehlt: ${missing.join(", ")}`
@@ -84,6 +94,7 @@ export async function publishAll(db: Database, input: { master: MasterContent; v
       plan.push({ ...base, wouldPublish: gate.allowed && supported && !missing.length, reason });
       continue;
     }
+    liveAttempts++;
     // Already handled for this version? Report the stored result, never publish twice.
     const existing = await platformAttempt(db, content.contentId, variant.platform).catch(() => null);
     if (existing && ["published", "processing", "unknown", "claimed"].includes(existing.status)) {
@@ -108,10 +119,10 @@ export async function publishAll(db: Database, input: { master: MasterContent; v
       const detail = error instanceof PlatformPublishError ? error.detail : blocked ? GATE_REASON[error.reason] ?? error.reason : "Ergebnis unklar";
       if (permit) await completePublishAttempt(db, permit, definite ? "failed" : "unknown", { reason: detail }).catch(() => undefined);
       emitEvent("platform_publish_failed", { contentId: content.contentId, platform: variant.platform, blocked, definite, detail }, "warn");
-      outcomes.push({ platform: variant.platform, status: blocked ? "blocked" : definite ? "failed" : "unknown", detail });
+      outcomes.push({ platform: variant.platform, status: blocked ? "blocked" : definite ? "failed" : "unknown", detail, ...(blocked ? { blockReason: error.reason } : {}) });
     }
   }
-  return { dryRun, outcomes, plan };
+  return { dryRun: origin === "product_pipeline" ? liveAttempts === 0 : !runLive, outcomes, plan };
 }
 
 // Asks the platforms about attempts that are still processing (or unclear but with a remote id). Never publishes
@@ -121,12 +132,13 @@ export async function reconcilePublishing(db: Database, publishers: PlatformPubl
   for (const attempt of await openAttempts(db)) {
     const publisher = publishers.find(item => item.platform === attempt.platform);
     const remoteId = attempt.externalId ?? attempt.remoteIds.at(-1);
-    if (!publisher?.status || !remoteId || !livePublishCapability(attempt.platform).ok) continue;
+    const origin: ContentOrigin = attempt.origin === "product_pipeline" ? "product_pipeline" : "topic_pipeline";
+    if (!publisher?.status || !remoteId || !livePublishCapability(attempt.platform, process.env, origin).ok) continue;
     try {
       const status = await publisher.status(remoteId);
-      if (status.state === "processing") continue;
+      if (status.state === "processing" || (status.state === "unknown" && attempt.status === "unknown")) continue;
       // A previously unclear attempt becomes published only on confirmation; "failed" never re-opens a claim on its own.
-      await settleAttempt(db, attempt.id, status.state === "published" ? "published" : attempt.status === "unknown" ? "unknown" : "failed",
+      await settleAttempt(db, attempt.id, status.state === "published" ? "published" : status.state === "unknown" || attempt.status === "unknown" ? "unknown" : "failed",
         { externalId: status.externalId, url: status.url ?? null, reason: status.detail });
       settled.push({ contentId: attempt.contentId, platform: attempt.platform, status: status.state });
       emitEvent(status.state === "published" ? "platform_publish_completed" : "platform_publish_failed", { contentId: attempt.contentId, platform: attempt.platform, via: "reconcile" });

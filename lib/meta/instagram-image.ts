@@ -44,7 +44,8 @@ async function defaultUpload(path: string, bytes: Buffer) {
   return blob.url;
 }
 
-// Affiliate image posts: Facebook first (already published here), then Instagram under the same approval.
+// Affiliate image posts: Facebook first, then Instagram under the same approval. Instagram no longer depends on the
+// Facebook result (platform isolation in the shared multi-publisher); it needs the explicit approval of this record.
 async function report(db: Database, publicationId: string, instagram: PlatformOutcome, note?: string) {
   let facebook: PlatformOutcome = { platform: "facebook", status: "published", url: null };
   try {
@@ -67,7 +68,8 @@ export async function publishInstagramImage(publicationId: string, deps: Instagr
   const sleep = deps.sleep ?? (ms => new Promise<void>(resolve => setTimeout(resolve, ms)));
   await ensureAutomationSchema(db);
   const claimed = await db.query(`INSERT INTO instagram_image_posts(publication_id,status)
-    SELECT id,'claimed' FROM publication_requests WHERE id=$1 AND status='published' AND platform='facebook'
+    SELECT id,'claimed' FROM publication_requests WHERE id=$1 AND platform='facebook'
+      AND status IN ('approved','publishing','published','unknown') AND whatsapp_message_id IS NOT NULL AND decided_at IS NOT NULL
     ON CONFLICT DO NOTHING RETURNING publication_id`, [publicationId]);
   if (!claimed.rows.length) return { status: "skipped" as const };
   const fail = async (status: "failed" | "unknown", phase: string, detail: string) => {

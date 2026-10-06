@@ -29,7 +29,14 @@ export type MasterContent = {
   campaign: { run_id: string | null; origin: string };
   affiliate_data: AffiliateData | null;
   disclosures: string[];
+  // Affiliate posts of the existing product pipeline: the approved record whose own WhatsApp approval, caption and
+  // bookkeeping the shared publishers must honour. Absent for topic posts.
+  source_ref?: AffiliateSourceRef | null;
 };
+
+export type AffiliateSourceRef =
+  | { kind: "facebook_publication"; publicationId: string; jobId: string }
+  | { kind: "instagram_reel"; publicationId: string; jobId: string };
 
 export const AFFILIATE_DISCLOSURE = "Werbung | Affiliate-Link";
 export const AI_IMAGE_DISCLOSURE = "Bild mit KI erstellt";
