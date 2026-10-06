@@ -150,22 +150,6 @@ verwendet die Facebook-Freigabe nur noch, wenn die Caption exakt der freigegeben
 
 ## Publish-Rückmeldung per WhatsApp (`lib/publishing/report.ts`)
 
-Nach jedem Veröffentlichungsversuch eine Nachricht mit zwei getrennten Klassifikationen in der Überschrift:
-**Content-Kategorie** (Themen-Post | Affiliate-Post) und **Content-Format** (Bild | Karussell | Video |
-Video (Avatar) | Text), z. B. „Themen-Post, Video veröffentlicht“, „Affiliate-Post, Bild teilweise
-veröffentlicht“, „… nicht veröffentlicht“, „… noch nicht bestätigt veröffentlicht“.
-
-Darunter je tatsächlich veröffentlichter Plattform: Name – Status – direkter Link. Ein Link erscheint nur,
-wenn die Plattform-API eine https-URL auf der eigenen Plattform-Domain mit Beitragspfad geliefert hat;
-sonst steht „Link nicht verfügbar“. Bei Teilerfolg getrennte Blöcke „Erfolgreich (live)“ und
-„Nicht erfolgreich (nicht live)“ (fehlgeschlagen, Ergebnis unklar, wird verarbeitet, blockiert).
-
-Angebunden: Facebook-/Instagram-Bildpost (Affiliate, Bild), Instagram-Reel (Affiliate, Video – vorher gab
-es keine aktive Erfolgsmeldung), unklarer Facebook-Versuch (vorher stumm). Die neuen Plattform-Adapter
-nutzen denselben Formatierer.
-
-## Publish-Rückmeldung per WhatsApp (`lib/publishing/report.ts`)
-
 ### Architektur-Klarstellung
 
 Die zentrale Rückmeldekomponente **trifft keine eigenen Entscheidungen**. Sie
@@ -217,10 +201,9 @@ Form gewählt und der Grund (`manualNotHonoured`) zurückgemeldet. `TEXT` ist im
 
 Kostenklassen (relativ, keine Euro-Beträge): Text 1, Bild 2, Karussell 4, Video 7, Avatar-Video 10.
 
-WhatsApp-Wünsche (`lib/formats/override.ts`, deterministisch): Karussell, Video, Nur Bild, Nur Text,
-HeyGen/Avatar, Kein Avatar, Kein Video, „N Slides“ (auf 3–7 begrenzt), zu teuer, ohne Produkt,
-weniger werblich, mehr Humor, sachlicher, kürzer, anderer Aufhänger, neues Thema. Spätere Wünsche
-ergänzen frühere (`mergeOverrides`).
+WhatsApp-Wünsche: freie Formulierungen versteht der semantische Router (siehe „WhatsApp-Freitext“ unten); sie werden
+als strukturierter Wunsch (`FormatOverride`, `lib/formats/override.ts`) an den Router übergeben. Es gibt keinen
+Muster-Parser für freie Wünsche. Spätere Wünsche ergänzen frühere (`mergeOverrides`).
 
 ### Visual Content Engine (`lib/visual/`)
 
@@ -262,29 +245,6 @@ Output-URL-Prüfung, begrenzter PNG-Download) und dieselben Variablen (`REPLICAT
 
 Job-Ledger (`ledger.ts`, Migration `030_visual_jobs.sql`): `visual_jobs` je Idempotenzschlüssel
 (Content-ID + Rolle + Brief-Fingerprint) und `provider_usage` für Budget/Kontingente.
-
-## Phase 3 – Video, HeyGen / AvatarVideoProvider, Kontingent, Fallbacks
-
-Ablauf: Format Router → `AVATAR_VIDEO` → `AvatarVideoRenderer` → `VideoProvider` (HeyGen). HeyGen-spezifischer
-Code liegt ausschließlich in `lib/visual/providers/heygen.ts`; Scout, Jarvis und Router importieren ihn nicht.
-`STANDARD_VIDEO` ist getrennt modelliert (`StandardVideoRenderer`, Adapter auf die bestehende Runway-Anbindung,
-nur mit `TOPIC_STANDARD_VIDEO_PROVIDER=runway`), damit später andere Video-Provider ergänzt werden können.
-
-- **Kontingent:** HeyGen gilt als begrenzte Ressource. Ohne `HEYGEN_MONTHLY_VIDEO_LIMIT` wird kein Avatar-Video
-  produziert. Lokaler Zähler `provider_usage` (geplant, erfolgreich, fehlgeschlagen, je Monat, idempotent je
-  Job). Vor jedem Anlegen wird geprüft und reserviert; fehlgeschlagene Jobs zählen nicht, hängende Jobs
-  vorsichtshalber schon. Kein HeyGen-Aufruf ohne vorherige Formatentscheidung.
-- **Fehler:** Timeout beim Anlegen (Ergebnis unklar → kein zweiter POST), 429 (`rate_limited`), 401/403
-  (`auth`, endgültig), Kontingent erschöpft (lokal ohne API-Aufruf oder von HeyGen gemeldet), Job `failed`,
-  Job hängt (`job_stuck`, Standard 30 min), API down (beim Abfragen vorübergehend), ungültige Antwort.
-- **Keine doppelte Generierung:** Videos laufen länger als ein Funktionsaufruf. Nach `maxWaitMs` bleibt der Job
-  mit seiner Provider-ID `running` (`in_progress`) und wird beim nächsten Lauf per ID weiter abgefragt, nie neu
-  angelegt. Fertige Videos werden in den Blob-Store kopiert (Provider-URLs laufen ab) und wiederverwendet.
-- **Fallback:** Fällt HeyGen aus → `STANDARD_VIDEO` → `CAROUSEL` → `SINGLE_IMAGE` → `TEXT`; die Pipeline bricht
-  nicht ab.
-- **Nicht live geprüft:** HeyGen-Endpunkte (`POST /v2/video/generate`, `GET /v1/video_status.get`) sind nach
-  öffentlicher Dokumentation umgesetzt und nur mit Mocks getestet. Benötigt: `HEYGEN_API_KEY`,
-  `HEYGEN_AVATAR_ID`, `HEYGEN_VOICE_ID`, `HEYGEN_MONTHLY_VIDEO_LIMIT` (PENDING_USER_INPUT).
 
 ## Phase 3 – Video, AvatarVideoProvider, Kontingent, Fallbacks
 
@@ -329,12 +289,27 @@ vorausgesetzt, dass ein Avatar-Anbieter Videos erzeugt.
    „Themen-Post/Affiliate-Post, Format …“ mit Status und Link je Plattform. Bei ausgeschalteter
    Live-Veröffentlichung (Standard) nur Probelauf, nichts wird gepostet.
 
-Wünsche auf Vorschlag oder Freigabe (deterministisch): Format, Slides, Kein Avatar, Weniger werblich, Mehr Humor,
-Anderer Aufhänger (neue Hook-Variante, erneut von Jarvis geprüft), Neues Thema (verwirft, nächstes Thema),
-Ohne Produkt. Nach der Produktion erzeugt jede Änderung eine neue Version (alte Freigabe ungültig) und eine
-neue Freigabenachricht; fertige Bilder/Slides werden über das Job-Ledger wiederverwendet. Webhook-Wiederholungen
-und fremde Absender werden ignoriert. Der bestehende semantische Router bleibt für Produkt-Entwürfe zuständig;
-Antworten auf Themen-Nachrichten werden vor ihm erkannt, damit er sie nicht als fremde Entwürfe deutet.
+### WhatsApp-Freitext über den semantischen Router
+
+- **Deterministisch bleiben:** „Freigeben“, „Ablehnen“ (bestehende Wortliste), „Wiederholen“, „Produkt N“,
+  „Kein Produkt“, „Produktvorschläge“, „Status“, „Weiter“. Diese Wörter erreichen nie ein Sprachmodell.
+- **Freie Wünsche** („Mach daraus lieber ein Karussell mit vier Slides“, „weniger werblich“, „anderer Aufhänger“,
+  „neues Thema“, „such mir dazu ein passendes Produkt“) versteht der bestehende semantische WhatsApp-Router: gleicher
+  Transport, gleiches Modell, gleiche Fehlerbehandlung (`routerModelCall` in `lib/whatsapp/route-llm.ts`), eigene
+  Anweisung und eigenes striktes Schema für Themen (`lib/whatsapp/topic-route.ts`). Das Ergebnis wird in einen
+  strukturierten Wunsch übersetzt (`lib/topic-pipeline/instructions.ts`).
+- **Zuordnung:** Zitiert der Betreiber eine Themen-Nachricht, ist der Entwurf festgelegt. Ohne Zitat entscheidet der
+  Router mit dem Kontext aller offenen Themen- **und** Produktentwürfe: `domain` = Thema, Produkt oder unklar,
+  `content_id` = gemeinter Themenentwurf. Produkt-Nachrichten gehen unverändert an den Produkt-Router; bei
+  Unklarheit oder mehreren möglichen Themenentwürfen kommt eine Rückfrage, und es wird nichts geändert.
+  Antworten auf Produkt-Freigaben erreicht die Themen-Pipeline nie.
+- **Invalidierung:** Jede angenommene Änderung macht sofort alle offenen oder erteilten Veröffentlichungsfreigaben
+  dieses Inhalts ungültig (`invalidateApprovals`), noch bevor die neue Fassung produziert ist. Antworten auf
+  veraltete Vorschläge oder Freigaben werden als veraltet beantwortet; es wird nichts geändert oder freigegeben.
+- **Ausfall des Modells:** keine Musterauswertung als Ersatz. Antwort „nicht sicher verstanden, nichts geändert“;
+  ohne Zitat übernimmt die bestehende Produktkette.
+- Idempotenz: Antworten über `whatsapp_events`, Nachrichten ohne Zitat über `topic_inbound` (Webhook-Wiederholung
+  löst nichts doppelt aus).
 
 ### Optionale Produktkopplung (nicht fest verdrahtet)
 
@@ -374,15 +349,51 @@ Linkstrategie zentral (`lib/distribution/link-policy.ts`, überschreibbar mit `T
 nie abschaltbar): Facebook/X Link im Text, Instagram/TikTok/YouTube „Link im Profil“ (Ziel: bestehende
 Landingpage `/produkte`, `TOPIC_LANDING_URL`). Themen-Posts verlinken auf Facebook/X die Quelle.
 
-### Veröffentlichung (`lib/distribution/publish.ts`)
+### Veröffentlichung (`lib/distribution/publish.ts`, `lib/distribution/publishers/`)
 
-Jede Plattform isoliert; ein Ausfall stoppt die anderen nicht. Jeder Live-Versuch läuft über
-`authorizePublish` + `assertPermitMatches`. Standard ist der Dry-Run (`TOPIC_LIVE_PUBLISHING` nicht `true`):
-er zeigt je Plattform Format, Linkstrategie, Freigabestatus und fehlende Zugänge, ohne etwas zu beanspruchen.
+Je Plattform ein Publisher mit getrennten Schritten **Upload/Vorbereitung → Publish → Status**:
 
-Live-Clients: nur Facebook-Foto über die bestehende `publishFacebookPhoto`-Anbindung. Instagram (Karussell/Reel
-der Themen-Pipeline), TikTok, YouTube und X haben vollständige Adapter und Dry-Run, aber noch keinen Live-Client
-(PENDING_USER_INPUT, siehe unten).
+| Plattform | Upload / Vorbereitung | Publish | Status / Abgleich |
+| --- | --- | --- | --- |
+| Instagram | JPEG-Kopie, Container (Bild, Karussell-Elemente + Karussell, Reel) über die bestehende `instagramGraph` | `media_publish` genau einmal | Container-Status; laufende Reels später per Container-ID fertigstellen |
+| Facebook | Album: unveröffentlichte Fotos | Foto über bestehendes `publishFacebookPhoto`; Text, Album, Video über `facebookPageGraph` | – (synchron) |
+| TikTok | Token (Access oder Refresh), Creator-Info (Sichtbarkeit, Username), JPEG-Kopien | `video/init` bzw. `content/init` (PULL_FROM_URL, Direct Post) | `status/fetch` bis `PUBLISH_COMPLETE` |
+| YouTube Shorts | OAuth-Refresh, resumable Upload-Sitzung | Upload der Bytes | `videos?part=status` bis `processed` |
+| X | OAuth 1.0a, Media-Upload (Bilder direkt, Video initialize/append/finalize/status) | `POST /2/tweets` genau einmal | Tweet-Abfrage |
+
+- **Isolation:** jede Plattform eigener try/catch; ein Fehler auf A stoppt B, C … nicht.
+- **Ergebnis je Plattform** in `publish_attempts`: Status (`published`, `processing`, `failed`, `unknown`,
+  `blocked`), alle Remote-IDs (Container, Uploads, Post), externe ID, finaler Link (nur wenn die Plattform ihn
+  liefert). Bericht und Stufe werden immer aus diesen gespeicherten Ergebnissen berechnet.
+- **Keine Doppelposts:** je Version und Plattform höchstens ein aktiver Versuch (`claimed`/`processing`/
+  `published`/`unknown`). Bereits veröffentlichte Plattformen werden beim erneuten Aufruf nur berichtet.
+- **Retry nur für fehlgeschlagene Plattformen:** „Wiederholen“ als Antwort auf die Freigabenachricht. `failed`
+  (eindeutig nichts veröffentlicht) darf erneut versucht werden, `unknown` (eventuell veröffentlicht) nie.
+- **Abgleich asynchroner Posts** (`reconcileTopicPublications`): Cron und „Status“ fragen die Plattform nach
+  `processing`-Versuchen und vervollständigen sie; es wird nie neu veröffentlicht. Danach folgt der Bericht.
+- **Fehlerklassifizierung:** alles vor dem finalen Publish-Aufruf ist „eindeutig“ (nichts sichtbar); beim finalen
+  Aufruf nur eine 4xx-Ablehnung, sonst „unklar“.
+- **Dry-Run ist Standard.** Er zeigt je Plattform Format, Linkstrategie und den Grund, warum nicht live
+  veröffentlicht würde (Freigabe, Schalter, fehlende Variable), ohne Netzwerkaufruf und ohne etwas zu beanspruchen.
+
+### Credential- und Capability-Prüfung (`lib/capabilities/index.ts`)
+
+Eine Stelle kennt alle Dienste, ihre Pflicht- und optionalen Variablen und meldet je Dienst: aktiviert?, vorhanden,
+fehlend, möglich (Dry-Run, Produktion, Live). Ausgabe nur mit Variablennamen, z. B. „TikTok: blockiert –
+TIKTOK_ACCESS_TOKEN oder … fehlt“, „X: nicht aktiviert“, „Instagram: … nur Dry-Run“. Die Freigabeschranke nutzt
+dieselbe Prüfung (`livePublishCapability`): Live nur mit `TOPIC_LIVE_PUBLISHING=true`, Plattform in
+`TOPIC_PLATFORMS` und vollständigen Zugangsdaten. Matrix: [CREDENTIALS.md](CREDENTIALS.md).
+
+### Cron (`/api/cron/topic-scout`, `lib/topic-pipeline/cron.ts`)
+
+- Ausgeschaltet (`disabled`) ohne jeden Datenbankzugriff, solange `TOPIC_PIPELINE_ENABLED` nicht `true` ist.
+- Lease (`topic_cron_lease`, 280 s) gegen überlappende Aufrufe (`locked`); Slot-Claim je Berliner Stunde gegen
+  Wiederholungen (`already_ran`).
+- Schritte isoliert: laufende Videos fortsetzen, asynchrone Posts abgleichen, neues Thema vorschlagen. Ein
+  fehlgeschlagener Schritt stoppt die anderen nicht (Exit `failed`, HTTP 500).
+- Exit-Zustände `disabled`, `locked`, `already_ran`, `proposed`, `no_topic`, `failed`; Events
+  `topic_cron_started/completed/skipped`.
+- Veröffentlicht nie. **Nicht in `vercel.json` eingetragen** (ein Test stellt das sicher).
 
 ### Status
 
@@ -408,12 +419,13 @@ Karussell-, Videojob, Plattformadapter und Live-Zugänge, offene Vorschläge/Fre
 Wiederverwendet: `TAVILY_API_KEY`, `REPLICATE_API_TOKEN`, `REPLICATE_IMAGE_MODEL`, `RUNWAYML_API_SECRET`,
 `META_*`, `WHATSAPP_*`, `CRON_SECRET`, `DATABASE_URL`.
 
-Für Live-Clients später nötig (PENDING_USER_INPUT): TikTok (`TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`,
+Vollständige Liste aller Variablen: [CREDENTIALS.md](CREDENTIALS.md). Für Live-Veröffentlichung nötig (PENDING_USER_INPUT): TikTok (`TIKTOK_CLIENT_KEY`, `TIKTOK_CLIENT_SECRET`,
 `TIKTOK_ACCESS_TOKEN`, Content Posting API), YouTube (`YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`,
 `YOUTUBE_REFRESH_TOKEN`), X (`X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET`).
 
 ### Einschalten (PENDING_USER_APPROVAL, nicht durchgeführt)
 
-1. PR mergen, deployen (Migrationen 028–031 laufen automatisch).
+1. PR mergen, deployen (Migrationen 028–032 laufen automatisch über `ensureAutomationSchema`).
 2. `TOPIC_PIPELINE_ENABLED=true` setzen; Cron-Eintrag für `/api/cron/topic-scout` in `vercel.json` ergänzen.
-3. Erst nach Probeläufen ggf. `TOPIC_LIVE_PUBLISHING=true`.
+3. Zugangsdaten je Plattform setzen (siehe [CREDENTIALS.md](CREDENTIALS.md)); „Status“ zeigt, was bereit ist.
+4. Erst nach Probeläufen ggf. `TOPIC_LIVE_PUBLISHING=true` (und `TOPIC_PLATFORMS` auf die gewünschten Plattformen).

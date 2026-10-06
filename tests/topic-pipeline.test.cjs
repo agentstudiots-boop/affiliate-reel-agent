@@ -575,3 +575,17 @@ test('signed webhook: a free message without a quote is assigned to the open top
   assert.equal((await handler.POST(request())).status, 200, 'Meta redelivery');
   assert.equal(h.sent.length, count);
 });
+
+test('invariant: a second "Freigeben" after publishing publishes nothing again', async () => {
+  const db = await pgliteDatabase();
+  try {
+    const h = harness(db);
+    const approval = await throughPublishApproval(h);
+    const calls = () => h.publishers.reduce((sum, publisher) => sum + publisher.calls.length, 0);
+    const before = calls();
+    assert.ok(before > 0);
+    await h.reply('Freigeben', approval);
+    assert.match(h.sent.at(-1), /nicht mehr aktuell oder bereits entschieden/);
+    assert.equal(calls(), before);
+  } finally { await db.close(); }
+});

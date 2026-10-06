@@ -79,6 +79,11 @@ async function load(db: Database, contentId: string): Promise<TopicContentRow | 
   const row = (await db.query("SELECT * FROM topic_contents WHERE content_id=$1", [contentId])).rows[0];
   return row ? (row as unknown as TopicContentRow) : null;
 }
+async function rememberOutdated(db: Database, contentId: string, messageId: string) {
+  await db.query("UPDATE topic_contents SET previous_message_ids=previous_message_ids||$2::jsonb WHERE content_id=$1 AND NOT previous_message_ids ? $3",
+    [contentId, JSON.stringify([messageId]), messageId]);
+}
+
 async function save(db: Database, row: TopicContentRow) {
   await db.query(`INSERT INTO topic_contents(content_id,run_id,topic_id,category,stage,format,revision,candidate,decision,override,copy,production,master,product,proposal_message_id,product_message_id,model_calls,last_error)
     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
@@ -114,6 +119,7 @@ async function propose(deps: TopicPipelineDeps, row: TopicContentRow, note: stri
     product: row.product.status === "selected" ? { status: "selected", name: row.product.product.name } : { status: row.product.status }, note }));
   const updated: TopicContentRow = { ...planned, stage: "proposed", proposal_message_id: messageId };
   await save(deps.db, updated);
+  if (row.proposal_message_id && row.proposal_message_id !== messageId) await rememberOutdated(deps.db, row.content_id, row.proposal_message_id);
   await recordTopicHistory(deps.db, candidate, "proposed", `${row.content_id}:${row.revision}`);
   emitEvent("topic_approval_requested", { contentId: row.content_id, stage: "proposal", revision: row.revision, format: updated.format });
   return updated;
@@ -245,7 +251,17 @@ export async function handleTopicReply(deps: TopicPipelineDeps, message: Inbound
   const byProposal = (await db.query("SELECT content_id FROM topic_contents WHERE proposal_message_id=$1 OR product_message_id=$1", [message.replyToMessageId])).rows[0];
   const byApproval = byProposal ? null : await contentIdForRequestMessage(db, message.replyToMessageId);
   const contentId = byProposal ? String(byProposal.content_id) : byApproval?.contentId;
-  if (!contentId) return false;
+  if (!contentId) {
+    // A reply to an earlier (replaced) proposal of a topic draft: answered as outdated, never handed to another pipeline.
+    const outdated = (await db.query("SELECT content_id FROM topic_contents WHERE previous_message_ids ? $1 LIMIT 1", [message.replyToMessageId])).rows[0];
+    if (!outdated) return false;
+    const trustedWa = deps.trustedWaId.replace(/\D/g, "");
+    if (!trustedWa || message.from.replace(/\D/g, "") !== trustedWa) return true;
+    const first = await db.query("INSERT INTO whatsapp_events(message_id,wa_id,reply_to_message_id,body,payload) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING RETURNING message_id",
+      [message.id, message.from, message.replyToMessageId, message.body, JSON.stringify(message.payload ?? {})]);
+    if (first.rows.length) await deps.send("Diese Nachricht ist veraltet: Der Themenbeitrag wurde inzwischen geändert. Antworte bitte auf die neueste Nachricht dazu. Es wurde nichts geändert oder freigegeben.");
+    return true;
+  }
   const row = await load(db, contentId);
   if (!row) return false;
   const trusted = deps.trustedWaId.replace(/\D/g, "");
@@ -311,6 +327,7 @@ async function requestProducts(deps: TopicPipelineDeps, row: TopicContentRow, wi
   if (!result.ok) { await deps.send(`Keine Produktvorschläge für „${candidate.title}“: ${result.reason}. Es bleibt ein Themen-Post ohne Affiliate-Link.`); return; }
   const sent = await deps.send(productSuggestionsText(candidate.title, result.suggestions));
   await save(deps.db, { ...row, product: { status: "suggested", suggestions: result.suggestions, requestedBy: messageId, suggestedAt: now(deps).toISOString() }, product_message_id: sent });
+  if (row.product_message_id && row.product_message_id !== sent) await rememberOutdated(deps.db, row.content_id, row.product_message_id);
   emitEvent("topic_instruction_applied", { contentId: row.content_id, instruction: "product_suggestions", count: result.suggestions.length });
 }
 
