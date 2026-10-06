@@ -1,7 +1,10 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { decideFormat } = require('../.test-build/lib/formats/router');
-const { parseFormatInstruction, mergeOverrides } = require('../.test-build/lib/formats/override');
+const { emptyOverride, mergeOverrides } = require('../.test-build/lib/formats/override');
+const { overrideFromTopicRoute } = require('../.test-build/lib/topic-pipeline/instructions');
+// Structured operator wishes (as produced by the semantic router mapping).
+const wish = over => ({ ...emptyOverride(), matched: ['test'], ...over });
 const { setEventSink } = require('../.test-build/lib/observability/events');
 
 setEventSink(() => {});
@@ -42,30 +45,30 @@ test('AVATAR_VIDEO: strong explanatory reach topic with avatar quota', () => {
 
 test('manual WhatsApp instruction overrides router and scout; unfeasible wish falls back with a reason', () => {
   const base = topic({ suggested_format: 'SINGLE_IMAGE' }, { utility: { score: 85 } });
-  const carousel = decide(base, { override: parseFormatInstruction('Mach daraus ein Karussell, nur vier Slides.') });
+  const carousel = decide(base, { override: wish({ format: 'CAROUSEL', slides: 4 }) });
   assert.equal(carousel.format, 'CAROUSEL');
   assert.equal(carousel.source, 'manual');
   assert.equal(carousel.slides, 4);
-  const textOnly = decide(base, { override: parseFormatInstruction('Nur Text.') });
+  const textOnly = decide(base, { override: wish({ format: 'TEXT' }) });
   assert.equal(textOnly.format, 'TEXT');
-  const avatar = decide(base, { availability: { ...all, avatarVideo: { available: false, quotaRemaining: null, reason: 'HEYGEN_API_KEY fehlt' } }, override: parseFormatInstruction('Mach ein HeyGen-Video') });
+  const avatar = decide(base, { availability: { ...all, avatarVideo: { available: false, quotaRemaining: null, reason: 'HEYGEN_API_KEY fehlt' } }, override: wish({ format: 'AVATAR_VIDEO' }) });
   assert.equal(avatar.source, 'manual');
   assert.equal(avatar.format, 'STANDARD_VIDEO');
   assert.match(avatar.manualNotHonoured, /HEYGEN_API_KEY/);
-  const noAvatar = decideFormat({ topic: topic({ suitable_for_avatar: true, virality_score: 90, relevance_score: 85 }, { utility: { score: 90 } }), platforms: ['tiktok'], availability: all, override: parseFormatInstruction('Kein Avatar.') });
+  const noAvatar = decideFormat({ topic: topic({ suitable_for_avatar: true, virality_score: 90, relevance_score: 85 }, { utility: { score: 90 } }), platforms: ['tiktok'], availability: all, override: wish({ exclude: ['AVATAR_VIDEO'] }) });
   assert.notEqual(noAvatar.format, 'AVATAR_VIDEO');
 });
 
 test('executive directive ranks below the operator and above the router', () => {
   const base = topic({}, { utility: { score: 85 } });
   assert.equal(decide(base, { executive: { source: 'executive_agent', format: 'SINGLE_IMAGE', reason: 'Wochenplan' } }).source, 'executive');
-  assert.equal(decide(base, { executive: { source: 'executive_agent', format: 'SINGLE_IMAGE', reason: 'Wochenplan' }, override: parseFormatInstruction('Lieber Video.') }).format, 'STANDARD_VIDEO');
+  assert.equal(decide(base, { executive: { source: 'executive_agent', format: 'SINGLE_IMAGE', reason: 'Wochenplan' }, override: wish({ format: 'STANDARD_VIDEO' }) }).format, 'STANDARD_VIDEO');
 });
 
 test('budget: cheap affiliate product never triggers a video; "zu teuer" means an image; equal value prefers cheaper', () => {
   const viral = topic({ suitable_for_video: true, suitable_for_avatar: true, virality_score: 85, relevance_score: 80, visual_potential: 80 }, { video_fit: { score: 85 }, utility: { score: 80 } });
   assert.ok(['TEXT', 'SINGLE_IMAGE', 'CAROUSEL'].includes(decideFormat({ topic: viral, platforms: ['instagram'], availability: all, productPriceClass: 'low' }).format));
-  assert.equal(decide(viral, { override: parseFormatInstruction('Das ist zu teuer, nimm ein Bild.') }).format, 'SINGLE_IMAGE');
+  assert.equal(decide(viral, { override: wish({ format: 'SINGLE_IMAGE', cheaper: true }) }).format, 'SINGLE_IMAGE');
   const capped = decideFormat({ topic: viral, platforms: ['tiktok'], availability: all, budget: { maxCostUnits: 4 } });
   assert.ok(capped.options.find(option => option.format === 'AVATAR_VIDEO').reasons.includes('über Budget'));
   assert.equal(capped.format, 'CAROUSEL');
@@ -76,28 +79,29 @@ test('provider unavailable: alternative format is chosen, TEXT always remains po
   const d = decideFormat({ topic: visual, platforms: ['instagram'], availability: { ...all, image: { available: false, reason: 'REPLICATE_API_TOKEN fehlt' } } });
   assert.notEqual(d.format, 'SINGLE_IMAGE');
   assert.match(d.options.find(option => option.format === 'SINGLE_IMAGE').reasons.join(' '), /REPLICATE_API_TOKEN fehlt/);
-  const nothing = decideFormat({ topic: visual, platforms: ['instagram'], availability: none, override: parseFormatInstruction('kein Karussell') });
+  const nothing = decideFormat({ topic: visual, platforms: ['instagram'], availability: none, override: wish({ exclude: ['CAROUSEL'] }) });
   assert.equal(nothing.format, 'TEXT');
 });
 
-test('WhatsApp phrases are parsed into deterministic wishes', () => {
-  const cases = {
-    'Mach das weniger werblich.': o => assert.deepEqual(o.tone, ['less_promotional']),
-    'Mehr Humor.': o => assert.deepEqual(o.tone, ['more_humor']),
-    'Nur vier Slides.': o => { assert.equal(o.slides, 4); assert.equal(o.format, 'CAROUSEL'); },
-    'Mach fünf Slides.': o => assert.equal(o.slides, 5),
-    'Kein Avatar.': o => { assert.deepEqual(o.exclude, ['AVATAR_VIDEO']); assert.equal(o.format, null); },
-    'Lieber Video.': o => assert.equal(o.format, 'STANDARD_VIDEO'),
-    'Nur Bild.': o => assert.equal(o.format, 'SINGLE_IMAGE'),
-    'Ohne Produkt.': o => assert.equal(o.noProduct, true),
-    'Anderer Aufhänger.': o => assert.equal(o.newHook, true),
-    'Neues Thema.': o => assert.equal(o.newTopic, true),
-    'Mach 12 Slides': o => assert.equal(o.slides, 7),
-  };
-  for (const [text, check] of Object.entries(cases)) check(parseFormatInstruction(text));
-  const merged = mergeOverrides(parseFormatInstruction('Kein Avatar.'), parseFormatInstruction('Lieber Video.'));
+test('semantic router output is mapped to structured wishes (no pattern parsing of free text)', () => {
+  const route = over => ({ domain: 'topic', content_id: 'tc_1', intent: 'change', format: null, slides: null, exclude_formats: [], tone: [], new_hook: false, cheaper: false,
+    product_wish: null, answer: null, clarification_question: null, confidence: 0.9, ambiguity: 'none', ...over });
+  assert.deepEqual(overrideFromTopicRoute(route({ slides: 4 })).format, 'CAROUSEL');
+  assert.equal(overrideFromTopicRoute(route({ slides: 12 })).slides, 7);
+  assert.equal(overrideFromTopicRoute(route({ slides: 1 })).slides, 3);
+  const noAvatar = overrideFromTopicRoute(route({ exclude_formats: ['AVATAR_VIDEO'], format: 'AVATAR_VIDEO' }));
+  assert.equal(noAvatar.format, null);
+  assert.deepEqual(noAvatar.exclude, ['AVATAR_VIDEO']);
+  assert.deepEqual(overrideFromTopicRoute(route({ tone: ['less_promotional', 'more_humor'] })).matched, ['weniger werblich', 'mehr Humor']);
+  assert.equal(overrideFromTopicRoute(route({ new_hook: true })).newHook, true);
+  assert.equal(overrideFromTopicRoute(route({ intent: 'new_topic' })).newTopic, true);
+  assert.equal(overrideFromTopicRoute(route({ intent: 'no_product' })).noProduct, true);
+  assert.equal(overrideFromTopicRoute(route({ intent: 'other', format: 'TEXT' })).matched.length, 0);
+  const merged = mergeOverrides(wish({ exclude: ['AVATAR_VIDEO'] }), wish({ format: 'STANDARD_VIDEO' }));
   assert.equal(merged.format, 'STANDARD_VIDEO');
   assert.deepEqual(merged.exclude, ['AVATAR_VIDEO']);
+  // The pattern parser for free wishes no longer exists.
+  assert.equal(require('../.test-build/lib/formats/override').parseFormatInstruction, undefined);
 });
 
 test('layering: the router never imports providers or renderers; the visual engine never imports scout, publishing or WhatsApp', () => {

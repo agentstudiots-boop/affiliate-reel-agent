@@ -7,3 +7,12 @@ ALTER TABLE publish_attempts ADD CONSTRAINT publish_attempts_status_check CHECK 
 DROP INDEX IF EXISTS publish_attempts_one_claim;
 -- At most one live claim per content version and platform (processing included): no double posting.
 CREATE UNIQUE INDEX IF NOT EXISTS publish_attempts_one_claim ON publish_attempts(content_id, version, platform) WHERE status IN ('claimed','processing','published','unknown');
+
+-- Idempotency/audit for free WhatsApp messages the topic pipeline handled without a quoted message
+-- (semantically assigned to a topic draft). Stores ids, the action and the target content id only.
+CREATE TABLE IF NOT EXISTS topic_inbound (
+  message_id text PRIMARY KEY,
+  content_id text,
+  action text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);

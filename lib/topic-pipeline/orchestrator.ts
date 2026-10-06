@@ -6,12 +6,16 @@ import { PLATFORM_ADAPTERS, type PlatformVariant } from "../distribution/platfor
 import { liveTopicPublishingEnabled, publishAll, publishableContent, reconcilePublishing, storedOutcomes, type PlatformPublisher, type PublishOutcome, type PublishRun } from "../distribution/publish";
 import { activePlatforms } from "../capabilities";
 import { FORMAT_LABEL, PLATFORM_LABEL, type Platform } from "../formats/catalog";
-import { emptyOverride, hasOverride, mergeOverrides, parseFormatInstruction, type FormatOverride } from "../formats/override";
+import { emptyOverride, hasOverride, mergeOverrides, type FormatOverride } from "../formats/override";
+import { interpretTopicMessage, type TopicRoute, type TopicRouteContext } from "../whatsapp/topic-route";
+import { RouterUnavailable } from "../whatsapp/route-llm";
+import { loadRouteContext } from "../whatsapp/route-context";
+import { overrideFromTopicRoute } from "./instructions";
 import { decideFormat, type FormatDecision } from "../formats/router";
 import type { Database } from "../memory/db";
 import { ensureAutomationSchema } from "../memory/ensure-automation-schema";
 import { emitEvent } from "../observability/events";
-import { ApprovalDecisionError, bindApprovalRequest, contentIdForRequestMessage, recordApprovalDecision, registerContentVersion } from "../publishing/approval-gate";
+import { ApprovalDecisionError, bindApprovalRequest, contentIdForRequestMessage, invalidateApprovals, recordApprovalDecision, registerContentVersion } from "../publishing/approval-gate";
 import { formatPublishReport, type ReportFormat } from "../publishing/report";
 import { discoverTopic } from "../topics/discovery";
 import { topicGate } from "../topics/gate";
@@ -27,7 +31,7 @@ import type { RenderContext } from "../visual/renderers";
 import type { ProductionResult } from "../visual/types";
 import { writeTopicCopy, type TopicCopy } from "./copy";
 import { productSuggestionsText, proposalText, publishApprovalText } from "./messages";
-import { productCouplingBlocked, productRequest, productSelection, suggestProducts, type ProductState, type ProductSuggester } from "./product-coupling";
+import { productCouplingBlocked, productListCommand, productSelection, suggestProducts, type ProductState, type ProductSuggester } from "./product-coupling";
 
 // The only module that connects topic scout, Jarvis gate, format router, visual engine, master content, platform
 // adapters, the publish gate and WhatsApp. Stages:
@@ -52,6 +56,8 @@ export type TopicPipelineDeps = {
   platforms?: Platform[];
   rasterize?: Rasterizer;
   liveEnabled?: boolean;
+  // Semantic understanding of free messages (existing router transport). Injected in tests.
+  interpret?: (body: string, context: TopicRouteContext) => Promise<TopicRoute>;
 };
 
 type Stage = "proposed" | "producing" | "in_production" | "awaiting_publish_approval" | "publishing" | "published" | "partially_published" | "not_published" | "rejected" | "discarded" | "failed";
@@ -207,7 +213,32 @@ export async function resumeTopicProductions(deps: TopicPipelineDeps) {
 }
 
 // ---------- WhatsApp replies ----------
-export async function handleTopicReply(deps: TopicPipelineDeps, message: { id: string; from: string; body: string; replyToMessageId: string | null; payload?: unknown }): Promise<boolean> {
+type Inbound = { id: string; from: string; body: string; replyToMessageId: string | null; payload?: unknown };
+const CHANGE_STAGES: Stage[] = ["proposed", "awaiting_publish_approval"];
+const deterministicWord = (body: string) => classifyWhatsAppReply(body).intent !== "changes_requested" || /^(status|weiter|entwurf|wochenbilanz|wiederholen|erneut versuchen)[.!?]*$/i.test(body.trim());
+
+async function topicRouteContext(deps: TopicPipelineDeps, message: Inbound, replying: TopicRouteContext["replying_to"]): Promise<TopicRouteContext> {
+  const rows = await deps.db.query(`SELECT content_id, candidate->'candidate'->>'title' AS title, stage, format, product->'product'->>'name' AS product FROM topic_contents
+    WHERE stage = ANY($1::text[]) AND updated_at > now() - interval '7 days' ORDER BY updated_at DESC LIMIT 6`, [CHANGE_STAGES]);
+  let products: TopicRouteContext["product_drafts"] = [];
+  try {
+    const context = await loadRouteContext(deps.db, deps.trustedWaId.replace(/\D/g, ""), message.id, message.replyToMessageId);
+    products = context.open_items.slice(0, 6).map(item => ({ draft_id: item.draft_id, product: item.product.slice(0, 80), stage: item.stage }));
+  } catch { /* product context is optional for the topic decision */ }
+  return { replying_to: replying, topic_drafts: rows.rows.map(row => ({ content_id: String(row.content_id), title: String(row.title ?? "").slice(0, 100), stage: String(row.stage),
+    format: String(row.format), product: row.product ? String(row.product) : null })), product_drafts: products };
+}
+
+async function interpretFor(deps: TopicPipelineDeps, body: string, context: TopicRouteContext): Promise<TopicRoute | null> {
+  try { return await (deps.interpret ?? interpretTopicMessage)(body, context); }
+  catch (error) {
+    emitEvent("topic_pipeline_failed", { stage: "interpret", failure: error instanceof RouterUnavailable ? error.message : "unknown" }, "warn");
+    return null;
+  }
+}
+
+// Replies that quote a topic-pipeline message (proposal, product suggestions, publish approval).
+export async function handleTopicReply(deps: TopicPipelineDeps, message: Inbound): Promise<boolean> {
   if (!message.replyToMessageId) return false;
   const db = deps.db;
   await ensureAutomationSchema(db);
@@ -222,16 +253,55 @@ export async function handleTopicReply(deps: TopicPipelineDeps, message: { id: s
   const claimed = await db.query("INSERT INTO whatsapp_events(message_id,wa_id,reply_to_message_id,body,payload) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING RETURNING message_id",
     [message.id, message.from, message.replyToMessageId, message.body, JSON.stringify(message.payload ?? {})]);
   if (!claimed.rows.length) return true; // webhook replay
-  try {
+  await guarded(deps, row, async () => {
     if (row.product_message_id === message.replyToMessageId) await onProductReply(deps, row, message);
     else if (row.proposal_message_id === message.replyToMessageId) await onProposalReply(deps, row, message);
     else await onPublishReply(deps, row, message);
-  } catch (error) {
-    emitEvent("topic_pipeline_failed", { stage: "reply", contentId, failure: error instanceof Error ? error.name : "unknown" }, "error");
-    await save(db, { ...(await load(db, contentId) ?? row), last_error: error instanceof Error ? error.message.slice(0, 300) : "unknown" });
+  });
+  return true;
+}
+
+// Free messages WITHOUT a quoted message. Only when topic drafts are open; the semantic router decides whether the
+// message is about a topic draft (and which one) or about the product pipeline. Product messages are left untouched.
+export async function routeTopicMessage(deps: TopicPipelineDeps, message: Inbound): Promise<boolean> {
+  if (message.replyToMessageId || deterministicWord(message.body)) return false;
+  const trusted = deps.trustedWaId.replace(/\D/g, "");
+  if (!trusted || message.from.replace(/\D/g, "") !== trusted) return false;
+  await ensureAutomationSchema(deps.db);
+  if ((await deps.db.query("SELECT 1 FROM topic_inbound WHERE message_id=$1", [message.id])).rows.length) return true; // replay of a handled message
+  const context = await topicRouteContext(deps, message, { kind: "none", content_id: null });
+  if (!context.topic_drafts.length) return false;
+  const route = await interpretFor(deps, message.body, context);
+  if (!route || route.domain === "product") return false; // the existing product router handles it
+  const claim = async (contentId: string | null, action: string) =>
+    (await deps.db.query("INSERT INTO topic_inbound(message_id,content_id,action) VALUES($1,$2,$3) ON CONFLICT DO NOTHING RETURNING message_id", [message.id, contentId, action])).rows.length > 0;
+  const target = context.topic_drafts.find(item => item.content_id === route.content_id) ?? (context.topic_drafts.length === 1 && route.domain === "topic" ? context.topic_drafts[0] : null);
+  if (route.domain === "unclear" || !target || route.ambiguity === "high" || route.confidence < 0.5 || route.intent === "clarify") {
+    if (!(await claim(null, "clarify"))) return true;
+    await deps.send(clarificationText(context, route));
+    return true;
+  }
+  if (!(await claim(target.content_id, route.intent))) return true;
+  const row = await load(deps.db, target.content_id);
+  if (!row) return true;
+  await guarded(deps, row, () => applyRoute(deps, row, route, message, row.stage === "proposed" ? "proposal" : "publish"));
+  return true;
+}
+
+function clarificationText(context: TopicRouteContext, route: TopicRoute | null) {
+  const topics = context.topic_drafts.slice(0, 3).map(item => `• Themenbeitrag „${item.title}“`);
+  const products = context.product_drafts.slice(0, 3).map(item => `• Produktentwurf „${item.product}“`);
+  return [route?.clarification_question?.trim() || "Welchen Entwurf meinst du?", ...topics, ...products,
+    "Antworte am besten direkt auf die Nachricht des gemeinten Entwurfs. Es wurde nichts geändert."].join("\n");
+}
+
+async function guarded(deps: TopicPipelineDeps, row: TopicContentRow, work: () => Promise<unknown>) {
+  try { await work(); }
+  catch (error) {
+    emitEvent("topic_pipeline_failed", { stage: "reply", contentId: row.content_id, failure: error instanceof Error ? error.name : "unknown" }, "error");
+    await save(deps.db, { ...(await load(deps.db, row.content_id) ?? row), last_error: error instanceof Error ? error.message.slice(0, 300) : "unknown" });
     await deps.send("Die Antwort zum Themenbeitrag konnte nicht vollständig verarbeitet werden. Es wurde nichts veröffentlicht. „Status“ zeigt Details.").catch(() => undefined);
   }
-  return true;
 }
 
 async function requestProducts(deps: TopicPipelineDeps, row: TopicContentRow, wish: string | null, messageId: string) {
@@ -244,10 +314,8 @@ async function requestProducts(deps: TopicPipelineDeps, row: TopicContentRow, wi
   emitEvent("topic_instruction_applied", { contentId: row.content_id, instruction: "product_suggestions", count: result.suggestions.length });
 }
 
-async function onProposalReply(deps: TopicPipelineDeps, row: TopicContentRow, message: { id: string; body: string }) {
+async function onProposalReply(deps: TopicPipelineDeps, row: TopicContentRow, message: Inbound) {
   if (row.stage !== "proposed") { await deps.send("Dieser Themenvorschlag ist nicht mehr offen. Es wurde nichts geändert."); return; }
-  const product = productRequest(message.body);
-  if (product.requested) return requestProducts(deps, row, product.wish, message.id);
   const intent = classifyWhatsAppReply(message.body).intent;
   if (intent === "approve") { await produce(deps, row); return; }
   if (intent === "reject") {
@@ -256,11 +324,36 @@ async function onProposalReply(deps: TopicPipelineDeps, row: TopicContentRow, me
     await deps.send(`Verworfen: „${row.candidate.candidate.title}“. Es wird nichts produziert oder veröffentlicht.`);
     return;
   }
-  await applyWish(deps, row, message, "proposal");
+  if (productListCommand(message.body)) return requestProducts(deps, row, null, message.id);
+  await understandAndApply(deps, row, message, "proposal");
 }
 
-async function applyWish(deps: TopicPipelineDeps, row: TopicContentRow, message: { id: string; body: string }, stage: "proposal" | "publish") {
-  const wish = parseFormatInstruction(message.body);
+// Free text quoting a topic message: the target is fixed by the quote; the semantic router says what is wanted.
+async function understandAndApply(deps: TopicPipelineDeps, row: TopicContentRow, message: Inbound, stage: "proposal" | "publish") {
+  const context = await topicRouteContext(deps, message, { kind: "topic", content_id: row.content_id });
+  const route = await interpretFor(deps, message.body, context);
+  if (!route) { await deps.send("Ich konnte die Nachricht gerade nicht sicher verstehen (Sprachmodell nicht erreichbar). Es wurde nichts geändert; bitte später noch einmal schreiben."); return; }
+  if (route.domain === "product") {
+    await deps.send(`Das klingt nach dem Produktentwurf, nicht nach dem Themenbeitrag „${row.candidate.candidate.title}“. Antworte bitte direkt auf die Nachricht des Produktentwurfs. Am Themenbeitrag wurde nichts geändert.`);
+    return;
+  }
+  if (route.ambiguity === "high" || route.confidence < 0.5 || route.intent === "clarify") { await deps.send(`${route.clarification_question?.trim() || "Was genau soll ich am Themenbeitrag ändern?"} Es wurde nichts geändert.`); return; }
+  await applyRoute(deps, row, route, message, stage);
+}
+
+async function applyRoute(deps: TopicPipelineDeps, row: TopicContentRow, route: TopicRoute, message: Inbound, stage: "proposal" | "publish") {
+  if (!CHANGE_STAGES.includes(row.stage)) { await deps.send("Dieser Themenbeitrag ist nicht mehr änderbar. Es wurde nichts geändert."); return; }
+  if (route.intent === "request_products") return requestProducts(deps, row, route.product_wish, message.id);
+  if (route.intent === "question") { await deps.send(route.answer?.trim() || "Dazu habe ich keine gespeicherte Information. Es wurde nichts geändert."); return; }
+  const wish = overrideFromTopicRoute(route);
+  if (!hasOverride(wish)) { await deps.send("Das habe ich nicht als Änderung am Themenbeitrag verstanden. Es wurde nichts geändert."); return; }
+  await applyWish(deps, row, wish, message, stage);
+}
+
+async function applyWish(deps: TopicPipelineDeps, row: TopicContentRow, wish: FormatOverride, message: { id: string }, stage: "proposal" | "publish") {
+  // Any accepted change voids every open or granted publish approval of this content right away.
+  const voided = await invalidateApprovals(deps.db, row.content_id, "operator_change");
+  if (voided.length) emitEvent("platform_publish_skipped", { contentId: row.content_id, reason: "approval_invalidated_by_operator_change", versions: voided });
   if (wish.newTopic) {
     await save(deps.db, { ...row, stage: "discarded" });
     await recordTopicHistory(deps.db, row.candidate.candidate, "discarded", message.id);
@@ -269,10 +362,6 @@ async function applyWish(deps: TopicPipelineDeps, row: TopicContentRow, message:
     return;
   }
   if (wish.noProduct && row.product.status !== "none") row = { ...row, product: { status: "declined", by: message.id } };
-  if (!hasOverride(wish)) {
-    await deps.send("Das habe ich nicht als Änderung erkannt. Möglich sind z. B. „Nur Bild“, „Karussell“, „Nur vier Slides“, „Lieber Video“, „Kein Avatar“, „Weniger werblich“, „Mehr Humor“, „Anderer Aufhänger“, „Neues Thema“, „Such mir dazu ein passendes Produkt“. Es wurde nichts geändert.");
-    return;
-  }
   let candidate = row.candidate;
   if (wish.newHook && candidate.cluster) {
     const variant = candidate.variant + 1;
@@ -285,7 +374,7 @@ async function applyWish(deps: TopicPipelineDeps, row: TopicContentRow, message:
   emitEvent("topic_instruction_applied", { contentId: row.content_id, stage, matched: wish.matched });
   if (stage === "proposal") { await propose(deps, updated, `Übernommen: ${wish.matched.join(", ")}`); return; }
   // After production: re-plan (format/slides), produce again (finished slides/images are reused via the job ledger),
-  // then a new version → automatic invalidation of the old approval → new approval request.
+  // then a new version and a new approval request.
   await produce(deps, await plan(deps, updated));
 }
 
@@ -313,7 +402,7 @@ async function onProductReply(deps: TopicPipelineDeps, row: TopicContentRow, mes
   await deps.send(`Produkt „${resolved.name}“ gespeichert; es wird mit der nächsten Fassung zur Freigabe vorgelegt.`);
 }
 
-async function onPublishReply(deps: TopicPipelineDeps, row: TopicContentRow, message: { id: string; from: string; body: string; replyToMessageId: string | null }) {
+async function onPublishReply(deps: TopicPipelineDeps, row: TopicContentRow, message: Inbound) {
   // Deterministic command: retry only definitely failed platforms of the already approved version.
   if (/^(wiederholen|erneut versuchen)[.!]?$/i.test(message.body.trim()) && ["not_published", "partially_published", "publishing", "published"].includes(row.stage)) {
     await retryFailedPlatforms(deps, row.content_id, message.id);
@@ -335,9 +424,8 @@ async function onPublishReply(deps: TopicPipelineDeps, row: TopicContentRow, mes
     return;
   }
   if (decision === "approved") { await publish(deps, row, message.id); return; }
-  const product = productRequest(message.body);
-  if (product.requested) return requestProducts(deps, row, product.wish, message.id);
-  await applyWish(deps, row, message, "publish");
+  if (productListCommand(message.body)) return requestProducts(deps, row, null, message.id);
+  await understandAndApply(deps, row, message, "publish");
 }
 
 async function publish(deps: TopicPipelineDeps, row: TopicContentRow, approvalMessageId: string, only?: Platform[]) {

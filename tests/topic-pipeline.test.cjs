@@ -4,9 +4,9 @@ const L = '../.test-build/lib';
 const { buildMasterContent, AFFILIATE_DISCLOSURE } = require(`${L}/distribution/master-content`);
 const { renderForPlatform, PLATFORM_ADAPTERS } = require(`${L}/distribution/platforms/adapters`);
 const { publishAll, publishableContent, PlatformPublishError } = require(`${L}/distribution/publish`);
-const { runTopicPipeline, handleTopicReply } = require(`${L}/topic-pipeline/orchestrator`);
+const { runTopicPipeline, handleTopicReply, routeTopicMessage } = require(`${L}/topic-pipeline/orchestrator`);
 const { topicPipelineStatus } = require(`${L}/topic-pipeline/status`);
-const { productCouplingBlocked, suggestProducts, productRequest, productSelection } = require(`${L}/topic-pipeline/product-coupling`);
+const { productCouplingBlocked, suggestProducts, productListCommand, productSelection } = require(`${L}/topic-pipeline/product-coupling`);
 const { referenceCopy } = require(`${L}/topic-pipeline/copy`);
 const G = require(`${L}/publishing/approval-gate`);
 const { memoryLedger } = require(`${L}/visual/ledger`);
@@ -162,6 +162,26 @@ test('without approval nothing is published even when live publishing is on', as
 });
 
 // ---------- end to end through WhatsApp ----------
+// Test double for the semantic router (the real one is a model call). Maps example sentences to what the model returns.
+const R = (over = {}) => ({ domain: 'topic', content_id: null, intent: 'change', format: null, slides: null, exclude_formats: [], tone: [], new_hook: false, cheaper: false,
+  product_wish: null, answer: null, clarification_question: null, confidence: 0.95, ambiguity: 'none', ...over });
+function fakeInterpreter(calls = []) {
+  return async (body, context) => {
+    calls.push({ body, context });
+    const target = context.replying_to.content_id ?? (context.topic_drafts.length === 1 ? context.topic_drafts[0].content_id : null);
+    const t = body.toLowerCase();
+    if (/silbermatte|produktentwurf/.test(t)) return R({ domain: 'product', intent: 'other' });
+    if (/das andere|irgendwas/.test(t)) return R({ domain: 'unclear', intent: 'clarify', clarification_question: 'Meinst du den Themenbeitrag oder den Produktentwurf?' });
+    if (/karussell/.test(t)) return R({ content_id: target, slides: /vier/.test(t) ? 4 : null, format: 'CAROUSEL' });
+    if (/nur bild/.test(t)) return R({ content_id: target, format: 'SINGLE_IMAGE' });
+    if (/werblich/.test(t)) return R({ content_id: target, tone: ['less_promotional'] });
+    if (/neues thema/.test(t)) return R({ content_id: target, intent: 'new_topic' });
+    if (/passendes produkt/.test(t)) return R({ content_id: target, intent: 'request_products' });
+    if (/fenster-beitrag/.test(t)) return R({ content_id: context.topic_drafts.find(item => /Fenster/.test(item.title))?.content_id ?? null, tone: ['more_humor'] });
+    return R({ intent: 'other', content_id: target });
+  };
+}
+
 function harness(db, over = {}) {
   const sent = [];
   let n = 0;
@@ -172,9 +192,10 @@ function harness(db, over = {}) {
   const deps = { db, trustedWaId: OPERATOR, now: () => NOW, send: async text => { sent.push(text); return `wamid.out.${++n}`; },
     render: { ledger: memoryLedger(), imageProvider }, scoutOptions: { sources: [calendarSource(), evergreenSource()], sleep: async () => {} },
     publishers, rasterize: async asset => asset.kind === 'text_graphic' ? { ...asset, url: `https://x.public.blob.vercel-storage.com/r/${asset.sha256}.png`, mediaType: 'image/png', svg: undefined } : asset,
-    liveEnabled: true, suggester: over.suggester ?? null, resolveProduct: over.resolveProduct ?? null, ...over.deps };
+    liveEnabled: true, suggester: over.suggester ?? null, resolveProduct: over.resolveProduct ?? null, interpret: over.interpret ?? fakeInterpreter(over.interpretCalls), ...over.deps };
   const reply = (body, to, id) => handleTopicReply(deps, { id: id ?? `wamid.in.${Math.random()}`, from: OPERATOR, body, replyToMessageId: to });
-  return { deps, sent, reply, publishers, imageCalls, lastId: () => `wamid.out.${n}` };
+  const free = (body, id) => routeTopicMessage(deps, { id: id ?? `wamid.free.${Math.random()}`, from: OPERATOR, body, replyToMessageId: null });
+  return { deps, sent, reply, free, publishers, imageCalls, lastId: () => `wamid.out.${n}` };
 }
 
 test('end to end: proposal → production approval → publish approval → publish → report', async () => {
@@ -286,9 +307,9 @@ test('sensitive topics never get product suggestions; the scout is not even aske
   }
   assert.equal(called, 0);
   assert.equal(productCouplingBlocked(base), null);
-  assert.deepEqual(productRequest('Such mir dazu ein passendes Produkt'), { requested: true, wish: null });
-  assert.deepEqual(productRequest('Such mir dazu ein Produkt wie eine Heizdecke'), { requested: true, wish: 'eine heizdecke' });
-  assert.equal(productRequest('Ohne Produkt bitte').requested, false);
+  // Deterministic commands only; free product requests go through the semantic router.
+  assert.equal(productListCommand('Produktvorschläge'), true);
+  assert.equal(productListCommand('Such mir dazu ein passendes Produkt'), false);
   assert.equal(productSelection('Produkt 3'), 3);
   assert.equal(productSelection('Kein Produkt'), 'none');
   assert.equal(productSelection('Produkt 4'), null);
@@ -400,4 +421,157 @@ test('asynchronous platforms: "processing" is completed by reconciliation, never
     assert.equal(h.publishers.find(publisher => publisher.platform === 'tiktok').calls.length, 1);
     assert.equal(await reconcileTopicPublications(h.deps), 0);
   } finally { await db.close(); }
+});
+
+// ---------- semantic routing: topic vs. product, several drafts, ambiguity ----------
+async function openProductDraft(db) {
+  const { memoryRepository } = require(`${L}/memory/repository`);
+  const { publicationRepository } = require(`${L}/meta/publication-gate`);
+  const { runContentJob } = require(`${L}/content/orchestrator`);
+  const { opportunitySchema } = require(`${L}/content/schema`);
+  const { approveContent } = require('./helpers/approve-content.cjs');
+  const restore = withEnv({ WHATSAPP_APPROVER_WA_ID: OPERATOR });
+  try {
+    const memory = memoryRepository(db), publication = publicationRepository(db);
+    const opportunity = opportunitySchema.parse({ product: { productVerifiedAt: '2026-10-05T06:00:00.000Z', productVerifiedName: 'Silbermatte', name: 'Silbermatte',
+      sourceUrl: 'https://www.amazon.de/dp/B000000009', affiliateUrl: 'https://www.amazon.de/dp/B000000009?tag=alltaeglichle-21', price: '', targetGroup: 'Haushalte',
+      benefits: 'Maße prüfen', notes: '' }, useCase: 'Backen ohne Backpapier an einem Sonntagnachmittag.', targetPlatform: 'facebook', budget: 'low' });
+    const id = crypto.randomUUID();
+    await memory.claim(id, opportunity, 'reference');
+    await runContentJob(opportunity, { id, onUpdate: memory.save, loadLearning: memory.learn });
+    await approveContent(db, memory, id);
+    const pending = await publication.prepare(id, OPERATOR);
+    await publication.claimImage(pending.id);
+    await publication.bindImage(pending.id, `https://x.public.blob.vercel-storage.com/generated/facebook/${id}/${'b'.repeat(64)}.png`);
+    await publication.claimWhatsAppSend(pending.id);
+    await publication.bindMessage(pending.id, 'wamid.product.approval');
+    return { jobId: id, publicationId: pending.id };
+  } finally { restore(); }
+}
+
+test('free text without a quote: one open topic draft → changed; product messages are left to the product router', async () => {
+  const db = await pgliteDatabase();
+  try {
+    const calls = [];
+    const h = harness(db, { interpretCalls: calls });
+    await runTopicPipeline(h.deps, { slotKey: 'r1' });
+    assert.equal(await h.free('Mach daraus bitte ein Karussell mit vier Slides'), true);
+    assert.match(h.sent.at(-1), /^Themenvorschlag \(Überarbeitung 2\)/);
+    assert.match(h.sent.at(-1), /4 Slides \(Betreiberwunsch/);
+    assert.equal(calls.at(-1).context.replying_to.kind, 'none');
+    const count = h.sent.length;
+    assert.equal(await h.free('Such mir lieber eine Silbermatte'), false, 'product pipeline message is not taken');
+    assert.equal(h.sent.length, count);
+    assert.equal(await h.free('Freigeben'), false, 'deterministic words never go through the topic router');
+    assert.equal(await h.free('Status'), false);
+  } finally { await db.close(); }
+});
+
+test('product and topic drafts open at the same time: unclear messages get a clarification, nothing is changed; replay is idempotent', async () => {
+  const db = await pgliteDatabase();
+  try {
+    await openProductDraft(db);
+    const calls = [];
+    const h = harness(db, { interpretCalls: calls });
+    await runTopicPipeline(h.deps, { slotKey: 'r2' });
+    const before = (await db.query('SELECT revision FROM topic_contents')).rows[0].revision;
+    assert.equal(await h.free('Ändere das andere bitte', 'wamid.same'), true);
+    const clarification = h.sent.at(-1);
+    assert.match(clarification, /Themenbeitrag oder den Produktentwurf/);
+    assert.match(clarification, /• Themenbeitrag „/);
+    assert.match(clarification, /• Produktentwurf „Silbermatte/);
+    assert.equal(calls.at(-1).context.product_drafts.length, 1);
+    assert.equal((await db.query('SELECT revision FROM topic_contents')).rows[0].revision, before);
+    const count = h.sent.length;
+    assert.equal(await h.free('Ändere das andere bitte', 'wamid.same'), true);
+    assert.equal(h.sent.length, count, 'replay sends nothing');
+    // A quoted product approval is never handled by the topic pipeline.
+    assert.equal(await h.reply('Mach es weniger werblich', 'wamid.product.approval'), false);
+  } finally { await db.close(); }
+});
+
+test('several topic drafts: the router picks the right one; without a clear target nothing changes', async () => {
+  const db = await pgliteDatabase();
+  try {
+    const h = harness(db);
+    await runTopicPipeline(h.deps, { slotKey: 'a' });
+    await runTopicPipeline(h.deps, { slotKey: 'b', exclude: [(await db.query('SELECT topic_id FROM topic_contents')).rows[0].topic_id] });
+    const rows = () => db.query("SELECT content_id, revision, candidate->'candidate'->>'title' AS title FROM topic_contents ORDER BY created_at").then(result => result.rows);
+    const [first, second] = await rows();
+    assert.equal(await h.free('Bitte etwas weniger werblich'), true);
+    assert.match(h.sent.at(-1), /Welchen Entwurf meinst du/);
+    assert.deepEqual((await rows()).map(row => row.revision), [1, 1]);
+    const fenster = [first, second].find(row => /Fenster/.test(row.title));
+    if (fenster) {
+      assert.equal(await h.free('Beim Fenster-Beitrag bitte mehr Humor'), true);
+      const after = await rows();
+      assert.equal(after.find(row => row.content_id === fenster.content_id).revision, 2);
+      assert.equal(after.find(row => row.content_id !== fenster.content_id).revision, 1);
+    }
+  } finally { await db.close(); }
+});
+
+test('quoted topic message: router failure or a product-domain answer changes nothing (no pattern fallback)', async () => {
+  const db = await pgliteDatabase();
+  try {
+    const failing = harness(db, { interpret: async () => { throw new (require(`${L}/whatsapp/route-llm`).RouterUnavailable)('router_http_503'); } });
+    await runTopicPipeline(failing.deps, { slotKey: 'f' });
+    await failing.reply('Mach daraus ein Karussell', 'wamid.out.1');
+    assert.match(failing.sent.at(-1), /nicht sicher verstehen.*nichts geändert/);
+    assert.equal((await db.query('SELECT revision FROM topic_contents')).rows[0].revision, 1);
+    const product = harness(db, { interpret: async () => R({ domain: 'product', intent: 'other' }) });
+    await product.reply('Bild vom Produkt neu', 'wamid.out.1');
+    assert.match(product.sent.at(-1), /Produktentwurf, nicht nach dem Themenbeitrag/);
+    assert.equal((await db.query('SELECT revision FROM topic_contents')).rows[0].revision, 1);
+  } finally { await db.close(); }
+});
+
+test('a change during the publish approval voids that approval at once; the old approval message cannot approve the new version', async () => {
+  const db = await pgliteDatabase();
+  try {
+    const h = harness(db);
+    await runTopicPipeline(h.deps, { slotKey: 'c' });
+    await h.reply('Freigeben', 'wamid.out.1');
+    const firstApproval = h.lastId();
+    const contentId = (await db.query('SELECT content_id FROM topic_contents')).rows[0].content_id;
+    assert.equal((await G.approvalState(db, contentId)).status, 'pending');
+    // Free text without a quote, semantically assigned to the only open topic draft.
+    assert.equal(await h.free('Mach das weniger werblich'), true);
+    const versions = (await db.query('SELECT version, status, reason FROM publish_approvals ORDER BY version')).rows;
+    assert.deepEqual(versions.map(row => [row.version, row.status]), [[1, 'invalidated'], [2, 'pending']]);
+    assert.equal(versions[0].reason, 'operator_change');
+    assert.match(h.sent.at(-1), /Fassung 2/);
+    await h.reply('Freigeben', firstApproval);
+    assert.match(h.sent.at(-1), /nicht mehr aktuell/);
+    assert.ok(h.publishers.every(publisher => publisher.calls.length === 0));
+  } finally { await db.close(); }
+});
+
+test('signed webhook: a free message without a quote is assigned to the open topic draft before the product router', async t => {
+  const { createHmac } = require('node:crypto');
+  const loadRoute = require('./helpers/load-route.cjs');
+  const db = await pgliteDatabase();
+  t.after(() => db.close());
+  const restore = withEnv({ META_APP_SECRET: 'topic-signature-2', WHATSAPP_PHONE_NUMBER_ID: '123456', WHATSAPP_APPROVER_WA_ID: OPERATOR, TOPIC_PIPELINE_ENABLED: 'true', WHATSAPP_ROUTER_ENABLED: 'true' });
+  t.after(restore);
+  const h = harness(db);
+  await runTopicPipeline(h.deps, { slotKey: 'webhook-free' });
+  const fail = name => async () => { throw new Error(`${name} must not run`); };
+  const handler = loadRoute('app/api/whatsapp/webhook/route.ts', {
+    'next/server': { after: () => {} }, '@/lib/memory/db': { getDatabase: () => db },
+    '@/lib/production/repository': { productionRepository: () => ({ applyIncomingWhatsApp: fail('keyword chain') }) },
+    '@/lib/whatsapp/router': { routeOperatorMessage: fail('product router') },
+    '@/lib/whatsapp/start-image-post': { startImagePostFromWhatsApp: fail('image post'), startProductSearch: fail('product search') },
+    '@/lib/daily/draft': { createDailyDraft: fail('daily draft'), sendDailyApproval: async () => true, sendPendingDailyApprovals: async () => 0 },
+    '@/lib/whatsapp/client': { sendWhatsAppText: async () => 'wamid.x' },
+    '@/lib/agents/topic-runtime': { topicPipelineDeps: () => h.deps },
+  });
+  const payload = JSON.stringify({ object: 'whatsapp_business_account', entry: [{ changes: [{ value: { metadata: { phone_number_id: '123456' },
+    messages: [{ id: 'wamid.topic.free', from: OPERATOR, type: 'text', text: { body: 'Mach das bitte weniger werblich' } }] } }] }] });
+  const request = () => new Request('https://local.test/api/whatsapp/webhook', { method: 'POST', headers: { 'x-hub-signature-256': `sha256=${createHmac('sha256', 'topic-signature-2').update(payload).digest('hex')}` }, body: payload });
+  assert.equal((await handler.POST(request())).status, 200);
+  assert.match(h.sent.at(-1), /Überarbeitung 2/);
+  const count = h.sent.length;
+  assert.equal((await handler.POST(request())).status, 200, 'Meta redelivery');
+  assert.equal(h.sent.length, count);
 });

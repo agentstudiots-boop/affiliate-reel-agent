@@ -24,7 +24,7 @@ import { publishInstagramImage, resumeInstagramImages } from "@/lib/meta/instagr
 import { deliverWeeklyReport } from "@/lib/reporting/weekly";
 import { latestImagePostsStatus } from "@/lib/reporting/whatsapp-status";
 import { formatPublishReport } from "@/lib/publishing/report";
-import { handleTopicReply, reconcileTopicPublications, resumeTopicProductions } from "@/lib/topic-pipeline/orchestrator";
+import { handleTopicReply, reconcileTopicPublications, resumeTopicProductions, routeTopicMessage } from "@/lib/topic-pipeline/orchestrator";
 import { topicPipelineStatus } from "@/lib/topic-pipeline/status";
 import { extractIncomingWhatsAppMessages, verifyMetaWebhookSignature, verifyWhatsAppChallenge } from "@/lib/whatsapp/security";
 
@@ -121,11 +121,13 @@ export async function POST(request: Request) {
         }
         continue;
       }
-      // Replies to topic-pipeline messages (proposal, product suggestions, publish approval) belong to that pipeline only.
-      // Any failure here falls back to the existing chain, which ignores unknown reply targets.
-      if (process.env.TOPIC_PIPELINE_ENABLED === "true" && message.replyToMessageId) {
+      // Topic pipeline first (only when enabled): replies quoting a topic message belong to it; free messages without a
+      // quote are assigned semantically to a topic draft or left to the product router. Any failure falls back to the
+      // existing chain, which ignores unknown reply targets.
+      if (process.env.TOPIC_PIPELINE_ENABLED === "true") {
+        const inbound = { id: message.id, from: message.from, body: message.body, replyToMessageId: message.replyToMessageId, payload };
         const handledTopic = await import("@/lib/agents/topic-runtime")
-          .then(({ topicPipelineDeps }) => handleTopicReply(topicPipelineDeps(), { id: message.id, from: message.from, body: message.body, replyToMessageId: message.replyToMessageId, payload }))
+          .then(({ topicPipelineDeps }) => message.replyToMessageId ? handleTopicReply(topicPipelineDeps(), inbound) : routeTopicMessage(topicPipelineDeps(), inbound))
           .catch(() => { console.error(JSON.stringify({ event: "topic_reply_unavailable", messageId: message.id })); return false; });
         if (handledTopic) continue;
       }

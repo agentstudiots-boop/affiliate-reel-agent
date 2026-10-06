@@ -256,3 +256,11 @@ export async function contentIdForRequestMessage(db: Sql, requestMessageId: stri
   const row = (await db.query("SELECT content_id,version FROM publish_approvals WHERE request_message_id=$1", [requestMessageId])).rows[0];
   return row ? { contentId: String(row.content_id), version: Number(row.version) } : null;
 }
+
+// An accepted operator change to a draft voids every open or granted approval of that content immediately, even
+// before the new version is produced (and even if producing it fails).
+export async function invalidateApprovals(db: Sql, contentId: string, reason: string) {
+  const result = await db.query("UPDATE publish_approvals SET status='invalidated', reason=$2, updated_at=now() WHERE content_id=$1 AND status IN ('pending','approved') RETURNING version",
+    [contentId, reason.slice(0, 120)]);
+  return result.rows.map(row => Number(row.version));
+}

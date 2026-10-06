@@ -32,14 +32,9 @@ export function productCouplingBlocked(candidate: TopicCandidate): string | null
   return null;
 }
 
-// Explicit request only. "ohne Produkt" / "kein Produkt" is the opposite and never triggers a search.
-export function productRequest(body: string): { requested: boolean; wish: string | null } {
-  const text = body.trim().toLocaleLowerCase("de-DE");
-  if (/\b(ohne|kein(en)?)\s+produkt/.test(text)) return { requested: false, wish: null };
-  const match = text.match(/(?:such|finde|schlag)\w*\s+(?:mir\s+)?(?:dazu\s+)?(?:ein(?:e|en)?\s+)?(?:passende[ns]?\s+)?(produkt|artikel|produktvorschläge|produktvorschlag)(?:\s+(?:wie|zum beispiel|z\.?\s?b\.?)\s+(.{3,60}))?/);
-  if (!match) return { requested: /^produktvorschl(ä|ae)ge[.!?]*$/.test(text), wish: null };
-  return { requested: true, wish: match[2]?.replace(/[.!?]+$/, "").trim() || null };
-}
+// Deterministic shortcut: the literal command "Produktvorschläge". Free requests ("such mir dazu ein passendes Produkt")
+// are understood by the semantic router (intent request_products), not by a pattern.
+export const productListCommand = (body: string) => /^produktvorschl(ä|ae)ge[.!?]*$/i.test(body.trim());
 
 // Selection reply to the suggestion message: "Produkt 2". Anything else is not a selection.
 export function productSelection(body: string): number | "none" | null {
