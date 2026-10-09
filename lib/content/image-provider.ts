@@ -12,9 +12,14 @@ export type OriginalVisualAsset = {
   usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number; predictionId?: string; predictTimeSeconds?: number };
 };
 
+// options.prompt: the validated provider prompt (image quality pipeline); the provider still runs its own creative and
+// context checks on the job. options.onPrediction: the accepted provider job id, recorded before waiting for the result.
+export type RenderOptions = { prompt?: string; onPrediction?: (predictionId: string) => Promise<void> };
 export type OriginalVisualProvider = {
   name: string;
-  render(job: ContentJob): Promise<OriginalVisualAsset>;
+  render(job: ContentJob, options?: RenderOptions): Promise<OriginalVisualAsset>;
+  // Looks up an already accepted provider job instead of creating a new paid one ("pending" while still running).
+  resume?(predictionId: string, job: ContentJob): Promise<OriginalVisualAsset | "pending">;
 };
 
 export class ImageProviderUnavailableError extends Error {}

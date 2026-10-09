@@ -123,6 +123,25 @@ export function publicationRepository(db: Database = getDatabase()) {
         return { job, existing: null };
       });
     },
+    // Continues the already claimed image of the current content version (operator decision after a stopped image job):
+    // same approval and context checks as claimVisual, no new claim, never after a publication request for this version.
+    async continueVisual(jobId: string): Promise<{ job: ContentJob; contentHash: string }> {
+      return db.transaction(async sql => {
+        const stored = await sql.query("SELECT snapshot FROM content_jobs WHERE id=$1 FOR UPDATE", [jobId]);
+        if (!stored.rows[0]) throw new PublicationConflictError("Content-Job fehlt.");
+        const job = parseJob(stored.rows[0].snapshot);
+        const { hash } = publicationContent(job);
+        const visualError = visualContextError(job);
+        if (visualError) throw new PublicationConflictError(visualError);
+        if (!await hasContentApproval(job, sql)) throw new PublicationConflictError("WhatsApp-Inhaltsfreigabe für den vollständigen Bildentwurf fehlt.");
+        const attempt = await sql.query("SELECT status FROM original_visual_attempts WHERE job_id=$1 AND content_hash=$2", [jobId, hash]);
+        if (attempt.rows[0]?.status !== "attempted") throw new PublicationConflictError("Für diese Fassung gibt es keinen angehaltenen Bildauftrag.");
+        const published = await sql.query("SELECT 1 FROM publication_requests WHERE job_id=$1 AND platform='facebook' AND content_hash=$2 LIMIT 1", [jobId, hash]);
+        if (published.rows.length) throw new PublicationConflictError("Für diese Fassung liegt bereits eine Veröffentlichungsfreigabe vor.");
+        return { job, contentHash: hash };
+      });
+    },
+    contentHashOf(job: ContentJob) { return publicationContent(job).hash; },
     async prepareWithVisual(jobId: string, approver: string, asset: OriginalVisualAsset) {
       const expectedPath = asset.sha256 && /^[a-f0-9]{64}$/.test(asset.sha256) ? `/generated/facebook/${jobId}/${asset.sha256}.png` : "";
       let validUrl = false;

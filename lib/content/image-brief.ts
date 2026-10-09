@@ -3,6 +3,7 @@ import { analyzeProductInspiration } from "./product-inspiration";
 import { isPumpkinCarvingProduct } from "./category";
 import { VISUAL_FUNCTION_RULE } from "./visual-coherence";
 import type { ApprovedEditorialCorrection } from "./agent";
+import { imageSpecFor } from "./image-quality/spec";
 
 function excerpt(value: string, limit: number): string {
   const clean = value.replace(/\s+/g, " ").trim();
@@ -25,7 +26,7 @@ export function imageBrief(job: ContentJob): string {
   const corrections=(correctionEvent?.data as {approvedEditorialCorrections?:ApprovedEditorialCorrection[]}|undefined)?.approvedEditorialCorrections || [];
   const relevantVisualCorrections=corrections.filter(item=>item.sameProductFamily && item.intent!=="revise_text").slice(0,1);
   return [
-    pumpkinCarving ? "HAUPTMOTIV – zwingend sofort erkennbar: Ein großer, eindeutig als echter orangefarbener Halloween-Kürbis erkennbarer Kürbis nimmt den Bildvordergrund ein. Eine erwachsene Person schnitzt gerade mit einem kleinen Kürbisschnitzwerkzeug die Augen- oder Mundöffnung in seine Schale; die ausgeschnittenen Gesichtszüge und der aktive Schnitzvorgang sind deutlich sichtbar. Kürbis und Schnitzhandlung müssen stärker auffallen als Person, Werkzeuge und Hintergrund." : `HAUPTMOTIV – zwingend sofort erkennbar: Die konkrete Anwendung der Produktkategorie ${category} steht groß und deutlich im Vordergrund; Person und Dekoration unterstützen nur die Handlung.`,
+    pumpkinCarving ? "HAUPTMOTIV – zwingend sofort erkennbar: Ein großer, eindeutig als echter orangefarbener Halloween-Kürbis erkennbarer Kürbis nimmt den Bildvordergrund ein. Eine erwachsene Person schnitzt gerade mit einem kleinen Kürbisschnitzwerkzeug die Augen- oder Mundöffnung in seine Schale; die ausgeschnittenen Gesichtszüge und der aktive Schnitzvorgang sind deutlich sichtbar. Kürbis und Schnitzhandlung müssen stärker auffallen als Person, Werkzeuge und Hintergrund." : `HAUPTMOTIV – zwingend sofort erkennbar: ${imageSpecFor(job).primary_object} (${category}) steht groß und deutlich im Vordergrund; Personen und Umgebung unterstützen nur.`,
     `Motiv und Handlung: ${excerpt(scene.visual, 360)}`,
     `Alltag und Umgebung: ${excerpt(concept.everydaySituation, 220)}`,
     `Sichtbarer Produktbezug: Eine neutrale, unmarkierte Darstellung der Kategorie ${category} muss bei der beschriebenen Anwendung erkennbar sein. Handlung und Produktbezug sind das Hauptmotiv, nicht bloß Dekoration.`,

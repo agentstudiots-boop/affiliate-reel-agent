@@ -50,8 +50,40 @@ export const visualConceptSchema = z.object({
   originality: z.literal("original_editorial"),
   visualWeight: z.enum(["image_led", "balanced", "text_led"]),
 });
+// Machine-readable image briefing (see lib/content/image-quality/spec.ts). Absent on older jobs: derived from the plan.
+const imageTerm = z.string().min(2).max(60);
+export const imageSpecSchema = z.object({
+  content_type: z.enum(["affiliate_image", "topic_image"]),
+  subject: z.string().min(2).max(160),
+  primary_object: z.string().min(2).max(160),
+  primary_object_terms: z.array(imageTerm).min(1).max(6),
+  primary_object_required: z.literal(true),
+  primary_object_prominence: z.enum(["dominant", "visible"]),
+  required_objects: z.array(imageTerm).max(6),
+  forbidden_objects: z.array(imageTerm).max(12),
+  composition: z.string().min(2).max(240),
+  style: z.string().min(2).max(160),
+  aspect_ratio: z.literal("4:5"),
+  platforms: z.array(z.enum(["instagram", "facebook", "tiktok", "youtube", "x"])).min(1).max(5),
+  commercial_intent: z.string().min(2).max(240),
+  product_reference_required: z.boolean(),
+  representation: z.enum(["generic_category", "verified_product_context", "symbolic"]),
+  edit_mode: z.literal("regenerate"),
+  change_instructions: z.array(z.string().min(2).max(300)).max(6),
+  // Product-specific briefing (from the concrete article, never invented): type, attributes named in the title or verified,
+  // setting, explicitly missing information and how far the image can claim to show the real article.
+  product_type: z.string().max(80).default(""),
+  product_attributes: z.array(z.string().max(80)).max(8).default([]),
+  setting: z.string().max(200).default(""),
+  missing_information: z.array(z.string().max(120)).max(6).default([]),
+  identity_class: z.enum(["symbolic", "generic_product", "brand_article"]).default("generic_product"),
+  // Relevant, sufficiently confirmed experience from earlier image jobs (see image-quality/learning.ts).
+  learned_guidance: z.array(z.string().max(200)).max(4).default([]),
+});
+export type ImageSpec = z.infer<typeof imageSpecSchema>;
 export const imageSchema = z.object({ ...base, format: z.literal("image"), layout: z.enum(["single", "carousel"]),
   visualConcept: visualConceptSchema.optional(),
+  imageSpec: imageSpecSchema.optional(),
   slides: z.array(z.object({ headline: text, copy: text, visual: text, prompt: text, alt: text })).min(1).max(7), caption: text,
 });
 export const textSchema = z.object({ ...base, format: z.literal("text"), style: z.enum(["recommendation", "expert", "community"]), body: z.string().min(120).max(5000) });

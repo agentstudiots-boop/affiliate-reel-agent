@@ -19,7 +19,10 @@ export type ProductionCopy = {
 export type RenderInput = { contentId: string; copy: ProductionCopy; style: StyleBrief; slides?: number | null; dryRun: boolean; visualPotential: number };
 export type RenderContext = { ledger: JobLedger; imageProvider: ImageProvider | null; sleep?: (ms: number) => Promise<void>; maxAttempts?: number;
   avatarProvider?: VideoProvider | null; standardVideoProvider?: VideoProvider | null; avatarQuota?: { store: QuotaStore; limit: number } | null;
-  videoTiming?: { pollIntervalMs?: number; maxWaitMs?: number; stuckAfterMs?: number }; now?: () => Date };
+  videoTiming?: { pollIntervalMs?: number; maxWaitMs?: number; stuckAfterMs?: number }; now?: () => Date;
+  // Shared visual quality gate (lib/content/image-quality). Optional; a rejected or uncertain image is never used: the
+  // single image degrades along the fallback chain, a carousel slide to a text graphic. It never triggers a new generation.
+  imageQuality?: (asset: GeneratedAsset, motif: { motif: string; title: string }) => Promise<{ approved: boolean; reasons: string[] }> };
 export type RenderOutcome = {
   status: "completed" | "degraded" | "failed" | "dry_run" | "in_progress";
   assets: { role: string; asset: GeneratedAsset }[];
@@ -56,6 +59,10 @@ export const singleImageRenderer: Renderer = {
     if (!context.imageProvider || !context.imageProvider.available().ok) return { status: "failed", assets: [], error: "image_provider_unavailable", notes: [] };
     const result = await runImageJob(brief, { contentId: input.contentId, role: "main-image", ledger: context.ledger, provider: context.imageProvider, sleep: context.sleep, maxAttempts: context.maxAttempts });
     if (!result.ok) return { status: "failed", assets: [], error: `image_${result.error}`, notes: [`Bild nicht erzeugt: ${result.error}`] };
+    if (context.imageQuality) {
+      const quality = await context.imageQuality(result.asset, { motif: input.copy.imageMotif, title: input.copy.title }).catch(() => ({ approved: false, reasons: ["Bildprüfung nicht möglich"] }));
+      if (!quality.approved) return { status: "failed", assets: [], error: "image_quality_rejected", notes: [`Bild nicht verwendet: ${quality.reasons.join(" ").slice(0, 200)}`] };
+    }
     return { status: "completed", assets: [{ role: "main-image", asset: result.asset }], notes: result.reused ? ["Vorhandenes Bild wiederverwendet"] : [] };
   },
 };
@@ -88,15 +95,17 @@ export async function renderCarouselPlan(plan: CarouselPlan, input: RenderInput,
     const result = context.imageProvider
       ? await runImageJob({ prompt: slide.visual_brief, aspectRatio: "4:5", styleKey: plan.style.key }, { contentId: plan.contentId, role, ledger: context.ledger, provider: context.imageProvider, sleep: context.sleep, maxAttempts: context.maxAttempts })
       : { ok: false as const, error: "image_provider_unavailable", retryable: false, attempts: 0, key: "" };
-    if (result.ok) {
+    const rejected = result.ok && context.imageQuality
+      ? !(await context.imageQuality(result.asset, { motif: slide.visual_brief, title: slide.headline }).catch(() => ({ approved: false, reasons: [] }))).approved : false;
+    if (result.ok && !rejected) {
       results.push({ slide_number: slide.slide_number, status: "succeeded", asset: result.asset, reused: result.reused });
       assets.push({ role, asset: result.asset });
       emitEvent("carousel_slide_completed", { contentId: plan.contentId, slide: slide.slide_number, kind: "generated_image", reused: result.reused });
     } else {
       const asset = graphic();
-      results.push({ slide_number: slide.slide_number, status: "degraded", asset, error: result.error });
+      results.push({ slide_number: slide.slide_number, status: "degraded", asset, error: result.ok ? "image_quality_rejected" : result.error });
       assets.push({ role, asset });
-      emitEvent("carousel_slide_failed", { contentId: plan.contentId, slide: slide.slide_number, error: result.error, degradedTo: "text_graphic" }, "warn");
+      emitEvent("carousel_slide_failed", { contentId: plan.contentId, slide: slide.slide_number, error: result.ok ? "image_quality_rejected" : result.error, degradedTo: "text_graphic" }, "warn");
     }
   }
   const degraded = results.filter(item => item.status === "degraded").length;

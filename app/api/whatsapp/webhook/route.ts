@@ -7,7 +7,7 @@ import { continuePendingReels, latestInstagramReelStatus, recoverRunwayPreflight
 import { productionRepository } from "@/lib/production/repository";
 import { publicationRepository } from "@/lib/meta/publication-gate";
 import { FacebookPublishFailure, publishFacebookPhoto } from "@/lib/meta/publisher";
-import { requestFacebookApproval } from "@/lib/meta/request-publication";
+import { alreadyNotified, requestFacebookApproval } from "@/lib/meta/request-publication";
 import { publicationPreparationFailureText, resumeApprovedDailyPublications } from "@/lib/meta/resume-publication";
 import { requestVideoCostApproval } from "@/lib/production/request-cost-approval";
 import { getDatabase } from "@/lib/memory/db";
@@ -18,6 +18,7 @@ import { changeCategory } from "@/lib/whatsapp/category-change";
 import type { Instruction } from "@/lib/whatsapp/instruction";
 import { startImagePostFromWhatsApp, startProductSearch } from "@/lib/whatsapp/start-image-post";
 import { handleManualOrder } from "@/lib/whatsapp/manual-order";
+import { handleImageQualityReply } from "@/lib/whatsapp/image-quality-reply";
 import { answerWhatsAppConversation } from "@/lib/whatsapp/chat";
 import { sendWhatsAppText } from "@/lib/whatsapp/client";
 import { completeVoice, releaseVoice, resolveVoiceMessage } from "@/lib/whatsapp/voice";
@@ -123,6 +124,8 @@ export async function POST(request: Request) {
         }
         continue;
       }
+      // Replies to a stopped image job's notice are the operator's manual decision for exactly that job.
+      if (await handleImageQualityReply({ ...message, payload }, { database: getDatabase, request: (jobId, mode) => requestFacebookApproval(jobId, mode), send: sendWhatsAppText, notified: alreadyNotified })) continue;
       // Explicit product orders and their short follow-ups („Erstelle einen Beitrag zum …“, „Mach es trotzdem“) are clear
       // enough for a deterministic path: they keep the active order as context and override only the TrendScout cooldown.
       if (await handleManualOrder({ ...message, payload }, { database: getDatabase, start: createDailyDraft, send: sendWhatsAppText })) continue;
@@ -165,7 +168,7 @@ export async function POST(request: Request) {
           else if(job.content?.format==="image")await requestFacebookApproval(jobId);
         } catch(error) {
           console.warn(JSON.stringify({event:"content_approved_next_step_blocked",jobId,reason:error instanceof Error?error.message:"unknown"}));
-          try{await sendWhatsAppText(`Der Inhalt ist freigegeben, aber der nächste Schritt ist noch blockiert: ${error instanceof Error?error.message:"Status unklar."} Es wurde nichts zusätzlich gekauft oder veröffentlicht. Antworte mit „Status“, nachdem der Zugang geprüft wurde.`);}catch{}
+          if(!alreadyNotified(error))try{await sendWhatsAppText(`Der Inhalt ist freigegeben, aber der nächste Schritt ist noch blockiert: ${error instanceof Error?error.message:"Status unklar."} Es wurde nichts zusätzlich gekauft oder veröffentlicht. Antworte mit „Status“, nachdem der Zugang geprüft wurde.`);}catch{}
         }
       })) continue;
       if (await processOperatorInstruction({ ...message, payload }, { sendApproval: sendDailyApproval, ...(routedInstruction ? { interpret: async () => routedInstruction! } : {}) })) continue;
@@ -192,7 +195,7 @@ export async function POST(request: Request) {
         catch (error) {
           // Never silent: the operator learns why no image / publication request followed the approval.
           console.error(JSON.stringify({event:"daily_publication_preparation_failed",jobId:result.dailyJobId,failureType:error instanceof Error?error.name:"unknown",reason:error instanceof Error?error.message.slice(0,200):undefined}));
-          try { await sendWhatsAppText(publicationPreparationFailureText(error)); } catch { console.error(JSON.stringify({event:"daily_publication_failure_notice_unsent",jobId:result.dailyJobId})); }
+          if (!alreadyNotified(error)) try { await sendWhatsAppText(publicationPreparationFailureText(error)); } catch { console.error(JSON.stringify({event:"daily_publication_failure_notice_unsent",jobId:result.dailyJobId})); }
         }
       }
       if (result.handled && "productionRunId" in result && result.intent === "changes_requested" && "jobId" in result && typeof result.jobId === "string") {

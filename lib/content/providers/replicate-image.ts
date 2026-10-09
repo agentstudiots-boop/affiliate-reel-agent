@@ -15,7 +15,7 @@ type Prediction = { id?: unknown; status?: unknown; output?: unknown; metrics?: 
 type Dependencies = { request?: typeof fetch; upload?: typeof put; timeoutMs?: number; pollIntervalMs?: number };
 
 export class ReplicateFailure extends Error {
-  constructor(public readonly category: string, public readonly httpStatus?: number, public readonly detail?: string) {
+  constructor(public readonly category: string, public readonly httpStatus?: number, public readonly detail?: string, public readonly retryAfterSeconds: number | null = null) {
     super(category);
   }
 }
@@ -30,7 +30,9 @@ export function replicateHttpFailure(status: number, body: string): ReplicateFai
     model_or_endpoint: "Modell oder Endpunkt nicht gefunden", request_schema: "Eingabe abgelehnt",
     rate_limit: "Rate Limit", provider_error: "Providerfehler", request_rejected: "Anfrage abgelehnt",
   } as Record<string, string>)[category];
-  return new ReplicateFailure(category, status, detail);
+  // Replicate advertises the wait of a throttled request ("retry_after"); only a concrete hint allows an automatic retry.
+  const retryAfter = status === 429 ? Number(body.match(/retry_after"?\s*:\s*(\d+(?:\.\d+)?)/)?.[1]) : NaN;
+  return new ReplicateFailure(category, status, detail, Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : null);
 }
 
 export function replicatePredictionId(value: unknown): string | null {
@@ -78,8 +80,42 @@ export function createReplicateImageProvider(key: string, model = DEFAULT_REPLIC
   if (!SUPPORTED_REPLICATE_IMAGE_MODELS.includes(model as (typeof SUPPORTED_REPLICATE_IMAGE_MODELS)[number])) {
     throw new OriginalVisualError("REPLICATE_IMAGE_MODEL wird nicht unterstützt.");
   }
-  return { name: "replicate", async render(job: ContentJob): Promise<OriginalVisualAsset> {
-    const prompt = buildOriginalVisualPrompt(job);
+  const headersFor = () => ({ Authorization: `Bearer ${key}` });
+  // Download, verify and store a finished prediction's PNG under the job's own path.
+  async function store(job: ContentJob, prediction: Prediction, id: string, request: typeof fetch, signal: AbortSignal): Promise<OriginalVisualAsset> {
+    const url = replicateOutputUrl(prediction.output);
+    if (!url) throw new ReplicateFailure("invalid_output");
+    const image = await request(url.href, { redirect: "manual", signal });
+    const bytes = await readReplicatePng(image);
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
+    const path = `generated/facebook/${job.id}/${sha256}.png`;
+    const blob = await (deps.upload || put)(path, bytes, { access: "public", addRandomSuffix: false, contentType: "image/png" });
+    const blobUrl = new URL(blob.url);
+    if (blobUrl.protocol !== "https:" || !blobUrl.hostname.endsWith(".public.blob.vercel-storage.com") || blobUrl.pathname !== `/${path}`) {
+      throw new OriginalVisualError("Blob-Upload lieferte keine gültige Bild-URL.");
+    }
+    const predictTime = prediction.metrics?.predict_time;
+    const usage = { predictionId: id, ...(typeof predictTime === "number" && Number.isFinite(predictTime) && predictTime >= 0 ? { predictTimeSeconds: predictTime } : {}) };
+    return { url: blobUrl.href, provider: "replicate", mediaType: "image", model, sha256, generatedAt: new Date().toISOString(), usage };
+  }
+  return { name: "replicate",
+  // A single status GET of an accepted prediction: never a new POST.
+  async resume(predictionId: string, job: ContentJob): Promise<OriginalVisualAsset | "pending"> {
+    const id = replicatePredictionId(predictionId);
+    if (!id) throw new ReplicateFailure("invalid_prediction_id");
+    const request = deps.request || fetch;
+    const signal = AbortSignal.timeout(deps.timeoutMs ?? TIMEOUT_MS);
+    const polled = await request(`${REPLICATE_API}/predictions/${id}`, { headers: headersFor(), signal });
+    if (!polled.ok) throw replicateHttpFailure(polled.status, (await polled.text()).slice(0, 2048));
+    const prediction = await polled.json() as Prediction;
+    if (replicatePredictionId(prediction?.id) !== id) throw new ReplicateFailure("prediction_id_mismatch");
+    if (prediction.status === "starting" || prediction.status === "processing") return "pending";
+    if (prediction.status !== "succeeded") throw new ReplicateFailure(prediction.status === "failed" || prediction.status === "canceled" ? prediction.status : "unknown_status");
+    return store(job, prediction, id, request, signal);
+  },
+  async render(job: ContentJob, options = {}): Promise<OriginalVisualAsset> {
+    const checked = buildOriginalVisualPrompt(job);
+    const prompt = options.prompt ?? checked;
     const request = deps.request || fetch;
     const deadline = AbortSignal.timeout(deps.timeoutMs ?? TIMEOUT_MS);
     const headers = { Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
@@ -98,6 +134,8 @@ export function createReplicateImageProvider(key: string, model = DEFAULT_REPLIC
       catch { throw new ReplicateFailure("invalid_prediction_response"); }
       id = replicatePredictionId(prediction?.id);
       if (!id) throw new ReplicateFailure("invalid_prediction_id");
+      phase = "accepted";
+      if (options.onPrediction) await options.onPrediction(id);
       phase = "poll";
       while (prediction.status === "starting" || prediction.status === "processing") {
         await new Promise<void>((resolve, reject) => {
@@ -115,23 +153,8 @@ export function createReplicateImageProvider(key: string, model = DEFAULT_REPLIC
       if (prediction.status !== "succeeded") throw new ReplicateFailure(
         prediction.status === "failed" || prediction.status === "canceled" ? prediction.status : "unknown_status",
       );
-      phase = "output";
-      const url = replicateOutputUrl(prediction.output);
-      if (!url) throw new ReplicateFailure("invalid_output");
       phase = "download";
-      const image = await request(url.href, { redirect: "manual", signal: deadline });
-      const bytes = await readReplicatePng(image);
-      const sha256 = createHash("sha256").update(bytes).digest("hex");
-      phase = "blob";
-      const path = `generated/facebook/${job.id}/${sha256}.png`;
-      const blob = await (deps.upload || put)(path, bytes, { access: "public", addRandomSuffix: false, contentType: "image/png" });
-      const blobUrl = new URL(blob.url);
-      if (blobUrl.protocol !== "https:" || !blobUrl.hostname.endsWith(".public.blob.vercel-storage.com") || blobUrl.pathname !== `/${path}`) {
-        throw new OriginalVisualError("Blob-Upload lieferte keine gültige Bild-URL.");
-      }
-      const predictTime = prediction.metrics?.predict_time;
-      const usage = { predictionId: id, ...(typeof predictTime === "number" && Number.isFinite(predictTime) && predictTime >= 0 ? { predictTimeSeconds: predictTime } : {}) };
-      return { url: blobUrl.href, provider: "replicate", mediaType: "image", model, sha256, generatedAt: new Date().toISOString(), usage };
+      return await store(job, prediction, id, request, deadline);
     } catch (error) {
       const failure = error instanceof ReplicateFailure ? error : null;
       const category = failure?.category || (deadline.aborted ? "timeout" : phase === "blob" ? "blob_error" : phase === "download" ? "invalid_media" : "unexpected_error");
@@ -141,7 +164,7 @@ export function createReplicateImageProvider(key: string, model = DEFAULT_REPLIC
       }));
       // A refusal while creating the prediction means that no image exists and nothing was charged: safe to try again later.
       const definite = !!failure?.httpStatus && phase === "create" && [401, 402, 403, 404, 422, 429].includes(failure.httpStatus);
-      if (definite) throw new OriginalVisualError(`Replicate hat die Bildanfrage abgelehnt (${failure?.detail || category}). Es wurde kein Bild erzeugt und nichts berechnet.`, true, category);
+      if (definite) throw new OriginalVisualError(`Replicate hat die Bildanfrage abgelehnt (${failure?.detail || category}). Es wurde kein Bild erzeugt und nichts berechnet.`, true, category, failure?.retryAfterSeconds ?? null);
       throw new OriginalVisualError("Replicate-Bildversuch fehlgeschlagen oder Ergebnis unklar. Kein automatischer zweiter Versuch.", false, category);
     }
   } };

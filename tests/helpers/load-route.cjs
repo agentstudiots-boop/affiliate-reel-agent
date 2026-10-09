@@ -13,6 +13,8 @@ module.exports = function loadRoute(file, overrides = {}) {
   const resolve = name => {
     if (Object.hasOwn(overrides, name)) return overrides[name];
     if (name.startsWith('@/')) return require(path.resolve('.test-build', name.slice(2)));
+    // A relative import that the test does not replace is the compiled sibling module of the loaded file.
+    if (name.startsWith('.')) return require(path.resolve('.test-build', path.dirname(file), name));
     return require(name);
   };
   new Function('require', 'exports', 'module', outputText)(resolve, route.exports, route);

@@ -48,17 +48,18 @@ export class RouterUnavailable extends Error {}
 // Shared transport of the semantic router: one bounded Replicate call, one retry only after an explicit 429, GETs only
 // observe the same prediction. Used by the product router (interpretMessage) and the topic pipeline
 // (interpretTopicMessage, lib/whatsapp/topic-route.ts) with their own instructions and schemas.
+// options.model / options.input: the image quality gate reuses this transport with a vision-capable model and image_input.
 export async function routerModelCall<T>(system: string, schema: z.ZodType<T>, prompt: string, request: typeof fetch = fetch,
-  sleep: (ms: number) => Promise<void> = ms => new Promise(resolve => setTimeout(resolve, ms))): Promise<T> {
+  sleep: (ms: number) => Promise<void> = ms => new Promise(resolve => setTimeout(resolve, ms)), options: { model?: string; input?: Record<string, unknown> } = {}): Promise<T> {
   const token = process.env.REPLICATE_API_TOKEN?.trim();
   if (!token) throw new RouterUnavailable("router_auth_missing");
   if (prompt.length > 20000) throw new RouterUnavailable("router_context_too_large");
   try {
-    const post = () => request(`https://api.replicate.com/v1/models/${ROUTER_MODEL}/predictions`, {
+    const post = () => request(`https://api.replicate.com/v1/models/${options.model ?? ROUTER_MODEL}/predictions`, {
       method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Prefer: "wait=20", "Cancel-After": "40s" },
       redirect: "error", signal: AbortSignal.timeout(25000),
       body: JSON.stringify({ input: { max_completion_tokens: 900, reasoning_effort: "none", verbosity: "low",
-        system_prompt: `${system}\nSchema: ${JSON.stringify(z.toJSONSchema(schema))}`, prompt } }),
+        system_prompt: `${system}\nSchema: ${JSON.stringify(z.toJSONSchema(schema))}`, prompt, ...options.input } }),
     });
     let response = await post();
     // HTTP 429 means the request was rejected before any inference: one retry after the advertised wait is safe.
