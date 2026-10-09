@@ -17,12 +17,14 @@ const labels: Record<JobStatus, string> = {
   reviewing: "Qualität prüfen", revising: "Überarbeiten", marketing: "Marketing planen", awaiting_approval: "Freigabe offen", needs_input: "Klärung nötig", failed: "Fehlgeschlagen", interrupted: "Unterbrochen", approved: "Plan freigegeben",
 };
 
-export function ContentStudio({ product, onFillReelTest }: { product: Product; onFillReelTest: () => void }) {
+export function ContentStudio({ product, onFillReelTest, password: controlledPassword, onPasswordChange }: { product: Product; onFillReelTest: () => void; password?: string; onPasswordChange?: (value: string) => void }) {
   const [useCase, setUseCase] = useState("");
   const [trend, setTrend] = useState("");
   const [goal, setGoal] = useState<Opportunity["goal"]>("conversion");
   const [budget, setBudget] = useState<Opportunity["budget"]>("balanced");
-  const [password, setPassword] = useState("");
+  const [localPassword, setLocalPassword] = useState("");
+  const password = controlledPassword ?? localPassword;
+  const setPassword = onPasswordChange ?? setLocalPassword;
   const [jobs, setJobs] = useState<ContentJob[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [ready, setReady] = useState(false);

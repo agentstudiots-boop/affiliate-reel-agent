@@ -36,6 +36,8 @@ export default function Home() {
   const [trendReport, setTrendReport] = useState<TrendReport | null>(null);
   const [productReview, setProductReview] = useState<ProductReview | null>(null);
   const [error, setError] = useState("");
+  // Operator access code (memory only, never stored). Every cost-bearing or privileged API call sends it.
+  const [password, setPassword] = useState("");
 
   useEffect(() => {
     const hydrate = window.setTimeout(() => {
@@ -71,7 +73,7 @@ export default function Home() {
     setScouting(true);
     setError("");
     try {
-      const response = await fetch("/api/trends", { method: "POST" });
+      const response = await fetch("/api/trends", { method: "POST", headers: { "x-content-password": password } });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Der Trend-Scout konnte nicht recherchieren.");
       setTrendReport(data as TrendReport);
@@ -88,7 +90,7 @@ export default function Home() {
     try {
       const response = await fetch("/api/verify", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-content-password": password },
         body: JSON.stringify(candidate),
       });
       const review = await response.json();
@@ -162,7 +164,7 @@ export default function Home() {
         {["Produkt", "Ideen & Format", "Entwurf & Prüfung", "Marketing & Freigabe"].map((label, i) => <span key={label}>{i + 1} {label}</span>)}
       </nav>
 
-      <MetaConnection />
+      <MetaConnection password={password} />
 
       <section className="scout panel">
         <div className="scoutHead">
@@ -207,7 +209,7 @@ export default function Home() {
           <button type="button" className="primary" onClick={() => document.getElementById("content-studio")?.scrollIntoView({ behavior: "smooth" })}>Weiter zur Content-Planung</button>
         </section>
 
-        <ContentStudio product={state.product} onFillReelTest={() => {
+        <ContentStudio password={password} onPasswordChange={setPassword} product={state.product} onFillReelTest={() => {
           setProductReview(null);
           setState(current => ({ ...current, product: {
             name: "Kuscheldecke", sourceUrl: "", affiliateUrl: "", price: "",
@@ -223,7 +225,7 @@ export default function Home() {
           <div className="panelTitle"><span>02</span><div><h2>Bisheriger Reel-Entwurf</h2><p>Menschen behalten die letzte Entscheidung.</p></div></div>
           {!state.concept ? <div className="empty"><b>Noch kein Entwurf</b><p>Links ein Produkt eintragen und den Agenten starten.</p></div> : <Concept concept={state.concept} />}
           {state.concept && state.status === "generated" && <button className="primary approve" onClick={() => patch({ status: "approved" })}>Entwurf freigeben</button>}
-          {state.concept && (state.status === "approved" || state.status === "published") && <VideoStudio key={JSON.stringify([state.conceptProduct || state.product, state.concept])} product={state.conceptProduct || state.product} concept={state.concept} />}
+          {state.concept && (state.status === "approved" || state.status === "published") && <VideoStudio key={JSON.stringify([state.conceptProduct || state.product, state.concept])} product={state.conceptProduct || state.product} concept={state.concept} password={password} />}
           {state.status === "approved" && <div className="publish"><label>URL des veröffentlichten Reels<input value={state.publishedUrl} onChange={(e) => patch({ publishedUrl: e.target.value })} placeholder="https://instagram.com/…" /></label><button className="primary" onClick={() => patch({ status: "published" })}>Als veröffentlicht markieren</button></div>}
           {state.status === "published" && <div className="success">✓ Reel als veröffentlicht erfasst</div>}
         </section>

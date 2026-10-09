@@ -1,12 +1,15 @@
 import { head, put } from "@vercel/blob";
 import { getRunwayClient } from "@/lib/runway";
+import { authorized, unauthorizedResponse } from "@/lib/memory/auth";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
+  // Reads provider tasks and writes to Blob storage: operator only.
+  if (!authorized(request)) return unauthorizedResponse();
+  const taskId = new URL(request.url).searchParams.get("taskId");
+  if (!taskId || !/^[a-zA-Z0-9_-]{8,100}$/.test(taskId)) return Response.json({ error: "Ungültige Runway-Task-ID." }, { status: 400 });
   try {
-    const taskId = new URL(request.url).searchParams.get("taskId");
-    if (!taskId || !/^[a-zA-Z0-9_-]{8,100}$/.test(taskId)) throw new Error("Ungültige Runway-Task-ID.");
     const task = await getRunwayClient().tasks.retrieve(taskId);
     if (task.status !== "SUCCEEDED") {
       return Response.json({
@@ -27,8 +30,8 @@ export async function GET(request: Request) {
       access: "public", addRandomSuffix: false, allowOverwrite: false, contentType: "video/mp4",
     });
     return Response.json({ status: task.status, videoUrl: blob.url, costCredits: task.cost.credits });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Video-Status konnte nicht geladen werden.";
-    return Response.json({ error: message }, { status: 400 });
+  } catch {
+    console.error(JSON.stringify({ event: "video_status_failed" }));
+    return Response.json({ error: "Video-Status konnte nicht geladen werden." }, { status: 502 });
   }
 }

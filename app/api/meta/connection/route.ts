@@ -1,9 +1,11 @@
+import { authorized, unauthorizedResponse } from "@/lib/memory/auth";
 import { cachedMetaConnection, metaConfig, pagePublishingToken, publicMetaReport } from "@/lib/meta/connection";
 export const runtime="nodejs";
 export const maxDuration=120;
 export const dynamic="force-dynamic";
-// Public coarse health check, cached server-side; no assets/IDs/tokens returned.
-export async function GET(){
+// Operator-only coarse health check, cached server-side; no assets/IDs/tokens returned.
+export async function GET(request: Request){
+  if(!authorized(request))return unauthorizedResponse();
   const checked=await cachedMetaConnection();
   const report=publicMetaReport(checked);
   const pageToken=checked.status==="connected"&&checked.resolved?.pageId
