@@ -24,6 +24,8 @@ Die Freigabeschranke selbst wurde **nicht abgeschwächt**; es kam nur ein weiter
 ## Bewusste Ausnahmen (nur vom Betreiber zu setzen, nie zusammen mit Produktionsressourcen)
 - `NON_PRODUCTION_SANDBOX=true` (nur Preview): erklärt, dass die Preview **eigene** Datenbank, **eigenen** Blob-Store und **Test**-Meta/WhatsApp-Zugänge nutzt. Hebt alle Sperren auf.
 - `ALLOW_NON_PRODUCTION_PAID_CALLS=true`: erlaubt ausschließlich bezahlte Modell-/Medienprovider (keine Datenbank, keine Veröffentlichung, keine Nachrichten).
+  Achtung: Bildprovider bezahlen zuerst und speichern danach im Blob-Store (`storage_write` bleibt gesperrt) – mit nur diesem Flag entstehen bezahlte Bilder ohne Ablage. Für Bildtests daher `NON_PRODUCTION_SANDBOX=true` mit eigenem Blob-Store verwenden.
+- Die Sandbox-Erklärung schaltet **nur die Umgebungssperren** ab. Freigabeschranke, Einmal-Claim je Plattform, Absender-/Signaturprüfung, Zugangscode und Cron-Secret bleiben aktiv. Sie wird nicht gegen echte Ressourcentrennung geprüft; im Log erscheint beim Start `non_production_sandbox_active`.
 
 Folge: **Ohne Sandbox kann eine Preview keine Datenbank öffnen.** Die Preview baut weiterhin; Seiten mit Datenbankzugriff (z. B. `/produkte`) zeigen dort den Fehlerzustand.
 
