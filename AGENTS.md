@@ -31,6 +31,16 @@ Jobs und Entscheidungen protokollieren; Secrets niemals in Jobdaten speichern.
 
 <!-- BEGIN:nextjs-agent-rules -->
 
+## Veröffentlichung nur nach Freigabe (harte Invariante)
+
+Jeder Veröffentlichungsweg der Themen-/Multi-Format-Pipeline läuft über `lib/publishing/approval-gate.ts`.
+Ohne ausdrückliche WhatsApp-Freigabe („Freigeben“ als Antwort auf genau die Freigabenachricht) für exakt
+diese Content-ID, Version und diesen Fingerprint wird nichts veröffentlicht – auch nicht durch Cron, Retries,
+Fallbacks oder Plattform-Adapter. Jede inhaltliche Änderung erzeugt eine neue Version und macht frühere
+Freigaben ungültig. Ablehnung, Änderungswunsch oder fehlende Antwort bedeuten: kein Publish. Ein späterer
+Executive-Agent ist nur als Schnittstelle vorgesehen und darf nicht ohne geprüfte Codeänderung freigeben.
+Keine Umgehung, keine direkten Schreibzugriffe auf die Freigabetabellen außerhalb von `lib/publishing/`.
+
 # This is NOT the Next.js you know
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.

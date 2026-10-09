@@ -2,6 +2,13 @@ import { getDatabase } from "../memory/db";
 import { instagramReelRepository, InstagramReelConflict } from "./instagram-reel";
 import { instagramGraph } from "./instagram-publisher";
 import { sendWhatsAppText, whatsappApprovalReady, WhatsAppRejectedError } from "../whatsapp/client";
+import { formatPublishReport, type PlatformOutcome } from "../publishing/report";
+
+// Affiliate reels: one structured notice per final publish outcome. A failed notice never changes the publication.
+async function reelReport(send: typeof sendWhatsAppText, instagram: PlatformOutcome) {
+  try { await send(formatPublishReport({ category: "affiliate", format: "STANDARD_VIDEO", outcomes: [instagram] })); }
+  catch { console.error(JSON.stringify({ event: "instagram_reel_report_unsent" })); }
+}
 
 export async function advanceInstagram(jobId: string, action: "request" | "publish" | "poll",
   repo = instagramReelRepository(), graphFactory = instagramGraph,
@@ -54,16 +61,19 @@ export async function advanceInstagram(jobId: string, action: "request" | "publi
   if (state === "PROCESSING") return { publication, stage: "processing" };
   if (state === "ERROR") {
     await repo.markUnknown(publication.id);
+    await reelReport(send, { platform: "instagram", status: "unknown" });
     return { publication: await repo.get(jobId), stage: "unknown" };
   }
   const claimed = await repo.claimMediaPublish(publication.id);
   let mediaId: string;
   try { mediaId = await graph.publish(claimed.containerId!); }
-  catch (error) { await repo.markUnknown(claimed.id); throw error; }
+  catch (error) { await repo.markUnknown(claimed.id); await reelReport(send, { platform: "instagram", status: "unknown" }); throw error; }
   // Once Graph confirms the media ID, persist publication before fetching the optional permalink.
   const saved = await repo.markPublished(claimed.id, mediaId);
   try { await repo.setPermalink(saved.id,await graph.permalink(mediaId)); }
   catch { console.warn(JSON.stringify({ event: "instagram_permalink_unavailable", publicationId: saved.id })); }
   console.info(JSON.stringify({ event: "instagram_publication", publicationId: saved.id, status: "published" }));
-  return { publication: await repo.get(jobId), stage: "published" };
+  const current = await repo.get(jobId);
+  await reelReport(send, { platform: "instagram", status: "published", url: current?.permalink ?? null });
+  return { publication: current, stage: "published" };
 }

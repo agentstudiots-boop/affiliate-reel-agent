@@ -7,20 +7,20 @@ import { buildOriginalVisualPrompt, OriginalVisualError, pngIsPlausible } from "
 export const DEFAULT_REPLICATE_IMAGE_MODEL = "black-forest-labs/flux-1.1-pro";
 // These official models share the same single-URI PNG output contract.
 export const SUPPORTED_REPLICATE_IMAGE_MODELS = [DEFAULT_REPLICATE_IMAGE_MODEL, "black-forest-labs/flux-1.1-pro-ultra"] as const;
-const API = "https://api.replicate.com/v1";
+export const REPLICATE_API = "https://api.replicate.com/v1";
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 const TIMEOUT_MS = 95_000; // Leave time for the 120-second publication route to respond.
 
 type Prediction = { id?: unknown; status?: unknown; output?: unknown; metrics?: { predict_time?: unknown } };
 type Dependencies = { request?: typeof fetch; upload?: typeof put; timeoutMs?: number; pollIntervalMs?: number };
 
-class ReplicateFailure extends Error {
+export class ReplicateFailure extends Error {
   constructor(public readonly category: string, public readonly httpStatus?: number, public readonly detail?: string) {
     super(category);
   }
 }
 
-function httpFailure(status: number, body: string): ReplicateFailure {
+export function replicateHttpFailure(status: number, body: string): ReplicateFailure {
   const category = ({ 401: "auth", 402: "billing", 403: "access", 404: "model_or_endpoint", 422: "request_schema", 429: "rate_limit" } as Record<number, string>)[status]
     || (status >= 500 ? "provider_error" : "request_rejected");
   // Provider responses can echo prompts or credentials. Only emit fixed labels and known field names.
@@ -33,11 +33,11 @@ function httpFailure(status: number, body: string): ReplicateFailure {
   return new ReplicateFailure(category, status, detail);
 }
 
-function predictionId(value: unknown): string | null {
+export function replicatePredictionId(value: unknown): string | null {
   return typeof value === "string" && /^[a-z0-9]{12,64}$/.test(value) ? value : null;
 }
 
-function outputUrl(value: unknown): URL | null {
+export function replicateOutputUrl(value: unknown): URL | null {
   if (typeof value !== "string") return null;
   try {
     const url = new URL(value);
@@ -47,7 +47,7 @@ function outputUrl(value: unknown): URL | null {
   return null;
 }
 
-async function readPng(response: Response): Promise<Buffer> {
+export async function readReplicatePng(response: Response): Promise<Buffer> {
   if (!response.ok || !/^image\/png(?:\s*;|\s*$)/i.test(response.headers.get("content-type") || "")) {
     throw new OriginalVisualError("Replicate-Bilddatei hat keinen gültigen PNG-Typ.");
   }
@@ -87,16 +87,16 @@ export function createReplicateImageProvider(key: string, model = DEFAULT_REPLIC
     let id: string | null = null;
     try {
       // One paid POST. Subsequent GETs only observe that same prediction; never create a second image.
-      const created = await request(`${API}/models/${model}/predictions`, {
+      const created = await request(`${REPLICATE_API}/models/${model}/predictions`, {
         method: "POST", headers: { ...headers, Prefer: "wait=20", "Cancel-After": "90s" },
         body: JSON.stringify({ input: { prompt, aspect_ratio: "4:5", output_format: "png", ...(model.endsWith("-ultra") ? { raw: true } : {}) } }),
         signal: deadline,
       });
-      if (!created.ok) throw httpFailure(created.status, (await created.text()).slice(0, 2048));
+      if (!created.ok) throw replicateHttpFailure(created.status, (await created.text()).slice(0, 2048));
       let prediction: Prediction;
       try { prediction = await created.json() as Prediction; }
       catch { throw new ReplicateFailure("invalid_prediction_response"); }
-      id = predictionId(prediction?.id);
+      id = replicatePredictionId(prediction?.id);
       if (!id) throw new ReplicateFailure("invalid_prediction_id");
       phase = "poll";
       while (prediction.status === "starting" || prediction.status === "processing") {
@@ -106,21 +106,21 @@ export function createReplicateImageProvider(key: string, model = DEFAULT_REPLIC
           deadline.addEventListener("abort", aborted, { once: true });
           if (deadline.aborted) aborted();
         });
-        const polled = await request(`${API}/predictions/${id}`, { headers: { Authorization: `Bearer ${key}` }, signal: deadline });
-        if (!polled.ok) throw httpFailure(polled.status, (await polled.text()).slice(0, 2048));
+        const polled = await request(`${REPLICATE_API}/predictions/${id}`, { headers: { Authorization: `Bearer ${key}` }, signal: deadline });
+        if (!polled.ok) throw replicateHttpFailure(polled.status, (await polled.text()).slice(0, 2048));
         try { prediction = await polled.json() as Prediction; }
         catch { throw new ReplicateFailure("invalid_prediction_response"); }
-        if (predictionId(prediction?.id) !== id) throw new ReplicateFailure("prediction_id_mismatch");
+        if (replicatePredictionId(prediction?.id) !== id) throw new ReplicateFailure("prediction_id_mismatch");
       }
       if (prediction.status !== "succeeded") throw new ReplicateFailure(
         prediction.status === "failed" || prediction.status === "canceled" ? prediction.status : "unknown_status",
       );
       phase = "output";
-      const url = outputUrl(prediction.output);
+      const url = replicateOutputUrl(prediction.output);
       if (!url) throw new ReplicateFailure("invalid_output");
       phase = "download";
       const image = await request(url.href, { redirect: "manual", signal: deadline });
-      const bytes = await readPng(image);
+      const bytes = await readReplicatePng(image);
       const sha256 = createHash("sha256").update(bytes).digest("hex");
       phase = "blob";
       const path = `generated/facebook/${job.id}/${sha256}.png`;

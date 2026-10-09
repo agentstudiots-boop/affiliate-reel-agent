@@ -4,6 +4,7 @@ import { advanceVideo } from "../production/advance";
 import { instagramReelRepository, InstagramReelConflict } from "../meta/instagram-reel";
 import { InstagramPublishFailure } from "../meta/instagram-publisher";
 import { advanceInstagram } from "../meta/advance-instagram";
+import { publishApprovedAffiliateReel } from "../distribution/affiliate";
 import { requestVideoCostApproval } from "../production/request-cost-approval";
 
 // A Reel was seen live on Instagram despite an ambiguous local result. Keep
@@ -64,7 +65,8 @@ export async function continueReel(jobId: string) {
   if (!publication || (publication.status === "pending" && !publication.whatsappSendAttempted)) {
     await advanceInstagram(jobId, "request");
   } else if (publication.status === "approved") {
-    await advanceInstagram(jobId, "publish");
+    // Same shared distribution layer as topic posts; the Instagram publisher runs the existing container step.
+    await publishApprovedAffiliateReel(jobId);
   } else if (publication.status === "processing" || (publication.status === "published" && !publication.permalink)) {
     await advanceInstagram(jobId, "poll");
   }

@@ -23,7 +23,14 @@ export async function ensureAutomationSchema(db: Database) {
     to_regclass('public.whatsapp_routes') IS NOT NULL AS routes,
     to_regclass('public.landing_clicks') IS NOT NULL AS clicks,
     to_regclass('public.content_categories') IS NOT NULL AS categories,
-    to_regclass('public.whatsapp_voice_messages') IS NOT NULL AS voice`);
-  if (ready.rows[0]?.slots === true && ready.rows[0]?.slot_key === true && ready.rows[0]?.stories === true && ready.rows[0]?.feedback === true && ready.rows[0]?.product_locks === true && ready.rows[0]?.chat_turns === true && ready.rows[0]?.slot_retry === true && ready.rows[0]?.instagram_images === true && ready.rows[0]?.routes === true && ready.rows[0]?.clicks === true && ready.rows[0]?.categories === true && ready.rows[0]?.voice === true) return;
+    to_regclass('public.whatsapp_voice_messages') IS NOT NULL AS voice,
+    to_regclass('public.topic_history') IS NOT NULL AS topics,
+    to_regclass('public.publish_attempts') IS NOT NULL AS publish_gate,
+    to_regclass('public.provider_usage') IS NOT NULL AS visual_jobs,
+    to_regclass('public.topic_contents') IS NOT NULL AS topic_contents,
+    EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='publish_attempts' AND column_name='remote_ids') AS publish_results,
+    EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='topic_contents' AND column_name='previous_message_ids') AS topic_previous,
+    to_regclass('public.whatsapp_active_context') IS NOT NULL AS active_context`);
+  if (ready.rows[0]?.slots === true && ready.rows[0]?.slot_key === true && ready.rows[0]?.stories === true && ready.rows[0]?.feedback === true && ready.rows[0]?.product_locks === true && ready.rows[0]?.chat_turns === true && ready.rows[0]?.slot_retry === true && ready.rows[0]?.instagram_images === true && ready.rows[0]?.routes === true && ready.rows[0]?.clicks === true && ready.rows[0]?.categories === true && ready.rows[0]?.voice === true && ready.rows[0]?.topics === true && ready.rows[0]?.publish_gate === true && ready.rows[0]?.visual_jobs === true && ready.rows[0]?.topic_contents === true && ready.rows[0]?.publish_results === true && ready.rows[0]?.topic_previous === true && ready.rows[0]?.active_context === true) return;
   await applyMigrations(db);
 }

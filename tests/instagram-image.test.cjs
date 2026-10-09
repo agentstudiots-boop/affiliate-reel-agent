@@ -51,7 +51,10 @@ test('an approved Facebook photo is published once to Instagram as a JPEG feed i
   assert.ok(validInstagramImageUrl(f.calls.create[0].url));
   const caption=f.calls.create[0].caption;
   assert.match(caption,/tag=alltaeglichle-21/);assert.match(caption,/\nWerbung \| Affiliate-Link\n/);assert.ok(!/^Werbung/i.test(caption));
-  assert.match(f.calls.notes.at(-1),/Instagram-Beitrag veröffentlicht: https:\/\/www\.instagram\.com\/p\/abc\//);
+  const report=f.calls.notes.at(-1);
+  assert.match(report,/^Affiliate-Post, Bild veröffentlicht\n/);
+  assert.match(report,/• Facebook – veröffentlicht – https:\/\/www\.facebook\.com\/x\/posts\/1/);
+  assert.match(report,/• Instagram – veröffentlicht – https:\/\/www\.instagram\.com\/p\/abc\//);
   const row=(await f.pg.query('SELECT status,media_id,permalink FROM instagram_image_posts')).rows[0];
   assert.deepEqual(row,{status:'published',media_id:'222',permalink:'https://www.instagram.com/p/abc/'});
   assert.equal((await publishInstagramImage(f.publicationId,f.deps())).status,'skipped');
@@ -62,7 +65,10 @@ test('a rejected container publishes nothing and is reported; an unknown publish
   const f=await fixture(t);
   const rejected=await publishInstagramImage(f.publicationId,f.deps({createError:new InstagramPublishFailure('container','graph_error',400,9004)}));
   assert.equal(rejected.status,'failed');assert.equal(f.calls.publish,0);
-  assert.match(f.calls.notes.at(-1),/Facebook-Post ist online.*nicht veröffentlicht/);
+  const partial=f.calls.notes.at(-1);
+  assert.match(partial,/^Affiliate-Post, Bild teilweise veröffentlicht/);
+  assert.match(partial,/Erfolgreich \(live\):\n• Facebook – veröffentlicht – https:\/\/www\.facebook\.com/);
+  assert.match(partial,/Nicht erfolgreich \(nicht live\):\n• Instagram – fehlgeschlagen/);
   assert.equal((await publishInstagramImage(f.publicationId,f.deps())).status,'skipped');
   const g=await fixture(t);
   const unknown=await publishInstagramImage(g.publicationId,g.deps({publishError:new InstagramPublishFailure('publish','network_or_timeout')}));
@@ -87,4 +93,13 @@ test('an image outside the Instagram aspect range is reported instead of cropped
   const ok=`https://s.public.blob.vercel-storage.com/generated/instagram/${crypto.randomUUID()}/${'b'.repeat(64)}.jpg`;
   assert.ok(validInstagramImageUrl(ok));
   for(const bad of ['http'+ok.slice(5),ok.replace('.jpg','.png'),ok+'?x=1','https://evil.example/generated/instagram/x.jpg','https://s.public.blob.vercel-storage.com/other/x.jpg'])assert.ok(!validInstagramImageUrl(bad),bad);
+});
+
+test('Instagram never posts a caption that differs from the approved one (approval bound to content)',async t=>{
+  const f=await fixture(t);
+  await f.pg.query("UPDATE publication_requests SET caption=caption||' (alte Fassung)' WHERE id=$1",[f.publicationId]);
+  const result=await publishInstagramImage(f.publicationId,f.deps());
+  assert.equal(result.status,'failed');
+  assert.match(result.detail,/approval_mismatch/);
+  assert.equal(f.calls.create.length,0);assert.equal(f.calls.publish,0);
 });

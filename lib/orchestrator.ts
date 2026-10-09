@@ -35,8 +35,11 @@ const defaultResearch: ResearchFn = ({ query, timeRange }) => tavilySearch({ que
 const defaultGenerate = (): Generator | null => process.env.REPLICATE_API_TOKEN?.trim()
   ? ((agent, instruction, input, schema, reference) => createGenerator({ mode: "ai", signal: AbortSignal.timeout(75_000) })(agent, instruction, input, schema, reference)) as Generator : null;
 
-export async function runProductScout(productSearch?: string, selectionKey?: string, options: { quality?: boolean; trend?: TrendDeps } = {}) {
+// `mandate`: the operator explicitly named this product. The cooldown then only orders the candidates (fresh ones first)
+// instead of removing them; automatic selection (no mandate) keeps the full cooldown.
+export async function runProductScout(productSearch?: string, selectionKey?: string, options: { quality?: boolean; trend?: TrendDeps; mandate?: boolean } = {}) {
   const db = getDatabase();
+  const mandate = !!options.mandate && !!productSearch;
   const automatic = !!options.quality && !productSearch;
   const history = automatic ? await loadSelectionHistory(db) : null;
   // Jarvis assigns the discovery job to the trend/strategy agent first; on any failure it falls back to the seed ideas.
@@ -89,7 +92,7 @@ export async function runProductScout(productSearch?: string, selectionKey?: str
   const prefiltered = [] as typeof pool;
   for (const candidate of pool) {
     const family = productFamily(candidate.name);
-    if (family && blockedFamilies.has(family)) { prefiltered.push(candidate); continue; }
+    if (family && blockedFamilies.has(family) && !mandate) { prefiltered.push(candidate); continue; }
     if (family && seenFamilies.has(family)) continue;
     selected.push(candidate);
     if (family) seenFamilies.add(family);
@@ -106,6 +109,17 @@ export async function runProductScout(productSearch?: string, selectionKey?: str
   const checked = await Promise.all(resolved.map(async candidate => ({candidate,
     blocked: candidate.resolvedProduct ? await productOnCooldown(db,candidate.resolvedProduct) : false,
   })));
+  if (mandate) {
+    const repeated = checked.filter(item => item.blocked).length;
+    console.info(JSON.stringify({ event: "scout_operator_mandate", search: productSearch?.slice(0, 80), candidates: checked.length, cooldownOverridden: repeated }));
+    return {
+      ...result.output,
+      // Fresh candidates first; products within the cooldown stay available because the operator asked for them.
+      candidates: [...checked.filter(item => !item.blocked), ...checked.filter(item => item.blocked)].map(item => ({ ...item.candidate, cooldownOverridden: item.blocked })),
+      cooldownBlocked: 0, cooldownOverridden: repeated, qualityBlocked: 0, trend: null, qualityRejected: [],
+      cooldownBlockedSeasonal: 0, cooldownBlockedAutomatic: 0, sources: webSources(result.sources),
+    };
+  }
   const blocked = [...prefiltered, ...checked.filter(item=>item.blocked).map(item=>item.candidate)];
   return {
     ...result.output,

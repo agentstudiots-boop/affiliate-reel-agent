@@ -167,3 +167,42 @@ Genau ein Pfad: Webhook (`type: "audio"`) → `lib/whatsapp/voice.ts` (nur Betre
 - Doppelte Webhook-Zustellung: Tabelle `whatsapp_voice_messages` (nur Nachrichten-ID, Status, Fehlercode; kein Audio, kein Transkript) verhindert zweiten Abruf und zweite Transkription. Wirft die Textverarbeitung, wird die Nachricht für den Meta-Retry freigegeben.
 - Anbieter: `OPENAI_API_KEY` (dann `gpt-4o-mini-transcribe`, Datei als `voice.wav`), sonst `REPLICATE_API_TOKEN`. Optional `WHATSAPP_TRANSCRIPTION_MODEL` (nur Replicate). Bei Replicate-429 wird die genannte Wartezeit abgewartet (höchstens zwei Wiederholungen).
 - Das Transkript wird – wie jede Textnachricht – von der bestehenden Pipeline als Nachrichtentext gespeichert.
+
+## Manuelle Produktaufträge und aktiver Gesprächskontext
+
+**Fehlerbild (behoben):** Ein ausdrücklicher Auftrag („Erstelle einen Beitrag zum Roborock Qrevo Edge 2“) lief durch den
+Trendscout-Filter. Dieser sperrte das ganze Produktfamilien-Cooldown (`robot_vacuum`, weil kurz zuvor ein anderer
+Saugroboter verwendet wurde) und brach ab, bevor ein Content-Job entstand. Weil der Router-Kontext („focus“) nur aus
+Content-Jobs gebildet wurde, bezog sich „Mach es trotzdem“ danach auf den zuletzt erstellten, älteren Entwurf.
+
+**Regel:**
+- Automatische Produktauswahl (Tagesslots, offene „Artikelsuche“ ohne Begriff): 7-Tage-Cooldown, Familien- und
+  Ablehnungssperre unverändert.
+- Ausdrücklicher Auftrag für ein benanntes Produkt (deterministisch erkannte Formulierungen, „Artikelsuche <Produkt>“,
+  „Bildpost <ASIN>“, Amazon-Link mit „Neuer Auftrag“, Router-`search_product` mit Suchbegriff): `mandate`. Der Cooldown
+  ordnet dann nur (frische Kandidaten zuerst), sperrt aber nicht (`reserveMandatedProduct`).
+- Ein Auftrag ist keine Freigabe: Amazon-Prüfung, Inhaltsprüfung, Inhaltsfreigabe und Veröffentlichungsfreigabe
+  bleiben unverändert. Ein Produkt mit laufendem Entwurf oder laufender Veröffentlichung wird nicht parallel ein zweites
+  Mal angelegt (`product_already_open`). Ein identischer, bereits veröffentlichter Beitragstext wird nie erneut
+  veröffentlicht (`publication-gate`: `prepare` und `claimPublish`).
+
+**Aktiver Kontext** (`lib/whatsapp/active-context.ts`, Tabellen `whatsapp_active_context`, `whatsapp_context_log`):
+- Eine Zeile je Betreiber: Produkt, ASIN/Suchbegriff, Job, Status (`requested`, `in_progress`, `awaiting_approval`,
+  `blocked`, `failed`), Grund, Formatwunsch, auslösende Nachricht. Jede Änderung wird je Nachricht idempotent protokolliert.
+- Ergebnis eines Laufs wird nur auf den Auftrag derselben Nachricht geschrieben (ein späterer Auftrag wird nie von einem
+  früheren überschrieben). Gültigkeit 24 h; ein seit 10 min hängender Lauf darf fortgesetzt werden.
+
+**Priorität bei der Zuordnung:** 1. Sicherheit/Freigaben (Gates entscheiden) · 2. ausdrückliche aktuelle Nachricht
+(benanntes Produkt, zitierte Freigabenachricht) · 3. aktiver Auftrag · 4. Gesprächskontext und ausdrücklich genannte
+ältere Entwürfe · 5. Trendscout-Regeln.
+
+**Verarbeitung:** `handleManualOrder` (Webhook, vor Themen-Pipeline und Router; Antworten auf zitierte Nachrichten und
+Freigabewörter unberührt) erkennt „Erstelle einen Beitrag zum …“, „Bewirb (bitte trotzdem) …“, „Ich möchte … bewerben“,
+„Mach es trotzdem“, „Nimm genau dieses Produkt“, „Ich möchte dieses Produkt bewerben“, „Mach daraus einen Reel-Entwurf“.
+Mehrdeutiges bleibt beim semantischen Router, der den aktiven Auftrag als `active_order` im Kontext erhält. Hat der
+aktive Auftrag noch keinen Entwurf, ändert der Router keine älteren Entwürfe (außer der Betreiber zitiert oder nennt sie).
+Gibt es keinen aktiven Auftrag und mehrere offene Entwürfe, wird nachgefragt. Reel-Wünsche werden notiert, aber nicht
+per WhatsApp gestartet (Video braucht Studio-Planung und Kostenfreigabe).
+
+**Antworten:** Erst „Ich habe den Auftrag … übernommen und erstelle jetzt den Entwurf“; bestätigt wird der Entwurf erst
+durch die Inhaltsfreigabe-Nachricht. Fehler werden ohne interne Details erklärt.

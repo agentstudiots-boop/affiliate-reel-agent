@@ -91,3 +91,39 @@ export async function reserveProduct(db: Database, product: Product, jobId: stri
 export async function releaseProduct(db: Database, jobId: string) {
   await db.query("DELETE FROM product_selection_locks WHERE job_id=$1", [jobId]);
 }
+
+// Is this exact product already in a running draft or publication? (Never two parallel drafts/publications of one product.)
+async function productInFlight(db: Sql, asin: string, jobId: string): Promise<boolean> {
+  const result = await db.query(
+    `SELECT 1 FROM content_jobs j
+     WHERE j.id<>$2 AND (j.opportunity->'product'->>'asin'=$1 OR j.opportunity->'product'->>'sourceUrl' LIKE '%/dp/' || $1 || '%')
+       AND ((j.status='awaiting_approval' AND NOT EXISTS(SELECT 1 FROM daily_drafts d WHERE d.job_id=j.id
+             AND d.status IN ('rejected','needs_input','failed')))
+         OR (j.status='approved' AND j.updated_at>now()-interval '7 days'
+           AND NOT EXISTS(SELECT 1 FROM publication_requests r WHERE r.job_id=j.id AND r.status IN ('published','rejected')))
+         OR EXISTS(SELECT 1 FROM publication_requests r WHERE r.job_id=j.id
+           AND r.status IN ('preparing','pending','approved','publishing','unknown')))
+     LIMIT 1`, [asin, jobId]);
+  return result.rows.length > 0;
+}
+
+// Explicit operator order for a named product: the operator's instruction overrides the TrendScout cooldown (recent use,
+// earlier rejection, product family). It never overrides duplicate protection: an exact product that is still in a running
+// draft or publication is not reserved a second time. The locks are still written, so automatic selection keeps avoiding it.
+export async function reserveMandatedProduct(db: Database, product: Product, jobId: string): Promise<"reserved" | "already_open" | "unresolved"> {
+  const asin = product.asin || amazonProduct(product.sourceUrl)?.asin;
+  if (!asin) return "unresolved";
+  const keys = [`asin:${asin}`, ...(productFamily(product.name) ? [`family:${productFamily(product.name)}`] : [])];
+  return db.transaction(async sql => {
+    await sql.query("SELECT pg_advisory_xact_lock($1)", [83624002]);
+    if (await productInFlight(sql, asin, jobId)) return "already_open" as const;
+    for (const key of keys) {
+      await sql.query(
+        `INSERT INTO product_selection_locks(key,job_id,expires_at) VALUES($1,$2,now()+interval '7 days')
+         ON CONFLICT(key) DO UPDATE SET job_id=excluded.job_id,expires_at=excluded.expires_at`,
+        [key, jobId],
+      );
+    }
+    return "reserved" as const;
+  });
+}

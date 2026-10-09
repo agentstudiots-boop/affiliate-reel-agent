@@ -5,6 +5,13 @@ import { amazonProduct } from "../amazon";
 import { createHash } from "node:crypto";
 import { asinFromOperatorLink, operatorProductLink } from "./product-link";
 import { replacementRequest, supersedeOpenDraft } from "./replace-draft";
+import { startActiveOrder } from "./active-context";
+import { orderFailureText, settleOrderFromDraft } from "./manual-order";
+
+// The active context must never stop an order that is already claimed: a failed context write is logged, the order runs.
+async function remember(step: () => Promise<unknown>) {
+  try { await step(); } catch { console.error(JSON.stringify({ event: "whatsapp_active_order_unsaved" })); }
+}
 
 // Only standalone, unambiguous requests start a new search. Replies always
 // remain corrections or decisions for the message they reference.
@@ -99,7 +106,12 @@ export async function startImagePostFromWhatsApp(input: IncomingWhatsAppMessage 
       return true;
     }
   }
-  const result = await start(day, slot, product, command.search);
+  // An explicitly named product (ASIN, link, product search) is an operator order: it becomes the active WhatsApp context
+  // and overrides the TrendScout cooldown (never duplicate protection, content review or approvals).
+  const named = !!(product || command.search);
+  if (named) await remember(() => startActiveOrder(db, { waId: input.from, messageId: input.id, productLabel: command.search ?? `ASIN ${product}`, asin: product ?? null, searchTerm: command.search ?? null }));
+  const result = await start(day, slot, product, command.search, named ? { mandate: true } : {});
+  if (named) await remember(() => settleOrderFromDraft(db, input.from, input.id, result));
   if (result.status === "failed" || result.status === "needs_input") {
     const subject = command.search ? `Trendscout-Suche nach „${command.search}“`
       : `${command.link ? "Produktlink" : command.product ? "Bildpost" : "Artikelsuche"} (Auftrag ${result.jobId})`;
@@ -111,6 +123,8 @@ export async function startImagePostFromWhatsApp(input: IncomingWhatsAppMessage 
         ? "Amazon antwortete, aber die Seite enthielt keinen eindeutigen Nachweis für diese ASIN. Derselbe Link wird nicht automatisch erneut geprüft. Bitte die Produktseite und ASIN im Browser prüfen; noch kein sicher gebundener Artikel."
       : result.reason === "amazon_verification_blocked"
         ? "Amazon hat die automatische Prüfung der Produktseite blockiert. Der Artikel bleibt ungeprüft und es wird kein Content produziert."
+      : result.reason === "product_already_open"
+        ? orderFailureText("product_already_open")
       : result.reason === "product_repeat_blocked"
         ? "Dieses Produkt oder seine Produktfamilie ist bereits in einem offenen Entwurf oder wurde innerhalb der letzten sieben Tage verwendet. Bitte wähle eine andere Produktart."
       : result.reason === "product_data_uncertain"
@@ -141,13 +155,17 @@ export async function startProductSearch(input: IncomingWhatsAppMessage & { payl
     [input.id, input.from, input.replyToMessageId, input.body, JSON.stringify(input.payload)]);
   if (!claim.rows.length) return true;
   const search = request.search?.trim() || undefined;
+  // A named search is an operator order (cooldown override, active context); an open search stays automatic.
+  if (search) await remember(() => startActiveOrder(db, { waId: input.from, messageId: input.id, productLabel: search, searchTerm: search }));
   const replaced = request.replace || request.replaceDraftId ? await supersedeOpenDraft(db, request.replyToMessageIdForReplace ?? null, request.replaceDraftId ?? null) : null;
   const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const slot = `manual:${createHash("sha256").update(input.id).digest("hex")}`;
   await send(`${replaced ? `Alten Entwurf${replaced.name ? ` („${replaced.name.slice(0, 60)}“)` : ""} gestoppt. ` : ""}Ich suche jetzt ${search ? `„${search}“` : "ein neues Produkt"} und schicke dir danach eine neue Inhaltsfreigabe.${request.note ? ` ${request.note}` : ""} Das dauert einen Moment; es wurde nichts produziert oder veröffentlicht.`);
-  const result = await start(day, slot, undefined, search);
+  const result = await start(day, slot, undefined, search, search ? { mandate: true } : {});
+  if (search) await remember(() => settleOrderFromDraft(db, input.from, input.id, result));
   if (result.status === "failed" || result.status === "needs_input") {
-    const reason = result.reason === "product_unresolved" ? "Ich konnte dazu keine passende, sicher geprüfte Amazon-Produktseite finden. Nenne bitte eine genauere Produktart oder sende einen Amazon-Link."
+    const reason = result.reason === "product_already_open" ? orderFailureText("product_already_open")
+      : result.reason === "product_unresolved" ? "Ich konnte dazu keine passende, sicher geprüfte Amazon-Produktseite finden. Nenne bitte eine genauere Produktart oder sende einen Amazon-Link."
       : result.reason === "product_repeat_blocked" ? "Dieses Produkt oder seine Produktfamilie wurde in den letzten sieben Tagen schon verwendet oder gerade abgelehnt."
       : result.reason === "amazon_verification_blocked" ? "Amazon hat die automatische Prüfung blockiert."
       : result.reason === "product_data_uncertain" ? "Die Produktdaten dieses Artikels belegen die geplanten Aussagen nicht; ich rate nicht und erzeuge keine Freigabe. Nenne ein anderes Produkt oder sende den Amazon-Link eines genauer passenden Artikels."
