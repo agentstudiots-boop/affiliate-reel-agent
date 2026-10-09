@@ -1,3 +1,4 @@
+import { assertEffectAllowed } from "../security/runtime-guard";
 import { cachedMetaConnection, metaConfig, pagePublishingToken } from "./connection";
 import { validReelVideoUrl } from "./instagram-reel";
 
@@ -33,6 +34,7 @@ export class InstagramPublishFailure extends Error {
 }
 
 async function graph(path: string, token: string, version: string, transport: typeof fetch, phase: InstagramPublishFailure["phase"], form?: URLSearchParams) {
+  if (form) assertEffectAllowed("publish");
   const url = new URL(`https://graph.facebook.com/${version}/${path}`);
   if (!form) url.searchParams.set("fields", phase === "status" ? "status_code" : "id,permalink");
   let response: Response;

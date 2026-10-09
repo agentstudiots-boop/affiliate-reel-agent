@@ -42,7 +42,7 @@ export class PublishBlockedError extends Error {
 }
 export type PublishBlockReason = "no_content_version" | "no_approval" | "approval_pending" | "approval_rejected" | "changes_requested" | "approval_invalidated"
   | "content_changed_since_approval" | "authority_inactive" | "approval_incomplete" | "platform_not_in_approved_version" | "already_attempted" | "permit_mismatch" | "permit_forged"
-  | "live_publishing_disabled" | "platform_not_enabled" | "credentials_missing";
+  | "live_publishing_disabled" | "platform_not_enabled" | "credentials_missing" | "non_production_environment";
 
 export class ApprovalDecisionError extends Error {
   constructor(public readonly reason: string) { super(`approval_decision_refused:${reason}`); this.name = "ApprovalDecisionError"; }

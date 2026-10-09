@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import { put } from "@vercel/blob";
+import { assertEffectAllowed } from "../security/runtime-guard";
 import { getDatabase } from "@/lib/memory/db";
 import { parseJob } from "@/lib/content/history";
 
@@ -28,6 +29,7 @@ export async function createSocialCard(jobId: string) {
   );
   const bytes = await image.arrayBuffer();
   if (bytes.byteLength > 4_000_000) throw new Error("Grafik überschreitet das Bildlimit.");
+  assertEffectAllowed("storage_write");
   const blob = await put(`social-cards/${jobId}.png`, bytes, {access:"public",addRandomSuffix:false,contentType:"image/png"});
   return blob.url;
 }

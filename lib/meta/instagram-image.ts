@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { put } from "@vercel/blob";
+import { assertEffectAllowed } from "../security/runtime-guard";
 import { getDatabase, type Database } from "../memory/db";
 import { parseJob } from "../content/history";
 import { requireProduct } from "../amazon";
@@ -40,6 +41,7 @@ async function defaultToJpeg(png: Buffer) {
 }
 
 async function defaultUpload(path: string, bytes: Buffer) {
+  assertEffectAllowed("storage_write");
   const blob = await put(path, bytes, { access: "public", addRandomSuffix: false, contentType: "image/jpeg" });
   return blob.url;
 }

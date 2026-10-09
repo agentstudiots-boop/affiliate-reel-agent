@@ -1,4 +1,5 @@
 import { head, put } from "@vercel/blob";
+import { assertEffectAllowed } from "@/lib/security/runtime-guard";
 import { getRunwayClient } from "@/lib/runway";
 import { authorized, unauthorizedResponse } from "@/lib/memory/auth";
 
@@ -26,6 +27,7 @@ export async function GET(request: Request) {
     } catch { /* Noch nicht dauerhaft archiviert. */ }
     const source = await fetch(task.output[0]);
     if (!source.ok || !source.body) throw new Error("Runway-Video konnte nicht gespeichert werden.");
+    assertEffectAllowed("storage_write");
     const blob = await put(pathname, source.body, {
       access: "public", addRandomSuffix: false, allowOverwrite: false, contentType: "video/mp4",
     });

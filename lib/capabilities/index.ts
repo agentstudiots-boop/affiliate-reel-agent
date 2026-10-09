@@ -1,4 +1,5 @@
 import { PLATFORMS, type Platform } from "../formats/catalog";
+import { effectDecision } from "../security/runtime-guard";
 
 // Central credential and capability check for the topic / multi-format pipeline.
 // Single source of truth for: which services exist, which variables they need, which are present or missing,
@@ -135,7 +136,9 @@ export type ContentOrigin = "topic_pipeline" | "product_pipeline";
 // kept exactly. Every other platform for affiliate posts follows the same rules as topic posts.
 export const PRODUCT_PIPELINE_LIVE_CHANNELS: readonly string[] = Object.freeze(["facebook", "instagram"]);
 
-export function livePublishCapability(platform: string, env: Env = process.env, origin: ContentOrigin = "topic_pipeline"): { ok: true } | { ok: false; reason: "live_publishing_disabled" | "platform_not_enabled" | "credentials_missing"; missing: string[] } {
+export function livePublishCapability(platform: string, env: Env = process.env, origin: ContentOrigin = "topic_pipeline"): { ok: true } | { ok: false; reason: "live_publishing_disabled" | "platform_not_enabled" | "credentials_missing" | "non_production_environment"; missing: string[] } {
+  // Preview/development deployments never publish (they may hold production credentials). Applies to every origin.
+  if (!effectDecision("publish", env).ok) return { ok: false, reason: "non_production_environment", missing: [] };
   if (!(PLATFORMS as readonly string[]).includes(platform)) return { ok: false, reason: "platform_not_enabled", missing: [] };
   if (origin === "product_pipeline" && PRODUCT_PIPELINE_LIVE_CHANNELS.includes(platform)) return { ok: true };
   const capability = capabilityOf(platform, env);

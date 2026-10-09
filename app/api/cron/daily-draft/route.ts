@@ -1,3 +1,4 @@
+import { effectDecision } from "@/lib/security/runtime-guard";
 import { timingSafeEqual } from "node:crypto";
 import { createDailyDraft } from "@/lib/daily/draft";
 import { resolveSlot } from "@/lib/daily/slots";
@@ -18,6 +19,8 @@ export async function GET(request: Request) {
     console.warn(JSON.stringify({ event: "daily_cron_unauthorized", secretConfigured: !!secret, credentialSent: !!given }));
     return new Response("Unauthorized", { status: 401 });
   }
+  // Scheduled jobs write to the database and message the operator: never from preview/development deployments.
+  if (!effectDecision("scheduled_job").ok) return Response.json({ status: "skipped_non_production_environment" }, { headers: { "Cache-Control": "no-store" } });
   try {
     // Six single-run UTC schedules; the local window (not the minute) selects the
     // slot, and the (day, slot) DB claim makes repeated or late calls idempotent.

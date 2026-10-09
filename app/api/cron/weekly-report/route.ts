@@ -1,3 +1,4 @@
+import { effectDecision } from "@/lib/security/runtime-guard";
 import { timingSafeEqual } from "node:crypto";
 import { createWeeklyReport } from "@/lib/reporting/weekly";
 
@@ -12,6 +13,8 @@ export async function GET(request: Request) {
       || !timingSafeEqual(Buffer.from(given), Buffer.from(secret))) {
     return new Response("Unauthorized", { status: 401 });
   }
+  // Scheduled jobs write to the database and message the operator: never from preview/development deployments.
+  if (!effectDecision("scheduled_job").ok) return Response.json({ status: "skipped_non_production_environment" }, { headers: { "Cache-Control": "no-store" } });
   try {
     const result = await createWeeklyReport();
     console.info(JSON.stringify({ event: "weekly_report", weekStart: result.weekStart, status: result.status }));
