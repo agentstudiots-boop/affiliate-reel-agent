@@ -74,7 +74,12 @@ export function guardedEgressFetch(inner: typeof fetch, env: Env = process.env):
   }) as typeof fetch;
 }
 export function installEgressGuard(target: { fetch: typeof fetch } = globalThis as unknown as { fetch: typeof fetch }, env: Env = process.env) {
-  if (!isNonProductionDeployment(env) || sandboxDeclared(env)) return false; // production and sandboxes are left untouched
+  if (isNonProductionDeployment(env) && sandboxDeclared(env)) {
+    // Visible in the logs: every guard is off here, the operator has declared that this deployment owns separate resources.
+    console.warn(JSON.stringify({ event: "non_production_sandbox_active", environment: runtimeEnvironment(env) }));
+    return false;
+  }
+  if (!isNonProductionDeployment(env)) return false; // production and local runs are left untouched
   const current = target.fetch as typeof fetch & { [INSTALLED]?: boolean };
   if (current[INSTALLED]) return false;
   const wrapped = guardedEgressFetch(current, env) as typeof fetch & { [INSTALLED]?: boolean };

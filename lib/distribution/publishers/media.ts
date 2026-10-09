@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { put } from "@vercel/blob";
+import { put } from "../../security/guarded-blob";
 import type { MasterContent } from "../master-content";
 import { PlatformPublishError } from "../publish";
 

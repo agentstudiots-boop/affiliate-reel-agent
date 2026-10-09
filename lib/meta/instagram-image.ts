@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { put } from "@vercel/blob";
+import { put } from "../security/guarded-blob";
 import { assertEffectAllowed } from "../security/runtime-guard";
 import { getDatabase, type Database } from "../memory/db";
 import { parseJob } from "../content/history";

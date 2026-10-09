@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { put } from "@vercel/blob";
+import { put } from "../../security/guarded-blob";
 import type { ContentJob } from "../schema";
 import type { OriginalVisualAsset, OriginalVisualProvider } from "../image-provider";
 import { buildOriginalVisualPrompt, OriginalVisualError, pngIsPlausible } from "./openai-image";

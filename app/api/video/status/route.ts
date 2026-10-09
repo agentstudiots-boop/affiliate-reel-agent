@@ -1,4 +1,4 @@
-import { head, put } from "@vercel/blob";
+import { head, put } from "@/lib/security/guarded-blob";
 import { assertEffectAllowed } from "@/lib/security/runtime-guard";
 import { getRunwayClient } from "@/lib/runway";
 import { authorized, unauthorizedResponse } from "@/lib/memory/auth";

@@ -1,4 +1,4 @@
-import { put } from "@vercel/blob";
+import { put } from "@/lib/security/guarded-blob";
 import { assertEffectAllowed } from "@/lib/security/runtime-guard";
 import { authorized } from "@/lib/memory/auth";
 

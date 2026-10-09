@@ -80,7 +80,7 @@ test('video status: no provider call and no Blob write without the access code; 
   const retrieve = counter(); const puts = counter(); const heads = counter();
   retrieve.result = { status: 'SUCCEEDED', cost: { credits: 5 }, output: ['https://runway.example/out.mp4'] };
   const route = loadRoute('app/api/video/status/route.ts', {
-    '@vercel/blob': { head: async () => { heads.calls++; throw new Error('missing'); }, put: puts.fn },
+    '@/lib/security/guarded-blob': { head: async () => { heads.calls++; throw new Error('missing'); }, put: puts.fn },
     '@/lib/runway': { getRunwayClient: () => ({ tasks: { retrieve: retrieve.fn } }) },
   });
   for (const code of [undefined, 'wrong']) {

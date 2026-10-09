@@ -37,6 +37,6 @@ Folge: **Ohne Sandbox kann eine Preview keine Datenbank öffnen.** Die Preview b
 4. Ungenutzt (im Code nicht referenziert): `GOOGLE_GENERATIVE_AI_API_KEY`, `AI_GATEWAY_API_KEY` — nach Prüfung entfernen.
 
 ## Nicht belegt / Grenzen
-- Ob `@vercel/blob` alle Schreibaufrufe über `globalThis.fetch` sendet, ist nicht verifiziert; deshalb gibt es zusätzlich die expliziten Sperren an den `put`-Stellen. [ungeklärt]
+- `@vercel/blob` sendet über `undici`, nicht über `globalThis.fetch` (im Paketcode bestätigt): der Egress-Filter sieht Blob-Schreibzugriffe nicht. Deshalb laufen alle Blob-`put`-Aufrufe über `lib/security/guarded-blob.ts`.
 - Der Filter greift nur im Node-Runtime der Funktion (`instrumentation.ts`), nicht im Build. Der Build führt keine Datenbank- oder Providerzugriffe aus [wahrscheinlich].
 - Live auf Vercel nicht getestet (kein Preview-Deployment mit dem Branch ausgelöst).

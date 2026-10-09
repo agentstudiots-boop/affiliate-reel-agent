@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { put } from "@vercel/blob";
+import { put } from "../../security/guarded-blob";
 import { getRunwayClient, RUNWAY_DURATION_SECONDS, RUNWAY_MODEL, RUNWAY_RATIO } from "../../runway";
 import { VideoProviderError, type VideoInput, type VideoProvider, type VideoStatus } from "../video";
 import type { GeneratedAsset } from "../types";

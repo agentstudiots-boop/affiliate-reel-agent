@@ -1,4 +1,4 @@
-import { head, put } from "@vercel/blob";
+import { head, put } from "../security/guarded-blob";
 import { assertEffectAllowed } from "../security/runtime-guard";
 import type { ContentJob } from "../content/schema";
 import { getRunwayClient, RUNWAY_DURATION_SECONDS, RUNWAY_ESTIMATED_CREDITS, RUNWAY_MODEL, RUNWAY_RATIO } from "../runway";

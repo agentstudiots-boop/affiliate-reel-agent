@@ -130,3 +130,19 @@ test('migrations, WhatsApp sends, database handle and scheduled jobs refuse to r
   assert.equal((await response.json()).status, 'skipped_non_production_environment');
   assert.equal((await cron.GET(new Request('https://x.test/api/cron/daily-draft', { headers: { authorization: 'Bearer wrong-secret-test' } }))).status, 401);
 });
+
+test('Blob writes: the guarded put refuses in preview before touching the SDK; no application module imports @vercel/blob directly', t => {
+  const fs = require('node:fs'); const path = require('node:path');
+  // @vercel/blob uses undici's own fetch, so the global egress filter cannot protect it: every write must use the guarded wrapper.
+  const offenders = [];
+  const walk = dir => { for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) { if (!['node_modules', '.next'].includes(entry.name)) walk(full); }
+    else if (/\.(ts|tsx)$/.test(entry.name) && !full.endsWith(path.join('security', 'guarded-blob.ts')) && /from ["']@vercel\/blob["']/.test(fs.readFileSync(full, 'utf8'))) offenders.push(full); } };
+  walk('lib'); walk('app');
+  assert.deepEqual(offenders, []);
+  quiet(t);
+  withVercelEnv(t, 'preview');
+  const { put } = require('../.test-build/lib/security/guarded-blob');
+  assert.throws(() => put('a.png', Buffer.from('x'), { access: 'public' }), R.NonProductionEffectError);
+});

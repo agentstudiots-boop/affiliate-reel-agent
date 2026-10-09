@@ -1,5 +1,5 @@
 import { ImageResponse } from "next/og";
-import { put } from "@vercel/blob";
+import { put } from "../security/guarded-blob";
 import { assertEffectAllowed } from "../security/runtime-guard";
 import { getDatabase } from "@/lib/memory/db";
 import { parseJob } from "@/lib/content/history";
