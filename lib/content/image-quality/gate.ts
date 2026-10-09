@@ -74,7 +74,7 @@ export async function technicalCheck(url: string, request: typeof fetch = fetch)
   }
 }
 
-async function replicateObserve(imageUrl: string, spec: ImageSpec): Promise<VisionObservation> {
+export async function replicateObserve(imageUrl: string, spec: ImageSpec): Promise<VisionObservation> {
   const briefing = { hauptmotiv: spec.primary_object, hauptmotiv_begriffe: spec.primary_object_terms, prominenz: spec.primary_object_prominence,
     pflichtobjekte: spec.required_objects, ausgeschlossen: spec.forbidden_objects, komposition: spec.composition, produktart: spec.subject,
     werbezweck: spec.commercial_intent, darstellung: spec.representation };

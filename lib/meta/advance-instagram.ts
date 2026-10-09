@@ -1,6 +1,7 @@
 import { getDatabase } from "../memory/db";
 import { instagramReelRepository, InstagramReelConflict } from "./instagram-reel";
 import { instagramGraph } from "./instagram-publisher";
+import { abortOpenAttempt, verifyPublishStillAuthorized } from "../publishing/approval-gate";
 import { sendWhatsAppText, whatsappApprovalReady, WhatsAppRejectedError } from "../whatsapp/client";
 import { formatPublishReport, type PlatformOutcome } from "../publishing/report";
 
@@ -63,6 +64,16 @@ export async function advanceInstagram(jobId: string, action: "request" | "publi
     await repo.markUnknown(publication.id);
     await reelReport(send, { platform: "instagram", status: "unknown" });
     return { publication: await repo.get(jobId), stage: "unknown" };
+  }
+  // Last gate before media_publish: the container was created under an earlier permit. Revoked, changed or superseded approvals void it.
+  const authorized = await verifyPublishStillAuthorized(db, `aff_reel_${publication.id}`, "instagram").catch(() => ({ ok: false as const, reason: "no_approval" as const }));
+  if (!authorized.ok) {
+    const voided = await db.query("UPDATE publication_requests SET status='rejected',updated_at=now() WHERE id=$1 AND platform='instagram' AND status='processing' RETURNING id", [publication.id]);
+    if (voided.rows.length) {
+      await abortOpenAttempt(db, `aff_reel_${publication.id}`, "instagram", authorized.reason).catch(() => undefined);
+      await send("Instagram-Reel nicht veröffentlicht: Die Freigabe ist nicht mehr gültig (widerrufen, geändert oder ersetzt). Es wurde nichts gepostet.").catch(() => undefined);
+    }
+    return { publication: await repo.get(jobId), stage: "blocked" as const };
   }
   const claimed = await repo.claimMediaPublish(publication.id);
   let mediaId: string;

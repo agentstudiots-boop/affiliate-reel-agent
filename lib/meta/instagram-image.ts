@@ -9,6 +9,7 @@ import { formatPublishReport, type PlatformOutcome } from "../publishing/report"
 import { ensureAutomationSchema } from "../memory/ensure-automation-schema";
 import { facebookCaption } from "./facebook-caption";
 import { instagramGraph, InstagramPublishFailure } from "./instagram-publisher";
+import { abortOpenAttempt, verifyPublishStillAuthorized } from "../publishing/approval-gate";
 
 type Graph = Awaited<ReturnType<typeof instagramGraph>>;
 export type InstagramImageDeps = {
@@ -129,6 +130,17 @@ export async function finishInstagramImage(publicationId: string, deps: Required
     await db.query("UPDATE instagram_image_posts SET status='processing',updated_at=now() WHERE publication_id=$1", [publicationId]);
     await note(send, await report(db, publicationId, { platform: "instagram", status: "processing" }, "Antworte später mit „Status“, dann veröffentliche ich es einmalig."));
     return { status: "processing" as const };
+  }
+  // Last gate before the irreversible step: the container may be hours old. The central approval must still be valid for the
+  // current version (revoked, changed or superseded approvals void the container); a single resume can never bypass it.
+  const authorized = await verifyPublishStillAuthorized(db, `aff_img_${publicationId}`, "instagram").catch(() => ({ ok: false as const, reason: "no_approval" as const }));
+  if (!authorized.ok) {
+    const voided = await db.query("UPDATE instagram_image_posts SET status='skipped',error_phase='approval',error_detail=$2,updated_at=now() WHERE publication_id=$1 AND status IN ('container_created','processing') RETURNING publication_id", [publicationId, `approval_${authorized.reason}`]);
+    if (voided.rows.length) {
+      await abortOpenAttempt(db, `aff_img_${publicationId}`, "instagram", authorized.reason).catch(() => undefined);
+      await note(send, "Instagram-Bild nicht veröffentlicht: Die Freigabe ist nicht mehr gültig (widerrufen, geändert oder ersetzt). Es wurde nichts gepostet.");
+    }
+    return { status: "blocked" as const, reason: authorized.reason };
   }
   const attempt = await db.query(`UPDATE instagram_image_posts SET status='publishing',publish_attempted_at=now(),updated_at=now()
     WHERE publication_id=$1 AND status IN ('container_created','processing') RETURNING publication_id`, [publicationId]);

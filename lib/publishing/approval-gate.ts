@@ -218,6 +218,36 @@ export async function platformAttempt(db: Sql, contentId: string, platform: stri
   return row ? attemptRow(row) : null;
 }
 
+// Re-check immediately before the last irreversible step of a multi-step publish (e.g. Instagram container → media_publish).
+// A permit is only valid at the moment it is issued; a container created earlier must not be published after the approval was
+// revoked, invalidated, superseded by a newer version, or the live switches/environment changed. Read-only; never claims.
+export async function verifyPublishStillAuthorized(db: Sql, contentId: string, platform: string): Promise<{ ok: true } | { ok: false; reason: PublishBlockReason }> {
+  const latest = await latestVersion(db, contentId);
+  if (!latest) return { ok: false, reason: "no_content_version" };
+  const approval = (await db.query("SELECT status,authority,fingerprint,request_message_id,decision_message_id,decided_at FROM publish_approvals WHERE content_id=$1 AND version=$2", [contentId, latest.version])).rows[0];
+  if (!approval) return { ok: false, reason: "no_approval" };
+  const status = String(approval.status);
+  if (status === "pending") return { ok: false, reason: "approval_pending" };
+  if (status === "rejected") return { ok: false, reason: "approval_rejected" };
+  if (status === "changes_requested") return { ok: false, reason: "changes_requested" };
+  if (status !== "approved") return { ok: false, reason: "approval_invalidated" };
+  if (!isActiveAuthority(approval.authority)) return { ok: false, reason: "authority_inactive" };
+  if (String(approval.fingerprint) !== latest.fingerprint || !approval.request_message_id || !approval.decision_message_id || !approval.decided_at) return { ok: false, reason: "approval_incomplete" };
+  if (!latest.platforms.includes(platform)) return { ok: false, reason: "platform_not_in_approved_version" };
+  // The attempt that was authorized for exactly this version must still be the open one (not failed, not from an older version).
+  const attempt = (await db.query("SELECT origin FROM publish_attempts WHERE content_id=$1 AND version=$2 AND platform=$3 AND status IN ('claimed','processing') ORDER BY created_at DESC LIMIT 1", [contentId, latest.version, platform])).rows[0];
+  if (!attempt) return { ok: false, reason: "permit_mismatch" };
+  const origin: ContentOrigin = String(attempt.origin) === "product_pipeline" ? "product_pipeline" : "topic_pipeline";
+  const live = livePublishCapability(platform, process.env, origin);
+  return live.ok ? { ok: true } : { ok: false, reason: live.reason };
+}
+
+// The open attempt of a publish that was stopped before its irreversible step: nothing was published.
+export async function abortOpenAttempt(db: Sql, contentId: string, platform: string, reason: string) {
+  await db.query("UPDATE publish_attempts SET status='failed', reason=$3, updated_at=now() WHERE content_id=$1 AND platform=$2 AND status IN ('claimed','processing')", [contentId, platform, reason.slice(0, 200)]);
+  emitEvent("platform_publish_skipped", { contentId, platform, reason }, "warn");
+}
+
 export async function openAttempts(db: Sql, limit = 20): Promise<AttemptRecord[]> {
   const rows = await db.query("SELECT * FROM publish_attempts WHERE status IN ('processing','unknown') AND jsonb_array_length(remote_ids)+(CASE WHEN external_id IS NULL THEN 0 ELSE 1 END)>0 AND updated_at>now()-interval '7 days' ORDER BY updated_at LIMIT $1", [limit]);
   return rows.rows.map(attemptRow);

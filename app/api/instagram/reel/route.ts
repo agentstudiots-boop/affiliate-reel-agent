@@ -1,4 +1,5 @@
 import { advanceInstagram } from "@/lib/meta/advance-instagram";
+import { publishApprovedAffiliateReel } from "@/lib/distribution/affiliate";
 import { z } from "zod";
 import { authorized } from "@/lib/memory/auth";
 import { databaseConfigured, getDatabase } from "@/lib/memory/db";
@@ -31,7 +32,20 @@ export async function POST(request: Request) {
     if (raw.length > 1500) return Response.json({ error: "Anfrage zu groß." }, { status: 413 });
     const { jobId, action } = requestSchema.parse(JSON.parse(raw));
     const repo = instagramReelRepository();
-    return Response.json(await advanceInstagram(jobId, action, repo, instagramGraph, getDatabase(), sendWhatsAppText, whatsappApprovalReady));
+    const db = getDatabase();
+    if (action === "publish") {
+      // Container creation is a publication step: it runs through the shared distribution layer and the central approval gate
+      // (same path as the automatic continuation), never directly. Without a valid approval of the exact current version nothing is created.
+      const run = await publishApprovedAffiliateReel(jobId, { db, send: sendWhatsAppText,
+        affiliate: { reel: id => advanceInstagram(id, "publish", repo, instagramGraph, db, sendWhatsAppText, whatsappApprovalReady), reels: () => repo } });
+      if (!run) throw new InstagramReelConflict("Eine eigene WhatsApp-Veröffentlichungsfreigabe fehlt oder der Versuch wurde bereits gestartet.");
+      const instagram = run.outcomes.find(item => item.platform === "instagram");
+      if (instagram?.status === "blocked") throw new InstagramReelConflict("Die Veröffentlichung ist durch die zentrale Freigabeprüfung gesperrt.");
+      if (!instagram || !["processing", "published"].includes(instagram.status))
+        return Response.json({ error: "Instagram-Vorgang nicht eindeutig bestätigt. Status prüfen; keinen zweiten Upload oder Post starten." }, { status: 503 });
+      return Response.json({ publication: await repo.get(jobId), stage: "processing" });
+    }
+    return Response.json(await advanceInstagram(jobId, action, repo, instagramGraph, db, sendWhatsAppText, whatsappApprovalReady));
   } catch (error) {
     if (error instanceof InstagramPublishFailure) console.error(JSON.stringify({ event: "instagram_publication_blocked", phase: error.phase, detail: error.detail, httpStatus: error.httpStatus, code: error.code, subcode: error.subcode }));
     return Response.json({ error: error instanceof InstagramReelConflict ? error.message : error instanceof InstagramPublishFailure
