@@ -8,6 +8,10 @@ import type { ProductSuggester, ProductSuggestion } from "@/lib/topic-pipeline/p
 import type { TopicPipelineDeps } from "@/lib/topic-pipeline/orchestrator";
 import { tokens } from "@/lib/topics/lexicon";
 import { postgresLedger } from "@/lib/visual/ledger";
+import type { GeneratedAsset } from "@/lib/visual/types";
+import { checkGeneratedImage } from "@/lib/content/image-quality/gate";
+import { qualityGateMode } from "@/lib/content/image-quality/production";
+import { topicImageSpec } from "@/lib/content/image-quality/spec";
 import { createHeyGenAvatarProvider, heygenConfig } from "@/lib/visual/providers/heygen";
 import { createReplicateBriefProvider } from "@/lib/visual/providers/replicate";
 import { createRunwayStandardVideoProvider } from "@/lib/visual/providers/runway-video";
@@ -63,7 +67,13 @@ export function topicPipelineDeps(): TopicPipelineDeps {
     db,
     send: async text => String(await sendWhatsAppText(text)),
     trustedWaId: process.env.WHATSAPP_APPROVER_WA_ID || "",
-    render: { ledger: postgresLedger(db), imageProvider: createReplicateBriefProvider(), avatarProvider: createHeyGenAvatarProvider(),
+    render: { ledger: postgresLedger(db), imageProvider: createReplicateBriefProvider(),
+      // Same visual quality gate as affiliate images (only when the vision check can run).
+      ...(qualityGateMode() === "strict" ? { imageQuality: async (asset: GeneratedAsset, motif: { motif: string; title: string }) => {
+        if (!asset.url) return { approved: false, reasons: ["Bild-URL fehlt"] };
+        const result = await checkGeneratedImage({ url: asset.url, spec: topicImageSpec(motif) });
+        return { approved: result.approved, reasons: [...result.hard_failures, ...result.soft_failures] };
+      } } : {}), avatarProvider: createHeyGenAvatarProvider(),
       standardVideoProvider: createRunwayStandardVideoProvider(), avatarQuota: limit > 0 ? { store: postgresQuota(db), limit } : null },
     // Reference mode by default (no model cost). AI copy only with TOPIC_COPY_MODE=ai and a Replicate token.
     generate: process.env.TOPIC_COPY_MODE === "ai" && process.env.REPLICATE_API_TOKEN?.trim() ? createGenerator({ mode: "ai" }) : null,

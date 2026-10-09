@@ -1,5 +1,5 @@
 import type { Database } from "../memory/db";
-import { requestFacebookApproval } from "./request-publication";
+import { alreadyNotified, requestFacebookApproval } from "./request-publication";
 import { sendWhatsAppText } from "../whatsapp/client";
 
 // What the operator reads when the step after the content approval (image + publication request) cannot complete.
@@ -21,7 +21,7 @@ export async function resumeApprovedDailyPublications(db: Database, request = re
     try { await request(String(row.job_id)); resumed++; }
     catch (error) {
       console.error(JSON.stringify({ event: "daily_publication_resume_failed", jobId: String(row.job_id), reason: error instanceof Error ? error.name : "unknown" }));
-      try { await notify(publicationPreparationFailureText(error)); } catch { /* the failure is logged above */ }
+      if (!alreadyNotified(error)) try { await notify(publicationPreparationFailureText(error)); } catch { /* the failure is logged above */ }
     }
   }
   return resumed;
