@@ -1,5 +1,6 @@
 import type { Sql } from "../memory/db";
 import { cleanAmazonTitle } from "../product-resolver";
+import { loadActiveOrder, type ActiveOrder } from "./active-context";
 
 // Everything the semantic router may see. Product names and captions are data, never instructions.
 export type OpenItem = {
@@ -16,9 +17,15 @@ export type RouteContext = {
   recent_instructions: { text: string; outcome: string; at: string }[];
   focus: FocusProduct | null; // the product the operator is most plausibly talking about
   candidate_job_ids: string[];
+  // The operator's latest explicit product order (persistent, see active-context.ts). Short follow-ups refer to it.
+  active_order: ActiveOrderSummary | null;
 };
+export type ActiveOrderSummary = { product: string; status: string; reason: string | null; draft_id: string | null; format_wish: string | null; at: string };
+const ORDER_STATE: Record<string, string> = { requested: "beauftragt", in_progress: "Entwurf wird erstellt", awaiting_approval: "Entwurf wartet auf Inhaltsfreigabe",
+  blocked: "gestoppt", failed: "unterbrochen" };
+export const orderState = (status: string) => ORDER_STATE[status] ?? status;
 export type FocusProduct = {
-  draft_id: string; source: "replying_to" | "single_open" | "latest_recent";
+  draft_id: string; source: "replying_to" | "active_order" | "single_open" | "latest_recent";
   product: string; asin: string | null; state: string;
   selection_basis: string[]; use_case_in_plan: string; caption_excerpt: string;
   verified_product_data: string[]; data_limits: string;
@@ -80,9 +87,12 @@ export async function loadRouteContext(db: Sql, waId: string, currentMessageId: 
   const recent_instructions = instructions.rows.map(row => ({ text: clip(row.body, 200),
     outcome: clip(`${row.status}${row.error_code ? `:${row.error_code}` : ""}`, 60), at: new Date(String(row.created_at)).toISOString() }));
   const replying = replyToMessageId ? open_items.find(item => item.approval_message_id === replyToMessageId) : undefined;
-  const focus = await resolveFocus(db, open_items, replyToMessageId);
+  const active = await loadActiveOrder(db, waId).catch(() => null);
+  const focus = await resolveFocus(db, open_items, replyToMessageId, active);
+  const active_order = active ? { product: tidyName(active.productLabel), status: active.status, reason: active.reason, draft_id: active.jobId,
+    format_wish: active.formatWish, at: active.updatedAt } : null;
   return { now: new Date().toISOString(), replying_to: replying?.draft_id ?? null, open_items, recent_messages, recent_products, recent_instructions,
-    focus, candidate_job_ids: open_items.map(item => item.draft_id) };
+    focus, candidate_job_ids: open_items.map(item => item.draft_id), active_order };
 }
 
 const stateOf = (row: Record<string, unknown>, open: boolean) => open ? "wartet auf Freigabe"
@@ -90,9 +100,10 @@ const stateOf = (row: Record<string, unknown>, open: boolean) => open ? "wartet 
   : row.draft_status === "needs_input" || row.status === "needs_input" || row.status === "failed" ? "gestoppt/ersetzt" : String(row.status || "offen");
 
 // Which product do „dieses Produkt“, „das Bild“, „nochmal“ refer to? A quoted approval message wins
-// (even if that draft is closed), then the only open draft, then the latest product of the last 6 hours.
-// Several open drafts without a quote: no focus; the router must ask instead of guessing.
-async function resolveFocus(db: Sql, open_items: OpenItem[], replyToMessageId: string | null): Promise<FocusProduct | null> {
+// (even if that draft is closed), then the active order's draft, then the only open draft, then the latest product of
+// the last 6 hours. An active order that has no draft yet hides older drafts (no silent context switch); several open
+// drafts without a quote or active order: no focus; the router must ask instead of guessing.
+async function resolveFocus(db: Sql, open_items: OpenItem[], replyToMessageId: string | null, active: ActiveOrder | null = null): Promise<FocusProduct | null> {
   let jobId: string | null = null, source: FocusProduct["source"] = "latest_recent";
   if (replyToMessageId) {
     const quoted = await db.query(`SELECT job_id FROM daily_drafts WHERE whatsapp_message_id=$1
@@ -100,6 +111,11 @@ async function resolveFocus(db: Sql, open_items: OpenItem[], replyToMessageId: s
       UNION SELECT job_id FROM content_approval_requests WHERE whatsapp_message_id=$1 LIMIT 1`, [replyToMessageId]);
     if (quoted.rows[0]) { jobId = String(quoted.rows[0].job_id); source = "replying_to"; }
   }
+  // The active order is the current topic while its draft is open or nothing newer arrived since. If it is still waiting
+  // for its draft, no older draft becomes the focus (the router sees it as active_order).
+  const current = !!active && (open_items.some(item => item.draft_id === active.jobId) || open_items.every(item => item.waiting_since <= active.updatedAt));
+  if (!jobId && current && active!.jobId) { jobId = active!.jobId; source = "active_order"; }
+  if (!jobId && current && ["requested", "in_progress", "blocked", "failed"].includes(active!.status)) return null;
   if (!jobId && open_items.length === 1) { jobId = open_items[0].draft_id; source = "single_open"; }
   if (!jobId && open_items.length > 1) return null;
   if (!jobId) {

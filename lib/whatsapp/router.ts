@@ -3,7 +3,7 @@ import { ensureAutomationSchema } from "../memory/ensure-automation-schema";
 import { classifyWhatsAppReply } from "./intent";
 import { sendWhatsAppText } from "./client";
 import type { IncomingWhatsAppMessage } from "./security";
-import { loadRouteContext, type OpenItem, type RouteContext } from "./route-context";
+import { loadRouteContext, orderState, type OpenItem, type RouteContext } from "./route-context";
 import { interpretMessage, routeSchema, RouterUnavailable, type Route } from "./route-llm";
 import { imagePostCommand } from "./start-image-post";
 import { validateInstruction, type Instruction } from "./instruction";
@@ -34,7 +34,8 @@ export function systemFacts(context: RouteContext) {
   const open = context.open_items.map(item => `- „${item.product}“${item.asin ? ` (ASIN ${item.asin})` : ""}: wartet seit ${time(item.waiting_since)} Uhr auf die ${stage(item)}`).join("\n") || "- nichts offen";
   const recent = context.recent_products.slice(0, 10).map(item => `- ${item.product}${item.asin ? ` (${item.asin})` : ""}: ${item.state}`).join("\n") || "- keine";
   const focus = context.focus ? `Besprochenes Produkt (${context.focus.source}): „${context.focus.product}“${context.focus.asin ? ` (ASIN ${context.focus.asin})` : ""}, Zustand: ${context.focus.state}.\nAuswahlgrund: ${context.focus.selection_basis.join(" ")}\nIm Plan vorgesehene Anwendung: ${context.focus.use_case_in_plan || "–"}\nBelegte Produktdaten: ${context.focus.verified_product_data.join("; ")}\n${context.focus.data_limits}\n` : "";
-  return `${focus}Offene Freigaben:\n${open}\nProdukte der letzten 7 Tage:\n${recent}\nProdukte dürfen innerhalb von 7 Tagen nicht erneut automatisch vorgeschlagen werden; abgelehnte oder ersetzte Produkte bleiben ebenfalls gesperrt.`;
+  const active = context.active_order ? `Aktiver Auftrag des Betreibers: „${context.active_order.product}“ (${orderState(context.active_order.status)}${context.active_order.reason ? `, Grund: ${context.active_order.reason}` : ""}).\n` : "";
+  return `${active}${focus}Offene Freigaben:\n${open}\nProdukte der letzten 7 Tage:\n${recent}\nProdukte dürfen innerhalb von 7 Tagen nicht erneut automatisch vorgeschlagen werden; abgelehnte oder ersetzte Produkte bleiben für automatische Vorschläge ebenfalls gesperrt. Ein ausdrücklicher Auftrag des Betreibers für ein bestimmtes Produkt hat Vorrang vor dieser Sperre; Prüfungen und Freigaben gelten trotzdem.`;
 }
 
 export function statusText(context: RouteContext) {
@@ -45,12 +46,38 @@ export function statusText(context: RouteContext) {
   return `Offen:\n${context.open_items.map(item => `• „${item.product}“ – ${stage(item)} seit ${time(item.waiting_since)} Uhr. Antworte direkt auf die Freigabenachricht mit „Freigeben“ oder „Ablehnen“.`).join("\n")}`;
 }
 
-function target(route: Route, context: RouteContext): { item: OpenItem | null; ambiguous: boolean } {
+// Significant words of a product name the operator may use to name a draft explicitly („beim Pilz-Entwurf …“).
+function mentions(body: string, product: string) {
+  const text = body.toLocaleLowerCase("de-DE");
+  return product.toLocaleLowerCase("de-DE").split(/[^\p{L}\p{N}]+/u).filter(word => word.length >= 4).some(word => text.includes(word));
+}
+
+// Target of a change/decision. Priority: quoted approval message → the active order's draft → a draft the operator names
+// explicitly → the only open draft. An active order without a draft never lets an older draft take over silently.
+function target(route: Route, context: RouteContext, body = ""): { item: OpenItem | null; ambiguous: boolean; activeWithoutDraft?: boolean } {
   const byId = (id: string | null) => context.open_items.find(item => item.draft_id === id) ?? null;
-  const chosen = byId(route.draft_id) ?? byId(context.replying_to);
-  if (chosen) return { item: chosen, ambiguous: false };
+  const quoted = byId(context.replying_to);
+  if (quoted) return { item: quoted, ambiguous: false };
+  const active = context.active_order;
+  const own = active ? byId(active.draft_id) : null;
+  if (own) return { item: own, ambiguous: false };
+  const named = byId(route.draft_id);
+  // Still waiting for its draft (planning, stopped, interrupted) and newer than every open draft: it is the current topic.
+  const pending = !!active && ["requested", "in_progress", "blocked", "failed"].includes(active.status)
+    && context.open_items.every(item => item.waiting_since <= active.at);
+  if (pending) {
+    if (named && mentions(body, named.product)) return { item: named, ambiguous: false };
+    if (context.open_items.length) return { item: null, ambiguous: false, activeWithoutDraft: true };
+  }
+  if (named) return { item: named, ambiguous: false };
   if (context.open_items.length === 1) return { item: context.open_items[0], ambiguous: false };
   return { item: null, ambiguous: context.open_items.length > 1 };
+}
+
+function activeWithoutDraftText(context: RouteContext) {
+  const active = context.active_order!;
+  const older = context.open_items[0];
+  return `Dein aktueller Auftrag ist „${active.product.slice(0, 70)}“ (${orderState(active.status)}); dazu gibt es noch keinen Entwurf, den ich ändern könnte. An älteren Entwürfen ändere ich deshalb nichts.${older ? ` Meinst du „${older.product.slice(0, 70)}“, antworte direkt auf dessen Freigabenachricht.` : ""} Es wurde nichts geändert.`;
 }
 
 function whichQuestion(context: RouteContext) {
@@ -114,11 +141,11 @@ export async function routeOperatorMessage(input: Message, deps: RouterDeps): Pr
     if (claimed.rows.length) await send(text);
     return { handled: true as const };
   };
-  const { item, ambiguous } = target(route, context);
+  const { item, ambiguous, activeWithoutDraft } = target(route, context, input.body);
   const base = { raw_message: input.body.slice(0, 300), normalized_message: input.body.trim().replace(/\s+/g, " ").slice(0, 300), wa_message_id: input.id,
     active_content_id: item?.draft_id ?? null, active_state: item?.stage ?? (context.open_items.length ? "multiple_open" : "idle"),
     inbound_message_id: input.id, reply_to_message_id: input.replyToMessageId, resolved_job_id: context.focus?.draft_id ?? item?.draft_id ?? null,
-    resolved_content_id: context.focus?.draft_id ?? item?.draft_id ?? null, resolved_product_name: context.focus?.product ?? item?.product ?? null,
+    resolved_content_id: context.focus?.draft_id ?? item?.draft_id ?? null, active_order: context.active_order ? { status: context.active_order.status, draft_id: context.active_order.draft_id } : null, resolved_product_name: context.focus?.product ?? item?.product ?? null,
     asin: context.focus?.asin ?? item?.asin ?? null, focus_source: context.focus?.source ?? null, candidate_job_ids: context.candidate_job_ids,
     context_fields_supplied: ["open_items", "recent_messages", "recent_products", "recent_instructions", ...(context.focus ? ["focus"] : [])],
     open_items: context.open_items.length, intent: route.intent, search_query: route.search_query, reject_current: route.reject_current,
@@ -132,15 +159,15 @@ export async function routeOperatorMessage(input: Message, deps: RouterDeps): Pr
   switch (route.intent) {
     case "search_product": {
       const replace = route.reject_current && context.open_items.length > 0;
-      if (replace && !item) { log({ ...base, action: "clarify_target" }); return reply(whichQuestion(context), "clarified"); }
+      if (replace && !item) { log({ ...base, action: "clarify_target" }); return reply(activeWithoutDraft ? activeWithoutDraftText(context) : whichQuestion(context), "clarified"); }
       log({ ...base, action: replace ? "replace_product" : "search_product", pipeline: "product_search" });
       await mark(replace ? "replace_product" : "search_product");
       await deps.searchProduct(input, { search: route.search_query?.trim() || null, replaceDraftId: replace ? item!.draft_id : null, replace, note: route.operator_note });
       return { handled: true };
     }
     case "set_category": {
-      if (!item) { log({ ...base, action: ambiguous ? "clarify_target" : "no_open_item" });
-        return reply(ambiguous ? whichQuestion(context) : "Dazu gibt es gerade keinen offenen Entwurf, dessen Kategorie ich ändern könnte. Es wurde nichts geändert.", "clarified"); }
+      if (!item) { log({ ...base, action: activeWithoutDraft ? "active_order_without_draft" : ambiguous ? "clarify_target" : "no_open_item" });
+        return reply(activeWithoutDraft ? activeWithoutDraftText(context) : ambiguous ? whichQuestion(context) : "Dazu gibt es gerade keinen offenen Entwurf, dessen Kategorie ich ändern könnte. Es wurde nichts geändert.", "clarified"); }
       if (item.stage !== "content_approval") { log({ ...base, action: "category_after_content_approval" });
         return reply("Dieser Beitrag wartet schon auf die Veröffentlichungsfreigabe; die Kategorie lässt sich nur vor der Inhaltsfreigabe ändern. Es wurde nichts geändert.", "clarified"); }
       if (!deps.setCategory) return reply("Die Kategorieänderung ist gerade nicht verfügbar. Es wurde nichts geändert.", "clarified");
@@ -150,8 +177,8 @@ export async function routeOperatorMessage(input: Message, deps: RouterDeps): Pr
       return { handled: true };
     }
     case "revise_image": case "revise_text": case "revise_both": {
-      if (!item) { log({ ...base, action: ambiguous ? "clarify_target" : "no_open_item" });
-        return reply(ambiguous ? whichQuestion(context) : "Dazu gibt es gerade keinen offenen Entwurf. Nenne mir ein Produkt, das ich suchen soll, dann schicke ich dir eine neue Inhaltsfreigabe. Es wurde nichts geändert.", "clarified"); }
+      if (!item) { log({ ...base, action: activeWithoutDraft ? "active_order_without_draft" : ambiguous ? "clarify_target" : "no_open_item" });
+        return reply(activeWithoutDraft ? activeWithoutDraftText(context) : ambiguous ? whichQuestion(context) : "Dazu gibt es gerade keinen offenen Entwurf. Nenne mir ein Produkt, das ich suchen soll, dann schicke ich dir eine neue Inhaltsfreigabe. Es wurde nichts geändert.", "clarified"); }
       // With an unambiguous target and a precise image wish the router's understanding is final: no second paid
       // parser call (which can hit the provider's rate limit). validateInstruction applies the same safety checks.
       const instruction = route.intent === "revise_image" ? routedImageInstruction(route, input.body) : undefined;
@@ -160,8 +187,8 @@ export async function routeOperatorMessage(input: Message, deps: RouterDeps): Pr
       return { handled: false, message: { ...input, replyToMessageId: item.approval_message_id }, skipKeywordStages: true, ...(instruction ? { instruction } : {}) };
     }
     case "reject_current": {
-      if (!item) { log({ ...base, action: ambiguous ? "clarify_target" : "no_open_item" });
-        return reply(ambiguous ? whichQuestion(context) : "Es wartet gerade nichts auf deine Freigabe, das ich ablehnen könnte.", "clarified"); }
+      if (!item) { log({ ...base, action: activeWithoutDraft ? "active_order_without_draft" : ambiguous ? "clarify_target" : "no_open_item" });
+        return reply(activeWithoutDraft ? activeWithoutDraftText(context) : ambiguous ? whichQuestion(context) : "Es wartet gerade nichts auf deine Freigabe, das ich ablehnen könnte.", "clarified"); }
       log({ ...base, action: "reject_via_gate", pipeline: "approval_gate" });
       await mark("reject_via_gate");
       return { handled: false, message: { ...input, body: "Ablehnen", replyToMessageId: item.approval_message_id }, skipKeywordStages: true };

@@ -21,6 +21,14 @@ function publicationContent(job: ContentJob) {
   return { caption, hash };
 }
 
+// A manual order may promote a product again, but never publish exactly the same post twice: an identical caption that is
+// already live on the page (another job) blocks both the publication request and the final claim.
+export const IDENTICAL_CONTENT_PUBLISHED = "Identischer Beitrag ist bereits veröffentlicht. Bitte Text oder Bild ändern; nichts wurde erneut gepostet.";
+async function identicalAlreadyPublished(sql: Pick<Database, "query">, jobId: string, caption: string) {
+  const result = await sql.query("SELECT 1 FROM publication_requests WHERE platform='facebook' AND status='published' AND job_id<>$1 AND caption=$2 LIMIT 1", [jobId, caption]);
+  return result.rows.length > 0;
+}
+
 function publication(row: Record<string, unknown>) {
   return {
     id: String(row.id), jobId: String(row.job_id), platform: "facebook" as const,
@@ -160,6 +168,7 @@ export function publicationRepository(db: Database = getDatabase()) {
         if (!await hasContentApproval(job,sql)) throw new PublicationConflictError("WhatsApp-Inhaltsfreigabe für den vollständigen Textentwurf fehlt.");
         if (!job.content || job.content.format === "video") throw new PublicationConflictError("Bild- oder Textentwurf fehlt.");
         const { caption, hash: contentHash } = publicationContent(job);
+        if (await identicalAlreadyPublished(sql, jobId, caption)) throw new PublicationConflictError(IDENTICAL_CONTENT_PUBLISHED);
         const existing = await sql.query("SELECT * FROM publication_requests WHERE job_id=$1 AND platform='facebook' ORDER BY revision DESC LIMIT 1", [jobId]);
         if (existing.rows[0]) {
           if (existing.rows[0].content_hash === contentHash) return publication(existing.rows[0]);
@@ -254,6 +263,8 @@ export function publicationRepository(db: Database = getDatabase()) {
       if (!stored.rows[0]) throw new PublicationConflictError("product_unresolved");
       const current = publicationContent(parseJob(stored.rows[0].snapshot));
       if (current.hash !== stored.rows[0].content_hash || current.caption !== stored.rows[0].caption) throw new PublicationConflictError("product_unresolved: Freigegebenes Produkt oder Caption geändert.");
+      const jobId = String((await sql.query("SELECT job_id FROM publication_requests WHERE id=$1", [id])).rows[0].job_id);
+      if (await identicalAlreadyPublished(sql, jobId, current.caption)) throw new PublicationConflictError(IDENTICAL_CONTENT_PUBLISHED);
       const result = await sql.query("UPDATE publication_requests SET status='publishing',publish_attempted_at=now(),updated_at=now() WHERE id=$1 AND status='approved' AND whatsapp_message_id IS NOT NULL AND publish_attempted_at IS NULL AND image_url IS NOT NULL AND image_url NOT LIKE '%/social-cards/%' RETURNING *", [id]);
       if (!result.rows[0]) throw new PublicationConflictError("Veröffentlichung nicht freigegeben oder bereits versucht.");
       return publication(result.rows[0]);

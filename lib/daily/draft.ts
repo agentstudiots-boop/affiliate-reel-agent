@@ -14,7 +14,7 @@ import { ensureAutomationSchema } from "@/lib/memory/ensure-automation-schema";
 import { loadApprovedEditorialCorrections } from "@/lib/whatsapp/language-memory";
 import { EDITORIAL_MODEL_ERROR, EDITORIAL_RATE_LIMIT_ERROR } from "@/lib/content/model";
 import { createHash } from "node:crypto";
-import { releaseProduct, reserveProduct } from "@/lib/daily/product-lock";
+import { releaseProduct, reserveMandatedProduct, reserveProduct } from "@/lib/daily/product-lock";
 import { facebookCaption } from "@/lib/meta/facebook-caption";
 import { bathtubMatUseCase, isBathtubMat } from "@/lib/content/bathtub-mat";
 import { STRATEGY_REJECTED, type AgentProvenance, type ChanceAssessment, type ContentChance } from "@/lib/content/strategy";
@@ -188,7 +188,10 @@ function safeReason(error: unknown) {
 
 // Each scheduled slot or explicit operator message has its own durable claim.
 // A retry of that slot/message never buys a second search or sends another approval.
-async function planDailyDraft(day: string, slot: string, productQuery?: string, productSearch?: string) {
+// options.mandate: explicit operator order for a named product (ASIN, link or product search) on a manual slot. It overrides
+// the TrendScout cooldown, never the duplicate protection, content review, content approval or publication approval.
+export type DraftOptions = { mandate?: boolean };
+async function planDailyDraft(day: string, slot: string, productQuery?: string, productSearch?: string, options: DraftOptions = {}) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error("Ungültiger Tag.");
   if (!/^(morning|afternoon|manual:[A-Za-z0-9._:-]{1,160})$/.test(slot)) throw new Error("Ungültiger Auslöser.");
   if(productSearch && (productQuery || productSearch.length>90 || !/^[\p{L}\p{N}][\p{L}\p{N}\s.,+&-]*$/u.test(productSearch)))throw Error("Ungültiger Suchbegriff.");
@@ -220,7 +223,8 @@ async function planDailyDraft(day: string, slot: string, productQuery?: string, 
   try {
     // Only scheduled slots are held to the content-chance quality gate; operator requests never are.
     const scheduled = slot === "morning" || slot === "afternoon";
-    const report = productQuery ? null : await runProductScout(productSearch,`${day}:${slot}`,{ quality: scheduled });
+    const mandate = !!options.mandate && slot.startsWith("manual:") && !!(productQuery || productSearch);
+    const report = productQuery ? null : await runProductScout(productSearch,`${day}:${slot}`,{ quality: scheduled, ...(mandate ? { mandate: true } : {}) });
     // Prefer seasonal ideas, then already researched evergreen candidates.
     // Neither category becomes affiliate content without exact product resolution.
     const openSearch = slot.startsWith("manual:") && !productQuery && !productSearch;
@@ -253,7 +257,7 @@ async function planDailyDraft(day: string, slot: string, productQuery?: string, 
     const pool = resolved.length ? resolved : candidates;
     const rotation = openSearch ? createHash("sha256").update(slot).digest().readUInt32BE(0)
       : new Date(`${day}T00:00:00Z`).getUTCDate() + (slot === "afternoon" ? 1 : 0);
-    await db.query("UPDATE daily_drafts SET status='planning',scout_report=$2,updated_at=now() WHERE job_id=$1", [jobId, JSON.stringify(report ? {requestedSearch:productSearch,report}: { requestedProduct: productQuery })]);
+    await db.query("UPDATE daily_drafts SET status='planning',scout_report=$2,updated_at=now() WHERE job_id=$1", [jobId, JSON.stringify({ ...(report ? {requestedSearch:productSearch,report}: { requestedProduct: productQuery }), ...(mandate ? { operatorMandate: true } : {}) })]);
     slotLog("daily_slot_stage", { day, slot, jobId, stage: "product_found", candidates: candidates.length });
     stage = "product_verification";
     let requestedProduct: Awaited<ReturnType<typeof resolveRequestedProduct>> | null = null;
@@ -276,14 +280,24 @@ async function planDailyDraft(day: string, slot: string, productQuery?: string, 
     const ordered = productSearch ? resolved : openSearch ? rotate(pool)
       : scheduled && pool.every(item => assessmentOf(item)) ? [...pool].sort((a, b) => (priorityOf(a) - priorityOf(b)) || assessmentOf(b)!.score - assessmentOf(a)!.score)
       : [...rotate(pool.filter(item => item.kind === "Saisontrend")), ...rotate(pool.filter(item => item.kind === "Dauerläufer"))];
+    // Automatic selection: full cooldown. Operator mandate: cooldown overridden, an already running draft/publication of
+    // the exact product still blocks a second one.
+    let alreadyOpen = false;
+    const reserve = async (product: NonNullable<typeof selectedProduct>) => {
+      if (!mandate) return reserveProduct(db, product, jobId);
+      const outcome = await reserveMandatedProduct(db, product, jobId);
+      if (outcome === "already_open") alreadyOpen = true;
+      return outcome === "reserved";
+    };
     for (const item of requestedProduct ? [] : ordered) {
-      if (item.resolvedProduct && await reserveProduct(db,item.resolvedProduct,jobId)) {
+      if (item.resolvedProduct && await reserve(item.resolvedProduct)) {
         candidate=item; selectedProduct=item.resolvedProduct; break;
       }
     }
-    if (requestedProduct && !await reserveProduct(db,requestedProduct,jobId) || !selectedProduct) {
-      await db.query("UPDATE daily_drafts SET status='needs_input',scout_report=jsonb_set(coalesce(scout_report,'{}'::jsonb),'{reason}',to_jsonb($2::text)),updated_at=now() WHERE job_id=$1", [jobId,"product_repeat_blocked"]);
-      return {status:'needs_input' as const,jobId,reason:'product_repeat_blocked' as const};
+    if (requestedProduct && !await reserve(requestedProduct) || !selectedProduct) {
+      const blockReason = alreadyOpen ? "product_already_open" as const : "product_repeat_blocked" as const;
+      await db.query("UPDATE daily_drafts SET status='needs_input',scout_report=jsonb_set(coalesce(scout_report,'{}'::jsonb),'{reason}',to_jsonb($2::text)),updated_at=now() WHERE job_id=$1", [jobId,blockReason]);
+      return {status:'needs_input' as const,jobId,reason:blockReason};
     }
     // The scout's idea is category-level. It may only steer the content if THIS article's data supports it.
     const rawUseCase = candidate?.reelIdea?.trim();
@@ -398,8 +412,8 @@ async function notifySlotOutcome(day: string, slot: string, result: { status: st
   } catch { console.error(JSON.stringify({ event: "daily_slot_notice_failed", day, slot })); }
 }
 
-export async function createDailyDraft(day = berlinDay(), slot = "morning", productQuery?: string, productSearch?: string) {
-  const result = await planDailyDraft(day, slot, productQuery, productSearch);
+export async function createDailyDraft(day = berlinDay(), slot = "morning", productQuery?: string, productSearch?: string, options: DraftOptions = {}) {
+  const result = await planDailyDraft(day, slot, productQuery, productSearch, options);
   if ((slot === "morning" || slot === "afternoon") && (result.status === "needs_input" || result.status === "failed") && "jobId" in result)
     await notifySlotOutcome(day, slot, { status: result.status, reason: "reason" in result ? String(result.reason) : undefined });
   return result;

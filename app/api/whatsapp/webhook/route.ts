@@ -17,6 +17,7 @@ import { routeOperatorMessage } from "@/lib/whatsapp/router";
 import { changeCategory } from "@/lib/whatsapp/category-change";
 import type { Instruction } from "@/lib/whatsapp/instruction";
 import { startImagePostFromWhatsApp, startProductSearch } from "@/lib/whatsapp/start-image-post";
+import { handleManualOrder } from "@/lib/whatsapp/manual-order";
 import { answerWhatsAppConversation } from "@/lib/whatsapp/chat";
 import { sendWhatsAppText } from "@/lib/whatsapp/client";
 import { completeVoice, releaseVoice, resolveVoiceMessage } from "@/lib/whatsapp/voice";
@@ -122,6 +123,9 @@ export async function POST(request: Request) {
         }
         continue;
       }
+      // Explicit product orders and their short follow-ups („Erstelle einen Beitrag zum …“, „Mach es trotzdem“) are clear
+      // enough for a deterministic path: they keep the active order as context and override only the TrendScout cooldown.
+      if (await handleManualOrder({ ...message, payload }, { database: getDatabase, start: createDailyDraft, send: sendWhatsAppText })) continue;
       // Topic pipeline first (only when enabled): replies quoting a topic message belong to it; free messages without a
       // quote are assigned semantically to a topic draft or left to the product router. Any failure falls back to the
       // existing chain, which ignores unknown reply targets.
