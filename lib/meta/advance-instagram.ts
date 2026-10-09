@@ -13,7 +13,9 @@ async function reelReport(send: typeof sendWhatsAppText, instagram: PlatformOutc
 
 export async function advanceInstagram(jobId: string, action: "request" | "publish" | "poll",
   repo = instagramReelRepository(), graphFactory = instagramGraph,
-  db = getDatabase(), send = sendWhatsAppText, approvalReady = whatsappApprovalReady) {
+  db = getDatabase(), send = sendWhatsAppText, approvalReady = whatsappApprovalReady,
+  // Last gate before media_publish; secure by default, injectable only so unit tests can state the gate result explicitly.
+  stillAuthorized: typeof verifyPublishStillAuthorized = verifyPublishStillAuthorized) {
   if (action === "request") {
     if (!approvalReady()) throw new InstagramReelConflict("WhatsApp-Freigabe ist nicht eingerichtet.");
     // Read-only Graph checks: fail before persisting an approval if Instagram is inaccessible.
@@ -66,7 +68,7 @@ export async function advanceInstagram(jobId: string, action: "request" | "publi
     return { publication: await repo.get(jobId), stage: "unknown" };
   }
   // Last gate before media_publish: the container was created under an earlier permit. Revoked, changed or superseded approvals void it.
-  const authorized = await verifyPublishStillAuthorized(db, `aff_reel_${publication.id}`, "instagram").catch(() => ({ ok: false as const, reason: "no_approval" as const }));
+  const authorized = await stillAuthorized(db, `aff_reel_${publication.id}`, "instagram").catch(() => ({ ok: false as const, reason: "no_approval" as const }));
   if (!authorized.ok) {
     const voided = await db.query("UPDATE publication_requests SET status='rejected',updated_at=now() WHERE id=$1 AND platform='instagram' AND status='processing' RETURNING id", [publication.id]);
     if (voided.rows.length) {
