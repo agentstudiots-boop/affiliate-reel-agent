@@ -237,7 +237,7 @@ function Scene(props: SceneProps) {
         {mode === "process" && !reducedMotion && <Pulse from={segment.from} to={segment.to} color={segment.color} offset={(segment.key.length * 0.37) % 1} />}
       </group>)}
       {[...visible].map(id => { const node = byId.get(id)!; return <ComponentNode key={id} data={data} node={node} position={layout[id]} selected={selectedId === id} dim={dimNode(id)}
-        step={mode === "process" ? stepOf.get(id) ?? null : null} scale={Math.min(1.6, labels)} reducedMotion={reducedMotion} onSelect={onSelect} onHover={onHover} />; })}
+        step={mode === "process" ? stepOf.get(id) ?? null : null} scale={Math.min(1.3, labels)} reducedMotion={reducedMotion} onSelect={onSelect} onHover={onHover} />; })}
     </group>
     <CameraRig goal={goal} goalKey={goalKey} reducedMotion={reducedMotion} />
     <OrbitControls makeDefault enableDamping dampingFactor={0.08} minDistance={5} maxDistance={95} maxPolarAngle={Math.PI * 0.49} />

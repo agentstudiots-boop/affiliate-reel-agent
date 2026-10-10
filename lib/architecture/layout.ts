@@ -68,7 +68,8 @@ export function nodeGoal(position: Vec3, cluster: ClusterId | "core", aspect: nu
   if (cluster === "core") return overviewGoal(aspect);
   const hub = hubPosition(cluster);
   const length = Math.hypot(hub[0], hub[2]) || 1;
-  const away = aspect < 1 ? 11 : 8.5;
+  // Far enough to keep the selected component's direct neighbours of its area in view.
+  const away = aspect < 1 ? 19 : 15;
   return { position: [round(position[0] + (hub[0] / length) * away), round(position[1] + away * 0.65), round(position[2] + (hub[2] / length) * away)], target: position };
 }
 
