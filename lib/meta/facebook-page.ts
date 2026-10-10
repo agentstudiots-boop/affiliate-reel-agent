@@ -1,3 +1,4 @@
+import { assertEffectAllowed } from "../security/runtime-guard";
 import { cachedMetaConnection, metaConfig, pagePublishingToken } from "./connection";
 import { FacebookPublishFailure } from "./publisher";
 
@@ -16,6 +17,7 @@ export async function facebookPageGraph(transport: typeof fetch = fetch) {
   if (pageToken.status !== "ready") throw new FacebookPublishFailure("connection", `page_token_${pageToken.status}`, pageToken.httpStatus, pageToken.code, pageToken.subcode);
   const version = config.version || "v25.0";
   const post = async (path: string, form: URLSearchParams): Promise<GraphResult> => {
+    assertEffectAllowed("publish");
     let response: Response;
     try {
       response = await transport(`https://graph.facebook.com/${version}/${path}`, { method: "POST", body: form, cache: "no-store", redirect: "error", signal: AbortSignal.timeout(30_000),

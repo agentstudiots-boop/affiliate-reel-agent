@@ -1,4 +1,5 @@
-import { head, put } from "@vercel/blob";
+import { head, put } from "../security/guarded-blob";
+import { assertEffectAllowed } from "../security/runtime-guard";
 import type { ContentJob } from "../content/schema";
 import { getRunwayClient, RUNWAY_DURATION_SECONDS, RUNWAY_ESTIMATED_CREDITS, RUNWAY_MODEL, RUNWAY_RATIO } from "../runway";
 
@@ -40,6 +41,7 @@ export function runwayStoryClient(client = getRunwayClient()) {
       try { const existing=await head(pathname); return existing.url; } catch { /* First archive attempt. */ }
       const source = await fetch(url);
       if (!source.ok || !source.body) throw new Error("Runway-MP4 ist nicht abrufbar; keinen zweiten Videostart auslösen.");
+      assertEffectAllowed("storage_write");
       const blob = await put(pathname,source.body,{access:"public",addRandomSuffix:false,allowOverwrite:false,contentType:"video/mp4"});
       return blob.url;
     },

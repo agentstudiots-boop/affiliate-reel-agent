@@ -1,6 +1,6 @@
 import {visualContextError} from "../visual-context";
 import { createHash } from "node:crypto";
-import { put } from "@vercel/blob";
+import { put } from "../../security/guarded-blob";
 import type { ContentJob } from "../schema";
 import { analyzeProductInspiration } from "../product-inspiration";
 import { imageCreativePublicationError } from "../creative-quality";

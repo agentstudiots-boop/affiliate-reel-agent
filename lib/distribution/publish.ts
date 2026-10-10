@@ -53,7 +53,7 @@ export type PublishRun = { dryRun: boolean; outcomes: PublishOutcome[]; plan: Pu
 const GATE_REASON: Record<string, string> = {
   approval_pending: "Freigabe steht aus", no_content_version: "keine registrierte Fassung", approval_rejected: "abgelehnt", changes_requested: "Änderung gewünscht",
   approval_invalidated: "Freigabe ungültig (Inhalt geändert)", content_changed_since_approval: "Inhalt nach Freigabe geändert", already_attempted: "bereits veröffentlicht/versucht",
-  live_publishing_disabled: "Live-Veröffentlichung aus (TOPIC_LIVE_PUBLISHING)", platform_not_enabled: "Plattform nicht aktiviert (TOPIC_PLATFORMS)", credentials_missing: "Zugangsdaten fehlen",
+  live_publishing_disabled: "Live-Veröffentlichung aus (TOPIC_LIVE_PUBLISHING)", platform_not_enabled: "Plattform nicht aktiviert (TOPIC_PLATFORMS)", non_production_environment: "Preview/Entwicklung: Veröffentlichung gesperrt", credentials_missing: "Zugangsdaten fehlen",
   platform_not_in_approved_version: "nicht Teil der freigegebenen Fassung", authority_inactive: "keine aktive Freigabeinstanz", approved: "würde live veröffentlicht",
 };
 

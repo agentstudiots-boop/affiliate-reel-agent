@@ -1,3 +1,4 @@
+import { assertEffectAllowed } from "../security/runtime-guard";
 import { cachedMetaConnection, metaConfig, pagePublishingToken } from "./connection";
 
 export class FacebookPublishFailure extends Error {
@@ -8,6 +9,7 @@ export class FacebookPublishFailure extends Error {
 }
 
 export async function publishFacebookPhoto(imageUrl: string, message: string, transport: typeof fetch = fetch) {
+  assertEffectAllowed("publish");
   let image: URL;
   try { image = new URL(imageUrl); }
   catch { throw new FacebookPublishFailure("image", "invalid_url"); }

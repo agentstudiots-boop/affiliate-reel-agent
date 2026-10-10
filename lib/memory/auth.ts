@@ -9,3 +9,8 @@ export function contentPasswordMatches(value: string) {
 export function authorized(request: Request) {
   return contentPasswordMatches(request.headers.get("x-content-password") || "");
 }
+
+// Uniform 401 for operator-only routes. No hint whether the code is missing, wrong or not configured.
+export function unauthorizedResponse() {
+  return Response.json({ error: "Zugangscode erforderlich." }, { status: 401, headers: { "Cache-Control": "no-store" } });
+}

@@ -1,4 +1,5 @@
 import RunwayML from "@runwayml/sdk";
+import { assertEffectAllowed } from "./security/runtime-guard";
 
 export const RUNWAY_MODEL = "wan3" as const;
 export const RUNWAY_DURATION_SECONDS = 30;
@@ -7,6 +8,7 @@ export const RUNWAY_RATIO = "720:1280" as const;
 export const RUNWAY_ESTIMATED_CREDITS = 300;
 
 export function getRunwayClient() {
+  assertEffectAllowed("paid_provider");
   if (!process.env.RUNWAYML_API_SECRET) throw new Error("RUNWAYML_API_SECRET fehlt in Vercel.");
   // A retried creation request can charge for a second clip if its response was lost.
   return new RunwayML({ apiKey: process.env.RUNWAYML_API_SECRET, maxRetries: 0 });

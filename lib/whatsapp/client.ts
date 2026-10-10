@@ -1,3 +1,4 @@
+import { assertEffectAllowed } from "../security/runtime-guard";
 export class WhatsAppRejectedError extends Error {
   constructor(
     public readonly code: number,
@@ -81,6 +82,7 @@ export async function sendWeeklyNotificationTemplate(to = process.env.WHATSAPP_A
 }
 
 async function sendWhatsAppMessage(message: Record<string, unknown>, to = process.env.WHATSAPP_APPROVER_WA_ID) {
+  assertEffectAllowed("message"); // preview deployments never message the real operator
   const token = accessToken();
   const sender = phoneNumberId();
   if (!token || !sender || !to) throw new Error("WhatsApp-Freigabe ist noch nicht vollständig konfiguriert.");

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { put } from "@vercel/blob";
+import { put } from "../../security/guarded-blob";
 import { DEFAULT_REPLICATE_IMAGE_MODEL, readReplicatePng, REPLICATE_API, ReplicateFailure, replicateHttpFailure, replicateOutputUrl, replicatePredictionId,
   SUPPORTED_REPLICATE_IMAGE_MODELS } from "../../content/providers/replicate-image";
 import { ImageGenerationError, type GeneratedAsset, type ImageBrief, type ImageProvider } from "../types";

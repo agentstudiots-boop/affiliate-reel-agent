@@ -70,11 +70,14 @@ test('route rejects unauthenticated requests and never retries a Graph POST when
   const f=await fixture(t);
   const old=process.env.CONTENT_STUDIO_PASSWORD;
   process.env.CONTENT_STUDIO_PASSWORD='local-instagram-test';
-  t.after(()=>{ if(old===undefined)delete process.env.CONTENT_STUDIO_PASSWORD;else process.env.CONTENT_STUDIO_PASSWORD=old; });
+  const oldApprover=process.env.WHATSAPP_APPROVER_WA_ID;process.env.WHATSAPP_APPROVER_WA_ID='4912345678';
+  t.after(()=>{ if(old===undefined)delete process.env.CONTENT_STUDIO_PASSWORD;else process.env.CONTENT_STUDIO_PASSWORD=old; if(oldApprover===undefined)delete process.env.WHATSAPP_APPROVER_WA_ID;else process.env.WHATSAPP_APPROVER_WA_ID=oldApprover; });
   const pending=await f.repo.prepare(f.id,'4912345678');
   await f.repo.claimWhatsAppSend(pending.id);
   await f.repo.bindMessage(pending.id,'wamid.igtest2');
   await f.pg.query("UPDATE publication_requests SET status='approved',decided_at=now() WHERE id=$1",[pending.id]);
+  // The operator's signed approval is stored by the webhook; the container step now runs through the central approval gate, which adopts it.
+  await f.pg.query("INSERT INTO whatsapp_events(message_id,wa_id,reply_to_message_id,body,intent,payload) VALUES('wamid.igtest2.ok','4912345678','wamid.igtest2','Freigeben','approve','{}')");
   let createCalls=0;
   const route=loadRoute('app/api/instagram/reel/route.ts',{
     '@/lib/memory/db':{databaseConfigured:()=>true,getDatabase:()=>f.db},
@@ -172,4 +175,47 @@ test('signed approval for Instagram never invokes the Facebook publisher; the Re
   assert.equal((await route.POST(request('poll'))).status,409);
   assert.equal(creates,1);assert.equal(publishes,1);
   assert.equal((await f.repo.get(f.id)).permalink,'https://www.instagram.com/reel/test/');
+});
+
+test('P-11: a Reel container whose central approval was revoked is never published by the poll step',async t=>{
+  const f=await fixture(t);
+  const env={CONTENT_STUDIO_PASSWORD:'local-instagram-test',WHATSAPP_APPROVER_WA_ID:'4912345678'};
+  const previous=Object.fromEntries(Object.keys(env).map(key=>[key,process.env[key]]));
+  Object.assign(process.env,env);
+  t.after(()=>{for(const [key,value] of Object.entries(previous)){if(value===undefined)delete process.env[key];else process.env[key]=value;}});
+  const pub=await f.repo.prepare(f.id,env.WHATSAPP_APPROVER_WA_ID);
+  await f.repo.claimWhatsAppSend(pub.id);
+  await f.repo.bindMessage(pub.id,'wamid.reel');
+  let facebookCalls=0,creates=0,publishes=0;
+  const webhook=loadRoute('app/api/whatsapp/webhook/route.ts',{
+    '@/lib/whatsapp/content-approval':{handleContentApproval:async()=>false},
+    'next/server': { after: () => {} },
+    '@/lib/production/repository':{productionRepository:()=>productionRepository(f.db)},
+    '@/lib/daily/draft':{sendDailyApproval:async()=>{throw Error('Unexpected daily flow')}},
+    '@/lib/meta/request-publication':{requestFacebookApproval:async()=>{throw Error('Unexpected Facebook approval')}},
+    '@/lib/reporting/weekly':{deliverWeeklyReport:async()=>{throw Error('Unexpected weekly flow')}},
+    '@/lib/whatsapp/client':{sendWhatsAppText:async()=>{throw Error('Unexpected WhatsApp send')}},
+    '@/lib/meta/publisher':{FacebookPublishFailure:class extends Error{},publishFacebookPhoto:async()=>{facebookCalls++;throw Error('Wrong platform');}},
+    '@/lib/whatsapp/security':{verifyMetaWebhookSignature:()=>true,verifyWhatsAppChallenge:()=>false,
+      extractIncomingWhatsAppMessages:()=>[{id:'wamid.reel.approve',from:env.WHATSAPP_APPROVER_WA_ID,body:'Freigeben',replyToMessageId:'wamid.reel'}]},
+  });
+  assert.equal((await webhook.POST(new Request('https://local.test/api/whatsapp/webhook',{method:'POST',body:'{}'}))).status,200);
+  assert.equal(facebookCalls,0);
+  assert.equal((await f.repo.get(f.id)).status,'approved');
+  const route=loadRoute('app/api/instagram/reel/route.ts',{
+    '@/lib/memory/db':{databaseConfigured:()=>true,getDatabase:()=>f.db},
+    '@/lib/meta/instagram-reel':{instagramReelRepository:()=>f.repo,InstagramReelConflict:require('../.test-build/lib/meta/instagram-reel').InstagramReelConflict},
+    '@/lib/meta/instagram-publisher':{instagramGraph:async()=>({create:async()=>{creates++;return '777'},status:async()=> 'FINISHED',publish:async()=>{publishes++;return '789'},permalink:async()=> 'https://www.instagram.com/reel/test/'}),InstagramPublishFailure:require('../.test-build/lib/meta/instagram-publisher').InstagramPublishFailure},
+  });
+  const request=action=>new Request('https://local.test/api/instagram/reel',{method:'POST',headers:{'Content-Type':'application/json','x-content-password':env.CONTENT_STUDIO_PASSWORD},body:JSON.stringify({jobId:f.id,action})});
+  assert.equal((await route.POST(request('publish'))).status,200);
+  assert.equal(creates,1);
+  // The approval is voided after the container exists (content changed / revoked): the poll step must not call media_publish.
+  const G=require('../.test-build/lib/publishing/approval-gate');
+  assert.deepEqual(await G.invalidateApprovals(f.db,`aff_reel_${pub.id}`,'operator_revoked'),[1]);
+  const polled=await route.POST(request('poll'));
+  assert.equal(polled.status,200);
+  assert.equal(publishes,0);
+  assert.equal((await f.repo.get(f.id)).status,'rejected');
+  assert.equal((await f.pg.query("SELECT status FROM publish_attempts WHERE content_id=$1 AND platform='instagram' AND status<>'blocked'",[`aff_reel_${pub.id}`])).rows[0].status,'failed');
 });

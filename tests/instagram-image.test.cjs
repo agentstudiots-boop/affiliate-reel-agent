@@ -4,6 +4,7 @@ const fs=require('node:fs');
 const sharp=require('sharp');
 const {PGlite}=require('@electric-sql/pglite');
 const {approveContent}=require('./helpers/approve-content.cjs');
+const {grantAffiliateImageGate}=require('./helpers/affiliate-gate.cjs');
 const {memoryRepository}=require('../.test-build/lib/memory/repository');
 const {productionRepository}=require('../.test-build/lib/production/repository');
 const {publicationRepository}=require('../.test-build/lib/meta/publication-gate');
@@ -27,6 +28,8 @@ async function fixture(t){
   await publication.claimWhatsAppSend(pending.id);await publication.bindMessage(pending.id,'wamid.pub');
   await inbound.applyIncomingWhatsApp({id:'wamid.ok',from:'491234',body:'Freigeben',replyToMessageId:'wamid.pub',payload:{}});
   const claimed=await publication.claimPublish(pending.id);await publication.published(claimed.id,'fb123','https://www.facebook.com/x/posts/1');
+  // Since the last-gate check every Instagram publish step needs the central approval + open attempt the shared distribution layer creates.
+  await grantAffiliateImageGate(db,claimed.id,'491234');
   const png=await sharp({create:{width:800,height:1000,channels:4,background:'#336699'}}).png().toBuffer();
   const calls={create:[],publish:0,status:0,notes:[],uploads:[]};
   const graphWith=(over={})=>async()=>({

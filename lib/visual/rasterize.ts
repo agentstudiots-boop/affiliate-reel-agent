@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { put } from "@vercel/blob";
+import { put } from "../security/guarded-blob";
 import type { GeneratedAsset } from "./types";
 
 // Text graphics are rendered locally as SVG; platforms need raster images. Live production converts them to PNG

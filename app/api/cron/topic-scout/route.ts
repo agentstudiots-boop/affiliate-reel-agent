@@ -1,3 +1,4 @@
+import { effectDecision } from "@/lib/security/runtime-guard";
 import { timingSafeEqual } from "node:crypto";
 import { runTopicCron } from "@/lib/topic-pipeline/cron";
 
@@ -15,6 +16,8 @@ export async function GET(request: Request) {
   if (!secret || !given || Buffer.byteLength(given) !== Buffer.byteLength(secret) || !timingSafeEqual(Buffer.from(given), Buffer.from(secret))) {
     return new Response("Unauthorized", { status: 401 });
   }
+  // Scheduled jobs write to the database and message the operator: never from preview/development deployments.
+  if (!effectDecision("scheduled_job").ok) return Response.json({ status: "skipped_non_production_environment" }, { headers: { "Cache-Control": "no-store" } });
   try {
     const enabled = process.env.TOPIC_PIPELINE_ENABLED === "true";
     // The runtime wiring (database, providers, WhatsApp) is only loaded when the pipeline is enabled.

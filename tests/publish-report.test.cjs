@@ -56,7 +56,7 @@ test('an affiliate reel sends "Affiliate-Post, Video veröffentlicht" with the I
       setPermalink: async (id, permalink) => (state = { ...state, permalink }), markUnknown: async () => (state = { ...state, status: 'unknown' }) };
     const graph = async () => ({ status: async () => 'FINISHED', publish: async () => { if (publishError) throw publishError; return 'm1'; }, permalink: async () => 'https://www.instagram.com/reel/r1/' });
     const sent = [];
-    return { run: () => advanceInstagram('job', 'poll', repo, graph, {}, async text => { sent.push(text); return 'wamid'; }), sent };
+    return { run: () => advanceInstagram('job', 'poll', repo, graph, {}, async text => { sent.push(text); return 'wamid'; }, () => true, async () => ({ ok: true })), sent };
   };
   const ok = make();
   await ok.run();
