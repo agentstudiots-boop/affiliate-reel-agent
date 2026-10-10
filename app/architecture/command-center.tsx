@@ -44,6 +44,7 @@ export function CommandCenter({ password }: { password: string }) {
   const [mode, setMode] = useState<"architecture" | "process">("architecture");
   const [resetToken, setResetToken] = useState(0);
   const [use3d, setUse3d] = useState(true);
+  const [webglSupported, setWebglSupported] = useState(false);
   const [sceneError, setSceneError] = useState("");
   const [reduced, setReduced] = useState(false);
   // The canvas is mounted once and afterwards only hidden: unmounting a react-three-fiber root inside a React commit logs
@@ -73,7 +74,9 @@ export function CommandCenter({ password }: { password: string }) {
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "Architekturdaten nicht erreichbar.");
       setData(body as Payload);
+      // Probed once per load: every probe creates a WebGL context, so it must never run during render.
       const gl = webglAvailable();
+      setWebglSupported(gl);
       setUse3d(gl);
       if (gl) setSceneMounted(true);
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Architekturdaten nicht erreichbar."); }
@@ -110,7 +113,7 @@ export function CommandCenter({ password }: { password: string }) {
         <div role="group" aria-label="Ansicht"><button type="button" className={mode === "architecture" ? "primary" : "ghost"} aria-pressed={mode === "architecture"} onClick={() => setMode("architecture")}>Architektur</button><button type="button" className={mode === "process" ? "primary" : "ghost"} aria-pressed={mode === "process"} onClick={() => setMode("process")}>Prozess (dekorativ animiert)</button></div>
         <button type="button" className="ghost" onClick={() => { setSelectedId(null); setQuery(""); setHidden(new Set()); setHiddenEdges(new Set()); setResetToken(token => token + 1); }}>Gesamtansicht</button>
         {use3d && <button type="button" className="ghost" onClick={() => setUse3d(false)}>2D-Ansicht</button>}
-        {!use3d && webglAvailable() && <button type="button" className="ghost" onClick={() => { setSceneError(""); setUse3d(true); setSceneMounted(true); }}>3D-Ansicht</button>}
+        {!use3d && webglSupported && <button type="button" className="ghost" onClick={() => { setSceneError(""); setUse3d(true); setSceneMounted(true); }}>3D-Ansicht</button>}
       </div>
       <div className="ccChips" role="group" aria-label="Cluster ein-/ausblenden">{(Object.keys(data.clusterMeta) as ClusterId[]).map(id => <button key={id} type="button" aria-pressed={!hidden.has(id)} className={`ccChip ${hidden.has(id) ? "ccChipOff" : ""}`} style={{ borderColor: data.clusterMeta[id].color }} onClick={() => setHidden(toggle(hidden, id))}>{data.clusterMeta[id].label}</button>)}</div>
       <div className="ccBody">

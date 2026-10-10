@@ -17,6 +17,9 @@ type Env = Record<string, string | undefined>;
 export function runtimeEnvironment(env: Env = process.env): "production" | "preview" | "development" | "local" {
   const value = env.VERCEL_ENV?.trim();
   if (value === "production" || value === "preview" || value === "development") return value;
+  // Fail closed: a Vercel runtime (VERCEL is always set there) that does not report a recognised VERCEL_ENV is never
+  // treated as production. Local runs and tests do not set VERCEL and stay "local".
+  if (env.VERCEL?.trim()) return "preview";
   return "local";
 }
 export const isNonProductionDeployment = (env: Env = process.env) => ["preview", "development"].includes(runtimeEnvironment(env));

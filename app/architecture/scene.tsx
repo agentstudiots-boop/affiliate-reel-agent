@@ -3,6 +3,9 @@
 import { Line, OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
+import { CanvasTexture, type Group, type Mesh, type Vector3 } from "three";
+import { layoutNodes, type Vec3 } from "@/lib/architecture/layout";
+import { CLUSTER_META, EDGE_META, STATUS_META, type ArchEdge, type ArchNode, type ComponentKind, type EdgeKind } from "@/lib/architecture/model";
 
 // Text labels are sprites with a canvas texture (no DOM overlay, no nested React roots, no font download).
 function LabelSprite({ text, highlighted, dimmed, y }: { text: string; highlighted: boolean; dimmed: boolean; y: number }) {
@@ -23,9 +26,6 @@ function LabelSprite({ text, highlighted, dimmed, y }: { text: string; highlight
   const height = 0.5;
   return <sprite position={[0, y, 0]} scale={[height * aspect, height, 1]} renderOrder={10}><spriteMaterial map={texture} transparent depthTest={false} depthWrite={false} opacity={dimmed ? 0.18 : highlighted ? 1 : 0.85} /></sprite>;
 }
-import { CanvasTexture, type Group, type Mesh, type Vector3 } from "three";
-import { layoutNodes, type Vec3 } from "@/lib/architecture/layout";
-import { CLUSTER_META, EDGE_META, STATUS_META, type ArchEdge, type ArchNode, type ComponentKind, type EdgeKind } from "@/lib/architecture/model";
 
 type ControlsHandle = { target: Vector3; update(): boolean | void };
 

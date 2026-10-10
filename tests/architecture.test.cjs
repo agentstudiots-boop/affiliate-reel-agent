@@ -72,3 +72,11 @@ test('the 3D scene is loaded on demand, client side only, with a WebGL check and
   const scene = fs.readFileSync(path.join(root, 'app/architecture/scene.tsx'), 'utf8');
   assert.ok(!/fetch\(/.test(scene), 'scene must not make network calls');
 });
+
+test('WebGL is probed once per load, never during render (each probe would create a GPU context)', () => {
+  const center = fs.readFileSync(path.join(root, 'app/architecture/command-center.tsx'), 'utf8');
+  assert.equal((center.match(/(?<!function )webglAvailable\(\)/g) || []).length, 1, 'webglAvailable() must only be called inside load()');
+  const scene = fs.readFileSync(path.join(root, 'app/architecture/scene.tsx'), 'utf8');
+  const firstDecl = scene.search(/^(function|const|export)\s/m);
+  assert.ok(scene.lastIndexOf('\nimport ') < firstDecl, 'imports must precede declarations');
+});
