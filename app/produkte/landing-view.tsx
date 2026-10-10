@@ -76,8 +76,8 @@ export function LandingView({ data, wanted }: { data: Awaited<ReturnType<typeof 
         <div className={styles.footerTop}>
           <span className={styles.footerBrand}>{BRAND.name}</span>
           <nav aria-label="Rechtliches">
-            {BRAND.imprintUrl && <a href={BRAND.imprintUrl}>Impressum</a>}
-            {BRAND.privacyUrl && <a href={BRAND.privacyUrl}>Datenschutz</a>}
+            <a href={BRAND.imprintUrl ?? "/impressum"}>Impressum</a>
+            <a href={BRAND.privacyUrl ?? "/datenschutz"}>Datenschutz</a>
             <a href="#affiliate-hinweis">Affiliate-Hinweis</a>
             <a href={`https://www.instagram.com/${BRAND.instagramUsername}/`} rel="noopener noreferrer">Instagram</a>
           </nav>
