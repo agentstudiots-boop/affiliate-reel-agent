@@ -11,6 +11,7 @@ export function Field({ value, label }: { value: string | null | undefined; labe
 export function Address({ profile = LEGAL }: { profile?: LegalProfile }) {
   return <address className={styles.address}>
     <Field value={profile.name} label="Name bzw. Firma" />{profile.legalForm ? <>, {profile.legalForm}</> : null}<br />
+    {profile.offerName ? <>Betreiber des Angebots „{profile.offerName}“<br /></> : null}
     <Field value={profile.street} label="Straße und Hausnummer" /><br />
     <Field value={profile.postalCodeCity} label="PLZ und Ort" /><br />
     <Field value={profile.country} label="Land" />

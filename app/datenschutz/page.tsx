@@ -24,8 +24,9 @@ export default function Page() {
       <Address />
       <p>E-Mail: <Field value={LEGAL.email} label="E-Mail-Adresse" /></p>
       <p>
-        Ein Datenschutzbeauftragter ist nicht benannt.{" "}
-        <mark className={styles.missing}>[BITTE BESTÄTIGEN: Benennung eines Datenschutzbeauftragten ist nach Art. 37 DSGVO / § 38 BDSG nicht erforderlich]</mark>
+        {LEGAL.dpoNotRequired
+          ? "Ein Datenschutzbeauftragter ist nicht benannt; eine Benennungspflicht besteht nicht (Art. 37 DSGVO, § 38 BDSG)."
+          : <mark className={styles.missing}>[BITTE BESTÄTIGEN: Datenschutzbeauftragter ist nach Art. 37 DSGVO / § 38 BDSG nicht erforderlich]</mark>}
       </p>
 
       <h2>2. Überblick</h2>
@@ -46,7 +47,9 @@ export default function Page() {
       <p>
         Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an einem sicheren und stabilen Betrieb). Eine Übermittlung in die USA kann nicht
         ausgeschlossen werden; sie stützt sich auf die vertraglichen Garantien des Anbieters (Standardvertragsklauseln bzw. EU-US Data Privacy Framework).
-        <mark className={styles.missing}>[BITTE BESTÄTIGEN: Auftragsverarbeitungsvertrag mit Vercel abgeschlossen und Aufbewahrungsdauer der Logs]</mark>
+        {LEGAL.vercelDpaAccepted
+          ? " Mit dem Anbieter besteht ein Vertrag zur Auftragsverarbeitung (Art. 28 DSGVO)."
+          : <mark className={styles.missing}>[BITTE BESTÄTIGEN: Auftragsverarbeitungsvertrag mit Vercel abgeschlossen]</mark>}
       </p>
       <p>Die Produktbilder liegen im Speicherdienst „Vercel Blob“ desselben Anbieters; beim Laden der Bilder gelten dieselben Angaben.</p>
 
@@ -101,7 +104,7 @@ export default function Page() {
         auf Grundlage berechtigter Interessen (Art. 21). Wenden Sie sich dazu an die oben genannte E-Mail-Adresse. Sie können sich außerdem bei einer Datenschutz-Aufsichtsbehörde beschweren (Art. 77 DSGVO),
         insbesondere in dem Land Ihres Wohnsitzes oder des Sitzes des Verantwortlichen.
       </p>
-      <p><mark className={styles.missing}>[ANGABE FEHLT: zuständige Datenschutz-Aufsichtsbehörde (Bundesland des Anbieters)]</mark></p>
+      <p>Zuständige Aufsichtsbehörde: <Field value={LEGAL.supervisoryAuthority} label="Datenschutz-Aufsichtsbehörde" /></p>
 
       <h2>10. Pflicht zur Bereitstellung, automatisierte Entscheidungen</h2>
       <p>Sie sind nicht verpflichtet, personenbezogene Daten bereitzustellen; ohne die technischen Verbindungsdaten kann die Website jedoch nicht angezeigt werden. Eine automatisierte Entscheidungsfindung einschließlich Profiling findet nicht statt.</p>

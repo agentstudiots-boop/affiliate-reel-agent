@@ -18,15 +18,30 @@ export type LegalProfile = {
   vatId: string | null;
   /** Verantwortlich für Inhalte nach § 18 Abs. 2 MStV, falls abweichend vom Anbieter. */
   contentResponsible: string | null;
+  /** Name des Angebots (keine Firma), wird unter dem Anbieternamen genannt. */
+  offerName: string | null;
+  /** Zuständige Datenschutz-Aufsichtsbehörde (Bundesland des Verantwortlichen). */
+  supervisoryAuthority: string | null;
+  /** Betreiber bestätigt: kein Datenschutzbeauftragter benannt und nicht erforderlich. */
+  dpoNotRequired: boolean | null;
+  /** Betreiber bestätigt: Auftragsverarbeitungsvertrag mit Vercel akzeptiert. */
+  vercelDpaAccepted: boolean | null;
+  /** Verbraucherschlichtung nach § 36 VSBG: Betreiber entscheidet ("no" = keine Teilnahme, "yes" = Teilnahme, Stelle muss genannt werden). */
+  consumerArbitration: "no" | "yes" | null;
 };
 
 export const LEGAL: LegalProfile = {
-  name: null,
+  name: "Thorsten Seyß",
   legalForm: null,
-  street: null,
-  postalCodeCity: null,
-  country: null,
-  email: null,
+  street: "Rathausstr. 19",
+  postalCodeCity: "98544 Zella-Mehlis",
+  country: "Deutschland",
+  email: "agentstudio.ts@gmail.com",
+  offerName: "Alltäglich leichter",
+  supervisoryAuthority: "Der Thüringer Landesbeauftragte für den Datenschutz und die Informationsfreiheit (TLfDI), Erfurt",
+  dpoNotRequired: null,
+  vercelDpaAccepted: null,
+  consumerArbitration: null,
   phone: null,
   vatId: null,
   contentResponsible: null,
@@ -38,10 +53,15 @@ export const LEGAL_REQUIRED: { key: keyof LegalProfile; label: string }[] = [
   { key: "postalCodeCity", label: "Postleitzahl und Ort" },
   { key: "country", label: "Land" },
   { key: "email", label: "E-Mail-Adresse" },
+  { key: "supervisoryAuthority", label: "Zuständige Datenschutz-Aufsichtsbehörde" },
+  { key: "dpoNotRequired", label: "Bestätigung: Datenschutzbeauftragter nicht erforderlich" },
+  { key: "vercelDpaAccepted", label: "Bestätigung: Auftragsverarbeitungsvertrag mit Vercel" },
+  { key: "consumerArbitration", label: "Entscheidung zur Verbraucherschlichtung (§ 36 VSBG)" },
 ];
 
+const filled = (value: unknown) => typeof value === "string" ? value.trim().length > 0 : value !== null && value !== undefined;
 export function missingLegalFields(profile: LegalProfile = LEGAL) {
-  return LEGAL_REQUIRED.filter(item => !profile[item.key]?.trim());
+  return LEGAL_REQUIRED.filter(item => !filled(profile[item.key]));
 }
 export const legalComplete = (profile: LegalProfile = LEGAL) => missingLegalFields(profile).length === 0;
 

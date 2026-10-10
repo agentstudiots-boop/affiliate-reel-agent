@@ -35,10 +35,9 @@ export default function Page() {
       </p>
 
       <h2>Verbraucherstreitbeilegung</h2>
-      <p>
-        {/* Rechtliche Angabe zur Teilnahmebereitschaft: nicht vom Betreiber bestätigt, deshalb nicht vorformuliert. */}
-        <mark style={{ background: "#ffe08a", padding: "1px 6px", borderRadius: 6, fontWeight: 600 }}>[ANGABE FEHLT: Bereitschaft oder Verpflichtung zur Teilnahme an Verbraucherschlichtungsverfahren (§ 36 VSBG) – bitte entscheiden und mitteilen]</mark>
-      </p>
+      {LEGAL.consumerArbitration === "no"
+        ? <p>Der Anbieter ist weder bereit noch verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.</p>
+        : <p><Field value={null} label={LEGAL.consumerArbitration === "yes" ? "zuständige Verbraucherschlichtungsstelle mit Anschrift und Website" : "Entscheidung zur Teilnahme an Verbraucherschlichtungsverfahren (§ 36 VSBG)"} /></p>}
     </LegalShell>
   );
 }
