@@ -50,12 +50,10 @@ test('footer links to both legal pages and the affiliate disclosure and the prod
 });
 
 
-test('operator data is entered and the pages stay a draft until the open confirmations are given', () => {
-  assert.equal(L.LEGAL.name, 'Thorsten Seyss'.replace('ss', '\u00df'));
-  const open = L.missingLegalFields().map(item => item.key);
-  for (const key of ['name', 'street', 'postalCodeCity', 'country', 'email', 'supervisoryAuthority']) assert.ok(!open.includes(key), key);
-  for (const key of ['dpoNotRequired', 'vercelDpaAccepted', 'consumerArbitration']) assert.ok(open.includes(key), `${key} must stay open until confirmed`);
-  assert.equal(L.legalComplete(), false);
-  const done = { ...L.LEGAL, dpoNotRequired: true, vercelDpaAccepted: true, consumerArbitration: 'no' };
-  assert.equal(L.legalComplete(done), true);
+test('operator data and confirmations are complete, so the pages are no longer a draft', () => {
+  assert.equal(L.LEGAL.name, 'Thorsten Sey\u00df');
+  assert.deepEqual(L.missingLegalFields(), []);
+  assert.equal(L.legalComplete(), true);
+  assert.equal(L.LEGAL.consumerArbitration, 'no');
+  assert.equal(L.legalComplete({ ...L.LEGAL, dpoNotRequired: null }), false);
 });
