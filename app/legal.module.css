@@ -1,0 +1,27 @@
+/* Rechtliche Seiten: gleiche Farbwelt wie die Landingpage (app/produkte/landing.module.css). */
+.page {
+  --green: #1f4d43; --sage: #e3ebe1; --cream: #fbf7ef; --ink: #20302b; --muted: #627068; --line: #e8e2d4; --warn-bg: #fff4d6; --warn-line: #d9a400;
+  min-height: 100vh; display: flex; flex-direction: column; background: var(--cream); color: var(--ink);
+  font-family: var(--font-geist), system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.page a { color: var(--green); }
+.header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; width: min(820px, calc(100% - 32px)); margin: 0 auto; padding: 18px 0; }
+.brand { font-family: Georgia, "Times New Roman", serif; font-size: 24px; font-weight: 600; text-decoration: none; }
+.header nav { display: flex; gap: 20px; font-size: 14px; }
+.main { width: min(820px, calc(100% - 32px)); margin: 0 auto; padding: 8px 0 40px; flex: 1; line-height: 1.65; }
+.main h1 { font-family: Georgia, "Times New Roman", serif; font-size: clamp(28px, 5vw, 40px); line-height: 1.15; color: var(--green); margin: 12px 0 4px; }
+.main h2 { font-size: clamp(19px, 3vw, 23px); margin: 34px 0 8px; color: var(--ink); }
+.main h3 { font-size: 16.5px; margin: 20px 0 6px; }
+.main p, .main li { overflow-wrap: anywhere; }
+.main ul { padding-left: 22px; }
+.updated { color: var(--muted); font-size: 13.5px; margin-top: 0; }
+.address { font-style: normal; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; display: inline-block; max-width: 100%; }
+.table { width: 100%; border-collapse: collapse; font-size: 14.5px; background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.table th, .table td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.table th { background: var(--sage); }
+.tableWrap { overflow-x: auto; }
+.draft { background: var(--warn-bg); border: 2px solid var(--warn-line); border-radius: 12px; padding: 14px 18px; margin: 8px 0 18px; font-size: 14.5px; }
+.draft ul { margin: 6px 0; }
+.missing { background: #ffe08a; color: #3b2b00; padding: 1px 6px; border-radius: 6px; font-weight: 600; }
+.footer { display: flex; flex-wrap: wrap; gap: 8px 22px; justify-content: center; padding: 22px 16px 30px; background: var(--sage); font-size: 14px; }
+@media (max-width: 520px) { .header nav { gap: 14px; } .table th, .table td { padding: 8px; } }
