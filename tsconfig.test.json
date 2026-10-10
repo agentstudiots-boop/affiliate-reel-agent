@@ -41,6 +41,7 @@
     "lib/publishing/**/*.ts",
     "lib/capabilities/**/*.ts",
     "lib/security/**/*.ts",
+    "lib/trendsetter/**/*.ts",
     "lib/architecture/**/*.ts",
     "lib/tavily.ts"
   ]
