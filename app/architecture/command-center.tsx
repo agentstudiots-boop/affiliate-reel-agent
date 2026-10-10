@@ -107,7 +107,7 @@ export function CommandCenter({ password }: { password: string }) {
     {error && <p role="alert" className="error">{error} {password ? "" : "Bitte zuerst den Zugangscode eintragen."} <button type="button" className="ghost" onClick={() => void load()}>Erneut versuchen</button></p>}
     {data && <>
       <p className="ccNotice">{data.meta.liveActivity}</p>
-      {(!use3d || sceneError) && <p role="status" className="muted" data-testid="cc-fallback-note">{sceneError ? `3D-Szene nicht verfügbar (${sceneError}). ` : "WebGL wird von diesem Browser nicht unterstützt. "}2D-Ansicht aktiv – alle Informationen bleiben verfügbar.</p>}
+      {(!use3d || sceneError) && <p role="status" className="muted" data-testid="cc-fallback-note">{sceneError ? `3D-Szene nicht verfügbar (${sceneError}). ` : webglSupported ? "" : "WebGL wird von diesem Browser nicht unterstützt. "}2D-Ansicht aktiv – alle Informationen bleiben verfügbar.</p>}
       <div className="ccToolbar">
         <input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Komponente suchen …" aria-label="Komponente suchen" />
         <div role="group" aria-label="Ansicht"><button type="button" className={mode === "architecture" ? "primary" : "ghost"} aria-pressed={mode === "architecture"} onClick={() => setMode("architecture")}>Architektur</button><button type="button" className={mode === "process" ? "primary" : "ghost"} aria-pressed={mode === "process"} onClick={() => setMode("process")}>Prozess (dekorativ animiert)</button></div>

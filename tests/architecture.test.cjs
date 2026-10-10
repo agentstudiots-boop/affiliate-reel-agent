@@ -80,3 +80,8 @@ test('WebGL is probed once per load, never during render (each probe would creat
   const firstDecl = scene.search(/^(function|const|export)\s/m);
   assert.ok(scene.lastIndexOf('\nimport ') < firstDecl, 'imports must precede declarations');
 });
+
+test('manually switching to the 2D view never claims that WebGL is unsupported', () => {
+  const center = fs.readFileSync(path.join(root, 'app/architecture/command-center.tsx'), 'utf8');
+  assert.match(center, /webglSupported \? "" : "WebGL wird von diesem Browser nicht unterst/);
+});
