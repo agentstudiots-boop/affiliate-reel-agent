@@ -46,6 +46,8 @@ export type DiscoveryResult = {
   dropped: DroppedOpportunity[];
   rejectedIdeas: { idea: string; reason: string }[];
   durationMs: number;
+  // Research hits the agent saw (shared with the Trendsetter so topic chances keep their sources). Empty on fallback.
+  evidence?: EvidenceItem[];
 };
 
 const failureKind = (error: unknown) => {
@@ -109,5 +111,5 @@ export async function discoverOpportunities(input: {
   const intake = intakeTrendReport(raw, evidence);
   if (!intake.ok) return fallback("invalid_response", { queries, evidenceCount: evidence.length });
   return { source: "trend_agent", outcome: intake.noGoodCandidate ? "no_candidate" : "success", candidates: intake.candidates, topics: intake.topics, noGoodCandidate: intake.noGoodCandidate, summary: intake.summary ?? "",
-    evidenceCount: evidence.length, queries, dropped: intake.dropped, rejectedIdeas: intake.rejectedIdeas, durationMs: Date.now() - started };
+    evidenceCount: evidence.length, queries, dropped: intake.dropped, rejectedIdeas: intake.rejectedIdeas, durationMs: Date.now() - started, evidence };
 }

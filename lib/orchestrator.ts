@@ -12,6 +12,7 @@ import { loadSelectionHistory } from "@/lib/content/selection-history";
 import { discoverOpportunities, type DiscoveryResult, type ResearchFn } from "@/lib/content/trend-scout";
 import { createGenerator } from "@/lib/content/model";
 import type { Generator } from "@/lib/content/agent";
+import { affiliateTrendsetter, trendsetterAffiliateMode } from "@/lib/trendsetter/affiliate";
 
 const MAX_PRODUCT_LOOKUPS = 5; // Existing five lookups per general scout run.
 
@@ -76,6 +77,22 @@ export async function runProductScout(productSearch?: string, selectionKey?: str
     for (const item of agentRun.rejectedIdeas) qualityRejected.push({ name: item.idea, score: 0, reason: item.reason });
     pool = assessed.filter(item => item.assessment.passed).sort((a, b) => a.candidate.priority - b.candidate.priority)
       .map(item => ({ ...item.candidate, searchQuery: item.candidate.searchQuery, assessment: item.assessment })) as unknown as typeof pool;
+    // Trendsetter (TRENDSETTER_AFFILIATE, default off = unchanged). "route": Jarvis lets only chances routed to the affiliate
+    // pipeline reach the Amazon lookup. A failure of that layer never stops the affiliate pipeline.
+    const trendsetterMode = trendsetterAffiliateMode();
+    if (trendsetterMode !== "off") {
+      try {
+        const routing = await affiliateTrendsetter(db, { candidates: assessed.filter(item => item.assessment.passed).map(item => item.candidate), topics: agentRun.topics,
+          evidence: agentRun.evidence ?? [], now: new Date(), mode: trendsetterMode });
+        if (routing.allowed) {
+          for (const item of routing.held) qualityRejected.push({ name: item.name, score: 0, reason: item.reason });
+          pool = pool.filter(item => routing.allowed!.has(item.name));
+        }
+        console.info(JSON.stringify({ event: "trendsetter_affiliate", mode: routing.mode, stored: routing.stored, allowed: routing.allowed?.size ?? null, held: routing.held.length }));
+      } catch (error) {
+        console.error(JSON.stringify({ event: "trendsetter_unavailable", stage: "affiliate", failure: error instanceof Error ? error.name : "unknown" }));
+      }
+    }
     if (!pool.length && !qualityRejected.length) qualityRejected.push({ name: "Trend-Agent", score: 0, reason: "Keine Content-Chance stark genug" });
   } else if (automatic && history) {
     const assessed = pool.map((candidate, index) => ({ candidate, index, assessment: assessContentChance(candidate.name, candidate.chance, history) }));

@@ -20,6 +20,8 @@ gegen den echten Anbieter geprüft.
 | `TOPIC_STANDARD_VIDEO_PROVIDER` | `runway` schaltet Standard-Video frei | aus |
 | `TOPIC_SOURCE_GOOGLE_NEWS`, `TOPIC_SOURCE_GOOGLE_TRENDS`, `TOPIC_SOURCE_WIKIPEDIA` | `false` schaltet die Quelle ab | an |
 | `TOPIC_LINK_POLICY`, `TOPIC_BRAND_PALETTE` | Linkregeln / Farben | Standardwerte |
+| `TOPIC_POSTS_PER_DAY` | geplante Themenvorschläge je Kalendertag (Europe/Berlin), 1–4 | 1 |
+| `TRENDSETTER_AFFILIATE` | `record`: Trend-Agent-Chancen als gemeinsame Ergebnisse speichern; `route`: zusätzlich nur von Jarvis zugewiesene Chancen zur Produktsuche | aus (Affiliate-Pipeline unverändert) |
 
 Live-Veröffentlichung einer Plattform erfordert **alle**: gültige zweite WhatsApp-Freigabe der exakten Fassung,
 `TOPIC_LIVE_PUBLISHING=true`, Plattform in `TOPIC_PLATFORMS`, alle Pflicht-Variablen der Plattform. Die

@@ -146,3 +146,13 @@ test('Blob writes: the guarded put refuses in preview before touching the SDK; n
   const { put } = require('../.test-build/lib/security/guarded-blob');
   assert.throws(() => put('a.png', Buffer.from('x'), { access: 'public' }), R.NonProductionEffectError);
 });
+
+test('fail closed: a Vercel runtime with a missing or unknown VERCEL_ENV is never treated as production', () => {
+  for (const env of [{ VERCEL: '1' }, { VERCEL: '1', VERCEL_ENV: '' }, { VERCEL: '1', VERCEL_ENV: 'staging' }]) {
+    assert.equal(R.runtimeEnvironment(env), 'preview');
+    assert.equal(R.effectDecision('database', env).ok, false);
+    assert.equal(R.effectDecision('publish', env).ok, false);
+  }
+  assert.equal(R.runtimeEnvironment({ VERCEL: '1', VERCEL_ENV: 'production' }), 'production');
+  assert.equal(R.runtimeEnvironment({}), 'local');
+});
