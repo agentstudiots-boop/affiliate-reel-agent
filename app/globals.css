@@ -105,3 +105,22 @@ select { width: 100%; min-height: 44px; padding: 12px; border: 1px solid #4c5549
 .legacyContent { margin: 24px 0; }
 .contentStudio p, .contentStudio li { overflow-wrap: anywhere; }
 @media (max-width: 720px) { .contentActions { align-items: stretch; flex-direction: column; } }
+
+/* Jarvis 3D Command Center */
+.ccLauncher{display:grid;gap:6px;margin:14px 0}.ccRoot{position:fixed;inset:0;z-index:50;overflow:auto;padding:16px max(16px,3vw);background:#080b10}.ccToolbar button,.ccHead button{width:auto}
+.ccHead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.ccHead h3{margin:0}.ccNotice{border-left:3px solid #ffd24a;padding:6px 10px;font-size:13px;color:var(--muted)}
+.ccToolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}.ccToolbar input{flex:1 1 180px;min-width:0}.ccChips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.ccChip{background:transparent;color:var(--text);border:1px solid;border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer}.ccChipOff{opacity:.4;text-decoration:line-through}
+.ccBody{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:12px}.ccStage{position:relative;height:min(72vh,680px);min-height:380px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#05070b}
+.ccStage canvas{touch-action:none}.ccHint{position:absolute;left:10px;bottom:6px;margin:0;font-size:11px;color:var(--muted);pointer-events:none}
+.ccDetail{max-height:min(72vh,680px);overflow:auto;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:13px}.ccDetail h4{margin:8px 0}.ccDetail ul{padding-left:18px;margin:4px 0 10px}
+.ccLegend{list-style:none;padding-left:0!important}.ccLegend li{display:grid;grid-template-columns:14px 1fr;gap:2px 8px;margin-bottom:6px}.ccLegend i,.ccRow i{width:12px;height:12px;border-radius:50%;display:inline-block}.ccLegend small{grid-column:2}
+.ccBadge{color:#05070b;border-radius:999px;padding:2px 10px;font-weight:700;font-size:12px}.ccLink{background:none;border:0;color:#7cf5ff;cursor:pointer;padding:0;text-decoration:underline}
+.ccLabel{white-space:nowrap;font-size:12px;color:#d9e2ee;background:rgba(5,7,11,.7);padding:1px 6px;border-radius:6px;transform:translateY(-4px)}.ccLabelOn{color:#fff;outline:1px solid #7cf5ff}.ccLabelDim{opacity:.25}
+.ccList{height:100%;overflow:auto;padding:10px}.ccList ul{list-style:none;padding:0;margin:0 0 10px}.ccRow{display:flex;gap:8px;align-items:center;width:100%;text-align:left;background:transparent;border:0;color:var(--text);padding:6px;border-radius:8px;cursor:pointer}.ccRow small{margin-left:auto;color:var(--muted)}.ccRowOn{background:#18202c}
+@media (max-width:800px){.ccBody{grid-template-columns:1fr}.ccStage{height:420px}.ccDetail{max-height:none}}
+@media (prefers-reduced-motion:reduce){.ccRoot *{animation:none!important;transition:none!important}}
+.ccRoot[hidden]{display:none}
+
+.ccEdgeChips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
+.ccDeploy{list-style:none;padding-left:0!important}.ccDeploy li{margin-bottom:8px}.ccDeploy small{display:block;color:var(--muted)}
