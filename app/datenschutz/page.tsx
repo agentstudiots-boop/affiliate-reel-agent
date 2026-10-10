@@ -9,7 +9,7 @@ export default function Datenschutz() {
     <h1>Datenschutzerklärung</h1>
     <p><strong>Entwurf – nicht für die Pinterest-App-Freigabe oder den öffentlichen Geschäftsbetrieb verwenden, bevor die Angaben geprüft und ergänzt wurden.</strong></p>
     <h2>Verantwortlicher</h2>
-    <p>[Name und ladungsfähige Kontaktanschrift der verantwortlichen Person]<br/>[Kontakt-E-Mail]</p>
+    <p>Thorsten Seyß<br/>Rathausstraße 19<br/>98544 Zella-Mehlis<br/>Deutschland<br/><a href="mailto:agentstudio.ts@gmail.com">agentstudio.ts@gmail.com</a></p>
     <h2>Hosting und technische Zugriffsdaten</h2>
     <p>[Verarbeitung durch Vercel, Logdaten, Rechtsgrundlage, Auftragsverarbeitung, Empfänger, Drittlandtransfer, Aufbewahrungsdauer anhand der tatsächlichen Konfiguration prüfen und konkret angeben.]</p>
     <h2>Externe Links und Affiliate-Marketing</h2>
