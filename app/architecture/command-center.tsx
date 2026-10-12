@@ -6,6 +6,7 @@ import type { ClusterId } from "@/lib/architecture/model";
 import type { SceneProps } from "@/app/architecture/scene";
 import { ClusterPanel, GroupedView, NodePanel, OverviewPanel, ProcessRibbon } from "@/app/architecture/panels";
 import type { Hover, Payload, Selection } from "@/app/architecture/types";
+import { webglAvailable } from "@/lib/architecture/webgl";
 
 // Loaded on demand and client side only: WebGL never touches server routes, and a failing 3D bundle cannot break the studio.
 const Scene = dynamic(() => import("@/app/architecture/scene"), { ssr: false, loading: () => <p className="muted" role="status">3D-Szene wird geladen …</p> });
@@ -17,12 +18,6 @@ class SceneBoundary extends Component<{ children: ReactNode; onFail: (message: s
   render() { return this.state.failed ? null : this.props.children; }
 }
 
-function webglAvailable() {
-  try {
-    const canvas = document.createElement("canvas");
-    return !!(canvas.getContext("webgl2") || canvas.getContext("webgl"));
-  } catch { return false; }
-}
 
 export function CommandCenter({ password }: { password: string }) {
   const [open, setOpen] = useState(false);
@@ -64,7 +59,11 @@ export function CommandCenter({ password }: { password: string }) {
     window.addEventListener("keydown", onKey);
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = previous; };
+    return () => {
+      window.removeEventListener("keydown", onKey); document.body.style.overflow = previous;
+      // A pointer resting on a 3D object when the dialog closes would otherwise leave the page cursor and tooltip behind.
+      document.body.style.cursor = ""; setHover(null);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, data]);
 
@@ -74,12 +73,15 @@ export function CommandCenter({ password }: { password: string }) {
       const response = await fetch("/api/architecture", { headers: { "x-content-password": password }, cache: "no-store" });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "Architekturdaten nicht erreichbar.");
+      const first = !data;
       setData(body as Payload);
-      // Probed once per load: every probe creates a WebGL context, so it must never run during render.
-      const gl = webglAvailable();
-      setWebglSupported(gl);
-      setUse3d(gl);
-      if (gl) setSceneMounted(true);
+      // Only on the first load: a refresh must neither probe again nor override a 2D view the operator chose.
+      if (first) {
+        const gl = webglAvailable();
+        setWebglSupported(gl);
+        setUse3d(gl);
+        if (gl) setSceneMounted(true);
+      }
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Architekturdaten nicht erreichbar."); }
     finally { setLoading(false); }
   }
@@ -149,7 +151,7 @@ export function CommandCenter({ password }: { password: string }) {
       <div className="ccBody">
         <div className="ccStage" data-testid="cc-stage" tabIndex={showScene ? 0 : -1} onKeyDown={showScene ? onStageKey : undefined}
           aria-label={showScene ? "3D-Ansicht. Pfeiltasten wechseln Bereiche und Komponenten, Enter öffnet, Pfeil hoch oder Escape geht zurück, Pos1 zeigt alles." : undefined}>
-          {sceneMounted && !sceneError && sceneProps && <div style={{ height: "100%", display: showScene ? "block" : "none" }}><SceneBoundary onFail={setSceneError}><Scene {...sceneProps} /></SceneBoundary></div>}
+          {sceneMounted && !sceneError && sceneProps && <div style={{ height: "100%", display: showScene ? "block" : "none" }}><SceneBoundary onFail={setSceneError}><Scene {...sceneProps} onContextLost={() => setSceneError("WebGL-Kontext vom Browser beendet")} /></SceneBoundary></div>}
           {!showScene && <GroupedView data={data} selection={selection} query={query} onSelect={select} />}
           {showScene && hover && <div className="ccTooltip" role="tooltip" style={{ left: hover.x, top: hover.y }}>
             <b>{hover.title}</b><span>{hover.text}</span></div>}

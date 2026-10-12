@@ -22,20 +22,26 @@ export type RuntimeSnapshot = {
 const iso = (value: unknown) => value ? new Date(String(value)).toISOString() : new Date(0).toISOString();
 const clean = (value: unknown, max = 120) => value === null || value === undefined ? null : String(value).replace(/https?:\/\/\S+/g, "[URL]").slice(0, max);
 
-async function section<T>(work: () => Promise<T>): Promise<T | null> {
-  try { return await work(); } catch { return null; }
+type Readable = Sql & { transaction?: <T>(fn: (sql: Sql) => Promise<T>) => Promise<T> };
+// Each section runs in its own READ ONLY transaction where the handle supports transactions: Postgres itself then rejects
+// any write, and a failing section (e.g. a table from a not yet applied migration) cannot abort the others.
+async function section<T>(db: Readable, work: (sql: Sql) => Promise<T>): Promise<T | null> {
+  try {
+    if (!db.transaction) return await work(db);
+    return await db.transaction(async sql => { await sql.query("SET TRANSACTION READ ONLY"); return work(sql); });
+  } catch { return null; }
 }
 
-export async function readSnapshot(now = new Date(), open: () => Sql = getDatabase): Promise<RuntimeSnapshot> {
+export async function readSnapshot(now = new Date(), open: () => Readable = getDatabase): Promise<RuntimeSnapshot> {
   const empty = { topic: null, affiliate: null, publications: null, chances: null, vision: null, visualJobs: null };
-  let db: Sql;
-  try { db = open(); }
+  let handle: Readable;
+  try { handle = open(); }
   catch (error) {
     const blocked = error instanceof Error && /non_production_effect_blocked/.test(error.message);
     return { available: false, reason: blocked ? "Preview/Entwicklung: Datenbankzugriff durch den Runtime-Guard gesperrt" : "Keine Datenbank erreichbar oder nicht konfiguriert",
       generatedAt: now.toISOString(), ...empty };
   }
-  const topic = await section(async () => {
+  const topic = await section(handle, async db => {
     const stages = (await db.query("SELECT stage, count(*)::int AS n FROM topic_contents GROUP BY stage")).rows;
     const recent = (await db.query(`SELECT content_id, candidate->'candidate'->>'title' AS title, stage, format, updated_at, last_error FROM topic_contents
       ORDER BY updated_at DESC LIMIT 6`)).rows;
@@ -45,29 +51,29 @@ export async function readSnapshot(now = new Date(), open: () => Sql = getDataba
         error: row.last_error && row.last_error !== "dry_run" ? clean(row.last_error) : null })),
       lastRun: run ? { outcome: String(run.outcome), at: iso(run.created_at), failure: clean(run.failure) } : null };
   });
-  const affiliate = await section(async () => {
+  const affiliate = await section(handle, async db => {
     const jobs = (await db.query("SELECT count(*)::int AS n FROM content_jobs WHERE status <> ALL($1::text[]) AND updated_at > now() - interval '1 day'", [terminalStatuses])).rows[0];
     const approvals = (await db.query("SELECT count(*)::int AS n FROM content_approval_requests WHERE status='pending'")).rows[0];
     const publications = (await db.query("SELECT count(*)::int AS n FROM publication_requests WHERE status='pending'")).rows[0];
     return { runningJobs: Number(jobs?.n ?? 0), pendingContentApprovals: Number(approvals?.n ?? 0), pendingPublications: Number(publications?.n ?? 0) };
   });
-  const publications = await section(async () => (await db.query(`SELECT platform, status, url, origin, updated_at FROM publish_attempts
+  const publications = await section(handle, async db => (await db.query(`SELECT platform, status, url, origin, updated_at FROM publish_attempts
       WHERE status IN ('published','processing','failed','unknown') ORDER BY updated_at DESC LIMIT 12`)).rows
     .map(row => ({ platform: String(row.platform), status: String(row.status), url: reliablePostUrl(String(row.platform), row.url ? String(row.url) : null), origin: String(row.origin), at: iso(row.updated_at) })));
-  const chances = await section(async () => {
+  const chances = await section(handle, async db => {
     const recent = (await db.query("SELECT chance_id, title, recommendation, suitability, last_seen_at FROM content_chances ORDER BY last_seen_at DESC LIMIT 6")).rows;
     const counts = (await db.query(`SELECT (SELECT count(*)::int FROM content_chance_routes WHERE status IN ('routed','consumed')) AS open,
       (SELECT count(*)::int FROM content_chances WHERE last_seen_at > now() - interval '1 day') AS day`)).rows[0];
     return { recent: recent.map(row => ({ chanceId: String(row.chance_id), title: clean(row.title, 90) ?? "", recommendation: String(row.recommendation), suitability: Number(row.suitability), at: iso(row.last_seen_at) })),
       openRoutes: Number(counts?.open ?? 0), last24h: Number(counts?.day ?? 0) };
   });
-  const vision = await section(async () => {
+  const vision = await section(handle, async db => {
     const row = (await db.query(`SELECT count(*) FILTER (WHERE quality->'checked'->>'vision' = 'true')::int AS checked,
       (SELECT quality_status FROM image_generation_attempts WHERE quality_status IS NOT NULL ORDER BY updated_at DESC LIMIT 1) AS last_status,
       (SELECT max(updated_at) FROM image_generation_attempts WHERE quality_status IS NOT NULL) AS last_at FROM image_generation_attempts`)).rows[0];
     return { checked: Number(row?.checked ?? 0), lastStatus: row?.last_status ? String(row.last_status) : null, lastAt: row?.last_at ? iso(row.last_at) : null };
   });
-  const visualJobs = await section(async () => (await db.query(`SELECT DISTINCT ON (kind) kind, status, updated_at FROM visual_jobs ORDER BY kind, updated_at DESC`)).rows
+  const visualJobs = await section(handle, async db => (await db.query(`SELECT DISTINCT ON (kind) kind, status, updated_at FROM visual_jobs ORDER BY kind, updated_at DESC`)).rows
     .map(row => ({ kind: String(row.kind), status: String(row.status), at: iso(row.updated_at) })));
   const any = [topic, affiliate, publications, chances, vision, visualJobs].some(item => item !== null);
   return { available: any, reason: any ? null : "Datenbank erreichbar, aber keine lesbaren Tabellen", generatedAt: now.toISOString(), topic, affiliate, publications, chances, vision, visualJobs };

@@ -195,7 +195,8 @@ test('the API cannot be reached around the UI: no or wrong access code → 401; 
 test('the 3D scene is loaded on demand, client side only, with a WebGL check, error fallback, reduced motion and keyboard control', () => {
   const center = read('app/architecture/command-center.tsx');
   assert.match(center, /ssr: false/);
-  assert.match(center, /getContext\("webgl2"\)/);
+  assert.match(center, /import \{ webglAvailable \} from "@\/lib\/architecture\/webgl"/);
+  assert.match(read("lib/architecture/webgl.ts"), /getContext\("webgl2"\)/);
   assert.match(center, /getDerivedStateFromError/);
   assert.match(center, /prefers-reduced-motion/);
   assert.match(center, /onKeyDown=\{showScene \? onStageKey/);
@@ -207,4 +208,50 @@ test('the 3D scene is loaded on demand, client side only, with a WebGL check, er
   assert.match(scene, /frameloop=\{!props\.active \? "never"/);
   const scenePos = scene.search(/^(function|const|export)\s/m);
   assert.ok(scene.lastIndexOf('\nimport ') < scenePos, 'imports precede declarations');
+});
+
+// ---------- review fixes (Phase 1, 2026-10-12) ----------
+const W = require('../.test-build/lib/architecture/webgl');
+test('WebGL probe: one context per page, released immediately; failures are cached as unsupported', () => {
+  W.resetWebglProbe();
+  let created = 0, lost = 0;
+  const doc = { createElement: () => { created++; return { getContext: kind => kind === 'webgl2' ? { getExtension: name => name === 'WEBGL_lose_context' ? { loseContext: () => { lost++; } } : null } : null }; } };
+  assert.equal(W.webglAvailable(doc), true);
+  assert.equal(W.webglAvailable(doc), true);
+  assert.equal(created, 1, 'a second call (e.g. "Aktualisieren") must not create another context');
+  assert.equal(lost, 1, 'the probe context must be released');
+  W.resetWebglProbe();
+  assert.equal(W.webglAvailable({ createElement: () => { throw new Error('no canvas'); } }), false);
+  assert.equal(W.webglAvailable(doc), false, 'cached');
+  W.resetWebglProbe();
+});
+test('snapshot: every section runs in its own READ ONLY transaction, so Postgres rejects any write', async () => {
+  const statements = [];
+  let transactions = 0;
+  const sql = { query: async q => { statements.push(q); return { rows: [] }; }, exec: async () => ({}) };
+  const db = { ...sql, query: async () => { throw new Error('direct query outside a read-only transaction'); },
+    transaction: async fn => { transactions++; const first = statements.length; const result = await fn(sql); assert.equal(statements[first], 'SET TRANSACTION READ ONLY'); return result; } };
+  const snapshot = await S.readSnapshot(NOW, () => db);
+  assert.equal(transactions, 6);
+  assert.equal(snapshot.available, true);
+});
+test('snapshot: a real read-only transaction refuses a write (PGlite), and one broken section leaves the others readable', async () => {
+  const db = await pgliteDatabase();
+  try {
+    await ensureAutomationSchema(db);
+    await assert.rejects(db.transaction(async sql => { await sql.query('SET TRANSACTION READ ONLY'); await sql.query("INSERT INTO topic_runs DEFAULT VALUES"); }), /read-only|read only/i);
+    await db.exec('DROP TABLE content_chance_routes');
+    const snapshot = await S.readSnapshot(NOW, () => db);
+    assert.equal(snapshot.chances, null);
+    assert.notEqual(snapshot.topic, null);
+    assert.notEqual(snapshot.visualJobs, null);
+  } finally { await db.close(); }
+});
+test('Command Center UI: refresh keeps the chosen view, context loss falls back to 2D, closing clears cursor and tooltip', () => {
+  const center = read('app/architecture/command-center.tsx');
+  assert.match(center, /if \(first\) \{\s*const gl = webglAvailable\(\);/);
+  assert.match(center, /onContextLost=\{\(\) => setSceneError\(/);
+  assert.match(center, /document\.body\.style\.cursor = ""; setHover\(null\);/);
+  const scene = read('app/architecture/scene.tsx');
+  assert.match(scene, /addEventListener\("webglcontextlost"/);
 });

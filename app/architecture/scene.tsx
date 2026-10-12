@@ -22,6 +22,8 @@ export type SceneProps = {
   onSelect: (selection: Selection) => void;
   onBackground: () => void;
   onHover: (hover: Hover) => void;
+  /** The browser dropped the WebGL context (GPU reset, tab in background on mobile, too many contexts): show the 2D view. */
+  onContextLost?: () => void;
 };
 
 type ControlsHandle = { target: Vector3; update(): boolean | void; addEventListener(type: string, fn: () => void): void; removeEventListener(type: string, fn: () => void): void };
@@ -247,7 +249,9 @@ function Scene(props: SceneProps) {
 export default function ArchitectureScene(props: SceneProps) {
   const initial = overviewGoal(1.6);
   return <Canvas camera={{ position: initial.position, fov: CAMERA_FOV }} dpr={[1, 1.75]} frameloop={!props.active ? "never" : props.reducedMotion ? "demand" : "always"}
-    gl={{ antialias: true, powerPreference: "default" }} aria-label="Interaktive 3D-Darstellung der Jarvis-Architektur" data-testid="cc-canvas">
+    gl={{ antialias: true, powerPreference: "default" }} onCreated={({ gl }) => {
+      gl.domElement.addEventListener("webglcontextlost", event => { event.preventDefault(); props.onContextLost?.(); }, { once: true });
+    }} aria-label="Interaktive 3D-Darstellung der Jarvis-Architektur" data-testid="cc-canvas">
     <Scene {...props} />
   </Canvas>;
 }
