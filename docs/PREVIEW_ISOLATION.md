@@ -22,12 +22,19 @@ In `preview` und `development` sind ohne Sandbox-Erklärung gesperrt:
 Die Freigabeschranke selbst wurde **nicht abgeschwächt**; es kam nur ein weiterer Sperrgrund hinzu.
 
 ## Bewusste Ausnahmen (nur vom Betreiber zu setzen, nie zusammen mit Produktionsressourcen)
-- `NON_PRODUCTION_SANDBOX=true` (nur Preview): erklärt, dass die Preview **eigene** Datenbank, **eigenen** Blob-Store und **Test**-Meta/WhatsApp-Zugänge nutzt. Hebt alle Sperren auf.
+- **Seit 2026-10-12 granular (fail-closed):** `NON_PRODUCTION_SANDBOX=true` allein öffnet **nichts** mehr. Zusätzlich nötig ist
+  `NON_PRODUCTION_SANDBOX_RESOURCES` mit den Ressourcen, die die Preview **als eigene Instanz** besitzt:
+  `database` (eigener Neon-Branch: Datenbank, Migrationen), `blob` (eigener Store: Schreiben), `whatsapp` (Testnummer und
+  Test-Freigabeinstanz: Nachrichten), `publishing` (Testseiten/-konten aller aktivierten Plattformen), `paid_providers`
+  (eigene Provider-Keys mit Budget). Jede Wirkung braucht genau ihre Ressource; Cron-Jobs brauchen alle fünf. Teilweise
+  Trennung bleibt teilweise gesperrt; unbekannte Wörter („all“, „*“) öffnen nichts.
+- Der Egress-Filter bleibt auch mit Sandbox-Erklärung installiert und lässt nur die erklärten Arten durch. WhatsApp-Versand
+  (`graph.facebook.com/…/messages`) zählt als `message`, alle übrigen Graph-POSTs als `publish`.
 - `ALLOW_NON_PRODUCTION_PAID_CALLS=true`: erlaubt ausschließlich bezahlte Modell-/Medienprovider (keine Datenbank, keine Veröffentlichung, keine Nachrichten).
-  Achtung: Bildprovider bezahlen zuerst und speichern danach im Blob-Store (`storage_write` bleibt gesperrt) – mit nur diesem Flag entstehen bezahlte Bilder ohne Ablage. Für Bildtests daher `NON_PRODUCTION_SANDBOX=true` mit eigenem Blob-Store verwenden.
-- Die Sandbox-Erklärung schaltet **nur die Umgebungssperren** ab. Freigabeschranke, Einmal-Claim je Plattform, Absender-/Signaturprüfung, Zugangscode und Cron-Secret bleiben aktiv. Sie wird nicht gegen echte Ressourcentrennung geprüft; im Log erscheint beim Start `non_production_sandbox_active`.
-
-Folge: **Ohne Sandbox kann eine Preview keine Datenbank öffnen.** Die Preview baut weiterhin; Seiten mit Datenbankzugriff (z. B. `/produkte`) zeigen dort den Fehlerzustand.
+  Achtung: Bildprovider bezahlen zuerst und speichern danach im Blob-Store (`storage_write` bleibt gesperrt) – mit nur diesem Flag entstehen bezahlte Bilder ohne Ablage.
+- Die Erklärungen schalten **nur die Umgebungssperren** ab. Freigabeschranke, Einmal-Claim je Plattform, Absender-/Signaturprüfung, Zugangscode und Cron-Secret bleiben aktiv.
+  Sie werden nicht gegen die echten Ressourcen geprüft; im Log erscheint beim Start `non_production_sandbox_active` mit der Ressourcenliste.
+  Nachweis vor dem Setzen: `scripts/check-preview-isolation.cjs` (siehe [PREVIEW_ISOLATION_CHECKLIST.md](PREVIEW_ISOLATION_CHECKLIST.md)).
 
 ## Anleitung für den Betreiber (Vercel → Settings → Environment Variables) — nicht automatisch ausgeführt
 1. In Neon einen **Branch** `preview` (oder ein eigenes Projekt) anlegen; Migrationen dort gesondert ausführen.
@@ -35,7 +42,7 @@ Folge: **Ohne Sandbox kann eine Preview keine Datenbank öffnen.** Die Preview b
    (Production-Einträge bleiben unverändert; bei Variablen mit gemeinsamen Targets den Eintrag teilen):
    `DATABASE_URL` und alle `DATABASE_*`/`POSTGRES_*`, `BLOB_READ_WRITE_TOKEN`/`BLOB_STORE_ID`, `META_SYSTEM_USER_TOKEN`, `META_APP_SECRET`,
    `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_APPROVER_WA_ID`, `WHATSAPP_VERIFY_TOKEN`, `CRON_SECRET`, `CONTENT_STUDIO_PASSWORD`, `REPLICATE_API_TOKEN`, `TAVILY_API_KEY`, `RUNWAYML_API_SECRET`.
-3. Erst wenn **alle** obigen Preview-Werte Testressourcen sind: `NON_PRODUCTION_SANDBOX=true` nur für Preview setzen.
+3. Erst wenn die Prüfung die Trennung belegt: `NON_PRODUCTION_SANDBOX=true` und `NON_PRODUCTION_SANDBOX_RESOURCES=<nur belegte Ressourcen>` nur für Preview setzen.
 4. Ungenutzt (im Code nicht referenziert): `GOOGLE_GENERATIVE_AI_API_KEY`, `AI_GATEWAY_API_KEY` — nach Prüfung entfernen.
 
 ## Nicht belegt / Grenzen
