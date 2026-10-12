@@ -10,6 +10,7 @@ const S = require('../.test-build/lib/architecture/snapshot');
 const { checkCapabilities } = require('../.test-build/lib/capabilities');
 const { ensureAutomationSchema } = require('../.test-build/lib/memory/ensure-automation-schema');
 const { NonProductionEffectError } = require('../.test-build/lib/security/runtime-guard');
+const G = require('../.test-build/lib/security/runtime-guard');
 const pgliteDatabase = require('./helpers/pglite-db.cjs');
 const loadRoute = require('./helpers/load-route.cjs');
 const { withEnv } = require('./helpers/live-env.cjs');
@@ -254,4 +255,17 @@ test('Command Center UI: refresh keeps the chosen view, context loss falls back 
   assert.match(center, /document\.body\.style\.cursor = ""; setHover\(null\);/);
   const scene = read('app/architecture/scene.tsx');
   assert.match(scene, /addEventListener\("webglcontextlost"/);
+});
+test('runtime: "Sandbox" is shown only when the runtime guard lets every external effect through, never for a flag the guard does not honour', () => {
+  const preview = { ...PROD, VERCEL_ENV: 'preview' };
+  assert.equal(runtimeFor(preview).sandbox, false);
+  assert.equal(runtimeFor({ ...preview, NON_PRODUCTION_SANDBOX: 'yes' }).sandbox, false);
+  const full = { ...preview, NON_PRODUCTION_SANDBOX: 'true', NON_PRODUCTION_SANDBOX_RESOURCES: 'database,blob,whatsapp,publishing,paid_providers' };
+  assert.equal(runtimeFor(full).sandbox, true);
+  assert.notEqual(runtimeFor(full).nodes.publisher.source, 'Preview-Sperre');
+  assert.equal(runtimeFor({ ...PROD, NON_PRODUCTION_SANDBOX: 'true' }).sandbox, false, 'production never shows a sandbox');
+  // Whatever the guard decides for a partial declaration, the display follows the guard, not the flag.
+  const partial = { ...preview, NON_PRODUCTION_SANDBOX: 'true', NON_PRODUCTION_SANDBOX_RESOURCES: 'database' };
+  const guardOpen = ['database', 'migrate', 'storage_write', 'message', 'publish', 'paid_provider', 'scheduled_job'].every(kind => G.effectDecision(kind, partial).ok);
+  assert.equal(runtimeFor(partial).sandbox, guardOpen);
 });

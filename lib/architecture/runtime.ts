@@ -1,5 +1,5 @@
 import type { ServiceCapability } from "../capabilities";
-import { runtimeEnvironment, sandboxDeclared } from "../security/runtime-guard";
+import { effectDecision, runtimeEnvironment, type EffectKind } from "../security/runtime-guard";
 import { NODES, PROCESS_STEPS, type ArchNode, type OperationalStatus } from "./model";
 import type { RuntimeSnapshot } from "./snapshot";
 
@@ -131,12 +131,16 @@ function withEvidence(id: string, current: NodeRuntime, snapshot: RuntimeSnapsho
   return current;
 }
 
+const SANDBOX_EFFECTS: EffectKind[] = ["database", "migrate", "storage_write", "message", "publish", "paid_provider", "scheduled_job"];
+
 export function computeRuntime(input: { capabilities: ServiceCapability[]; snapshot: RuntimeSnapshot; env?: Env; now?: Date; nodes?: ArchNode[] }): RuntimeState {
   const env = input.env ?? process.env;
   const now = input.now ?? new Date();
   const flags = readFlags(env);
   const environment = runtimeEnvironment(env);
-  const sandbox = sandboxDeclared(env);
+  // "Sandbox" only when the runtime guard itself lets EVERY external effect through. A sandbox flag alone (or a partial
+  // isolation) never counts: the display must not show a component as unblocked while the guard still blocks it.
+  const sandbox = (environment === "preview" || environment === "development") && SANDBOX_EFFECTS.every(kind => effectDecision(kind, env).ok);
   const caps = new Map(input.capabilities.map(item => [item.id, item]));
   const nodes: Record<string, NodeRuntime> = {};
   for (const node of input.nodes ?? NODES) {
