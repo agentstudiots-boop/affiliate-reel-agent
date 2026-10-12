@@ -269,3 +269,9 @@ test('runtime: "Sandbox" is shown only when the runtime guard lets every externa
   const guardOpen = ['database', 'migrate', 'storage_write', 'message', 'publish', 'paid_provider', 'scheduled_job'].every(kind => G.effectDecision(kind, partial).ok);
   assert.equal(runtimeFor(partial).sandbox, guardOpen);
 });
+test('mobile: long ghost-button labels wrap on phones, so the studio page never widens the layout viewport under the full-screen dialog', () => {
+  const css = read('app/globals.css');
+  const phone = css.slice(css.indexOf('@media (max-width:480px)'));
+  assert.match(phone.slice(0, phone.indexOf('}\n') + 400), /\.ghost\{white-space:normal;max-width:100%\}/);
+  assert.match(css, /\.ccRoot\{position:fixed;inset:0;/);
+});
