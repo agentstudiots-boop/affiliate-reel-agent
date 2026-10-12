@@ -32,9 +32,10 @@ function encodePng(width, height, pixel) {
   const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(width, 0); ihdr.writeUInt32BE(height, 4); ihdr[8] = 8; ihdr[9] = 2;
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(Buffer.concat(rows))), chunk('IEND', Buffer.alloc(0))]);
 }
-// 64x64: red 32x32 square centred on white (live call). 40x50 (4:5) grey: only for the offline technical check.
+// 64x64: red 32x32 square centred on white (live call). 512x640 (4:5) grey: only for the offline checks – it has to pass the
+// technical check (PNG, 512–3840 px, 4:5), otherwise the provider/schema failure paths under test are never reached.
 const syntheticPng = () => encodePng(64, 64, (x, y) => (x >= 16 && x < 48 && y >= 16 && y < 48 ? [220, 20, 20] : [255, 255, 255]));
-const syntheticPngPortrait = () => encodePng(40, 50, () => [200, 200, 200]);
+const syntheticPngPortrait = () => encodePng(512, 640, () => [200, 200, 200]);
 
 const spec = topicImageSpec({ motif: 'blauer Kreis', title: 'Smoke-Test' });
 const modelId = QUALITY_MODEL();
@@ -45,6 +46,8 @@ async function offline() {
   // Failure handling and "uncertain is never approved" – with injected observers, no network.
   const png = 'https://x.public.blob.vercel-storage.com/a.png';
   const fetchPng = async () => new Response(syntheticPngPortrait(), { headers: { 'content-type': 'image/png' } });
+  const passing = await checkGeneratedImage({ url: png, spec }, { request: fetchPng, observe: async () => { throw new Error('provider down'); } });
+  check('Offline-Testbild besteht die technische Prüfung (sonst prüfen die folgenden Fälle nichts)', passing.findings.technical === false && passing.checked.technical === true);
   const throwing = await checkGeneratedImage({ url: png, spec }, { request: fetchPng, observe: async () => { throw new Error('provider down'); } });
   check('Providerfehler => nicht freigegeben, unsicher', throwing.approved === false && throwing.uncertain === true && throwing.checked.vision === false);
   const garbage = await checkGeneratedImage({ url: png, spec }, { request: fetchPng, observe: async () => ({ hello: 'world' }) });
