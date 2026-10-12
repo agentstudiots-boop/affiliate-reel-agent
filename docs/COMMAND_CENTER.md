@@ -31,6 +31,16 @@ Prüfbericht und Aktivierungsplan: `docs/JARVIS_AUDIT_2026-10-10.md`.
   (`lib/architecture/layout.ts`); Beschriftungen als Sprites, Größe aus Kameradistanz und Bühnenhöhe, auf kleinen Bühnen Kurznamen.
 - Fallbacks: kein WebGL, Fehler in der Szene oder manuell → 2D. Die Szene wird einmal gemountet und danach nur ausgeblendet (`frameloop="never"`).
 - Panels: `app/architecture/panels.tsx`; Steuerung: `app/architecture/command-center.tsx`.
+- Review 2026-10-12 (behoben, mit Tests):
+  - WebGL wird höchstens einmal je Seite geprüft und der Prüfkontext sofort freigegeben (`lib/architecture/webgl.ts`). Vorher
+    erzeugte jedes „Aktualisieren“ einen neuen, nie freigegebenen WebGL-Kontext. Am Browserlimit kann das die eigene Szene beenden.
+    „Aktualisieren“ setzte außerdem eine gewählte 2D-Ansicht zurück.
+  - Verliert der Browser den WebGL-Kontext (GPU-Reset, mobiler Hintergrund), schaltet die Ansicht auf 2D statt auf eine schwarze Fläche.
+  - Beim Schließen werden Mauszeiger und Tooltip zurückgesetzt.
+  - Laufzeitnachweise laufen je Abschnitt in einer `READ ONLY`-Transaktion: Postgres selbst lehnt jeden Schreibzugriff ab, und ein
+    fehlender Abschnitt (z. B. Migration 035 noch nicht angewendet) bricht die anderen nicht ab.
+  - „Sandbox erklärt“ erscheint nur, wenn der Runtime-Guard tatsächlich jede Wirkung erlaubt. Ein bloßer Schalter oder eine
+    teilweise Isolation reicht dafür nicht (passend zur granularen Sandbox im separaten Härtungs-PR).
 
 ## Pflege
 Neue Komponente = Eintrag in `NODES` (mit `plain`, `short`, `since`, `operation`, `effects`) und passende `EDGES`.
