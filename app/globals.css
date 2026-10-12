@@ -76,7 +76,10 @@ blockquote { margin:0; border-left:3px solid var(--accent); padding:10px 14px; b
 footer { color:#687069; font-size:12px; text-align:center; padding:30px 0 0; }
 @media (max-width:1050px) { .trendGrid{grid-template-columns:repeat(2,minmax(0,1fr))} }
 @media (max-width:800px) { main{padding-top:28px}.hero{display:block}.hero .ghost{margin-top:12px}.grid{grid-template-columns:1fr}.two,.metricGrid{grid-template-columns:1fr 1fr}.steps span{font-size:11px}.steps span{white-space:nowrap;overflow:hidden}.panel{padding:18px}.scoutHead{display:block}.scoutButton{width:100%;margin-top:18px} }
-@media (max-width:480px) { .two,.metricGrid{grid-template-columns:1fr}.steps{overflow:auto;gap:20px}.steps span{min-width:82px} }
+@media (max-width:480px) { .two,.metricGrid{grid-template-columns:1fr}.steps{overflow:auto;gap:20px}.steps span{min-width:82px}
+  /* Long button labels (e.g. "Kuscheldecken-Reeltest vorausfüllen …") wrap instead of widening the layout viewport, which
+     otherwise cut off the right edge of the full-screen Command Center on phones. */
+  .ghost{white-space:normal;max-width:100%} }
 @media (max-width:560px) { .trendGrid{grid-template-columns:1fr} }
 
 /* Content orchestration extends the existing studio without replacing legacy jobs. */
