@@ -11,6 +11,9 @@ const SQL_034 = load('034_image_quality.sql');
 const TABLES_034 = ['image_generation_attempts', 'image_quality_notices', 'image_generation_grants', 'image_quality_experiences'];
 const ALL = fs.readdirSync('db/migrations').filter(name => name.endsWith('.sql')).sort();
 const BEFORE_034 = ALL.slice(0, ALL.indexOf('034_image_quality.sql'));
+// Later migrations (e.g. 035) are recorded as no-ops so that each test isolates exactly 034, whatever comes after it.
+const AFTER_034 = new Set(ALL.slice(ALL.indexOf('034_image_quality.sql') + 1));
+const only034 = name => AFTER_034.has(name) ? 'SELECT 1;' : load(name);
 
 function database() {
   const pg = new PGlite();
@@ -52,13 +55,16 @@ test('upgrading a populated 033 database applies only 034 and leaves every exist
   try {
     await upTo033(pg);
     const before = await snapshot(pg);
-    assert.deepEqual(await applyMigrations(db), { applied: ['034_image_quality.sql'], alreadyApplied: BEFORE_034 });
+    const first = await applyMigrations(db, only034);
+    assert.deepEqual(first.alreadyApplied, BEFORE_034);
+    assert.equal(first.applied[0], '034_image_quality.sql');
+    assert.deepEqual(first.applied.slice(1), [...AFTER_034]);
     const after = await snapshot(pg);
     assert.deepEqual(after.tables.filter(name => !TABLES_034.includes(name)), before.tables);
     for (const table of before.tables) if (table !== 'schema_migrations') assert.deepEqual(after.rows[table], before.rows[table], table);
     assert.deepEqual(after.columns.filter(column => !TABLES_034.includes(column.table_name)), before.columns);
     for (const table of TABLES_034) assert.deepEqual(after.rows[table], [], `${table} starts empty`);
-    assert.deepEqual(await applyMigrations(db), { applied: [], alreadyApplied: [...BEFORE_034, '034_image_quality.sql'] });
+    assert.deepEqual((await applyMigrations(db, only034)).applied, []);
   } finally { await pg.close(); }
 });
 
@@ -67,7 +73,7 @@ test('a failure while applying 034 rolls back completely: no new table, no migra
   try {
     await upTo033(pg);
     const before = await snapshot(pg);
-    await assert.rejects(applyMigrations(db, name => name === '034_image_quality.sql' ? `${SQL_034}\nSELECT 1/0;` : load(name)));
+    await assert.rejects(applyMigrations(db, name => name === '034_image_quality.sql' ? `${SQL_034}\nSELECT 1/0;` : only034(name)));
     assert.deepEqual(await snapshot(pg), before);
   } finally { await pg.close(); }
 });
@@ -77,7 +83,8 @@ test('the documented rollback (docs/IMAGE_QUALITY_VERIFICATION.md) restores the 
   try {
     const jobId = await upTo033(pg);
     const before = await snapshot(pg);
-    await applyMigrations(db);
+    await applyMigrations(db, only034);
+    await pg.exec(`DELETE FROM schema_migrations WHERE name IN (${[...AFTER_034].map(name => `'${name}'`).join(',') || "''"})`); // the no-op records of later migrations
     await pg.query(`INSERT INTO image_generation_attempts(job_id,attempt_no,content_hash,provider,model,prompt_sha256,status) VALUES($1,1,'h','replicate','m','s','generated')`, [jobId]);
     const doc = fs.readFileSync('docs/IMAGE_QUALITY_VERIFICATION.md', 'utf8');
     const rollback = doc.slice(doc.indexOf('### Rollback')).match(/```sql\n([\s\S]*?)```/)[1];
