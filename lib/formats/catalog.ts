@@ -26,9 +26,9 @@ export const FALLBACK_CHAIN: Record<ContentFormat, ContentFormat[]> = {
   TEXT: [],
 };
 
-export const PLATFORMS = ["instagram", "facebook", "tiktok", "youtube", "x"] as const;
+export const PLATFORMS = ["instagram", "facebook", "tiktok", "youtube", "x", "pinterest"] as const;
 export type Platform = (typeof PLATFORMS)[number];
-export const PLATFORM_LABEL: Record<Platform, string> = { instagram: "Instagram", facebook: "Facebook", tiktok: "TikTok", youtube: "YouTube Shorts", x: "X" };
+export const PLATFORM_LABEL: Record<Platform, string> = { instagram: "Instagram", facebook: "Facebook", tiktok: "TikTok", youtube: "YouTube Shorts", x: "X", pinterest: "Pinterest" };
 
 export const CAROUSEL_MIN_SLIDES = 3;
 export const CAROUSEL_MAX_SLIDES = 7;

@@ -1,4 +1,7 @@
-import type { Sql } from "../memory/db";
+import type { Database } from "../memory/db";
+import { reserveRunwayBudget } from "./runway-budget";
+import { RUNWAY_ESTIMATED_CREDITS } from "../runway";
+import { assertEffectAllowed } from "../security/runtime-guard";
 import { emitEvent } from "../observability/events";
 import { briefHash, jobKey, type JobKind, type JobLedger } from "./ledger";
 import type { GeneratedAsset } from "./types";
@@ -33,7 +36,7 @@ export type QuotaUsage = { planned: number; succeeded: number; failed: number };
 export interface QuotaStore {
   usage(provider: string, month: string): Promise<QuotaUsage>;
   // Idempotent per key: the same job never counts twice.
-  reserve(provider: string, kind: string, key: string, month: string): Promise<void>;
+  reserve(provider: string, kind: string, key: string, month: string, limit: number): Promise<boolean>;
   settle(provider: string, key: string, status: "succeeded" | "failed"): Promise<void>;
 }
 export const monthOf = (date: Date) => date.toISOString().slice(0, 7);
@@ -46,20 +49,36 @@ export function memoryQuota(): QuotaStore & { rows: Map<string, { provider: stri
       const list = [...rows.values()].filter(row => row.provider === provider && row.month === month);
       return { planned: list.filter(row => row.status === "planned").length, succeeded: list.filter(row => row.status === "succeeded").length, failed: list.filter(row => row.status === "failed").length };
     },
-    async reserve(provider, _kind, key, month) { if (!rows.has(`${provider}|${key}`)) rows.set(`${provider}|${key}`, { provider, status: "planned", month }); },
+    async reserve(provider, _kind, key, month, limit) {
+      if (!Number.isSafeInteger(limit) || limit <= 0) return false;
+      if (rows.has(`${provider}|${key}`)) return true;
+      if ([...rows.values()].filter(row => row.provider === provider && row.month === month).length >= limit) return false;
+      rows.set(`${provider}|${key}`, { provider, status: "planned", month });
+      return true;
+    },
     async settle(provider, key, status) { const row = rows.get(`${provider}|${key}`); if (row) row.status = status; },
   };
 }
 
-export function postgresQuota(db: Sql): QuotaStore {
+export function postgresQuota(db: Database): QuotaStore {
   return {
     async usage(provider, month) {
       const result = await db.query("SELECT status, count(*)::int AS n FROM provider_usage WHERE provider=$1 AND month=$2 GROUP BY status", [provider, month]);
       const by = Object.fromEntries(result.rows.map(row => [String(row.status), Number(row.n)]));
       return { planned: by.planned ?? 0, succeeded: by.succeeded ?? 0, failed: by.failed ?? 0 };
     },
-    async reserve(provider, kind, key, month) {
-      await db.query("INSERT INTO provider_usage(provider,kind,idempotency_key,status,month) VALUES($1,$2,$3,'planned',$4) ON CONFLICT (provider,idempotency_key) DO NOTHING", [provider, kind, key, month]);
+    async reserve(provider, kind, key, month, limit) {
+      if (!Number.isSafeInteger(limit) || limit <= 0) return false;
+      return db.transaction(async sql => {
+        // Serialize check + reservation across processes. No network I/O while holding this short lock.
+        await sql.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`video-quota:${provider}:${month}`]);
+        if ((await sql.query("SELECT 1 FROM provider_usage WHERE provider=$1 AND idempotency_key=$2", [provider, key])).rows.length) return true;
+        if (provider === "runway" && !await reserveRunwayBudget(sql, month, RUNWAY_ESTIMATED_CREDITS)) return false;
+        const used = Number((await sql.query("SELECT count(*)::int AS n FROM provider_usage WHERE provider=$1 AND month=$2", [provider, month])).rows[0]?.n ?? 0);
+        if (used >= limit) return false;
+        await sql.query("INSERT INTO provider_usage(provider,kind,idempotency_key,status,month) VALUES($1,$2,$3,'planned',$4)", [provider, kind, key, month]);
+        return true;
+      });
     },
     async settle(provider, key, status) {
       await db.query("UPDATE provider_usage SET status=$3,updated_at=now() WHERE provider=$1 AND idempotency_key=$2 AND status='planned'", [provider, key, status]);
@@ -67,7 +86,8 @@ export function postgresQuota(db: Sql): QuotaStore {
   };
 }
 
-export function remainingQuota(limit: number, usage: QuotaUsage) { return Math.max(0, limit - usage.planned - usage.succeeded); }
+// Failed/ambiguous requests may still cost money. Never recycle budget automatically.
+export function remainingQuota(limit: number, usage: QuotaUsage) { return Number.isSafeInteger(limit) && limit > 0 ? Math.max(0, limit - usage.planned - usage.succeeded - usage.failed) : 0; }
 
 // ---- Video job runner ----
 export type VideoJobOptions = {
@@ -109,15 +129,17 @@ export async function runVideoJob(input: VideoInput, options: VideoJobOptions): 
   const startedAt = claim.job.createdAt ?? Date.now();
 
   if (!jobId) {
+    assertEffectAllowed("paid_provider");
+    if (!provider.available().ok) return fail("unavailable", false, null);
+    if (!options.quota) return fail("quota_unconfigured", false, null);
     // No provider call without an available provider and remaining quota.
     if (options.quota) {
-      const usage = await options.quota.store.usage(provider.name, monthOf(now()));
-      if (remainingQuota(options.quota.limit, usage) <= 0) {
-        emitEvent("avatar_quota_blocked", { contentId: input.contentId, provider: provider.name, limit: options.quota.limit, ...usage }, "warn");
+      const reserved = await options.quota.store.reserve(provider.name, provider.kind, key, monthOf(now()), options.quota.limit);
+      if (!reserved) {
+        emitEvent("avatar_quota_blocked", { contentId: input.contentId, provider: provider.name, limit: options.quota.limit }, "warn");
         await options.ledger.fail(key, "quota_exhausted", false, null);
         return { state: "failed", category: "quota_exhausted", retryable: false, jobId: null };
       }
-      await options.quota.store.reserve(provider.name, provider.kind, key, monthOf(now()));
     }
     emitEvent(event.started, { contentId: input.contentId, provider: provider.name, role: input.role });
     try {

@@ -20,7 +20,7 @@ test('preflight: empty or multiple TOPIC_PLATFORMS, missing credentials and publ
   assert.match(preflight('youtube', { TOPIC_PLATFORMS: 'youtube' }).blockers.join(), /YOUTUBE_REFRESH_TOKEN/);
   assert.match(preflight('youtube', { ...youtube, TOPIC_PLATFORMS: 'youtube', YOUTUBE_PRIVACY_STATUS: 'public' }).blockers.join(), /öffentlich/);
   assert.match(preflight('tiktok', { ...tiktok, TOPIC_PLATFORMS: 'tiktok', TIKTOK_PRIVACY_LEVEL: 'PUBLIC_TO_EVERYONE' }).blockers.join(), /SELF_ONLY/);
-  assert.match(preflight('pinterest', {}).blockers.join(), /Unbekannte Plattform/);
+  assert.match(preflight('mastodon', {}).blockers.join(), /Unbekannte Plattform/);
 });
 test('preflight: platforms without a private mode require a test account; preview without isolated publishing is reported', () => {
   const ig = preflight('instagram', { TOPIC_PLATFORMS: 'instagram', META_SYSTEM_USER_TOKEN: SECRET, META_PAGE_ID: '1', META_INSTAGRAM_USER_ID: '2', BLOB_READ_WRITE_TOKEN: SECRET, VERCEL_ENV: 'preview' });

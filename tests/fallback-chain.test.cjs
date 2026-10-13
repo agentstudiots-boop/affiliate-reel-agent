@@ -37,7 +37,7 @@ function imageProvider(script = {}) {
       if (step instanceof Error) throw step; if (options.onJobCreated) await options.onJobCreated(`job-${options.role}`);
       return { kind: 'image', url: `https://x.public.blob.vercel-storage.com/generated/topics/tc_fb/${options.role}.png`, sha256: 'a'.repeat(64), mediaType: 'image/png', provider: 'fake' }; } };
 }
-const ctx = (over = {}) => ({ ledger: memoryLedger(), imageProvider: imageProvider(), avatarQuota: { store: memoryQuota(), limit: 3 }, sleep: async () => {}, videoTiming: { pollIntervalMs: 0 }, ...over });
+const ctx = (over = {}) => ({ standardQuota: { store: memoryQuota(), limit: 3 }, ledger: memoryLedger(), imageProvider: imageProvider(), avatarQuota: { store: memoryQuota(), limit: 3 }, sleep: async () => {}, videoTiming: { pollIntervalMs: 0 }, ...over });
 const chain = result => result.fallbacks.map(item => `${item.from}->${item.to}`);
 
 test('video provider not available (missing credentials): Avatar → Video → Karussell without any provider call', async () => {
@@ -56,7 +56,7 @@ test('video provider not available (missing credentials): Avatar → Video → K
 test('video quota exhausted: no avatar call at all, falls back', async () => {
   const quota = memoryQuota();
   const month = new Date().toISOString().slice(0, 7);
-  for (const key of ['a', 'b', 'c']) { await quota.reserve('heygen', 'avatar_video', key, month); await quota.settle('heygen', key, 'succeeded'); }
+  for (const key of ['a', 'b', 'c']) { await quota.reserve('heygen', 'avatar_video', key, month, 3); await quota.settle('heygen', key, 'succeeded'); }
   const { calls, provider } = heygen([]);
   const result = await produceContent(input('AVATAR_VIDEO'), ctx({ avatarProvider: provider, avatarQuota: { store: quota, limit: 3 } }));
   assert.equal(calls.length, 0);

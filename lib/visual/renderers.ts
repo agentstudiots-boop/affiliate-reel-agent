@@ -19,6 +19,7 @@ export type ProductionCopy = {
 export type RenderInput = { contentId: string; copy: ProductionCopy; style: StyleBrief; slides?: number | null; dryRun: boolean; visualPotential: number };
 export type RenderContext = { ledger: JobLedger; imageProvider: ImageProvider | null; sleep?: (ms: number) => Promise<void>; maxAttempts?: number;
   avatarProvider?: VideoProvider | null; standardVideoProvider?: VideoProvider | null; avatarQuota?: { store: QuotaStore; limit: number } | null;
+  standardQuota?: { store: QuotaStore; limit: number } | null;
   videoTiming?: { pollIntervalMs?: number; maxWaitMs?: number; stuckAfterMs?: number }; now?: () => Date;
   // Shared visual quality gate (lib/content/image-quality). Optional; a rejected or uncertain image is never used: the
   // single image degrades along the fallback chain, a carousel slide to a text graphic. It never triggers a new generation.
@@ -134,7 +135,7 @@ async function renderVideo(kind: "avatar" | "standard", input: RenderInput, cont
   if (!provider) return { status: "failed", assets: [], error: `${kind}_provider_unavailable`, notes: [] };
   const result = await runVideoJob({ contentId: input.contentId, role: kind === "avatar" ? "avatar-video" : "standard-video", title: input.copy.title, script: input.copy.videoScript,
     visualPrompt: imagePromptFromBrief(input.style, input.copy.imageMotif), aspect: "9:16" },
-  { ledger: context.ledger, provider, quota: kind === "avatar" ? context.avatarQuota ?? null : null, sleep: context.sleep, now: context.now, ...context.videoTiming });
+  { ledger: context.ledger, provider, quota: kind === "avatar" ? context.avatarQuota ?? null : context.standardQuota ?? null, sleep: context.sleep, now: context.now, ...context.videoTiming });
   if (result.state === "completed") return { status: "completed", assets: [{ role: "video", asset: result.asset }], video: { script: input.copy.videoScript, provider: provider.name, jobId: result.jobId }, notes: result.reused ? ["Vorhandenes Video wiederverwendet"] : [] };
   if (result.state === "in_progress") return { status: "in_progress", assets: [], video: { script: input.copy.videoScript, provider: provider.name, jobId: result.jobId }, notes: [`${label} wird noch erzeugt; wird beim nächsten Lauf fortgesetzt, nicht neu gestartet`] };
   return { status: "failed", assets: [], error: `${kind === "avatar" ? "heygen" : "video"}_${result.category}`, notes: [] };
@@ -154,7 +155,8 @@ export const avatarVideoRenderer: Renderer = {
 
 export const standardVideoRenderer: Renderer = {
   format: "STANDARD_VIDEO",
-  available: context => context.standardVideoProvider ? context.standardVideoProvider.available() : { ok: false, reason: "kein Video-Provider" },
+  available: context => !context.standardQuota ? { ok: false, reason: "Video-Kontingent nicht konfiguriert" }
+    : context.standardVideoProvider ? context.standardVideoProvider.available() : { ok: false, reason: "kein Video-Provider" },
   render: (input, context) => renderVideo("standard", input, context),
 };
 

@@ -16,7 +16,7 @@ export function getRunwayClient() {
 
 export function monthlyBudgetCredits() {
   const configured = Number(process.env.RUNWAY_MONTHLY_BUDGET_CREDITS ?? "1800");
-  return Number.isFinite(configured) && configured > 0 ? Math.floor(configured) : 1800;
+  return Number.isFinite(configured) && configured > 0 ? Math.floor(configured) : 0;
 }
 
 export function currentMonthRange(now = new Date()) {

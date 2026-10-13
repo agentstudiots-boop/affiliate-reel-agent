@@ -1,7 +1,7 @@
 import type { Database } from "../memory/db";
 import type { Platform } from "../formats/catalog";
 import { emitEvent } from "../observability/events";
-import { assertPermitMatches, authorizePublish, completePublishAttempt, openAttempts, platformAttempt, previewPublish, PublishBlockedError, recordRemoteId, settleAttempt, type PublishableContent, type PublishPermit } from "../publishing/approval-gate";
+import { assertPermitMatches, authorizePublish, completePublishAttempt, openAttempts, platformAttempt, previewPublish, PublishBlockedError, recordRemoteId, settleAttempt, verifyPublishStillAuthorized, type PublishableContent, type PublishPermit } from "../publishing/approval-gate";
 import { livePublishCapability, liveSwitchOn, type ContentOrigin } from "../capabilities";
 import type { PlatformOutcome } from "../publishing/report";
 import type { MasterContent } from "./master-content";
@@ -16,7 +16,7 @@ import type { PlatformVariant } from "./platforms/adapters";
 // be reconciled by status() instead of being repeated.
 export type PublisherResult = { state: "published" | "processing"; externalId: string; url: string | null };
 export type RemoteStatus = { state: "published" | "processing" | "failed" | "unknown"; externalId?: string; url?: string | null; detail?: string };
-export type PublishContext = { permit: PublishPermit; onRemoteId: (remoteId: string) => Promise<void> };
+export type PublishContext = { permit: PublishPermit; onRemoteId: (remoteId: string) => Promise<void>; beforePublish: () => Promise<void> };
 export class PlatformPublishError extends Error {
   // definite: the platform rejected the request (nothing published) → a later retry of the same approved version is allowed.
   // Not definite: the result is unknown (maybe published) → never retried automatically.
@@ -109,7 +109,12 @@ export async function publishAll(db: Database, input: { master: MasterContent; v
       if (!publisher.supports(variant)) throw new PlatformPublishError(true, `Format ${variant.mediaFormat} wird live nicht unterstützt`);
       assertPermitMatches(permit, content, variant.platform);
       const claimed = permit;
-      const result = await publisher.publish(variant, input.master, { permit: claimed, onRemoteId: remoteId => recordRemoteId(db, claimed, remoteId) });
+      const result = await publisher.publish(variant, input.master, { permit: claimed, onRemoteId: remoteId => recordRemoteId(db, claimed, remoteId),
+        beforePublish: async () => {
+          assertPermitMatches(claimed, publishableContent(input.master, input.variants), variant.platform);
+          const current = await verifyPublishStillAuthorized(db, content.contentId, variant.platform);
+          if (!current.ok) throw new PublishBlockedError(current.reason, content.contentId, variant.platform);
+        } });
       await completePublishAttempt(db, claimed, result.state, { externalId: result.externalId, url: result.state === "published" ? result.url : null });
       emitEvent(result.state === "published" ? "platform_publish_completed" : "platform_publish_started", { contentId: content.contentId, platform: variant.platform, state: result.state, hasUrl: !!result.url });
       outcomes.push({ platform: variant.platform, status: result.state, url: result.state === "published" ? result.url : null, externalId: result.externalId });

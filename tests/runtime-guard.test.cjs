@@ -182,3 +182,9 @@ test('fail closed: a Vercel runtime with a missing or unknown VERCEL_ENV is neve
   assert.equal(R.runtimeEnvironment({ VERCEL: '1', VERCEL_ENV: 'production' }), 'production');
   assert.equal(R.runtimeEnvironment({}), 'local');
 });
+
+test('preview publishing sandbox never permits paid Gemini calls or unisolated Pinterest writes', () => {
+  const { egressDecision } = require('../.test-build/lib/security/runtime-guard');
+  assert.equal(egressDecision(new URL('https://api.pinterest.com/v5/pins'), 'POST', { VERCEL_ENV: 'preview' }).ok, false);
+  assert.equal(egressDecision(new URL('https://generativelanguage.googleapis.com/v1/models/x:generateContent'), 'POST', { VERCEL_ENV: 'preview', NON_PRODUCTION_SANDBOX: 'true', NON_PRODUCTION_SANDBOX_RESOURCES: 'publishing' }).ok, false);
+});

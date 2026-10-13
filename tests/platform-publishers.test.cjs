@@ -21,7 +21,7 @@ const master = (format, assets) => buildMasterContent({ contentId: 'tc_demo', to
 const carousel = master('CAROUSEL', [1, 2, 3].map(n => ({ role: `slide-${n}`, asset: img(n) })));
 const single = master('SINGLE_IMAGE', [{ role: 'main-image', asset: img(1) }]);
 const video = master('STANDARD_VIDEO', [{ role: 'video', asset: vid }]);
-const context = () => { const ids = []; return { ids, ctx: { permit: {}, onRemoteId: async id => { ids.push(id); } } }; };
+const context = () => { const ids = []; return { ids, ctx: { permit: {}, beforePublish: async () => {}, onRemoteId: async id => { ids.push(id); } } }; };
 const media = { request: async () => new Response(Buffer.from('png'), { status: 200 }), toJpeg: async bytes => bytes,
   upload: async path => ({ url: `https://x.public.blob.vercel-storage.com/${path}` }) };
 const json = (body, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } });
@@ -146,7 +146,7 @@ const YT_ENV = { YOUTUBE_CLIENT_ID: 'id', YOUTUBE_CLIENT_SECRET: 'secret', YOUTU
 test('YouTube: token → resumable session → upload → processing; status processed → published Short link', async () => {
   const { calls, request } = scripted([json({ access_token: 'at' }),
     new Response(null, { status: 200, headers: { location: 'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&upload_id=U1' } }),
-    json({ id: 'dQw4w9WgXcQ' }), json({ access_token: 'at' }), json({ items: [{ status: { uploadStatus: 'processed' } }] })]);
+    json({ id: 'dQw4w9WgXcQ' }), json({ access_token: 'at' }), json({ items: [{ status: { uploadStatus: 'processed', privacyStatus: 'public' } }] })]);
   const publisher = youtubePublisher({ ...media, request, env: YT_ENV });
   const { ids, ctx } = context();
   const result = await publisher.publish(renderForPlatform(video, 'youtube'), video, ctx);
@@ -213,4 +213,12 @@ test('publishers report missing credentials by variable name and make no call wi
     await assert.rejects(tiktokPublisher({ request: async url => { calls.push(url); return json({}); }, env: {} }).publish(renderForPlatform(video, 'tiktok'), video, context().ctx), error => error.definite);
     assert.equal(calls.length, 0);
   } finally { restore(); }
+});
+
+test('YouTube processed private/unlisted/unknown visibility is never reported publicly live', async () => {
+  for (const privacyStatus of ['private', 'unlisted', undefined]) {
+    const { request } = scripted([json({ access_token: 'at' }), json({ items: [{ status: { uploadStatus: 'processed', privacyStatus } }] })]);
+    const result = await youtubePublisher({ request, env: YT_ENV }).status('dQw4w9WgXcQ');
+    assert.equal(result.state, 'unknown'); assert.equal(result.url, undefined);
+  }
 });

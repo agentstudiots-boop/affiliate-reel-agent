@@ -27,7 +27,7 @@ const one = (name: string) => req(name, [name]);
 
 export function activePlatforms(env: Env = process.env): Platform[] {
   const raw = env.TOPIC_PLATFORMS?.trim();
-  if (!raw) return [...PLATFORMS];
+  if (!raw) return PLATFORMS.filter(platform => platform !== "pinterest");
   return raw.split(",").map(item => item.trim().toLowerCase()).filter((item): item is Platform => (PLATFORMS as readonly string[]).includes(item));
 }
 export const liveSwitchOn = (env: Env = process.env) => env.TOPIC_LIVE_PUBLISHING === "true";
@@ -57,6 +57,11 @@ export const SERVICES: ServiceDefinition[] = [
     requires: [one("X_API_KEY"), one("X_API_SECRET"), one("X_ACCESS_TOKEN"), one("X_ACCESS_TOKEN_SECRET")], optional: [],
     enabled: platformEnabled("x"), implemented: true, liveVerified: false, neededFor: { dryRun: false, production: false, livePublishing: true } },
 
+  { id: "pinterest", label: "Pinterest", kind: "platform", purpose: "Bild- und Video-Pins über API v5; ausschließlich über den Publisher-Router",
+    requires: [one("PINTEREST_ACCESS_TOKEN"), one("PINTEREST_ACCESS_TOKEN_EXPIRES_AT"), one("PINTEREST_BOARD_ID")],
+    optional: [{ name: "PINTEREST_CLIENT_ID", purpose: "OAuth-Refresh (separat geschützter Token-Speicher erforderlich)" }, { name: "PINTEREST_CLIENT_SECRET", purpose: "OAuth" }],
+    enabled: platformEnabled("pinterest"), implemented: true, liveVerified: false, neededFor: { dryRun: false, production: false, livePublishing: true } },
+
   { id: "replicate", label: "Replicate (Bilder, Router, Texte)", kind: "media_provider", purpose: "Bildgenerierung (FLUX), semantischer WhatsApp-Router, optionale KI-Texte",
     requires: [one("REPLICATE_API_TOKEN")], optional: [{ name: "REPLICATE_IMAGE_MODEL", purpose: "Bildmodell (unterstützte FLUX-Modelle)" }],
     implemented: true, liveVerified: false, neededFor: { dryRun: false, production: true, livePublishing: false } },
@@ -66,7 +71,7 @@ export const SERVICES: ServiceDefinition[] = [
     requires: [one("HEYGEN_API_KEY"), one("HEYGEN_AVATAR_ID"), one("HEYGEN_VOICE_ID"), one("HEYGEN_MONTHLY_VIDEO_LIMIT")], optional: [],
     implemented: true, liveVerified: false, neededFor: { dryRun: false, production: true, livePublishing: false } },
   { id: "runway", label: "Runway (Standard-Video)", kind: "media_provider", purpose: "Standard-Video über die bestehende Runway-Anbindung (opt-in)",
-    requires: [one("RUNWAYML_API_SECRET")], optional: [{ name: "RUNWAY_MONTHLY_BUDGET_CREDITS", purpose: "Monatsbudget (bestehend)" }],
+    requires: [one("RUNWAYML_API_SECRET"), one("TOPIC_RUNWAY_MONTHLY_VIDEO_LIMIT")], optional: [{ name: "RUNWAY_MONTHLY_BUDGET_CREDITS", purpose: "Monatsbudget (bestehend)" }],
     enabled: env => env.TOPIC_STANDARD_VIDEO_PROVIDER === "runway" ? { enabled: true } : { enabled: false, reason: "TOPIC_STANDARD_VIDEO_PROVIDER≠runway" },
     implemented: true, liveVerified: false, neededFor: { dryRun: false, production: true, livePublishing: false } },
   { id: "openai", label: "OpenAI (Bild-Fallback Produkt-Pipeline)", kind: "model_provider", purpose: "Nur Produkt-Pipeline: Bildprovider, wenn Replicate fehlt; Themen-Pipeline nutzt ihn nicht",

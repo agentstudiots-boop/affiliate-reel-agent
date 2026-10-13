@@ -63,6 +63,7 @@ export async function resolveTopicProduct(query: string) {
 export function topicPipelineDeps(): TopicPipelineDeps {
   const db = getDatabase();
   const limit = heygenConfig().monthlyLimit;
+  const videoLimit = Number(process.env.TOPIC_RUNWAY_MONTHLY_VIDEO_LIMIT ?? "0");
   return {
     db,
     send: async text => String(await sendWhatsAppText(text)),
@@ -74,7 +75,8 @@ export function topicPipelineDeps(): TopicPipelineDeps {
         const result = await checkGeneratedImage({ url: asset.url, spec: topicImageSpec(motif) });
         return { approved: result.approved, reasons: [...result.hard_failures, ...result.soft_failures] };
       } } : {}), avatarProvider: createHeyGenAvatarProvider(),
-      standardVideoProvider: createRunwayStandardVideoProvider(), avatarQuota: limit > 0 ? { store: postgresQuota(db), limit } : null },
+      standardVideoProvider: createRunwayStandardVideoProvider(), avatarQuota: limit > 0 ? { store: postgresQuota(db), limit } : null,
+      standardQuota: Number.isSafeInteger(videoLimit) && videoLimit > 0 ? { store: postgresQuota(db), limit: videoLimit } : null },
     // Reference mode by default (no model cost). AI copy only with TOPIC_COPY_MODE=ai and a Replicate token.
     generate: process.env.TOPIC_COPY_MODE === "ai" && process.env.REPLICATE_API_TOKEN?.trim() ? createGenerator({ mode: "ai" }) : null,
     publishers: defaultPublishers(),

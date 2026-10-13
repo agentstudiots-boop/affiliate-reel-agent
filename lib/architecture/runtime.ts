@@ -9,7 +9,8 @@ import type { RuntimeSnapshot } from "./snapshot";
 
 type Env = Record<string, string | undefined>;
 export type StatusSource = "Konfiguration" | "Datenbank" | "Repo-Analyse" | "Betreiberentscheidung" | "Preview-Sperre";
-export type NodeRuntime = { status: OperationalStatus; reason: string; source: StatusSource; details: string[] };
+export type EvidenceCheck = { state: "yes" | "no" | "unknown" | "not_required"; reason: string };
+export type NodeRuntime = { checks?: { configured: EvidenceCheck; reachable: EvidenceCheck; functional: EvidenceCheck }; status: OperationalStatus; reason: string; source: StatusSource; details: string[] };
 export type StepRuntime = { id: string; status: OperationalStatus; counts: string[] };
 export type RuntimeState = {
   generatedAt: string;
@@ -19,7 +20,7 @@ export type RuntimeState = {
   nodes: Record<string, NodeRuntime>;
   steps: StepRuntime[];
   evidence: { available: boolean; reason: string | null; generatedAt: string };
-  pending: { label: string; count: number }[];
+  pending: { label: string; count: number | null }[];
   publications: { platform: string; status: string; url: string | null; at: string; origin: string }[];
   recentTopics: NonNullable<RuntimeSnapshot["topic"]>["recent"];
   recentChances: NonNullable<RuntimeSnapshot["chances"]>["recent"];
@@ -148,7 +149,23 @@ export function computeRuntime(input: { capabilities: ServiceCapability[]; snaps
     // Preview/development without a declared sandbox: every external effect is blocked by the runtime guard.
     if ((environment === "preview" || environment === "development") && !sandbox && node.effects && state.status !== "not_applicable")
       state = { status: "disabled", reason: "Preview: externe Wirkungen gesperrt (Runtime-Guard)", source: "Preview-Sperre", details: [`Ohne Sperre wäre: ${state.reason}`] };
-    nodes[node.id] = withEvidence(node.id, state, input.snapshot, now);
+    const configured: EvidenceCheck = node.operation.type === "custom" && node.operation.id === "database" ? { state: set(env, "DATABASE_URL") ? "yes" : "no", reason: "DATABASE_URL vorhanden oder fehlend; Verbindung getrennt geprüft" }
+      : node.operation.type === "code" ? { state: "not_required", reason: "Keine eigene Konfiguration" }
+      : node.operation.type === "services" ? { state: node.operation.ids.every(id => caps.has(id) && !caps.get(id)!.missing.length) ? "yes" : "no", reason: "Nur erforderliche Einstellungen geprüft; keine Anmeldung beim Dienst" }
+      : { state: state.status === "ready" ? "yes" : state.status === "not_configured" ? "no" : "unknown", reason: state.reason };
+    const reachable: EvidenceCheck = { state: "unknown", reason: "Keine aktuelle Erreichbarkeitsprüfung dieses Dienstes" };
+    const functional: EvidenceCheck = { state: "unknown", reason: "Kein erfolgreicher Funktionsnachweis für diese Komponente" };
+    if (node.operation.type === "custom" && node.operation.id === "database" && input.snapshot.available) {
+      reachable.state = "yes"; reachable.reason = "SELECT-Abfragen in dieser Anfrage erfolgreich";
+      functional.state = "yes"; functional.reason = "Lesender Zugriff bestätigt; Schreibzugriff und Migrationen damit nicht nachgewiesen";
+    }
+    const latest = input.snapshot.publications?.find(item => item.platform === node.id);
+    if (latest?.status === "published") {
+      functional.state = "yes"; functional.reason = `Veröffentlichung in der Datenbank belegt am ${when(latest.at)}; kein aktueller Provider-Test`;
+    } else if (latest?.status === "failed") {
+      functional.state = "no"; functional.reason = `Letzter Versuch fehlgeschlagen am ${when(latest.at)}`;
+    }
+    nodes[node.id] = { ...withEvidence(node.id, state, input.snapshot, now), checks: { configured, reachable, functional } };
   }
   const s = input.snapshot;
   const steps: StepRuntime[] = PROCESS_STEPS.map(step => {
@@ -164,10 +181,10 @@ export function computeRuntime(input: { capabilities: ServiceCapability[]; snaps
     return { id: step.id, status: worst(step.nodes.map(id => nodes[id]?.status ?? "unknown")), counts };
   });
   const pending = [
-    { label: "Themenvorschläge (Inhalt/Kosten)", count: s.topic?.byStage.proposed ?? 0 },
-    { label: "Themen: Veröffentlichungsfreigaben", count: s.topic?.byStage.awaiting_publish_approval ?? 0 },
-    { label: "Produkt-Pipeline: Inhaltsfreigaben", count: s.affiliate?.pendingContentApprovals ?? 0 },
-    { label: "Produkt-Pipeline: Veröffentlichungsfreigaben", count: s.affiliate?.pendingPublications ?? 0 },
+    { label: "Themenvorschläge (Inhalt/Kosten)", count: s.topic ? (s.topic.byStage.proposed ?? 0) : null },
+    { label: "Themen: Veröffentlichungsfreigaben", count: s.topic ? (s.topic.byStage.awaiting_publish_approval ?? 0) : null },
+    { label: "Produkt-Pipeline: Inhaltsfreigaben", count: s.affiliate?.pendingContentApprovals ?? null },
+    { label: "Produkt-Pipeline: Veröffentlichungsfreigaben", count: s.affiliate?.pendingPublications ?? null },
   ];
   return { generatedAt: now.toISOString(), environment, sandbox, flags, nodes, steps, evidence: { available: s.available, reason: s.reason, generatedAt: s.generatedAt },
     pending: s.available ? pending : [], publications: s.publications ?? [], recentTopics: s.topic?.recent ?? [], recentChances: s.chances?.recent ?? [] };
