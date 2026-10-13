@@ -98,3 +98,7 @@ abgedeckt. Frühere, noch nicht gespeicherte Aufträge werden nicht nachträglic
 - Vor jeder Veröffentlichung ist eine menschliche Freigabe erforderlich.
 
 Diese Grenzen halten den ersten Test klein. Erst nach einem vollständigen Durchlauf werden Datenbank und automatische Social- oder Drive-Aktionen ergänzt.
+
+## Jarvis 3D Command Center
+
+Interaktive, read-only Architekturkarte im Content Studio: siehe [docs/COMMAND_CENTER.md](docs/COMMAND_CENTER.md).

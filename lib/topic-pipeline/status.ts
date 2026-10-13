@@ -1,6 +1,10 @@
 import { capabilityLines } from "../capabilities";
 import type { Database } from "../memory/db";
-import { liveTopicPublishingEnabled } from "../distribution/publish";
+import type { MasterContent } from "../distribution/master-content";
+import type { PlatformVariant } from "../distribution/platforms/adapters";
+import { liveTopicPublishingEnabled, storedOutcomes } from "../distribution/publish";
+import { PLATFORM_LABEL, type Platform } from "../formats/catalog";
+import { reliablePostUrl } from "../publishing/report";
 import { latestTopicRun } from "../topics/repository";
 import type { SourceHealth } from "../topics/schema";
 import { providerAvailability } from "../visual/availability";
@@ -55,6 +59,17 @@ export async function topicPipelineStatus(db: Database, render: RenderContext): 
     lines.push(`Offen: ${row.proposals ?? 0} Themenvorschlag/-vorschläge, ${row.approvals ?? 0} Veröffentlichungsfreigabe(n), ${row.producing ?? 0} in Produktion`);
     const error = (await db.query("SELECT last_error, updated_at FROM topic_contents WHERE last_error IS NOT NULL AND last_error<>'dry_run' ORDER BY updated_at DESC LIMIT 1")).rows[0];
     if (error) lines.push(`Letzter Fehler (${time(error.updated_at)}): ${String(error.last_error).replace(/https?:\/\/\S+/g, "[URL]").slice(0, 160)}`);
+  } catch { /* table may not exist yet */ }
+  // Last published topic posts with the links the platforms returned (stored per platform, never constructed).
+  try {
+    const rows = (await db.query(`SELECT candidate->'candidate'->>'title' AS title, stage, master FROM topic_contents
+      WHERE stage IN ('published','partially_published','publishing') AND master IS NOT NULL ORDER BY updated_at DESC LIMIT 3`)).rows;
+    for (const row of rows) {
+      const stored = row.master as { master: MasterContent; variants: PlatformVariant[] };
+      const live = (await storedOutcomes(db, stored.master, stored.variants)).filter(item => item.status === "published");
+      if (!live.length) continue;
+      lines.push(`Veröffentlicht: „${String(row.title ?? "").slice(0, 70)}“ – ${live.map(item => `${PLATFORM_LABEL[item.platform as Platform] ?? item.platform} ${reliablePostUrl(item.platform, item.url) ?? "(Link nicht verfügbar)"}`).join(" · ")}`);
+    }
   } catch { /* table may not exist yet */ }
   return lines.join("\n");
 }

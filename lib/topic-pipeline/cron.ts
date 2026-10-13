@@ -11,7 +11,8 @@ import { reconcileTopicPublications, resumeTopicProductions, runTopicPipeline, t
 //   already_ran  this hourly slot was already claimed (repeated cron call)
 //   proposed / no_topic  normal outcomes
 //   failed       an isolated step failed; the other steps still ran
-export type CronExit = "disabled" | "locked" | "already_ran" | "proposed" | "no_topic" | "failed";
+//   daily_limit  the configured number of topic proposals for today (TOPIC_POSTS_PER_DAY, default 1) is reached
+export type CronExit = "disabled" | "locked" | "already_ran" | "daily_limit" | "proposed" | "no_topic" | "failed";
 export type CronResult = { status: CronExit; slotKey: string | null; steps: Record<string, string>; contentId?: string; durationMs: number };
 
 const LEASE_MS = 280_000; // below the function's maxDuration (300 s): a crashed run frees the lease in time
@@ -35,7 +36,7 @@ export async function runTopicCron(input: { enabled: boolean; now?: Date; deps: 
   const now = input.now ?? new Date();
   const done = (status: CronExit, slotKey: string | null, steps: Record<string, string>, extra: Partial<CronResult> = {}): CronResult => {
     const result = { status, slotKey, steps, durationMs: Date.now() - started, ...extra };
-    emitEvent(status === "disabled" || status === "locked" || status === "already_ran" ? "topic_cron_skipped" : "topic_cron_completed", { status, slotKey, steps }, status === "failed" ? "error" : "info");
+    emitEvent(status === "disabled" || status === "locked" || status === "already_ran" || status === "daily_limit" ? "topic_cron_skipped" : "topic_cron_completed", { status, slotKey, steps }, status === "failed" ? "error" : "info");
     return result;
   };
   if (!input.enabled) return done("disabled", null, {});
@@ -53,7 +54,7 @@ export async function runTopicCron(input: { enabled: boolean; now?: Date; deps: 
     const run = await runTopicPipeline(deps, { slotKey });
     steps.scout = run.status;
     const failed = Object.values(steps).some(value => value.startsWith("failed"));
-    if (run.status === "already_ran") return done(failed ? "failed" : "already_ran", slotKey, steps);
+    if (run.status === "already_ran" || run.status === "daily_limit") return done(failed ? "failed" : run.status, slotKey, steps);
     if (run.status === "failed" || failed) return done("failed", slotKey, steps);
     return done(run.status, slotKey, steps, run.status === "proposed" ? { contentId: run.contentId } : {});
   } finally {

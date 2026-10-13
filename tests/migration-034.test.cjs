@@ -87,7 +87,7 @@ test('the documented rollback (docs/IMAGE_QUALITY_VERIFICATION.md) restores the 
     await pg.exec(`DELETE FROM schema_migrations WHERE name IN (${[...AFTER_034].map(name => `'${name}'`).join(',') || "''"})`); // the no-op records of later migrations
     await pg.query(`INSERT INTO image_generation_attempts(job_id,attempt_no,content_hash,provider,model,prompt_sha256,status) VALUES($1,1,'h','replicate','m','s','generated')`, [jobId]);
     const doc = fs.readFileSync('docs/IMAGE_QUALITY_VERIFICATION.md', 'utf8');
-    const rollback = doc.slice(doc.indexOf('### Rollback')).match(/```sql\n([\s\S]*?)```/)[1];
+    const rollback = doc.slice(doc.indexOf('### Rollback')).match(/```sql\r?\n([\s\S]*?)```/)[1];
     await pg.exec(rollback);
     assert.deepEqual(await snapshot(pg), before);
   } finally { await pg.close(); }
