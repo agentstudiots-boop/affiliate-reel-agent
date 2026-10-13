@@ -73,3 +73,35 @@ export function extractIncomingWhatsAppMessages(payload: unknown, expectedPhoneN
   }
   return result;
 }
+
+// Delivery statuses Meta reports for messages this number sent (value.statuses[]). Ids, status and provider error codes
+// only; the recipient number is deliberately not kept.
+export type WhatsAppDeliveryStatus = { messageId: string; status: "sent" | "delivered" | "read" | "failed"; providerAt: string | null; errorCode: number | null; errorTitle: string | null };
+export function extractWhatsAppDeliveryStatuses(payload: unknown, expectedPhoneNumberId: string): WhatsAppDeliveryStatus[] {
+  if (!/^\d+$/.test(expectedPhoneNumberId) || !payload || typeof payload !== "object") return [];
+  const root = payload as Record<string, unknown>;
+  if (root.object !== "whatsapp_business_account" || !Array.isArray(root.entry)) return [];
+  const result: WhatsAppDeliveryStatus[] = [];
+  for (const entry of root.entry) {
+    const changes = entry && typeof entry === "object" ? (entry as Record<string, unknown>).changes : null;
+    if (!Array.isArray(changes)) continue;
+    for (const change of changes) {
+      const value = change && typeof change === "object" ? (change as Record<string, unknown>).value as Record<string, unknown> | undefined : undefined;
+      const metadata = value?.metadata as Record<string, unknown> | undefined;
+      if (!value || metadata?.phone_number_id !== expectedPhoneNumberId || !Array.isArray(value.statuses)) continue;
+      for (const item of value.statuses) {
+        if (!item || typeof item !== "object") continue;
+        const status = item as Record<string, unknown>;
+        if (typeof status.id !== "string" || !/^[A-Za-z0-9._=:-]{5,200}$/.test(status.id)) continue;
+        if (!["sent", "delivered", "read", "failed"].includes(String(status.status))) continue;
+        const seconds = Number(status.timestamp);
+        const error = Array.isArray(status.errors) && status.errors[0] && typeof status.errors[0] === "object" ? status.errors[0] as Record<string, unknown> : null;
+        result.push({ messageId: status.id, status: status.status as WhatsAppDeliveryStatus["status"],
+          providerAt: Number.isFinite(seconds) && seconds > 0 ? new Date(seconds * 1000).toISOString() : null,
+          errorCode: error && Number.isFinite(Number(error.code)) ? Number(error.code) : null,
+          errorTitle: error && typeof error.title === "string" ? error.title.replace(/https?:\/\/\S+/g, "[URL]").slice(0, 160) : null });
+      }
+    }
+  }
+  return result;
+}

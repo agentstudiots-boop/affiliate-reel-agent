@@ -21,6 +21,7 @@ import { STRATEGY_REJECTED, type AgentProvenance, type ChanceAssessment, type Co
 import { PRODUCT_DATA_UNCERTAIN, productEvidence, unsupportedClaims } from "@/lib/content/claim-support";
 import { suggestCategory } from "@/lib/content/taxonomy";
 import { categoryLabel } from "@/lib/content/category-store";
+import { serviceWindowClosesAt } from "@/lib/daily/evidence";
 
 async function resolveRequestedProduct(value: string) {
   const asin = /^(?:[A-Z0-9]{10})$/.test(value) ? value : value.match(/^https:\/\/(?:www\.)?amazon\.de\/dp\/([A-Z0-9]{10})\/?$/)?.[1];
@@ -65,7 +66,11 @@ export async function sendDailyApproval(jobId: string) {
     [(process.env.WHATSAPP_APPROVER_WA_ID || "").replace(/\D/g, "")],
   );
   if (!recent.rows.length) return false;
-  const body=dailyApprovalMessage(job,new Date(String(record.rows[0].day)).toISOString().slice(0,10),await categoryLabel(db,job.opportunity.category));
+  const draft=dailyApprovalMessage(job,new Date(String(record.rows[0].day)).toISOString().slice(0,10),await categoryLabel(db,job.opportunity.category));
+  // Without the (deactivated) template, the next approval can only be sent while the operator's 24 h window is open.
+  const closes=await serviceWindowClosesAt(db,process.env.WHATSAPP_APPROVER_WA_ID||"").catch(()=>null);
+  const hint=closes?`\n\nHinweis: Dein WhatsApp-Fenster ist offen bis ${new Intl.DateTimeFormat("de-DE",{timeZone:"Europe/Berlin",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}).format(closes)} Uhr. Schreib mir bis dahin kurz, sonst warten die nächsten Freigaben auf deine Nachricht.`:"";
+  const body=draft.length+hint.length<=4000?draft+hint:draft;
   const claimed = await db.query(
     `UPDATE daily_drafts SET whatsapp_send_attempted_at=now() WHERE job_id=$1
      AND status='awaiting_approval' AND whatsapp_message_id IS NULL
