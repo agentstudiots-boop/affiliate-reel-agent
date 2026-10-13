@@ -11,6 +11,7 @@ import { alreadyNotified, requestFacebookApproval } from "@/lib/meta/request-pub
 import { publicationPreparationFailureText, resumeApprovedDailyPublications } from "@/lib/meta/resume-publication";
 import { requestVideoCostApproval } from "@/lib/production/request-cost-approval";
 import { getDatabase } from "@/lib/memory/db";
+import { ensureAutomationSchema } from "@/lib/memory/ensure-automation-schema";
 import { parseJob } from "@/lib/content/history";
 import { createDailyDraft, sendDailyApproval, sendPendingDailyApprovals } from "@/lib/daily/draft";
 import { routeOperatorMessage } from "@/lib/whatsapp/router";
@@ -29,7 +30,8 @@ import { formatPublishReport } from "@/lib/publishing/report";
 import { publishApprovedAffiliateImage } from "@/lib/distribution/affiliate";
 import { handleTopicReply, reconcileTopicPublications, resumeTopicProductions, routeTopicMessage } from "@/lib/topic-pipeline/orchestrator";
 import { topicPipelineStatus } from "@/lib/topic-pipeline/status";
-import { extractIncomingWhatsAppMessages, verifyMetaWebhookSignature, verifyWhatsAppChallenge } from "@/lib/whatsapp/security";
+import { extractIncomingWhatsAppMessages, extractWhatsAppDeliveryStatuses, verifyMetaWebhookSignature, verifyWhatsAppChallenge } from "@/lib/whatsapp/security";
+import { recordDeliveryStatuses, slotEvidenceLines } from "@/lib/daily/evidence";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -58,6 +60,14 @@ export async function POST(request: Request) {
 
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || process.env.WHATTSAPP_PHONE_NUMBER_ID || "";
   const messages = extractIncomingWhatsAppMessages(payload, phoneNumberId);
+  // Delivery statuses (sent/delivered/read/failed) are the only proof that an approval actually reached the operator.
+  // They are stored best effort: a storage failure is logged but never makes Meta redeliver the batch.
+  const statuses = typeof extractWhatsAppDeliveryStatuses === "function" ? extractWhatsAppDeliveryStatuses(payload, phoneNumberId) : [];
+  if (statuses.length) {
+    for (const item of statuses) console.info(JSON.stringify({ event: "whatsapp_delivery_status", messageId: item.messageId, status: item.status, errorCode: item.errorCode ?? undefined, errorTitle: item.errorTitle ?? undefined }));
+    try { const db = getDatabase(); await ensureAutomationSchema(db); await recordDeliveryStatuses(db, statuses); }
+    catch { console.error(JSON.stringify({ event: "whatsapp_delivery_status_unsaved", count: statuses.length })); }
+  }
   if (!messages.length) return new Response("EVENT_RECEIVED", { status: 200, headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" } });
   let repo;
   try { repo = productionRepository(); }
@@ -108,6 +118,10 @@ export async function POST(request: Request) {
           await recoverRunwayPreflightIncident();
           const status=await latestInstagramReelStatus();
           const imageStatus = await latestImagePostsStatus(getDatabase());
+          // Cron runs and Meta delivery statuses: proof whether the regular slots ran and their approvals arrived.
+          let slotEvidence = "";
+          try { slotEvidence = `\n\nTages-Slots (Nachweis):\n${(await slotEvidenceLines(getDatabase(), process.env.WHATSAPP_APPROVER_WA_ID || "")).join("\n")}`; }
+          catch { console.error(JSON.stringify({ event: "daily_slot_evidence_unavailable" })); }
           // Topic pipeline: continue running video jobs and add a readable health summary. Isolated from the product status.
           let topicStatus = "";
           try {
@@ -120,7 +134,8 @@ export async function POST(request: Request) {
             }
             topicStatus = `\n\n${await topicPipelineStatus(getDatabase(), deps.render)}`;
           } catch { console.error(JSON.stringify({ event: "topic_status_unavailable" })); }
-          await sendWhatsAppText(`Aktuelle Bildpost-Aufträge:\n${imageStatus}${correctionStatus?`\n\nLetzte Korrektur: ${correctionStatus}`:''}\n\nLetzter Instagram-Reel-Auftrag: ${status}${topicStatus}`);
+          // WhatsApp rejects texts above 4096 characters: the status must never fail because it grew.
+          await sendWhatsAppText(`Aktuelle Bildpost-Aufträge:\n${imageStatus}${slotEvidence}${correctionStatus?`\n\nLetzte Korrektur: ${correctionStatus}`:''}\n\nLetzter Instagram-Reel-Auftrag: ${status}${topicStatus}`.slice(0, 4000));
         }
         continue;
       }
