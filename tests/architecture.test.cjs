@@ -44,7 +44,8 @@ test('status dimensions are separate and evidence based: implementation from cod
   assert.equal(M.implementationOf(M.nodeById('executive-agent')), 'planned');
   assert.equal(M.implementationOf(M.nodeById('pinterest')), 'planned');
   assert.equal(M.implementationOf(M.nodeById('youtube')), 'tested');
-  assert.equal(M.deploymentOf(M.nodeById('trendsetter')), 'preview');
+  assert.equal(M.deploymentOf(M.nodeById('trendsetter')), 'production');
+  assert.equal(M.deploymentOf({ since: 'pr64' }), 'preview');
   assert.equal(M.deploymentOf(M.nodeById('jarvis')), 'production');
   assert.equal(M.deploymentOf(M.nodeById('pinterest')), 'not_deployed');
   assert.ok(!('live_verified' in M.OPERATION_META));

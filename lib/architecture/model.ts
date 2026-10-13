@@ -104,12 +104,12 @@ export const NODES: ArchNode[] = [
     gaps: ["KI-Modus der Agenten nicht live belegt; Referenzmodus ist regelbasiert"], operation: CODE }),
 
   // ---- Recherche & Themen ----
-  n({ id: "trendsetter", label: "Trendsetter (gemeinsame Content-Chancen)", short: "Trendsetter", kind: "module", cluster: "research", since: "pr64", effects: false,
+  n({ id: "trendsetter", label: "Trendsetter (gemeinsame Content-Chancen)", short: "Trendsetter", kind: "module", cluster: "research", since: "main", effects: false,
     plain: "Sammelt alle gefundenen Trends und Themen an einer Stelle, bewertet sie einheitlich und verhindert Doppelungen.",
     summary: "Führt Trend-Recherche (Affiliate) und Themen-Quellen (Themen-Pipeline) zu einheitlichen Content-Chancen zusammen: ID, Quellen, Zeitstempel, fünf Bewertungen, Empfehlung für eine oder beide Pipelines. Recherchiert nicht selbst.",
     responsibilities: ["Content-Chance mit eindeutiger ID je Konzept", "Bewertung: Aktualität, Relevanz, Zielgruppeninteresse, Vertrauen, Reichweite", "Gemeinsame Rechercheergebnisse (content_chances)", "Duplikatkontrolle und Zeitsperren je Pipeline (content_chance_routes)"],
     code: ["lib/trendsetter/chance.ts", "lib/trendsetter/repository.ts", "lib/trendsetter/topic.ts", "lib/trendsetter/affiliate.ts", "db/migrations/035_content_chances.sql"], tests: ["tests/trendsetter.test.cjs"],
-    gaps: ["Affiliate-Anbindung standardmäßig aus (TRENDSETTER_AFFILIATE=record|route schaltet sie ein)", "Migration 035 noch nicht in Produktion"], env: ["TRENDSETTER_AFFILIATE", "TOPIC_PIPELINE_ENABLED"],
+    gaps: ["Affiliate-Anbindung standardmäßig aus (TRENDSETTER_AFFILIATE=record|route schaltet sie ein)", "Migration 035 in Produktion nicht verifiziert"], env: ["TRENDSETTER_AFFILIATE", "TOPIC_PIPELINE_ENABLED"],
     operation: { type: "custom", id: "trendsetter" } }),
   n({ id: "trend-agent", label: "Trend-Recherche (Trend-Agent)", short: "Trend-Recherche", kind: "agent", cluster: "research", since: "main", effects: true,
     plain: "Recherchiert per Tavily aktuelle Ideen und lässt sie von einem Sprachmodell als Produkt- oder Themenchance einordnen.",
@@ -388,7 +388,7 @@ export const PROCESS_STEPS: { id: string; label: string; plain: string; nodes: s
 
 export const ARCHITECTURE_META = {
   version: 2,
-  basis: "Code-, Test- und Dokuanalyse des Repositories (Branch von PR #64). Betriebsstatus wird beim Laden auf dem Server ermittelt.",
+  basis: "Code-, Test- und Dokuanalyse des Repositories (Stand main). Betriebsstatus wird beim Laden auf dem Server ermittelt.",
 } as const;
 
 export function implementationOf(node: Pick<ArchNode, "code" | "tests" | "operation">): ImplementationStatus {
