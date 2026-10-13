@@ -31,6 +31,8 @@ import type { RenderContext } from "../visual/renderers";
 import type { ProductionResult } from "../visual/types";
 import { writeTopicCopy, type TopicCopy } from "./copy";
 import { productSuggestionsText, proposalText, publishApprovalText } from "./messages";
+import { closeRoute } from "../trendsetter/repository";
+import { jarvisSelectTopic } from "../trendsetter/topic";
 import { productCouplingBlocked, productListCommand, productSelection, suggestProducts, type ProductState, type ProductSuggester } from "./product-coupling";
 
 // The only module that connects topic scout, Jarvis gate, format router, visual engine, master content, platform
@@ -61,7 +63,8 @@ export type TopicPipelineDeps = {
 };
 
 type Stage = "proposed" | "producing" | "in_production" | "awaiting_publish_approval" | "publishing" | "published" | "partially_published" | "not_published" | "rejected" | "discarded" | "failed";
-type StoredCandidate = { candidate: TopicCandidate; cluster: { title: string; signals: RawSignal[] } | null; variant: number };
+// chance_id: the Trendsetter chance Jarvis routed to this content (absent for rows created before the Trendsetter).
+type StoredCandidate = { candidate: TopicCandidate; cluster: { title: string; signals: RawSignal[] } | null; variant: number; chance_id?: string };
 export type TopicContentRow = {
   content_id: string; run_id: string | null; topic_id: string; category: "topic" | "affiliate"; stage: Stage; format: string; revision: number;
   candidate: StoredCandidate; decision: FormatDecision | null; override: FormatOverride; copy: TopicCopy | null; production: ProductionResult | null;
@@ -93,6 +96,14 @@ async function save(db: Database, row: TopicContentRow) {
   [row.content_id, row.run_id, row.topic_id, row.category, row.stage, row.format, row.revision, JSON.stringify(row.candidate), JSON.stringify(row.decision), JSON.stringify(row.override),
     JSON.stringify(row.copy), row.production ? JSON.stringify(row.production) : null, row.master ? JSON.stringify(row.master) : null, JSON.stringify(row.product),
     row.proposal_message_id, row.product_message_id, row.model_calls, row.last_error]);
+}
+
+// Outcome of the Trendsetter route of this content (time lock / duplicate control). Never blocks the reply itself.
+async function closeTopicRoute(deps: TopicPipelineDeps, row: TopicContentRow, status: "published" | "rejected") {
+  const chanceId = row.candidate.chance_id;
+  if (!chanceId) return;
+  await closeRoute(deps.db, { chanceId, pipeline: "topic", status, ref: row.content_id })
+    .catch(() => emitEvent("trendsetter_unavailable", { stage: "close_route", contentId: row.content_id }, "warn"));
 }
 
 // ---------- proposal ----------
@@ -129,25 +140,51 @@ function styleFor(row: TopicContentRow) {
   return createStyleBrief({ topicId: row.topic_id, trendType: row.candidate.candidate.trend_type, tone: row.override.tone });
 }
 
-function newRow(candidate: TopicCandidate, cluster: StoredCandidate["cluster"], runId: string | null): TopicContentRow {
-  return { content_id: `tc_${randomUUID().replace(/-/g, "").slice(0, 16)}`, run_id: runId, topic_id: candidate.topic_id, category: "topic", stage: "proposed", format: candidate.suggested_format,
-    revision: 1, candidate: { candidate, cluster, variant: 0 }, decision: null, override: emptyOverride(), copy: null, production: null,
+const newContentId = () => `tc_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
+
+function newRow(candidate: TopicCandidate, cluster: StoredCandidate["cluster"], runId: string | null, contentId = newContentId(), chanceId: string | null = null): TopicContentRow {
+  return { content_id: contentId, run_id: runId, topic_id: candidate.topic_id, category: "topic", stage: "proposed", format: candidate.suggested_format,
+    revision: 1, candidate: { candidate, cluster, variant: 0, ...(chanceId ? { chance_id: chanceId } : {}) }, decision: null, override: emptyOverride(), copy: null, production: null,
     master: null, product: { status: "none" }, proposal_message_id: null, product_message_id: null, model_calls: 0, last_error: null };
 }
+
+// Scheduled topic proposals per Berlin calendar day (default 1; TOPIC_POSTS_PER_DAY raises it, at most 4). Only scheduled
+// runs (with a slot key) count; a topic the operator explicitly asks for ("anderes Thema") is never limited by it.
+export const dailyTopicLimit = (env: Record<string, string | undefined> = process.env) => Math.max(1, Math.min(4, Math.floor(Number(env.TOPIC_POSTS_PER_DAY)) || 1));
 
 // Cron entry point. Never throws: a failing topic run cannot affect the product pipeline.
 export async function runTopicPipeline(deps: TopicPipelineDeps, input: { slotKey: string | null; exclude?: string[] }) {
   try {
     await ensureAutomationSchema(deps.db);
+    const day = input.slotKey?.match(/^(\d{4}-\d{2}-\d{2}):/)?.[1];
+    // A slot that was already claimed keeps answering "already_ran" (claimTopicRun below); the daily limit applies to new slots.
+    const slotKnown = input.slotKey ? (await deps.db.query("SELECT 1 FROM topic_runs WHERE slot_key=$1", [input.slotKey])).rows.length > 0 : false;
+    if (day && !slotKnown) {
+      const taken = Number((await deps.db.query("SELECT count(*)::int AS n FROM topic_runs WHERE slot_key LIKE $1 AND selected_topic_id IS NOT NULL", [`${day}:%`])).rows[0]?.n ?? 0);
+      if (taken >= dailyTopicLimit()) return { status: "daily_limit" as const, taken, limit: dailyTopicLimit() };
+    }
     const runId = randomUUID();
     if (input.slotKey && !(await claimTopicRun(deps.db, runId, input.slotKey, now(deps).toISOString()))) return { status: "already_ran" as const };
     if (!input.slotKey) await claimTopicRun(deps.db, runId, null, now(deps).toISOString());
     const history = await loadTopicHistory(deps.db).catch(() => []);
     const productHistory = await loadSelectionHistory(deps.db).catch(() => undefined);
     const selection = await discoverTopic({ now: now(deps), history, productHistory, exclude: input.exclude, scout: deps.scout, ...deps.scoutOptions });
-    await saveTopicRun(deps.db, runId, selection.scout, selection.verdicts, selection.candidates, selection.selected, selection.failure);
-    if (!selection.selected) return { status: "no_topic" as const, runId, failure: selection.failure };
-    const row = await propose(deps, newRow(selection.selected, selection.scout?.clusters[selection.selected.topic_id] ?? null, runId));
+    // Trendsetter + Jarvis: the scout's accepted topics and the shared chances of the trend agent are routed centrally
+    // (duplicate control, time locks, priority). If that layer is unreachable, the scout's own best topic is used
+    // (documented fallback, logged); the topic history and gate still applied above.
+    let pick: { candidate: TopicCandidate; cluster: StoredCandidate["cluster"]; contentId: string; chanceId: string | null } | null = null;
+    let failure = selection.failure;
+    try {
+      const routed = await jarvisSelectTopic(deps.db, { selection, now: now(deps), exclude: input.exclude, history, productHistory, contentIdFor: newContentId });
+      if (routed.pick && routed.contentId) pick = { candidate: routed.pick.candidate, cluster: routed.pick.cluster, contentId: routed.contentId, chanceId: routed.pick.chance.chance_id };
+      else failure = failure ?? "no_routed_topic";
+    } catch (error) {
+      emitEvent("trendsetter_unavailable", { stage: "topic_routing", failure: error instanceof Error ? error.name : "unknown" }, "warn");
+      if (selection.selected) pick = { candidate: selection.selected, cluster: selection.scout?.clusters[selection.selected.topic_id] ?? null, contentId: newContentId(), chanceId: null };
+    }
+    await saveTopicRun(deps.db, runId, selection.scout, selection.verdicts, selection.candidates, pick?.candidate ?? null, pick ? null : failure);
+    if (!pick) return { status: "no_topic" as const, runId, failure };
+    const row = await propose(deps, newRow(pick.candidate, pick.cluster, runId, pick.contentId, pick.chanceId));
     return { status: "proposed" as const, runId, contentId: row.content_id, format: row.format };
   } catch (error) {
     emitEvent("topic_pipeline_failed", { stage: "run", failure: error instanceof Error ? error.name : "unknown" }, "error");
@@ -338,6 +375,7 @@ async function onProposalReply(deps: TopicPipelineDeps, row: TopicContentRow, me
   if (intent === "reject") {
     await save(deps.db, { ...row, stage: "rejected" });
     await recordTopicHistory(deps.db, row.candidate.candidate, "rejected", message.id);
+    await closeTopicRoute(deps, row, "rejected");
     await deps.send(`Verworfen: „${row.candidate.candidate.title}“. Es wird nichts produziert oder veröffentlicht.`);
     return;
   }
@@ -374,6 +412,7 @@ async function applyWish(deps: TopicPipelineDeps, row: TopicContentRow, wish: Fo
   if (wish.newTopic) {
     await save(deps.db, { ...row, stage: "discarded" });
     await recordTopicHistory(deps.db, row.candidate.candidate, "discarded", message.id);
+    await closeTopicRoute(deps, row, "rejected");
     const next = await runTopicPipeline(deps, { slotKey: null, exclude: [row.topic_id] });
     if (next.status !== "proposed") await deps.send("Ich habe gerade kein weiteres Thema, das Jarvis' Prüfung besteht. Es wird nichts produziert.");
     return;
@@ -437,6 +476,7 @@ async function onPublishReply(deps: TopicPipelineDeps, row: TopicContentRow, mes
   if (decision === "rejected") {
     await save(deps.db, { ...row, stage: "rejected" });
     await recordTopicHistory(deps.db, row.candidate.candidate, "rejected", message.id);
+    await closeTopicRoute(deps, row, "rejected");
     await deps.send(`Abgelehnt: „${row.candidate.candidate.title}“. Es wird nichts veröffentlicht.`);
     return;
   }
@@ -472,7 +512,7 @@ async function reportStored(deps: TopicPipelineDeps, row: TopicContentRow, histo
   const pending = outcomes.some(item => item.status === "processing");
   const stage: Stage = pending ? "publishing" : !outcomes.length || !live ? "not_published" : live === outcomes.length ? "published" : "partially_published";
   await save(deps.db, { ...row, stage });
-  if (live) await recordTopicHistory(deps.db, row.candidate.candidate, "published", historyOrigin);
+  if (live) { await recordTopicHistory(deps.db, row.candidate.candidate, "published", historyOrigin); await closeTopicRoute(deps, row, "published"); }
   const failed = outcomes.some(item => item.status === "failed");
   await deps.send(formatPublishReport({ category: row.master.master.category, format: row.master.master.selected_format as ReportFormat, outcomes,
     note: [row.master.variants.some(variant => !variant.publishable) ? `Nicht vorgesehen: ${row.master.variants.filter(variant => !variant.publishable).map(variant => `${PLATFORM_LABEL[variant.platform]} (${variant.skipReason})`).join(", ")}` : null,

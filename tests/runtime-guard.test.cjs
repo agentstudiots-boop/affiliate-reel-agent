@@ -35,9 +35,22 @@ test('preview and development block every effect by default; a bare flag value o
   }
 });
 
-test('sandbox declaration opens everything; the paid-call flag opens only paid providers', () => {
-  for (const kind of KINDS) assert.equal(R.effectDecision(kind, { VERCEL_ENV: 'preview', NON_PRODUCTION_SANDBOX: 'true' }).ok, true);
+test('sandbox: the flag alone opens nothing; only a complete resource declaration opens everything; the paid-call flag opens only paid providers', () => {
+  for (const kind of KINDS) assert.equal(R.effectDecision(kind, { VERCEL_ENV: 'preview', NON_PRODUCTION_SANDBOX: 'true' }).ok, false, `${kind}: flag without resources`);
+  for (const kind of KINDS) assert.equal(R.effectDecision(kind, { VERCEL_ENV: 'preview', NON_PRODUCTION_SANDBOX: 'true', NON_PRODUCTION_SANDBOX_RESOURCES: 'database,blob,whatsapp,publishing,paid_providers' }).ok, true);
+  for (const kind of KINDS) assert.equal(R.effectDecision(kind, { VERCEL_ENV: 'preview', NON_PRODUCTION_SANDBOX_RESOURCES: 'database,blob,whatsapp,publishing,paid_providers' }).ok, false, `${kind}: resources without the flag`);
   for (const kind of KINDS) assert.equal(R.effectDecision(kind, { VERCEL_ENV: 'preview', ALLOW_NON_PRODUCTION_PAID_CALLS: 'true' }).ok, kind === 'paid_provider');
+});
+test('sandbox: partial isolation opens exactly the declared kinds; scheduled jobs need every resource; unknown words open nothing', () => {
+  const partial = { VERCEL_ENV: 'preview', NON_PRODUCTION_SANDBOX: 'true', NON_PRODUCTION_SANDBOX_RESOURCES: ' Database , blob ' };
+  const expected = { database: true, migrate: true, storage_write: true, message: false, publish: false, paid_provider: false, scheduled_job: false };
+  for (const kind of KINDS) assert.equal(R.effectDecision(kind, partial).ok, expected[kind], kind);
+  const allButOne = { VERCEL_ENV: 'preview', NON_PRODUCTION_SANDBOX: 'true', NON_PRODUCTION_SANDBOX_RESOURCES: 'database,blob,whatsapp,publishing' };
+  assert.equal(R.effectDecision('scheduled_job', allButOne).ok, false);
+  assert.equal(R.effectDecision('publish', { VERCEL_ENV: 'preview', NON_PRODUCTION_SANDBOX: 'true', NON_PRODUCTION_SANDBOX_RESOURCES: 'all,everything,*' }).ok, false);
+  assert.deepEqual([...R.sandboxResources(partial)].sort(), ['blob', 'database']);
+  assert.equal(R.fullSandbox(partial), false);
+  assert.equal(R.fullSandbox({ VERCEL_ENV: 'preview', NON_PRODUCTION_SANDBOX: 'true', NON_PRODUCTION_SANDBOX_RESOURCES: 'database,blob,whatsapp,publishing,paid_providers' }), true);
 });
 
 test('assertEffectAllowed throws a typed error and logs only kind and environment', t => {
@@ -58,7 +71,17 @@ test('egress filter: writes to Meta, TikTok, X, Google, Blob and paid providers 
   for (const [url, method] of [['https://graph.facebook.com/v25.0/me?fields=id', 'GET'], ['https://api.replicate.com/v1/predictions/abc', 'GET'], ['https://example.org/hook', 'POST'], ['https://www.amazon.de/dp/B000000000', 'GET']])
     assert.equal(R.egressDecision(new URL(url), method, preview).ok, true, url);
   for (const [url, method] of blocked) assert.equal(R.egressDecision(new URL(url), method, { VERCEL_ENV: 'production' }).ok, true);
-  assert.equal(R.egressDecision(new URL('https://graph.facebook.com/x'), 'POST', { ...preview, NON_PRODUCTION_SANDBOX: 'true' }).ok, true);
+  assert.equal(R.egressDecision(new URL('https://graph.facebook.com/x'), 'POST', { ...preview, NON_PRODUCTION_SANDBOX: 'true' }).ok, false, 'flag without resources');
+  assert.equal(R.egressDecision(new URL('https://graph.facebook.com/x'), 'POST', { ...preview, NON_PRODUCTION_SANDBOX: 'true', NON_PRODUCTION_SANDBOX_RESOURCES: 'database,blob,whatsapp,publishing,paid_providers' }).ok, true);
+});
+test('egress filter: WhatsApp sends and page posts share the Graph host but need different isolated resources', () => {
+  const whatsappOnly = { VERCEL_ENV: 'preview', NON_PRODUCTION_SANDBOX: 'true', NON_PRODUCTION_SANDBOX_RESOURCES: 'whatsapp' };
+  assert.deepEqual(R.egressDecision(new URL('https://graph.facebook.com/v25.0/123456/messages'), 'POST', whatsappOnly), { ok: true });
+  assert.deepEqual(R.egressDecision(new URL('https://graph.facebook.com/v25.0/123456/feed'), 'POST', whatsappOnly), { ok: false, kind: 'publish' });
+  assert.deepEqual(R.egressDecision(new URL('https://graph.facebook.com/v25.0/17890/media_publish'), 'POST', whatsappOnly), { ok: false, kind: 'publish' });
+  const publishingOnly = { VERCEL_ENV: 'preview', NON_PRODUCTION_SANDBOX: 'true', NON_PRODUCTION_SANDBOX_RESOURCES: 'publishing' };
+  assert.deepEqual(R.egressDecision(new URL('https://graph.facebook.com/v25.0/123456/messages'), 'POST', publishingOnly), { ok: false, kind: 'message' });
+  assert.deepEqual(R.egressDecision(new URL('https://graph.facebook.com/v25.0/123456/messages'), 'POST', { VERCEL_ENV: 'preview' }), { ok: false, kind: 'message' });
 });
 
 test('guarded fetch never calls the transport for a blocked write, and passes allowed calls through', async t => {
@@ -72,11 +95,12 @@ test('guarded fetch never calls the transport for a blocked write, and passes al
   assert.equal(calls.length, 1);
 });
 
-test('installEgressGuard wraps fetch only in preview/development without sandbox, and only once', () => {
+test('installEgressGuard wraps fetch in every preview/development deployment (also with a sandbox declaration), and only once', () => {
   const marker = async () => new Response('x');
   const prod = { fetch: marker }; assert.equal(R.installEgressGuard(prod, { VERCEL_ENV: 'production' }), false); assert.equal(prod.fetch, marker);
   const local = { fetch: marker }; assert.equal(R.installEgressGuard(local, {}), false); assert.equal(local.fetch, marker);
-  const sandbox = { fetch: marker }; assert.equal(R.installEgressGuard(sandbox, { VERCEL_ENV: 'preview', NON_PRODUCTION_SANDBOX: 'true' }), false);
+  // With a (possibly partial) sandbox the filter stays: it lets through exactly the declared kinds.
+  const sandbox = { fetch: marker }; assert.equal(R.installEgressGuard(sandbox, { VERCEL_ENV: 'preview', NON_PRODUCTION_SANDBOX: 'true' }), true); assert.notEqual(sandbox.fetch, marker);
   const preview = { fetch: marker }; assert.equal(R.installEgressGuard(preview, { VERCEL_ENV: 'preview' }), true);
   assert.notEqual(preview.fetch, marker);
   assert.equal(R.installEgressGuard(preview, { VERCEL_ENV: 'preview' }), false);
@@ -90,7 +114,9 @@ test('live publish capability: preview never publishes, not even the product pip
     const decision = livePublishCapability(platform, { ...env, VERCEL_ENV: 'preview' }, origin);
     assert.equal(decision.ok, false); assert.equal(decision.reason, 'non_production_environment');
   }
-  assert.equal(livePublishCapability('facebook', { ...env, VERCEL_ENV: 'preview', NON_PRODUCTION_SANDBOX: 'true' }, 'product_pipeline').ok, true);
+  assert.equal(livePublishCapability('facebook', { ...env, VERCEL_ENV: 'preview', NON_PRODUCTION_SANDBOX: 'true' }, 'product_pipeline').ok, false, 'flag alone');
+  assert.equal(livePublishCapability('facebook', { ...env, VERCEL_ENV: 'preview', NON_PRODUCTION_SANDBOX: 'true', NON_PRODUCTION_SANDBOX_RESOURCES: 'database,blob,whatsapp' }, 'product_pipeline').ok, false, 'publishing not isolated');
+  assert.equal(livePublishCapability('facebook', { ...env, VERCEL_ENV: 'preview', NON_PRODUCTION_SANDBOX: 'true', NON_PRODUCTION_SANDBOX_RESOURCES: 'publishing' }, 'product_pipeline').ok, true);
 });
 
 test('approval gate: a fully approved version still cannot get a permit in a preview deployment, and nothing is claimed', async t => {
@@ -145,4 +171,14 @@ test('Blob writes: the guarded put refuses in preview before touching the SDK; n
   withVercelEnv(t, 'preview');
   const { put } = require('../.test-build/lib/security/guarded-blob');
   assert.throws(() => put('a.png', Buffer.from('x'), { access: 'public' }), R.NonProductionEffectError);
+});
+
+test('fail closed: a Vercel runtime with a missing or unknown VERCEL_ENV is never treated as production', () => {
+  for (const env of [{ VERCEL: '1' }, { VERCEL: '1', VERCEL_ENV: '' }, { VERCEL: '1', VERCEL_ENV: 'staging' }]) {
+    assert.equal(R.runtimeEnvironment(env), 'preview');
+    assert.equal(R.effectDecision('database', env).ok, false);
+    assert.equal(R.effectDecision('publish', env).ok, false);
+  }
+  assert.equal(R.runtimeEnvironment({ VERCEL: '1', VERCEL_ENV: 'production' }), 'production');
+  assert.equal(R.runtimeEnvironment({}), 'local');
 });

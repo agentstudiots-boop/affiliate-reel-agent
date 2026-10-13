@@ -23,6 +23,7 @@
     "lib/product-resolver.ts",
     "lib/daily/product-lock.ts",
     "lib/daily/slots.ts",
+    "lib/daily/evidence.ts",
     "lib/affiliate-guard.ts",
     "lib/agents/content-chances.ts",
     "lib/memory/**/*.ts",
@@ -41,6 +42,8 @@
     "lib/publishing/**/*.ts",
     "lib/capabilities/**/*.ts",
     "lib/security/**/*.ts",
+    "lib/trendsetter/**/*.ts",
+    "lib/architecture/**/*.ts",
     "lib/tavily.ts"
   ]
 }

@@ -283,7 +283,8 @@ export async function previewPublish(db: Sql, content: PublishableContent, platf
   if (status !== "approved") return { allowed: false, reason: approval ? "approval_invalidated" : "no_approval" };
   if (!isActiveAuthority(approval.authority)) return { allowed: false, reason: "authority_inactive" };
   if (!latest.platforms.includes(platform)) return { allowed: false, reason: "platform_not_in_approved_version" };
-  const attempt = await db.query("SELECT 1 FROM publish_attempts WHERE content_id=$1 AND version=$2 AND platform=$3 AND status IN ('claimed','processing','published','unknown') LIMIT 1", [content.contentId, latest.version, platform]);
+  // Same rule as authorizePublish: a live attempt of ANY version blocks the platform (a new version never republishes it).
+  const attempt = await db.query("SELECT 1 FROM publish_attempts WHERE content_id=$1 AND platform=$2 AND status IN ('claimed','processing','published','unknown') LIMIT 1", [content.contentId, platform]);
   if (attempt.rows.length) return { allowed: false, reason: "already_attempted" };
   const live = livePublishCapability(platform, process.env, content.origin);
   return live.ok ? { allowed: true, reason: "approved" } : { allowed: false, reason: live.reason };
