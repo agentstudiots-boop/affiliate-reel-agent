@@ -17,8 +17,9 @@ export type PlatformOutcome = { platform: string; status: PlatformOutcomeStatus;
 
 export const CATEGORY_LABEL: Record<ContentCategory, string> = { topic: "Themen-Post", affiliate: "Affiliate-Post" };
 export const REPORT_FORMAT_LABEL: Record<ReportFormat, string> = { TEXT: "Text", SINGLE_IMAGE: "Bild", CAROUSEL: "Karussell", STANDARD_VIDEO: "Video", AVATAR_VIDEO: "Video (Avatar)" };
-const PLATFORM_NAME: Record<string, string> = { instagram: "Instagram", facebook: "Facebook", tiktok: "TikTok", youtube: "YouTube Shorts", x: "X" };
+const PLATFORM_NAME: Record<string, string> = { instagram: "Instagram", facebook: "Facebook", tiktok: "TikTok", youtube: "YouTube Shorts", x: "X", pinterest: "Pinterest" };
 const POST_HOSTS: Record<string, string[]> = {
+  pinterest: ["pinterest.com"],
   instagram: ["instagram.com"], facebook: ["facebook.com", "fb.com", "fb.watch"], tiktok: ["tiktok.com"], youtube: ["youtube.com", "youtu.be"], x: ["x.com", "twitter.com"],
 };
 const STATUS_LABEL: Record<PlatformOutcomeStatus, string> = {

@@ -63,7 +63,7 @@ test('quota reached: locally (monthly limit) without any HeyGen call, and when H
   clearRecentEvents();
   const quota = memoryQuota();
   const month = new Date().toISOString().slice(0, 7);
-  for (const key of ['a', 'b', 'c']) { await quota.reserve('heygen', 'avatar_video', key, month); await quota.settle('heygen', key, 'succeeded'); }
+  for (const key of ['a', 'b', 'c']) { await quota.reserve('heygen', 'avatar_video', key, month, 3); await quota.settle('heygen', key, 'succeeded'); }
   const { provider, calls } = heygen([]);
   const local = await job(provider, { quota: { store: quota, limit: 3 } });
   assert.equal(local.category, 'quota_exhausted');
@@ -132,7 +132,7 @@ const renderInput = { contentId: 'tc_7', style, dryRun: false, visualPotential: 
 test('HeyGen down: the pipeline falls back to standard video, carousel, image or text instead of aborting', async () => {
   const down = heygen([json({}, 503)]).provider;
   const runway = createRunwayStandardVideoProvider({ client: { textToVideo: { create: async () => { const error = new Error('down'); error.status = 503; throw error; } }, tasks: { retrieve: async () => ({}) } } });
-  const result = await produceContent(renderInput, { ledger: memoryLedger(), imageProvider: null, avatarProvider: down, standardVideoProvider: runway,
+  const result = await produceContent(renderInput, { ledger: memoryLedger(), imageProvider: null, avatarProvider: down, standardVideoProvider: runway, standardQuota: { store: memoryQuota(), limit: 3 },
     avatarQuota: { store: memoryQuota(), limit: 3 }, sleep: noSleep, videoTiming: { pollIntervalMs: 0 } });
   assert.equal(result.producedFormat, 'CAROUSEL');
   assert.deepEqual(result.fallbacks.map(item => `${item.from}->${item.to}`), ['AVATAR_VIDEO->STANDARD_VIDEO', 'STANDARD_VIDEO->CAROUSEL']);
@@ -154,7 +154,7 @@ test('STANDARD_VIDEO is modelled separately from HeyGen (Runway adapter, opt-in)
   let creates = 0;
   const client = { textToVideo: { create: async () => { creates++; return { id: 'task_1' }; } }, tasks: { retrieve: async () => ({ status: 'SUCCEEDED', output: ['https://dnznrvs05pmza.cloudfront.net/x.mp4'] }) } };
   const runway = createRunwayStandardVideoProvider({ client, request: async () => mp4(), upload });
-  const result = await produceContent({ ...renderInput, format: 'STANDARD_VIDEO' }, { ledger: memoryLedger(), imageProvider: null, standardVideoProvider: runway, sleep: noSleep, videoTiming: { pollIntervalMs: 0 } });
+  const result = await produceContent({ ...renderInput, format: 'STANDARD_VIDEO' }, { ledger: memoryLedger(), imageProvider: null, standardVideoProvider: runway, standardQuota: { store: memoryQuota(), limit: 3 }, sleep: noSleep, videoTiming: { pollIntervalMs: 0 } });
   assert.equal(result.producedFormat, 'STANDARD_VIDEO');
   assert.equal(result.assets[0].asset.provider, 'runway');
   assert.equal(creates, 1);
@@ -172,4 +172,28 @@ test('Postgres ledger + quota: a second process neither generates nor counts the
     const usage = (await db.query('SELECT status, count(*)::int AS n FROM provider_usage GROUP BY status')).rows;
     assert.deepEqual(usage, [{ status: 'succeeded', n: 1 }]);
   } finally { await db.close(); }
+});
+
+test('concurrent video jobs share an atomic monthly cap; ambiguous creations keep their budget', async () => {
+  for (const backend of ['memory', 'postgres']) {
+    const db = backend === 'postgres' ? await pgliteDatabase() : null;
+    const quota = db ? postgresQuota(db) : memoryQuota();
+    let creates = 0;
+    const provider = { name: 'heygen', kind: 'avatar_video', available: () => ({ ok: true }), create: async () => { creates++; throw new VideoProviderError('timeout', false); } };
+    try {
+      const results = await Promise.all(['a', 'b', 'c'].map(id => runVideoJob({ ...input, contentId: id }, { provider, ledger: memoryLedger(), quota: { store: quota, limit: 1 } })));
+      assert.equal(creates, 1, backend);
+      assert.equal(results.filter(r => r.category === 'quota_exhausted').length, 2);
+      assert.equal((await quota.usage('heygen', new Date().toISOString().slice(0, 7))).failed, 1);
+    } finally { if (db) await db.close(); }
+  }
+});
+
+test('paid video without quota and HeyGen 503 fail closed without a second creation', async () => {
+  const noCap = heygen([]);
+  assert.equal((await job(noCap.provider, { quota: null })).category, 'quota_unconfigured');
+  assert.equal(noCap.calls.length, 0);
+  const down = heygen([json({}, 503)]); const ledger = memoryLedger();
+  assert.equal((await job(down.provider, { ledger })).retryable, false);
+  await job(down.provider, { ledger }); assert.equal(down.calls.length, 1);
 });

@@ -70,8 +70,10 @@ export function assertEffectAllowed(kind: EffectKind, env: Env = process.env) {
 // GET/HEAD) to hosts that publish, message, store or cost money are refused before the request leaves the server.
 const WRITE_HOSTS: { pattern: RegExp; kind: EffectKind }[] = [
   { pattern: /(^|\.)graph\.facebook\.com$/i, kind: "publish" },
+  { pattern: /(^|\.)api\.pinterest\.com$/i, kind: "publish" },
   { pattern: /(^|\.)open\.tiktokapis\.com$/i, kind: "publish" },
   { pattern: /(^|\.)(upload\.)?twitter\.com$|(^|\.)api\.x\.com$|(^|\.)upload\.x\.com$/i, kind: "publish" },
+  { pattern: /(^|\.)generativelanguage\.googleapis\.com$/i, kind: "paid_provider" },
   { pattern: /(^|\.)googleapis\.com$/i, kind: "publish" },
   { pattern: /(^|\.)vercel\.com$|(^|\.)blob\.vercel-storage\.com$/i, kind: "storage_write" },
   { pattern: /(^|\.)api\.replicate\.com$|(^|\.)api\.openai\.com$|(^|\.)api\.runwayml\.com$|(^|\.)api\.dev\.runwayml\.com$|(^|\.)api\.heygen\.com$|(^|\.)faceless\.so$|(^|\.)api\.tavily\.com$/i, kind: "paid_provider" },

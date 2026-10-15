@@ -315,7 +315,7 @@ test('outside the 24 h window the approved template is sent once, never counts a
 });
 
 test('a plan rejected by the publication gate is stored with its reason and explained by Status',async t=>{
-  const {pg,daily,state}=await retryFixture(t);
+  const {pg,state}=await retryFixture(t);
   const {latestImagePostsStatus}=loadRoute('lib/reporting/whatsapp-status.ts',{'../memory/ensure-automation-schema':{ensureAutomationSchema:async()=>{}},'../daily/slots':require('../.test-build/lib/daily/slots')});
   const gated=loadRoute('lib/daily/draft.ts',{
     '@/lib/orchestrator':{runProductScout:async()=>({candidates:[{kind:'Saisontrend',name:'Kuscheldecke',category:'Wohnen',whyNow:'Herbst',reelIdea:'x',

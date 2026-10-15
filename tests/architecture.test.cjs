@@ -42,15 +42,15 @@ test('seven main areas around Jarvis; Jarvis is the only core component; Trendse
 });
 test('status dimensions are separate and evidence based: implementation from code/tests, deployment from the branch, no "live verified" status', () => {
   assert.equal(M.implementationOf(M.nodeById('executive-agent')), 'planned');
-  assert.equal(M.implementationOf(M.nodeById('pinterest')), 'planned');
+  assert.equal(M.implementationOf(M.nodeById('pinterest')), 'tested');
   assert.equal(M.implementationOf(M.nodeById('youtube')), 'tested');
   assert.equal(M.deploymentOf(M.nodeById('trendsetter')), 'production');
   assert.equal(M.deploymentOf({ since: 'pr64' }), 'preview');
   assert.equal(M.deploymentOf(M.nodeById('jarvis')), 'production');
-  assert.equal(M.deploymentOf(M.nodeById('pinterest')), 'not_deployed');
+  assert.equal(M.deploymentOf(M.nodeById('pinterest')), 'production');
   assert.ok(!('live_verified' in M.OPERATION_META));
   assert.ok(!/live_verified/.test(read('lib/architecture/model.ts')));
-  assert.equal(M.nodeById('pinterest').operation.type, 'planned', 'Pinterest is not presented as finished');
+  assert.equal(M.nodeById('pinterest').operation.type, 'services', 'Pinterest has a disabled-by-default capability');
   assert.equal(M.nodeById('faceless').operation.status, 'disabled', 'Faceless.so is not an active production provider');
 });
 test('env entries are variable names only, never values', () => {
@@ -101,7 +101,7 @@ test('runtime: switches off = deactivated, missing names = not configured, plann
   assert.match(state.nodes['topic-orchestrator'].reason, /TOPIC_PIPELINE_ENABLED/);
   assert.equal(state.nodes.trendsetter.status, 'disabled');
   assert.equal(state.nodes['executive-agent'].status, 'not_applicable');
-  assert.equal(state.nodes.pinterest.status, 'not_applicable');
+  assert.equal(state.nodes.pinterest.status, 'disabled');
   assert.equal(state.nodes.faceless.source, 'Betreiberentscheidung');
   assert.equal(state.nodes.youtube.status, 'not_configured');
   assert.match(state.nodes.youtube.reason, /YOUTUBE_CLIENT_ID/);
@@ -275,4 +275,21 @@ test('mobile: long ghost-button labels wrap on phones, so the studio page never 
   const phone = css.slice(css.indexOf('@media (max-width:480px)'));
   assert.match(phone.slice(0, phone.indexOf('}\n') + 400), /\.ghost\{white-space:normal;max-width:100%\}/);
   assert.match(css, /\.ccRoot\{position:fixed;inset:0;/);
+});
+
+test('configuration, reachability and functional evidence remain separate; absent data is unknown', () => {
+  const state = R.computeRuntime({ capabilities: checkCapabilities(PROD), snapshot: emptySnapshot(), env: PROD, now: NOW });
+  assert.equal(state.nodes.replicate.checks.configured.state, 'yes');
+  assert.equal(state.nodes.replicate.checks.reachable.state, 'unknown');
+  assert.equal(state.nodes.replicate.checks.functional.state, 'unknown');
+  assert.equal(state.nodes.postgres.checks.reachable.state, 'unknown');
+  const observed = R.computeRuntime({ capabilities: checkCapabilities(PROD), snapshot: emptySnapshot({ available: true, affiliate: { runningJobs: 0, pendingContentApprovals: 0, pendingPublications: 0 } }), env: PROD });
+  assert.equal(observed.nodes.postgres.checks.reachable.state, 'yes');
+});
+
+ test('partial runtime reads keep missing approval counts unknown and configuration separate', () => {
+  const state = R.computeRuntime({ capabilities: checkCapabilities(PROD), snapshot: emptySnapshot({ available: true, affiliate: { runningJobs: 0, pendingContentApprovals: 0, pendingPublications: 0 } }), env: PROD });
+  assert.equal(state.pending.find(item => item.label.startsWith('Themenvorschläge')).count, null);
+  assert.equal(state.pending.find(item => item.label === 'Produkt-Pipeline: Inhaltsfreigaben').count, 0);
+  assert.equal(runtimeFor(PROD).nodes.postgres.checks.configured.state, 'yes');
 });

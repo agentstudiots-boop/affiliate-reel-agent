@@ -22,6 +22,8 @@ const DEFAULTS: Record<Platform, LinkRule> = {
     cta: { topic: "Folgen für mehr Alltagstipps", affiliate: "Link im Profil" } },
   youtube: { directLinks: false, profileLink: true, affiliateInText: false, sourceLinks: false, disclosureRequired: true,
     cta: { topic: "Abonnieren für mehr Alltagstipps", affiliate: "Link im Kanal" } },
+  pinterest: { directLinks: true, profileLink: false, affiliateInText: true, sourceLinks: true, disclosureRequired: true,
+    cta: { topic: "Mehr dazu:", affiliate: "Zum Produkt:" } },
   x: { directLinks: true, profileLink: false, affiliateInText: true, sourceLinks: true, disclosureRequired: true,
     cta: { topic: "", affiliate: "Zum Produkt:" } },
 };
