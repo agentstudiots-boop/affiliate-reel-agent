@@ -10,7 +10,7 @@ Blocker und Übergabe stehen in `docs/PROJECT_STATUS.md`.
 - Repository `agentstudiots-boop/affiliate-reel-agent`, Default-Branch `main` (kein Branch-Schutz – trotzdem nie direkt auf `main` arbeiten).
 - Vercel-Projekt `affiliate-reel-agent` (`prj_tcYmiHTgJ3VF6E1bmapnNYkDHikI`, Team-Slug `agentstudiots-boop`, Hobby-Plan, Region `fra1`).
   Production-Domain `https://affiliate-reel-agent.vercel.app`. Merge nach `main` ⇒ automatisches Production-Deployment.
-- Next.js **16** (App Router, `proxy.ts` statt Middleware, Node-Runtime). Vor Next-spezifischem Code die Doku unter
+- Next.js **16.3.8** (fest gepinnt, App Router, `proxy.ts` statt Middleware, Node-Runtime). Vor Next-spezifischem Code die Doku unter
   `node_modules/next/dist/docs/` lesen. React 19, TypeScript strict, Zod, `pg` (Neon Postgres), Vercel Blob.
 - Betreiber kommuniziert auf Deutsch; Oberfläche, WhatsApp-Texte und Doku sind deutsch.
 
@@ -32,7 +32,7 @@ Browser (Betreiber, Admin-Session)          WhatsApp (Betreiber)            Verc
      Freigaben: lib/whatsapp/content-approval.ts (Inhalt) · lib/production/* (Videokosten)
                 lib/meta/publication-gate.ts (Affiliate-Bildpost) · lib/publishing/approval-gate.ts (Themen-Publish, harte Invariante)
                          │
-     Publisher: lib/meta/* (Facebook/Instagram Affiliate) · lib/distribution/publishers/* (Meta, YouTube, TikTok, X für Themen)
+     Publisher: lib/meta/* (Facebook/Instagram Affiliate) · lib/distribution/publishers/* (Meta, YouTube, TikTok, X, Pinterest für Themen; nur Meta/YouTube-Dry-Run nutzbar)
 ```
 
 ### Agenten (Spezialisten haben keine Tools, keine Imports untereinander)
@@ -50,6 +50,10 @@ Browser (Betreiber, Admin-Session)          WhatsApp (Betreiber)            Verc
 | Trendsetter | `lib/trendsetter/*` | Bewertung von Content-Chancen |
 
 Referenzmodus und KI-Modus in Oberfläche und Doku immer klar unterscheiden (AGENTS.md).
+
+**Modellaufrufe** werden zentral protokolliert: `lib/observability/model-calls.ts` → Tabelle `model_calls` (Agent, Modell, Erfolg,
+Latenz, Tokens, Rechenzeit; nie Prompts/Ausgaben). Jeder neue Modellaufruf muss `recordModelCall` verwenden. Übersicht: `/api/operations` → `modelUsage`.
+Kein Modellwechsel ohne nachvollziehbare Daten; kostenpflichtige Vergleiche nur nach Freigabe.
 
 ## 3. Sicherheitsregeln (verbindlich)
 
@@ -98,7 +102,7 @@ Referenzmodus und KI-Modus in Oberfläche und Doku immer klar unterscheiden (AGE
   durch `ensureAutomationSchema` (transaktional, Advisory-Lock) oder `/api/admin/migrate` (angemeldet).
 - **Nur additive Migrationen** (`CREATE … IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`), keine destruktiven Änderungen.
   Neue Migration ⇒ Liste in `migrations.ts`, Prüfung in `ensure-automation-schema.ts`, `tests/migration-upgrade.test.cjs`,
-  Anzeige in `lib/architecture/model.ts` anpassen. Aktuell: 001–036.
+  Anzeige in `lib/architecture/model.ts` anpassen. Aktuell: 001–037 (037 = `model_calls`).
 
 ## 7. Cron-Jobs (`vercel.json`, UTC)
 
