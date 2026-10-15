@@ -165,3 +165,19 @@ test('3 + 5: a refused duplicate never repoints the active order to an empty pla
   assert.equal(order.jobId, job.id);
   assert.equal(order.status, 'blocked'); assert.equal(order.reason, 'product_already_open');
 });
+
+test('2 + 5: a free image wish without quote while the order\'s image job is stopped points to the image notice; nothing starts', async t => {
+  const { routeOperatorMessage } = require(`${L}/whatsapp/router`);
+  const w = await world(t);
+  const job = await w.job();
+  await startActiveOrder(w.db, { waId: OPERATOR, messageId: 'wamid.order', productLabel: 'Deko Pilze', searchTerm: 'Deko Pilze', status: 'awaiting_approval', jobId: job.id });
+  await w.attempt(job.id, 1, 'h1', DESIGN); await w.notice('wamid.n1', job.id, 'quality_failed', 1);
+  const routed = await routeOperatorMessage({ id: 'wamid.wish', from: OPERATOR, body: 'Mach die Pilze größer', replyToMessageId: null, payload: {} }, {
+    database: w.db, send: async text => { w.sent.push(text); return 'x'; },
+    interpret: async () => ({ intent: 'revise_image', draft_id: null, search_query: null, reject_current: false, operator_note: null, answer: null,
+      image_instruction: 'Pilze größer im Vordergrund', category_name: null, category_create: false, category_force_new: false, clarification_question: null, confidence: 0.95, ambiguity: 'none' }),
+    searchProduct: async () => { throw new Error('unexpected search'); }, converse: async () => { throw new Error('unexpected chat'); } });
+  assert.deepEqual(routed, { handled: true });
+  assert.match(w.sent.at(-1), /Bildauftrag zu „Deko Pilze“ ist angehalten.*„Neues Bild: Pilze größer im Vordergrund“/s);
+  assert.equal((await w.db.query('SELECT count(*)::int AS n FROM image_generation_grants')).rows[0].n, 0);
+});

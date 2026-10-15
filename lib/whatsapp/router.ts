@@ -8,6 +8,7 @@ import { interpretMessage, routeSchema, RouterUnavailable, type Route } from "./
 import { imagePostCommand } from "./start-image-post";
 import { validateInstruction, type Instruction } from "./instruction";
 import { operatorProductLink } from "./product-link";
+import { approvedJobState } from "./manual-order";
 
 export type Message = IncomingWhatsAppMessage & { payload: unknown };
 // handled: the router answered or delegated completely. rewritten: continue the existing gated chain
@@ -177,6 +178,13 @@ export async function routeOperatorMessage(input: Message, deps: RouterDeps): Pr
       return { handled: true };
     }
     case "revise_image": case "revise_text": case "revise_both": {
+      // A free image wish while the active order's image job is stopped belongs to that stop notice: point there instead of
+      // claiming that nothing is open (and never start a new paid attempt from an unquoted message).
+      if (!item && route.intent !== "revise_text" && context.active_order?.draft_id
+        && await approvedJobState(db, context.active_order.draft_id).catch(() => null) === "image_stopped") {
+        log({ ...base, action: "image_stop_pending" });
+        return reply(`Der Bildauftrag zu „${context.active_order.product.slice(0, 70)}“ ist angehalten. Antworte bitte direkt auf die Bildnachricht, z. B. mit „Neues Bild: ${(route.image_instruction?.trim() || "dein Wunsch").slice(0, 120)}“ oder „Stopp“. Es wurde nichts gestartet.`, "clarified");
+      }
       if (!item) { log({ ...base, action: activeWithoutDraft ? "active_order_without_draft" : ambiguous ? "clarify_target" : "no_open_item" });
         return reply(activeWithoutDraft ? activeWithoutDraftText(context) : ambiguous ? whichQuestion(context) : "Dazu gibt es gerade keinen offenen Entwurf. Nenne mir ein Produkt, das ich suchen soll, dann schicke ich dir eine neue Inhaltsfreigabe. Es wurde nichts geändert.", "clarified"); }
       // With an unambiguous target and a precise image wish the router's understanding is final: no second paid
