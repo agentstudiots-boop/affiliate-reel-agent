@@ -1,7 +1,6 @@
 "use client";
 
 import { amazonProduct } from "@/lib/amazon";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ContentStudio } from "@/app/content-studio";
 import { MetaConnection } from "@/app/meta-connection";
@@ -160,7 +159,7 @@ export default function Home() {
       </header>
 
       <nav className="studioNav" aria-label="Bereiche">
-        <Link className="primary" href="/architecture" style={{ width: "auto", textDecoration: "none" }}>Command Center öffnen – Agenten, Status &amp; Abläufe</Link>
+        <a className="primary" href="/architecture" style={{ width: "auto", textDecoration: "none" }}>Command Center öffnen – Agenten, Status &amp; Abläufe</a>
         <a className="ghost" href="/produkte" target="_blank" rel="noopener noreferrer">Öffentliche Produktseite ↗</a>
         <form method="post" action="/api/auth/logout"><button type="submit" className="ghost">Abmelden</button></form>
       </nav>

@@ -1,7 +1,6 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { Component, useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import type { ClusterId } from "@/lib/architecture/model";
 import type { SceneProps } from "@/app/architecture/scene";
@@ -138,10 +137,12 @@ export function CommandCenter({ standalone = false }: { standalone?: boolean } =
 
   return <>
   {!standalone && <div className="ccLauncher"><button type="button" className="ghost" onClick={() => { setOpen(true); if (!data) void load(); }}>Jarvis 3D Command Center öffnen</button>
-    <Link href="/architecture">Command Center als eigene Seite öffnen ↗</Link><small>Nur Lesezugriff. Keine Schreibzugriffe, keine Anbieteraufrufe, keine Veröffentlichung.</small></div>}
+    <a href="/architecture">Command Center als eigene Seite öffnen ↗</a><small>Nur Lesezugriff. Keine Schreibzugriffe, keine Anbieteraufrufe, keine Veröffentlichung.</small></div>}
   <section className={`ccRoot${standalone ? " ccPage" : ""}`} hidden={!open} {...(standalone ? { "aria-label": "Jarvis Command Center" } : { role: "dialog", "aria-modal": true, "aria-label": "Jarvis 3D Command Center" })} data-testid="command-center">
     <div className="ccHead"><div><h3>Jarvis Command Center</h3><p className="muted">{data?.meta.basis}</p></div>
-      {standalone ? <div className="ccHeadActions"><Link className="ghost" href="/">← Zum Content Studio</Link><form method="post" action="/api/auth/logout"><button type="submit" className="ghost">Abmelden</button></form></div>
+      {standalone ? <div className="ccHeadActions">{/* Plain <a>: the Link component with prefetching is banned project-wide (tests/affiliate-guard.test.cjs). */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+        <a className="ghost" href="/">← Zum Content Studio</a><form method="post" action="/api/auth/logout"><button type="submit" className="ghost">Abmelden</button></form></div>
         : <button type="button" className="ghost" onClick={() => setOpen(false)}>Schließen</button>}</div>
     {loading && <p role="status" className="muted">Architekturdaten werden geladen …</p>}
     {error && <p role="alert" className="error">{error} <button type="button" className="ghost" onClick={() => void load()}>Erneut versuchen</button></p>}
