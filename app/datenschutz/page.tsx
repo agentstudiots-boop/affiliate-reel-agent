@@ -31,7 +31,7 @@ export default function Page() {
 
       <h2>2. Überblick</h2>
       <ul>
-        <li>Diese Website setzt <strong>keine Cookies</strong> und speichert nichts auf Ihrem Gerät (kein lokaler Speicher auf den öffentlichen Seiten).</li>
+        <li>Die öffentlichen Seiten setzen <strong>keine Cookies</strong> und speichern nichts auf Ihrem Gerät (kein lokaler Speicher). Nur der passwortgeschützte, nicht öffentliche Betreiberbereich verwendet nach der Anmeldung des Betreibers ein technisch notwendiges Sitzungs-Cookie (§ 25 Abs. 2 Nr. 2 TDDDG).</li>
         <li>Es gibt <strong>kein Tracking</strong>, keine Webanalyse, keine Werbenetzwerke und keine Social-Media-Plugins.</li>
         <li>Es werden keine Inhalte von YouTube, TikTok, Pinterest, Meta oder anderen Plattformen eingebettet. Es gibt lediglich einfache Links.</li>
         <li>Schriftarten werden beim Bau der Website lokal ausgeliefert; Ihr Browser lädt sie nicht von Google-Servern.</li>

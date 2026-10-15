@@ -26,14 +26,14 @@ const publicationLabels: Record<string,string> = {
   changes_requested: "Änderung angefragt", rejected: "Abgelehnt",
 };
 
-export function OperationsPanel({ password }: { password: string }) {
+export function OperationsPanel() {
   const [data, setData] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   async function refresh() {
     setLoading(true); setError("");
     try {
-      const response = await fetch("/api/operations", { cache: "no-store", headers: { "x-content-password": password } });
+      const response = await fetch("/api/operations", { cache: "no-store" });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Tageslauf nicht abrufbar.");
       setData(result);
@@ -43,7 +43,7 @@ export function OperationsPanel({ password }: { password: string }) {
   async function run(action: "daily" | "continue") {
     setLoading(true); setError("");
     try {
-      const response = await fetch("/api/operations", { method: "POST", headers: { "Content-Type": "application/json", "x-content-password": password }, body: JSON.stringify({ action }) });
+      const response = await fetch("/api/operations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
       const result = await response.json();
       if (!response.ok || result.status === "failed") throw new Error(result.error || "Tageslauf fehlgeschlagen; gespeicherten Status prüfen.");
       await refresh();
@@ -53,9 +53,9 @@ export function OperationsPanel({ password }: { password: string }) {
   return <section className="reviewBox">
     <h3>Tageslauf &amp; Ergebnisse</h3>
     <p>Zwei geplante Bildentwürfe täglich; zusätzliche Entwürfe per WhatsApp mit „Bildpost“ oder „Bildpost B0…“. Jede Bildproduktion und Veröffentlichung benötigt deine eigene WhatsApp-Freigabe.</p>
-    <button type="button" className="ghost" disabled={!password || loading} onClick={refresh}>{loading ? "Lade …" : "Aktuellen Stand laden"}</button>
-    <button type="button" className="ghost" disabled={!password || loading} onClick={() => run("daily")}>Zusätzlichen Bildentwurf starten</button>
-    <button type="button" className="ghost" disabled={!password || loading} onClick={() => run("continue")}>Freigegebene Reels fortsetzen</button>
+    <button type="button" className="ghost" disabled={loading} onClick={refresh}>{loading ? "Lade …" : "Aktuellen Stand laden"}</button>
+    <button type="button" className="ghost" disabled={loading} onClick={() => run("daily")}>Zusätzlichen Bildentwurf starten</button>
+    <button type="button" className="ghost" disabled={loading} onClick={() => run("continue")}>Freigegebene Reels fortsetzen</button>
     {error && <p role="alert" className="error">{error}</p>}
     {data && <>
       <p><strong>Umgebung:</strong> {data.environment === "production" ? "Production" : "Preview / lokal – kein automatischer Vercel-Cronlauf"}</p>

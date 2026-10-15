@@ -5,21 +5,20 @@ import type { ContentJob } from "@/lib/content/schema";
 type Reel = { id: string; status: string; caption: string; videoUrl: string; permalink: string | null;
   feedback: string; whatsappMessageId: string | null; whatsappSendAttempted: boolean };
 
-export function InstagramReelGate({ job, password }: { job: ContentJob; password: string }) {
+export function InstagramReelGate({ job }: { job: ContentJob }) {
   const [reel, setReel] = useState<Reel | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const refresh = useCallback(async () => {
-    if (!password) return;
-    const response = await fetch(`/api/instagram/reel?jobId=${encodeURIComponent(job.id)}`, { headers: { "x-content-password": password }, cache: "no-store" });
+    const response = await fetch(`/api/instagram/reel?jobId=${encodeURIComponent(job.id)}`, { cache: "no-store" });
     if (response.ok) setReel((await response.json()).publication);
-  }, [job.id,password]);
+  }, [job.id]);
   useEffect(() => { const initial = setTimeout(() => { void refresh(); },0); const timer = setInterval(() => { void refresh(); },15000); return () => { clearTimeout(initial); clearInterval(timer); }; },[refresh]);
   async function action(name: "request" | "publish" | "poll") {
     setBusy(true); setNotice(""); setError("");
     try {
-      const response = await fetch("/api/instagram/reel", { method: "POST", headers: { "Content-Type": "application/json", "x-content-password": password }, body: JSON.stringify({ jobId: job.id, action: name }) });
+      const response = await fetch("/api/instagram/reel", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jobId: job.id, action: name }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Instagram-Status unklar.");
       setReel(data.publication);
@@ -33,7 +32,7 @@ export function InstagramReelGate({ job, password }: { job: ContentJob; password
   }
   return <section className="reviewBox"><h4>Instagram Reel · WhatsApp-Veröffentlichungsfreigabe</h4>
     <p>Das fertige MP4 und der Text müssen vor dem Post geprüft werden. Der Affiliate-Link steht in der Caption, ist dort aber nicht anklickbar.</p>
-    {!reel && <button type="button" disabled={busy || !password} onClick={() => action("request")}>Video & Text per WhatsApp freigeben lassen</button>}
+    {!reel && <button type="button" disabled={busy} onClick={() => action("request")}>Video & Text per WhatsApp freigeben lassen</button>}
     {reel && <><p>Status: <strong>{reel.status}</strong></p><p><a href={reel.videoUrl} target="_blank" rel="noreferrer">Video ansehen ↗</a></p>
       <div className="postCopy">{reel.caption}</div>
       {reel.status === "pending" && !reel.whatsappSendAttempted && <button type="button" disabled={busy} onClick={() => action("request")}>WhatsApp-Freigabe senden</button>}

@@ -1,4 +1,4 @@
-import { contentPasswordMatches } from "@/lib/memory/auth";
+import { authorized, contentPasswordMatches } from "@/lib/memory/auth";
 import { databaseConfigured } from "@/lib/memory/db";
 import { applyMigrations } from "@/lib/memory/migrations";
 
@@ -14,10 +14,12 @@ const headers = {
 };
 
 function page(message = "") {
-  return `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Postgres einrichten</title><style>body{font:16px system-ui;max-width:640px;margin:48px auto;padding:0 20px;color:#191919}form{display:grid;gap:12px}input,button{font:inherit;padding:12px}button{cursor:pointer}p{line-height:1.5}.status{padding:12px;background:#f1f5f9;border-radius:8px}</style></head><body><h1>Postgres-Migration</h1><p>Führt ausschließlich die im Projekt hinterlegten, noch offenen Migrationen aus. Der Zugangscode wird weder gespeichert noch ausgegeben.</p>${message ? `<p class="status">${message}</p>` : ""}<form method="post"><label for="password">Content-Studio-Zugangscode</label><input id="password" name="password" type="password" required autocomplete="current-password" maxlength="256"><button type="submit">Migration sicher ausführen</button></form></body></html>`;
+  return `<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Postgres einrichten</title><style>body{font:16px system-ui;max-width:640px;margin:48px auto;padding:0 20px;color:#191919}form{display:grid;gap:12px}input,button{font:inherit;padding:12px}button{cursor:pointer}p{line-height:1.5}.status{padding:12px;background:#f1f5f9;border-radius:8px}</style></head><body><h1>Postgres-Migration</h1><p>Führt ausschließlich die im Projekt hinterlegten, noch offenen Migrationen aus. Nur für den angemeldeten Betreiber.</p>${message ? `<p class="status">${message}</p>` : ""}<form method="post"><button type="submit">Migration sicher ausführen</button></form></body></html>`;
 }
 
-export function GET() {
+// The info page is only served to the logged-in operator (proxy.ts); it never shows configuration values.
+export function GET(request: Request) {
+  if (!authorized(request)) return new Response(page("Bitte zuerst unter /login anmelden."), { status: 401, headers });
   return new Response(page(databaseConfigured() ? "Datenbank und Zugangscode sind konfiguriert." : "Konfiguration ist noch unvollständig."), { headers });
 }
 
@@ -26,7 +28,8 @@ export async function POST(request: Request) {
     return new Response(page("Anfrage zu groß."), { status: 413, headers });
   }
   let password = request.headers.get("x-content-password") || "";
-  if (!password) {
+  const session = authorized(request);
+  if (!password && !session) {
     try {
       const form = await request.formData();
       password = String(form.get("password") || "");
@@ -34,7 +37,7 @@ export async function POST(request: Request) {
       return new Response(page("Ungültige Anfrage."), { status: 400, headers });
     }
   }
-  if (!contentPasswordMatches(password)) {
+  if (!session && !contentPasswordMatches(password)) {
     return new Response(page("Zugangscode stimmt nicht."), { status: 401, headers });
   }
   if (!databaseConfigured()) {

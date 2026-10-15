@@ -12,7 +12,7 @@ const jobSchema = z.object({
 });
 type VideoJob = z.infer<typeof jobSchema>;
 
-export function VideoStudio({ product, concept, password = "" }: { product: Product; concept: ReelConcept; password?: string }) {
+export function VideoStudio({ product, concept }: { product: Product; concept: ReelConcept }) {
   const storageKey = `affiliate-video-v1:${JSON.stringify([product, concept])}`;
   const [job, setJob] = useState<VideoJob | null>(null);
   const [ready, setReady] = useState(false);
@@ -54,7 +54,6 @@ export function VideoStudio({ product, concept, password = "" }: { product: Prod
         const response = await fetch(`/api/video/status?taskId=${encodeURIComponent(taskId!)}`, {
           signal: controller.signal,
           cache: "no-store",
-          headers: { "x-content-password": password },
         });
         const data = await response.json();
         if (cancelled) return;
@@ -79,7 +78,7 @@ export function VideoStudio({ product, concept, password = "" }: { product: Prod
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [ready, taskId, finished, paused, save, password]);
+  }, [ready, taskId, finished, paused, save]);
 
   async function createVideo() {
     if (!ready || (job && job.status !== "NOT_STARTED") || startingRef.current) return;

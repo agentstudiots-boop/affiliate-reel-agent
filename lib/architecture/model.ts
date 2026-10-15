@@ -189,9 +189,11 @@ export const NODES: ArchNode[] = [
     responsibilities: ["Preview-Sperre", "Egress-Filter"], code: ["lib/security/runtime-guard.ts", "instrumentation.ts"], tests: ["tests/runtime-guard.test.cjs"],
     gaps: ["Auf Vercel nicht live getestet", "Neon und Blob werden von Preview und Production geteilt (docs/PREVIEW_ISOLATION_MATRIX.md)"], env: ["NON_PRODUCTION_SANDBOX", "ALLOW_NON_PRODUCTION_PAID_CALLS"], operation: CODE }),
   n({ id: "api-auth", label: "Zugangsschutz", short: "Zugangsschutz", kind: "guard", cluster: "quality", since: "main", effects: false,
-    plain: "Nur mit Zugangscode, Cron-Secret oder gültiger WhatsApp-Signatur kommt man an die Funktionen.",
-    summary: "Zugangscode (timing-safe), Cron-Secret, WhatsApp-Signatur.", responsibilities: ["Operator-Routen schützen"], code: ["lib/memory/auth.ts"], tests: ["tests/api-access.test.cjs"],
-    gaps: [], env: ["CONTENT_STUDIO_PASSWORD"], operation: { type: "env", anyOf: [["CONTENT_STUDIO_PASSWORD"]] } }),
+    plain: "Studio und Command Center nur nach Admin-Login; Cron nur mit Cron-Secret, WhatsApp nur mit gültiger Signatur.",
+    summary: "Admin-Login mit signiertem HttpOnly-Session-Cookie (12 h, Logout), proxy.ts für interne Seiten/APIs, jede Route prüft selbst; Cron-Secret, WhatsApp-Signatur.",
+    responsibilities: ["Operator-Routen schützen", "Admin-Sitzung"], code: ["lib/memory/auth.ts", "lib/security/admin-session.ts", "lib/security/access-policy.ts", "proxy.ts"],
+    tests: ["tests/api-access.test.cjs", "tests/admin-session.test.cjs"],
+    gaps: ["Fehlversuchsbremse nur pro Serverinstanz", "Nur ein gemeinsamer Betreiber-Zugangscode (kein Mehrbenutzer-System)"], env: ["CONTENT_STUDIO_PASSWORD", "ADMIN_SESSION_SECRET"], operation: { type: "env", anyOf: [["CONTENT_STUDIO_PASSWORD"]] } }),
 
   // ---- Medienproduktion ----
   n({ id: "visual-engine", label: "Visual Engine", short: "Visual Engine", kind: "module", cluster: "media", since: "main", effects: true,
