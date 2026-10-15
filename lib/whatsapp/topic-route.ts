@@ -51,5 +51,5 @@ intent (nur bei domain=topic):
 export async function interpretTopicMessage(body: string, context: TopicRouteContext, request: typeof fetch = fetch,
   sleep?: (ms: number) => Promise<void>): Promise<TopicRoute> {
   if (!process.env.REPLICATE_API_TOKEN?.trim()) throw new RouterUnavailable("router_auth_missing");
-  return routerModelCall(SYSTEM, topicRouteSchema, JSON.stringify({ operator_message: body.slice(0, 1500), context }), request, sleep);
+  return routerModelCall(SYSTEM, topicRouteSchema, JSON.stringify({ operator_message: body.slice(0, 1500), context }), request, sleep, { agent: "topic_router" });
 }

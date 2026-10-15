@@ -1,3 +1,4 @@
+import { predictionMetrics, recordModelCall } from "../observability/model-calls";
 import { getDatabase, type Database } from "../memory/db";
 import { ensureAutomationSchema } from "../memory/ensure-automation-schema";
 import { classifyWhatsAppReply } from "./intent";
@@ -25,6 +26,8 @@ export async function conversationalReply(body: string, history: History[], quot
   const context = JSON.stringify({ message: body.slice(0, 1500), quotedProduct, ...(facts ? { system_facts: facts.slice(0, 3500) } : {}),
     conversation: history.slice(-6).map(item => ({ operator: item.operator_text.slice(0, 700), assistant: item.reply_text.slice(0, 1000) })) });
   if (context.length > 9000) return "Die Nachricht ist für diesen Gesprächsweg zu lang. Bitte stelle die Frage kürzer; es wurde nichts geändert.";
+  const started = Date.now();
+  let seen: unknown = null;
   try {
     const post = () => request(`https://api.replicate.com/v1/models/${MODEL}/predictions`, {
       method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Prefer: "wait=20", "Cancel-After": "40s" },
@@ -42,6 +45,7 @@ export async function conversationalReply(body: string, history: History[], quot
     }
     if (!response.ok) throw Error(`chat_http_${response.status}`);
     let prediction = await response.json() as { id?: string; status?: string; output?: unknown };
+    seen = prediction;
     if (!prediction.id || !/^[a-z0-9]{12,64}$/.test(prediction.id)) throw Error("chat_provider_unavailable");
     for (let attempt = 0; ["starting", "processing"].includes(prediction.status || "") && attempt < 8; attempt++) {
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -52,13 +56,16 @@ export async function conversationalReply(body: string, history: History[], quot
       const next = await poll.json() as typeof prediction;
       if (next.id !== prediction.id) throw Error("chat_provider_unavailable");
       prediction = next;
+      seen = prediction;
     }
     const output = typeof prediction.output === "string" ? prediction.output
       : Array.isArray(prediction.output) && prediction.output.every(part => typeof part === "string")
         ? prediction.output.join("") : "";
     if (prediction.status !== "succeeded" || !output.trim() || output.length > 5000) throw Error("chat_provider_unavailable");
+    await recordModelCall({ agent: "whatsapp_chat", model: MODEL, ok: true, latencyMs: Date.now() - started, ...predictionMetrics(prediction) });
     return output.trim().slice(0, 1800);
   } catch (error) {
+    await recordModelCall({ agent: "whatsapp_chat", model: MODEL, ok: false, errorClass: error instanceof Error ? error.message.slice(0, 40) : "unknown", latencyMs: Date.now() - started, ...predictionMetrics(seen) });
     console.warn(JSON.stringify({ event: "whatsapp_chat_unavailable", model: MODEL, reason: error instanceof Error ? error.message.slice(0, 40) : "unknown" }));
     return "Ich konnte gerade keine sichere Antwort formulieren. Der offene Auftrag und seine Freigaben bleiben unverändert. Bitte sende deine Frage als neue Nachricht; dieselbe Nachricht wird nicht erneut berechnet.";
   }

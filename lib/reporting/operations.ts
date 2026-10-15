@@ -1,3 +1,4 @@
+import { modelCallSummary } from "../observability/model-calls";
 import { getDatabase, type Database } from "../memory/db";
 import { imageProviderStatus } from "../content/image-provider";
 import { dailyNotificationTemplateConfigured, weeklyNotificationTemplateConfigured, whatsappApprovalReady } from "../whatsapp/client";
@@ -44,7 +45,10 @@ export async function getOperationsSnapshot(db: Database = getDatabase()) {
   // Read-only, bounded operational diagnostics; never log tokens or message text.
   console.info(JSON.stringify({event:'whatsapp_instruction_diagnostics',languageMemoryReady:memoryReady,parserProvider:"replicate",parserConfigured:!!process.env.REPLICATE_API_TOKEN?.trim(),instructions:instructions.rows,pending:pending.rows[0]}));
   const provider = imageProviderStatus();
+  // Model costs per agent: provider metrics of the last 7 days (no invented Euro amounts). Missing table → unknown, not zero.
+  const modelUsage = await modelCallSummary(db, 7).catch(() => null);
   return {
+    modelUsage,
     environment: process.env.VERCEL_ENV === "production" ? "production" : "preview_or_local",
     readiness: {
       cronSecretConfigured: !!process.env.CRON_SECRET,

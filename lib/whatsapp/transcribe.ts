@@ -1,3 +1,4 @@
+import { recordModelCall } from "../observability/model-calls";
 // Speech-to-text for operator voice messages. The result is plain text that enters the normal message pipeline;
 // nothing here interprets commands.
 import { AudioError, prepareAudio } from "./audio";
@@ -112,8 +113,13 @@ export async function transcribeAudio(bytes: Uint8Array, _declaredMime: string, 
   // Facts about the real file, for diagnosis. No content.
   console.info(JSON.stringify({ event: "voice_audio_inspected", ...audio.info, sentAs: audio.mime, sentBytes: audio.bytes.length }));
   let raw: unknown;
-  try { raw = openai ? await viaOpenAI(audio.bytes, audio.mime, openai, request) : await viaReplicate(audio.bytes, audio.mime, replicate!, request, sleep); }
+  const call = { agent: "whatsapp_transcription", model: openai ? OPENAI_MODEL : REPLICATE_MODEL(), provider: openai ? "openai" : "replicate" }, started = Date.now();
+  try {
+    raw = openai ? await viaOpenAI(audio.bytes, audio.mime, openai, request) : await viaReplicate(audio.bytes, audio.mime, replicate!, request, sleep);
+    await recordModelCall({ ...call, ok: true, latencyMs: Date.now() - started });
+  }
   catch (error) {
+    await recordModelCall({ ...call, ok: false, errorClass: error instanceof TranscriptionError ? error.code : "provider_failed", latencyMs: Date.now() - started });
     if (error instanceof TranscriptionError) throw error;
     throw new TranscriptionError(error instanceof Error && /timeout|aborted/i.test(`${error.name} ${error.message}`) ? "timeout" : "provider_failed",
       error instanceof Error ? `${openai ? "openai" : "replicate"} ${error.name}` : "unknown");

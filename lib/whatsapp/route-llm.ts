@@ -1,3 +1,4 @@
+import { predictionMetrics, recordModelCall } from "../observability/model-calls";
 import { z } from "zod";
 import type { RouteContext } from "./route-context";
 import { predictionText } from "./instruction";
@@ -50,10 +51,12 @@ export class RouterUnavailable extends Error {}
 // (interpretTopicMessage, lib/whatsapp/topic-route.ts) with their own instructions and schemas.
 // options.model / options.input: the image quality gate reuses this transport with a vision-capable model and image_input.
 export async function routerModelCall<T>(system: string, schema: z.ZodType<T>, prompt: string, request: typeof fetch = fetch,
-  sleep: (ms: number) => Promise<void> = ms => new Promise(resolve => setTimeout(resolve, ms)), options: { model?: string; input?: Record<string, unknown> } = {}): Promise<T> {
+  sleep: (ms: number) => Promise<void> = ms => new Promise(resolve => setTimeout(resolve, ms)), options: { model?: string; input?: Record<string, unknown>; agent?: string } = {}): Promise<T> {
   const token = process.env.REPLICATE_API_TOKEN?.trim();
   if (!token) throw new RouterUnavailable("router_auth_missing");
   if (prompt.length > 20000) throw new RouterUnavailable("router_context_too_large");
+  const model = options.model ?? ROUTER_MODEL, agent = options.agent ?? "whatsapp_router", started = Date.now();
+  let seen: unknown = null;
   try {
     const post = () => request(`https://api.replicate.com/v1/models/${options.model ?? ROUTER_MODEL}/predictions`, {
       method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Prefer: "wait=20", "Cancel-After": "40s" },
@@ -70,6 +73,7 @@ export async function routerModelCall<T>(system: string, schema: z.ZodType<T>, p
     }
     if (!response.ok) throw new RouterUnavailable(`router_http_${response.status}`);
     let prediction = await response.json() as { id?: string; status?: string; output?: unknown };
+    seen = prediction;
     if (!prediction.id || !/^[a-z0-9]{12,64}$/.test(prediction.id)) throw new RouterUnavailable("router_bad_response");
     // GETs observe the same inference; there is never a second paid POST.
     for (let attempt = 0; ["starting", "processing"].includes(prediction.status || "") && attempt < 8; attempt++) {
@@ -79,14 +83,18 @@ export async function routerModelCall<T>(system: string, schema: z.ZodType<T>, p
       const next = await poll.json() as typeof prediction;
       if (next.id !== prediction.id) throw new RouterUnavailable("router_bad_response");
       prediction = next;
+      seen = prediction;
     }
     const output = predictionText(prediction.output);
     if (prediction.status !== "succeeded" || !output || output.length > 6000) throw new RouterUnavailable("router_no_output");
     const json = output.trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
-    return schema.parse(JSON.parse(json));
+    const parsed = schema.parse(JSON.parse(json));
+    await recordModelCall({ agent, model, ok: true, latencyMs: Date.now() - started, ...predictionMetrics(prediction) });
+    return parsed;
   } catch (error) {
-    if (error instanceof RouterUnavailable) throw error;
-    throw new RouterUnavailable(error instanceof z.ZodError ? "router_schema_invalid" : "router_failed");
+    const failure = error instanceof RouterUnavailable ? error : new RouterUnavailable(error instanceof z.ZodError ? "router_schema_invalid" : "router_failed");
+    await recordModelCall({ agent, model, ok: false, errorClass: failure.message, latencyMs: Date.now() - started, ...predictionMetrics(seen) });
+    throw failure;
   }
 }
 

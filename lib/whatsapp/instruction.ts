@@ -1,3 +1,4 @@
+import { predictionMetrics, recordModelCall } from "../observability/model-calls";
 import { z } from "zod";
 import type { ContentJob } from "../content/schema";
 import { classifyWhatsAppReply } from "./intent";
@@ -84,6 +85,8 @@ export async function interpretInstruction(body: string, job: ContentJob, reques
   if (!token) throw new InstructionParserError("parser_auth_missing");
   const input=JSON.stringify({operator_message:body,context:instructionContext(job),confirmed_language_examples:examples.slice(0,5)});
   if (input.length>22000) throw new InstructionParserError("parser_context_too_large");
+  const started=Date.now();
+  let seen:unknown=null;
   try {
     const post=()=>request(`https://api.replicate.com/v1/models/${INSTRUCTION_MODEL}/predictions`,{
       method:"POST",headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"wait=20","Cancel-After":"40s"},redirect:"error",signal:AbortSignal.timeout(25000),
@@ -105,6 +108,7 @@ export async function interpretInstruction(body: string, job: ContentJob, reques
       throw new InstructionParserError(response.status===402?'parser_billing_required':response.status===429?'parser_rate_limited':[401,403].includes(response.status)?'parser_auth_rejected':'parser_unavailable');
     }
     let prediction=await response.json();
+    seen=prediction;
     const id=prediction.id;
     if(typeof id!=="string" || !/^[a-z0-9]{12,64}$/.test(id))throw new InstructionParserError('parser_unavailable');
     // GETs observe the same inference; there is never a second paid POST.
@@ -113,6 +117,7 @@ export async function interpretInstruction(body: string, job: ContentJob, reques
       const poll=await request(`https://api.replicate.com/v1/predictions/${id}`,{headers:{Authorization:`Bearer ${token}`},redirect:"error",signal:AbortSignal.timeout(5000)});
       if(!poll.ok)throw new InstructionParserError('parser_unavailable');
       prediction=await poll.json();
+      seen=prediction;
       if(prediction.id!==id)throw new InstructionParserError('parser_unavailable');
     }
     const output=predictionText(prediction.output);
@@ -120,8 +125,10 @@ export async function interpretInstruction(body: string, job: ContentJob, reques
     if(output.length>10000)throw new InstructionParserError('parser_unavailable');
     const result=validateInstruction(JSON.parse(output),body);
     console.info(JSON.stringify({event:'instruction_parser_result',provider:'replicate',model:INSTRUCTION_MODEL,intent:result.intent,confidence:result.confidence}));
+    await recordModelCall({agent:"whatsapp_instruction",model:INSTRUCTION_MODEL,ok:true,latencyMs:Date.now()-started,...predictionMetrics(prediction)});
     return result;
   } catch(error) {
+    await recordModelCall({agent:"whatsapp_instruction",model:INSTRUCTION_MODEL,ok:false,errorClass:error instanceof InstructionParserError?error.message:"invalid_or_unknown_response",latencyMs:Date.now()-started,...predictionMetrics(seen)});
     if(error instanceof InstructionParserError)throw error;
     console.warn(JSON.stringify({event:"instruction_parser_unavailable",reason:"invalid_or_unknown_response"}));
     throw new InstructionParserError('parser_unavailable');
