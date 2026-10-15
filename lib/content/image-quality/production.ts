@@ -177,13 +177,29 @@ export async function resumeUnclearVisual(job: ContentJob, contentHash: string, 
   return { status: "stopped", reason: outcome.quality.uncertain ? "quality_uncertain" : "quality_failed", detail: [...outcome.quality.hard_failures, ...outcome.quality.soft_failures], attemptNo, used, allowed, quality: outcome.quality };
 }
 
-// "Bild trotzdem senden": only an image whose automatic check was uncertain (never one with a hard failure) may go to the
-// operator's own approval, explicitly marked as not automatically confirmed.
+// Which manual decision a stopped image allows:
+//   "hard"      a hard check failed (missing/wrong product, excluded motif, logo/text, severe defect, unrealistic use,
+//               unreachable/broken file) → never overridable, only „Neues Bild“ or „Stopp“
+//   "uncertain" the automatic check could not decide → the operator may review the image himself
+//   "design"    the vision check ran and found only design (soft) issues such as composition → overridable after the
+//               operator's explicit „Bild trotzdem senden“
+// The override only lets the operator see the image in his publication approval; it is never a publication approval.
+export type OverrideClass = "hard" | "uncertain" | "design";
+export function overrideClass(quality: Pick<QualityResult, "hard_failures" | "uncertain" | "findings" | "checked"> | null | undefined): OverrideClass {
+  if (!quality || quality.hard_failures?.length || quality.findings?.technical) return "hard";
+  if (quality.uncertain) return "uncertain";
+  return quality.checked?.vision ? "design" : "hard";
+}
+export const overridable = (quality: Parameters<typeof overrideClass>[0]) => overrideClass(quality) !== "hard";
+
+// "Bild trotzdem senden": only an image whose automatic check was uncertain or found design issues only (never one with a
+// hard failure) may go to the operator's own approval, explicitly marked as not automatically confirmed.
 export async function uncheckedVisual(job: ContentJob, contentHash: string, deps: VisualProductionDeps): Promise<VisualOutcome> {
   const row = (await deps.db.query(`SELECT * FROM image_generation_attempts WHERE job_id=$1 AND content_hash=$2 AND status='generated'
     ORDER BY attempt_no DESC LIMIT 1`, [job.id, contentHash])).rows[0];
   const { used, allowed } = await generationBudget(deps.db, job);
-  if (!row || row.quality_status !== "uncertain") return { status: "stopped", reason: "quality_failed", detail: ["Nur ein Bild mit unsicherer Prüfung (ohne harten Fehler) kann manuell zur Freigabe gesendet werden."], attemptNo: row ? Number(row.attempt_no) : null, used, allowed };
+  const allowedOverride = !!row && (row.quality_status === "uncertain" || (row.quality_status === "failed" && overrideClass(row.quality as QualityResult | null) === "design"));
+  if (!allowedOverride) return { status: "stopped", reason: "quality_failed", detail: ["Nur ein Bild mit unsicherer Prüfung oder rein gestalterischen Mängeln (ohne harten Fehler) kann manuell zur Freigabe gesendet werden."], attemptNo: row ? Number(row.attempt_no) : null, used, allowed };
   await deps.db.query("UPDATE image_generation_attempts SET quality_status='manual_override',updated_at=now() WHERE job_id=$1 AND attempt_no=$2", [job.id, row.attempt_no]);
   return { status: "passed", asset: assetOf(row, String(row.provider), String(row.model)), quality: row.quality as QualityResult, attemptNo: Number(row.attempt_no), checked: false, manualOverride: true };
 }
@@ -204,10 +220,11 @@ export function stopNoticeText(productName: string, outcome: Extract<VisualOutco
   const options = [
     ["quality_failed", "quality_uncertain", "budget_exhausted", "prompt_invalid"].includes(outcome.reason) ? "„Neues Bild“ (genau ein weiterer kostenpflichtiger Versuch; optional mit Wunsch, z. B. „Neues Bild: Pilze größer im Vordergrund“)" : "",
     outcome.reason === "quality_uncertain" ? "„Bild trotzdem senden“ (du prüfst das Bild selbst in der Freigabe)" : "",
+    outcome.reason === "quality_failed" && outcome.quality && overrideClass(outcome.quality) === "design" ? "„Bild trotzdem senden“ (nur gestalterische Mängel; du prüfst das Bild selbst in der Freigabe)" : "",
     outcome.reason === "provider_unclear" ? "„Bildstatus prüfen“ (fragt den vorhandenen Auftrag ab, kein neues Bild)" : "",
     "„Stopp“",
   ].filter(Boolean);
   return `Bildauftrag „${productName.slice(0, 70)}“ angehalten. ${REASON_TEXT[outcome.reason]}${outcome.detail.length ? `\nGrund: ${outcome.detail.join(" ").replace(/https?:\/\/\S+/g, "").slice(0, 400)}` : ""}
-Kostenpflichtige Bildversuche: ${outcome.used} von ${outcome.allowed}. Es wurde nichts zur Freigabe gesendet und nichts veröffentlicht.
+${outcome.reason === "quality_failed" && outcome.quality && overrideClass(outcome.quality) === "hard" ? "Harte Prüfregel verletzt: dieses Bild kann nicht übersteuert werden.\n" : ""}Kostenpflichtige Bildversuche: ${outcome.used} von ${outcome.allowed}. Es wurde nichts zur Freigabe gesendet und nichts veröffentlicht.
 Antworte direkt auf diese Nachricht mit ${options.join(" · ")}.`;
 }

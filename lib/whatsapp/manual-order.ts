@@ -88,12 +88,36 @@ export async function settleOrderFromDraft(db: Sql, waId: string, messageId: str
     productLabel = job?.name ? String(job.name) : null; asin = job?.asin ? String(job.asin) : null;
   }
   const status = result.status === "awaiting_approval" ? "awaiting_approval" : result.status === "failed" ? "failed" : "blocked";
-  await settleActiveOrder(db, { waId, messageId, status, jobId: result.jobId ?? null, reason: result.reason ?? null, productLabel, asin });
+  // A refused duplicate („product_already_open“) must not repoint the order to the empty placeholder draft: the order keeps
+  // referring to the job that is actually running.
+  const duplicate = result.reason === "product_already_open";
+  await settleActiveOrder(db, { waId, messageId, status, jobId: duplicate ? null : result.jobId ?? null, reason: result.reason ?? null, productLabel: duplicate ? null : productLabel, asin: duplicate ? null : asin });
 }
 
 function sameProduct(order: ActiveOrder, name: string) {
   const a = order.productLabel.toLocaleLowerCase("de-DE"), b = name.toLocaleLowerCase("de-DE");
   return a.includes(b) || b.includes(a) || (!!order.searchTerm && order.searchTerm.toLocaleLowerCase("de-DE").includes(b));
+}
+
+// State of the order's job once its content was approved: a follow-up („Mach es trotzdem“) must never start a second
+// draft for it. "image_stopped": its newest image notice is still unanswered by a publication request.
+export async function approvedJobState(db: Sql, jobId: string): Promise<"image_stopped" | "in_publication" | "published" | "approved" | null> {
+  const job = (await db.query("SELECT status FROM content_jobs WHERE id=$1", [jobId])).rows[0];
+  if (!job || String(job.status) !== "approved") return null;
+  const publication = (await db.query(`SELECT status FROM publication_requests WHERE job_id=$1 ORDER BY created_at DESC LIMIT 1`, [jobId]).catch(() => ({ rows: [] }))).rows[0];
+  if (publication && String(publication.status) === "published") return "published";
+  if (publication && String(publication.status) !== "rejected") return "in_publication";
+  const notice = (await db.query("SELECT 1 FROM image_quality_notices WHERE job_id=$1 LIMIT 1", [jobId]).catch(() => ({ rows: [] }))).rows[0];
+  return notice ? "image_stopped" : "approved";
+}
+
+function approvedJobText(label: string, state: NonNullable<Awaited<ReturnType<typeof approvedJobState>>>) {
+  switch (state) {
+    case "image_stopped": return `Meinst du den angehaltenen Bildauftrag zu „${label}“? Antworte dann bitte direkt auf die Bildnachricht mit „Neues Bild“, „Bild trotzdem senden“ (nur wenn dort angeboten) oder „Stopp“. Ich lege keinen neuen Entwurf an; es wurde nichts gestartet.`;
+    case "in_publication": return `Der Beitrag zu „${label}“ ist inhaltlich freigegeben und wartet auf die Veröffentlichungsfreigabe bzw. läuft bereits. Antworte direkt auf die Veröffentlichungsfreigabe mit „Freigeben“ oder „Ablehnen“. Ich lege keinen zweiten Entwurf an.`;
+    case "published": return `Der Beitrag zu „${label}“ ist bereits veröffentlicht. Für einen neuen Beitrag zu einem anderen Produkt nenne es bitte ausdrücklich. Es wurde nichts gestartet.`;
+    default: return `Der Entwurf zu „${label}“ ist bereits inhaltlich freigegeben; das Bild bzw. die Veröffentlichungsfreigabe folgt. Schreibe „Status“ für den Stand. Ich lege keinen zweiten Entwurf an.`;
+  }
 }
 
 async function openDrafts(db: Sql) {
@@ -159,6 +183,14 @@ export async function handleManualOrder(input: IncomingWhatsAppMessage & { paylo
     // The stored state can be outdated (draft since rejected, approved or published): the draft itself decides.
     const draftOpen = target.jobId ? (await db.query(`SELECT 1 FROM content_jobs j WHERE j.id=$1 AND j.status='awaiting_approval'
       AND NOT EXISTS(SELECT 1 FROM daily_drafts d WHERE d.job_id=j.id AND d.status IN ('rejected','needs_input','failed'))`, [target.jobId])).rows.length > 0 : false;
+    // An approved draft (image stop, publication approval, published) is never replaced by a new draft from a short follow-up.
+    const approved = target.jobId ? await approvedJobState(db, target.jobId) : null;
+    // An explicitly named product whose earlier post is already live may get a new post (the operator's mandate).
+    if (approved && !(approved === "published" && command.kind === "named")) {
+      console.info(JSON.stringify({ event: "manual_order_followup_on_approved_job", messageId: input.id, jobId: target.jobId, state: approved }));
+      await send(approvedJobText(short(target.productLabel), approved));
+      return true;
+    }
     if (target.status === "awaiting_approval" && draftOpen) {
       await send(`Der Entwurf zu „${short(target.productLabel)}“ wartet bereits auf deine Inhaltsfreigabe. Antworte direkt auf die Freigabenachricht mit „Freigeben“ oder sage, was geändert werden soll. Ich lege keinen zweiten Entwurf an.`);
       return true;
