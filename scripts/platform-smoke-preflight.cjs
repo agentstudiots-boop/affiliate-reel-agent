@@ -17,7 +17,7 @@ const { effectDecision, runtimeEnvironment } = build('lib/security/runtime-guard
 const { PLATFORMS } = build('lib/formats/catalog');
 
 // Platforms without a private post mode: a smoke test there is public unless it targets a dedicated test page/account.
-const NO_PRIVATE_MODE = { instagram: 'Instagram-Business-Testkonto', facebook: 'Facebook-Testseite', x: 'X-Testkonto (geschütztes Profil)' };
+const NO_PRIVATE_MODE = { instagram: 'Instagram-Business-Testkonto', facebook: 'Facebook-Testseite', x: 'X-Testkonto (geschütztes Profil)', pinterest: 'Pinterest-Testkonto und ausdrücklich gewähltem Testboard' };
 
 function preflight(platform, env) {
   const blockers = [], notes = [];

@@ -1,3 +1,4 @@
+import { reserveRunwayBudget } from "../visual/runway-budget";
 import { confirmLanguageExample } from "../whatsapp/language-memory";
 import { requireJobProduct, jobProductError } from "../content/product-contract";
 import { randomBytes } from "node:crypto";
@@ -204,6 +205,7 @@ export function productionRepository(db: Database = getDatabase()) {
 
     async claimRunwayCreation(jobId: string, credits: number) {
       return db.transaction(async sql => {
+        if (!await reserveRunwayBudget(sql, new Date().toISOString().slice(0, 7), credits)) throw new ProductionConflictError("Runway-Monatsbudget ausgeschöpft oder ungültig; kein kostenpflichtiger Start.");
         const rows = await sql.query(`SELECT r.* FROM production_runs r JOIN approval_requests a ON a.production_run_id=r.id
           WHERE r.job_id=$1 AND r.provider_mode='RUNWAY_SINGLE_CLIP' AND r.status='approved_for_spend'
           AND r.provider_request_attempted_at IS NULL AND r.estimated_provider_credits >= $2

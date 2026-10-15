@@ -16,25 +16,25 @@
     "@react-three/fiber": "^9.8.1",
     "@runwayml/sdk": "^4.20.0",
     "@vercel/blob": "^2.8.0",
-    "next": "latest",
+    "next": "16.3.8",
     "ogg-opus-decoder": "^1.7.5",
     "pg": "^8.23.0",
-    "react": "latest",
-    "react-dom": "latest",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
     "sharp": "^0.35.5",
     "three": "^0.186.1",
-    "zod": "latest"
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
-    "@types/node": "latest",
+    "@types/node": "26.6.2",
     "@types/pg": "^8.23.1",
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
     "@types/three": "^0.186.0",
-    "eslint": "latest",
-    "eslint-config-next": "latest",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.8",
     "opusscript": "^0.1.1",
-    "typescript": "latest"
+    "typescript": "6.0.3"
   }
 }

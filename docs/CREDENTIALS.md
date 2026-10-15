@@ -87,3 +87,11 @@ Produkt-Pipeline. Kein neuer Weg der Themen-Pipeline wurde gegen echte Anbieter 
 - **X:** Projekt/App mit Lese- und Schreibrecht (Basic-Tarif oder höher für Media-Upload und Posts).
 - **Instagram:** Business-Konto mit verbundener Seite, Berechtigungen `instagram_content_publish`,
   `pages_read_engagement`; Veröffentlichungslimit (25 Posts / 24 h).
+
+## Produktionsaudit 13.10.2026: vorbereitete Erweiterungen
+
+- `TOPIC_RUNWAY_MONTHLY_VIDEO_LIMIT`: positive ganze Zahl, separat für Themenvideos; fehlt standardmäßig (keine Generierung). Zusätzlich begrenzt `RUNWAY_MONTHLY_BUDGET_CREDITS` beide Runway-Pipelines gemeinsam. Fehlgeschlagene/unklare Aufträge zählen konservativ weiter.
+- Pinterest ist NICHT Teil der Standardplattformen. Erst explizites `TOPIC_PLATFORMS=pinterest` (oder gezielte Liste mit Pinterest), Live-Schalter und exakte Inhaltsfreigabe erlauben den Adapter.
+- `PINTEREST_ACCESS_TOKEN`, `PINTEREST_ACCESS_TOKEN_EXPIRES_AT` (ISO-8601-Zeitpunkt), `PINTEREST_BOARD_ID`: sicher in Production speichern. Unbekannter/abgelaufener Zeitpunkt sperrt jeden Pin.
+- `PINTEREST_CLIENT_ID`, `PINTEREST_CLIENT_SECRET`: für OAuth-Refresh; `refreshPinterestToken` unterstützt Tokenrotation. Automatischer Refresh erfordert einen angeschlossenen, verschlüsselten `PinterestTokenStore` mit workerübergreifender Sperre. Dieser Store ist bewusst noch NICHT eingerichtet; keine Zugangsdaten in Jobtabellen oder Logs schreiben. Bis dahin Token kontrolliert erneuern und als Sensitive-Umgebungsvariable übernehmen.
+- Video-Pins nutzen das vorhandene MP4 plus ein bereits freigegebenes Bild aus demselben Master-Content. Ohne Titelbild wird nicht veröffentlicht; keine zusätzliche kostenpflichtige Generierung.

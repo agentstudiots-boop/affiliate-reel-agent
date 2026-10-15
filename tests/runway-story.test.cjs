@@ -48,8 +48,17 @@ test('Runway 30-second story requires fresh content and cost approvals and claim
   const old=process.env.WHATSAPP_APPROVER_WA_ID;process.env.WHATSAPP_APPROVER_WA_ID='491234';
   try { await repo.applyIncomingWhatsApp({id:'wamid.runway.approved',from:'491234',body:'Freigeben',replyToMessageId:'wamid.runway',payload:{}}); }
   finally { if(old===undefined) delete process.env.WHATSAPP_APPROVER_WA_ID; else process.env.WHATSAPP_APPROVER_WA_ID=old; }
+  const budgetBefore = process.env.RUNWAY_MONTHLY_BUDGET_CREDITS;
+  process.env.RUNWAY_MONTHLY_BUDGET_CREDITS = '299';
+  try { await assert.rejects(repo.claimRunwayCreation(id,300), /Monatsbudget/); }
+  finally { if (budgetBefore === undefined) delete process.env.RUNWAY_MONTHLY_BUDGET_CREDITS; else process.env.RUNWAY_MONTHLY_BUDGET_CREDITS = budgetBefore; }
   const claimed=await repo.claimRunwayCreation(id,300);
   assert.equal(claimed.imageUrl,'');
+  process.env.RUNWAY_MONTHLY_BUDGET_CREDITS = '300';
+  try {
+    const quota = require('../.test-build/lib/visual/video').postgresQuota(db);
+    assert.equal(await quota.reserve('runway','standard_video','topic-after-product',new Date().toISOString().slice(0,7),10),false,'topic videos share the credits already reserved by the product pipeline');
+  } finally { if (budgetBefore === undefined) delete process.env.RUNWAY_MONTHLY_BUDGET_CREDITS; else process.env.RUNWAY_MONTHLY_BUDGET_CREDITS = budgetBefore; }
   assert.match(runwayPrompt(claimed.job),/Vakuumierer/);
   assert.match(runwayPrompt(claimed.job),/optionales Referenzbild zeigt nur die Atmosphäre/);
   const calls=[];

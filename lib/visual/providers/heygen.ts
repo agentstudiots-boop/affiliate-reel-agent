@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { put } from "../../security/guarded-blob";
 import { VideoProviderError, type VideoInput, type VideoProvider, type VideoStatus } from "../video";
 import type { GeneratedAsset } from "../types";
+import { assertEffectAllowed } from "../../security/runtime-guard";
 
 // HeyGenAvatarProvider: the only place with HeyGen-specific code. Called exclusively through the
 // AvatarVideoRenderer after the format router chose AVATAR_VIDEO; never by the scout or Jarvis.
@@ -28,7 +29,7 @@ function classify(status: number, body: string, phase: "create" | "status", jobI
   if (status === 401 || status === 403) return new VideoProviderError("auth", false, jobId, status);
   if (status === 429) return new VideoProviderError("rate_limited", phase === "create" || !!jobId, jobId, status);
   if (/quota|credit|insufficient|limit exceeded|exceed/i.test(body) && status >= 400 && status < 500) return new VideoProviderError("quota_exhausted", false, jobId, status);
-  if (status >= 500) return new VideoProviderError("provider_down", phase === "create" || !!jobId, jobId, status);
+  if (status >= 500) return new VideoProviderError("provider_down", phase === "status" && !!jobId, jobId, status);
   return new VideoProviderError(phase === "create" ? "invalid_request" : "invalid_response", false, jobId, status);
 }
 
@@ -44,6 +45,7 @@ export function createHeyGenAvatarProvider(deps: HeyGenDeps = {}): VideoProvider
       return { ok: true };
     },
     async create(input: VideoInput) {
+      assertEffectAllowed("paid_provider");
       const config = heygenConfig(deps);
       if (config.missing.length) throw new VideoProviderError("unavailable", false);
       const clock = timed();

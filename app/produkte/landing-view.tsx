@@ -3,7 +3,6 @@ import type { loadPublishedProducts } from "@/lib/landing/published";
 import { TrackedLink } from "./track-link";
 import styles from "./landing.module.css";
 
-const dateFormat = new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", day: "2-digit", month: "long", year: "numeric" });
 
 // Presentation only: it renders what the database query returned and nothing else.
 export function LandingView({ data, wanted }: { data: Awaited<ReturnType<typeof loadPublishedProducts>> | null; wanted: string | null }) {

@@ -19,6 +19,10 @@ export function StatusRows({ data, node }: { data: Payload; node: ClientNode }) 
   return <dl className="ccStatusRows">
     <div><dt>Umsetzung</dt><dd title={data.labels.implementation[node.implementation].description}>{data.labels.implementation[node.implementation].label}</dd></div>
     <div><dt>Deployment</dt><dd title={data.labels.deployment[node.deployment].description}>{data.labels.deployment[node.deployment].label}</dd></div>
+    {op?.checks && (Object.entries(op.checks) as [keyof typeof op.checks, typeof op.checks.configured][]).map(([key, check]) => <div key={key}>
+      <dt>{{ configured: "Konfiguriert", reachable: "Erreichbarkeit", functional: "Funktionsnachweis" }[key]}</dt>
+      <dd title={check.reason}>{{ yes: "Nachgewiesen", no: "Nicht erfüllt", unknown: "Unbekannt", not_required: "Nicht erforderlich" }[check.state]}<small> · {check.reason}</small></dd>
+    </div>)}
     <div><dt>Betrieb</dt><dd>{op ? <OpChip data={data} status={op.status} /> : "–"}</dd></div>
     {op && <p className="ccReason">{op.reason}<small> · Quelle: {op.source}{op.source === "Datenbank" ? `, Stand ${time(data.runtime.evidence.generatedAt)}` : op.source === "Konfiguration" || op.source === "Preview-Sperre" ? `, Stand ${time(data.runtime.generatedAt)}` : ""}</small></p>}
   </dl>;
@@ -103,7 +107,7 @@ export function OverviewPanel({ data, onSelect }: { data: Payload; onSelect: (se
     <h5>Alle Komponenten</h5>
     <StatusSummary data={data} nodes={data.nodes} />
     {!!attention.length && <><h5>Braucht Aufmerksamkeit</h5><ul className="ccRelations">{attention.map(node => <li key={node.id}><NodeLink data={data} id={node.id} onSelect={onSelect} /> <small>{rt.nodes[node.id]?.reason}</small></li>)}</ul></>}
-    {!!rt.pending.length && <><h5>Wartet auf deine Freigabe</h5><ul>{rt.pending.map(item => <li key={item.label}>{item.label}: <b>{item.count}</b></li>)}</ul></>}
+    {!!rt.pending.length && <><h5>Wartet auf deine Freigabe</h5><ul>{rt.pending.map(item => <li key={item.label}>{item.label}: <b>{item.count ?? "Unbekannt"}</b></li>)}</ul></>}
     {!!rt.publications.length && <><h5>Letzte Veröffentlichungsversuche</h5><ul className="ccPubs">{rt.publications.slice(0, 8).map((item, index) => <li key={`${item.platform}-${item.at}-${index}`}>
       <b>{item.platform}</b> · {item.status === "published" ? "veröffentlicht" : item.status === "processing" ? "in Verarbeitung" : item.status === "failed" ? "fehlgeschlagen" : "unklar"} · {time(item.at)}
       {item.url && <> · <a href={item.url} target="_blank" rel="noopener noreferrer">Beitrag öffnen</a></>}</li>)}</ul></>}

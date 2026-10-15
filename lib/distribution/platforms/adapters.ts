@@ -24,6 +24,7 @@ const LIMITS: Record<Platform, Limits> = {
   facebook: { text: 3000, hashtags: 3, title: null, images: 10 },
   tiktok: { text: 2200, hashtags: 5, title: null, images: 35 },
   youtube: { text: 5000, hashtags: 3, title: 100, images: 0 },
+  pinterest: { text: 500, hashtags: 0, title: 100, images: 1 },
   x: { text: 280, hashtags: 2, title: null, images: 4 },
 };
 
@@ -38,6 +39,8 @@ const TRANSFORM: Record<Platform, Record<ContentFormat, { media: MediaFormat | "
   youtube: { TEXT: { media: "none", aspect: null, skip: "YouTube Shorts braucht ein Video" }, SINGLE_IMAGE: { media: "none", aspect: null, skip: "YouTube Shorts braucht ein Video" },
     CAROUSEL: { media: "none", aspect: null, skip: "Keine Videoableitung des Karussells vorhanden; nicht veröffentlichen" },
     STANDARD_VIDEO: { media: "short", aspect: "9:16" }, AVATAR_VIDEO: { media: "short", aspect: "9:16" } },
+  pinterest: { TEXT: { media: "none", aspect: null, skip: "Pinterest braucht ein Bild oder Video" }, SINGLE_IMAGE: { media: "image", aspect: "4:5" },
+    CAROUSEL: { media: "none", aspect: null, skip: "Karussell nicht als Einzel-Pin veröffentlichen" }, STANDARD_VIDEO: { media: "video", aspect: "9:16" }, AVATAR_VIDEO: { media: "video", aspect: "9:16" } },
   x: { TEXT: { media: "text", aspect: null }, SINGLE_IMAGE: { media: "text_with_images", aspect: "4:5" }, CAROUSEL: { media: "text_with_images", aspect: "4:5" },
     STANDARD_VIDEO: { media: "video", aspect: "9:16" }, AVATAR_VIDEO: { media: "video", aspect: "9:16" } },
 };
@@ -112,4 +115,5 @@ export const FacebookAdapter = adapter("facebook");
 export const TikTokAdapter = adapter("tiktok");
 export const YouTubeAdapter = adapter("youtube");
 export const XAdapter = adapter("x");
-export const PLATFORM_ADAPTERS: PlatformAdapter[] = [InstagramAdapter, FacebookAdapter, TikTokAdapter, YouTubeAdapter, XAdapter];
+export const PinterestAdapter = adapter("pinterest");
+export const PLATFORM_ADAPTERS: PlatformAdapter[] = [InstagramAdapter, FacebookAdapter, TikTokAdapter, YouTubeAdapter, XAdapter, PinterestAdapter];

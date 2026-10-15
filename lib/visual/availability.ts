@@ -14,7 +14,7 @@ export async function providerAvailability(context: RenderContext, now = new Dat
   }
   return {
     image: { available: image.ok, reason: image.reason },
-    standardVideo: { available: standard.ok, reason: standard.reason },
+    standardVideo: { available: standard.ok && !!context.standardQuota, reason: context.standardQuota ? standard.reason : "Video-Kontingent nicht konfiguriert" },
     avatarVideo: { available: avatar.ok && !!context.avatarQuota, quotaRemaining, reason: avatar.ok && !context.avatarQuota ? "Avatar-Kontingent nicht konfiguriert" : avatar.reason },
   };
 }

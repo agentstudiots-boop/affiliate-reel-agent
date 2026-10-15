@@ -76,5 +76,5 @@ export async function readSnapshot(now = new Date(), open: () => Readable = getD
   const visualJobs = await section(handle, async db => (await db.query(`SELECT DISTINCT ON (kind) kind, status, updated_at FROM visual_jobs ORDER BY kind, updated_at DESC`)).rows
     .map(row => ({ kind: String(row.kind), status: String(row.status), at: iso(row.updated_at) })));
   const any = [topic, affiliate, publications, chances, vision, visualJobs].some(item => item !== null);
-  return { available: any, reason: any ? null : "Datenbank erreichbar, aber keine lesbaren Tabellen", generatedAt: now.toISOString(), topic, affiliate, publications, chances, vision, visualJobs };
+  return { available: any, reason: any ? null : "Keine erfolgreiche Datenbankabfrage; Verbindung oder Tabellen unbekannt", generatedAt: now.toISOString(), topic, affiliate, publications, chances, vision, visualJobs };
 }
