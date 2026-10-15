@@ -158,6 +158,12 @@ export default function Home() {
         <button className="ghost" onClick={reset}>Neuer Test</button>
       </header>
 
+      <nav className="studioNav" aria-label="Bereiche">
+        <a className="primary" href="/architecture" style={{ width: "auto", textDecoration: "none" }}>Command Center öffnen – Agenten, Status &amp; Abläufe</a>
+        <a className="ghost" href="/produkte" target="_blank" rel="noopener noreferrer">Öffentliche Produktseite ↗</a>
+        <form method="post" action="/api/auth/logout"><button type="submit" className="ghost">Abmelden</button></form>
+      </nav>
+
       <nav className="steps" aria-label="Workflow">
         {["Produkt", "Ideen & Format", "Entwurf & Prüfung", "Marketing & Freigabe"].map((label, i) => <span key={label}>{i + 1} {label}</span>)}
       </nav>

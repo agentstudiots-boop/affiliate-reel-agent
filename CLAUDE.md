@@ -60,6 +60,9 @@ Kein Modellwechsel ohne nachvollziehbare Daten; kostenpflichtige Vergleiche nur 
 - **Admin-Zugang:** `/login` → `POST /api/auth/login` prüft `CONTENT_STUDIO_PASSWORD` (konstante Zeit) und setzt das
   signierte Session-Cookie `acs_admin_session` (HttpOnly, SameSite=Strict, Secure, 12 h; `lib/security/admin-session.ts`).
   Logout: `POST /api/auth/logout`. Rotation von `CONTENT_STUDIO_PASSWORD` oder optional `ADMIN_SESSION_SECRET` beendet alle Sitzungen.
+- **Command Center:** eigene Seite `/architecture` (Login nötig) + Link oben im Studio. Daten: `/api/architecture`
+  (`lib/architecture/model.ts` = statisches Inventar inkl. KI-Modell je Komponente, `runtime.ts` = Status aus Variablennamen/Schaltern,
+  `snapshot.ts` = nur lesende DB-Nachweise inkl. „zuletzt erfolgreich“). Keine erfundenen Aktivitätsanzeigen; ohne Nachweis steht das dort.
 - **`proxy.ts`** schützt alle internen Seiten und APIs (`lib/security/access-policy.ts`). Öffentlich bleiben nur:
   `/login`, `/produkte*`, `/impressum`, `/datenschutz`, `/api/whatsapp/webhook` (Meta-Signatur), `/api/cron/*` (CRON_SECRET),
   `/api/landing/click` (same-origin, nur IDs veröffentlichter Posts), `/api/auth/*`, `/_next/*`. Neue öffentliche Routen

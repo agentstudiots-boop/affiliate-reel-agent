@@ -1,7 +1,7 @@
 import type { ServiceCapability } from "../capabilities";
 import { effectDecision, runtimeEnvironment, type EffectKind } from "../security/runtime-guard";
 import { NODES, PROCESS_STEPS, type ArchNode, type OperationalStatus } from "./model";
-import type { RuntimeSnapshot } from "./snapshot";
+import type { Activity, ActivityEntry, RuntimeSnapshot } from "./snapshot";
 
 // Operational status per component, computed on the server at request time. Inputs: capability check (variable NAMES
 // only), documented switches, the deployment environment and read-only database evidence. Every status carries its
@@ -10,7 +10,10 @@ import type { RuntimeSnapshot } from "./snapshot";
 type Env = Record<string, string | undefined>;
 export type StatusSource = "Konfiguration" | "Datenbank" | "Repo-Analyse" | "Betreiberentscheidung" | "Preview-Sperre";
 export type EvidenceCheck = { state: "yes" | "no" | "unknown" | "not_required"; reason: string };
-export type NodeRuntime = { checks?: { configured: EvidenceCheck; reachable: EvidenceCheck; functional: EvidenceCheck }; status: OperationalStatus; reason: string; source: StatusSource; details: string[] };
+// lastRun: newest database evidence of a successful (okAt) and of a failed (failedAt) run; label says what was measured.
+export type LastRun = { okAt: string | null; failedAt: string | null; error: string | null; label: string };
+export type NodeRuntime = { checks?: { configured: EvidenceCheck; reachable: EvidenceCheck; functional: EvidenceCheck }; status: OperationalStatus; reason: string; source: StatusSource; details: string[];
+  lastRun?: LastRun; aiModel?: string };
 export type StepRuntime = { id: string; status: OperationalStatus; counts: string[] };
 export type RuntimeState = {
   generatedAt: string;
@@ -132,6 +135,44 @@ function withEvidence(id: string, current: NodeRuntime, snapshot: RuntimeSnapsho
   return current;
 }
 
+// Which existing evidence answers "when did it last work?" for a component. Only real rows; null = no evidence.
+const fromEntry = (entry: ActivityEntry | null | undefined, label: string): LastRun | null => entry && (entry.lastOkAt || entry.lastAt)
+  ? { okAt: entry.lastOkAt, failedAt: entry.lastOk === false ? entry.lastAt : null, error: entry.lastOk === false ? entry.lastError : null, label } : null;
+const okOnly = (okAt: string | null | undefined, label: string): LastRun | null => okAt ? { okAt, failedAt: null, error: null, label } : null;
+const newest = (...runs: (LastRun | null)[]): LastRun | null => runs.filter((run): run is LastRun => !!run)
+  .sort((a, b) => (b.okAt ?? b.failedAt ?? "").localeCompare(a.okAt ?? a.failedAt ?? ""))[0] ?? null;
+
+export function lastRunOf(id: string, snapshot: RuntimeSnapshot): LastRun | null {
+  const a: Activity | null = snapshot.activity ?? null;
+  const m = a?.models ?? {};
+  const draft = a?.drafts?.lastAt ? okOnly(a.drafts.lastAt, `Letzter Entwurf zur Freigabe übergeben (${a.drafts.lastMode === "ai" ? "KI-Modus" : "Referenzmodus"})`) : null;
+  const contentAgent = (agent: string, label: string) => fromEntry(m[`content_${agent}`], `${label} (KI-Modus, Modellaufruf)`);
+  const published = (platform: string) => okOnly(snapshot.publications?.find(item => item.platform === platform && item.status === "published")?.at, "Letzte belegte Veröffentlichung");
+  switch (id) {
+    case "jarvis": return draft;
+    case "trend-agent": return fromEntry(m.content_trend, "Letzte Trend-Recherche mit Modellaufruf");
+    case "creative-agent": return newest(contentAgent("creative", "Ideen erzeugt"), draft);
+    case "marketing-agent": return newest(contentAgent("marketing", "Plattformempfehlung"), draft);
+    case "video-agent": return contentAgent("video", "Drehbuch");
+    case "image-agent": return contentAgent("image", "Bildkonzept");
+    case "text-agent": return contentAgent("text", "Textentwurf");
+    case "whatsapp": return newest(okOnly(a?.whatsappInboundAt, "Letzte eingehende WhatsApp-Nachricht verarbeitet"), fromEntry(m.whatsapp_router, "Letzte Router-Einordnung"),
+      fromEntry(m.whatsapp_chat, "Letzte Gesprächsantwort"), fromEntry(m.whatsapp_instruction, "Letzte Änderungsanweisung"));
+    case "vision-gate": return newest(fromEntry(m.image_quality_vision, "Letzte Bildprüfung (Vision-Modell)"), okOnly(snapshot.vision?.lastAt, "Letzte gespeicherte Bildprüfung"));
+    case "product-scout": case "product-reviewer": return okOnly(a?.productVerifiedAt, "Letztes Produkt mit geprüfter Amazon-Detailseite");
+    case "trendsetter": return okOnly(a?.chancesSeenAt, "Letzte gespeicherte Content-Chance");
+    case "topic-scout": case "topic-orchestrator": return a?.topicRun ? { okAt: a.topicRun.lastOkAt, failedAt: a.topicRun.lastOutcome === "failed" ? a.topicRun.lastAt : null, error: a.topicRun.lastOutcome === "failed" ? "Themenlauf fehlgeschlagen" : null,
+      label: `Letzter Themenlauf (${a.topicRun.lastOutcome ?? "–"})` } : null;
+    case "cron": return a?.cron ? { okAt: a.cron.lastOkAt, failedAt: a.cron.lastOk === false ? a.cron.lastAt : null, error: a.cron.lastError, label: `Letzter Tages-Slot-Lauf (${a.cron.lastOutcome ?? "–"})` } : null;
+    case "content-approval": return okOnly(a?.contentApprovedAt, "Letzte Inhaltsfreigabe per WhatsApp");
+    case "replicate": return newest(...Object.entries(m).filter(([agent]) => agent !== "whatsapp_transcription").map(([agent, entry]) => fromEntry(entry, `Letzter Modellaufruf (${agent})`)));
+    case "postgres": return snapshot.available ? okOnly(snapshot.generatedAt, "Lesender Zugriff in dieser Anfrage") : null;
+    case "instagram": case "facebook": return newest(published(id), okOnly(a?.affiliatePublished?.[id], "Letzter veröffentlichter Produktbeitrag (Affiliate)"));
+    case "youtube": case "tiktok": case "x": case "pinterest": return published(id);
+    default: return null;
+  }
+}
+
 const SANDBOX_EFFECTS: EffectKind[] = ["database", "migrate", "storage_write", "message", "publish", "paid_provider", "scheduled_job"];
 
 export function computeRuntime(input: { capabilities: ServiceCapability[]; snapshot: RuntimeSnapshot; env?: Env; now?: Date; nodes?: ArchNode[] }): RuntimeState {
@@ -165,7 +206,14 @@ export function computeRuntime(input: { capabilities: ServiceCapability[]; snaps
     } else if (latest?.status === "failed") {
       functional.state = "no"; functional.reason = `Letzter Versuch fehlgeschlagen am ${when(latest.at)}`;
     }
-    nodes[node.id] = { ...withEvidence(node.id, state, input.snapshot, now), checks: { configured, reachable, functional } };
+    let current = withEvidence(node.id, state, input.snapshot, now);
+    const lastRun = lastRunOf(node.id, input.snapshot);
+    // A documented failure newer than the last success (within 24 h) is an error – only for an otherwise "ready" component.
+    if (lastRun?.failedAt && current.status === "ready" && (!lastRun.okAt || lastRun.failedAt > lastRun.okAt) && day(lastRun.failedAt, now) <= 1)
+      current = { status: "error", reason: `Letzter Lauf fehlgeschlagen (${when(lastRun.failedAt)})${lastRun.error ? `: ${lastRun.error}` : ""}`, source: "Datenbank", details: current.details };
+    if (lastRun?.okAt && functional.state === "unknown") { functional.state = "yes"; functional.reason = `${lastRun.label}: ${when(lastRun.okAt)} (Datenbank-Nachweis)`; }
+    const aiModel = node.aiModel && node.id === "vision-gate" && env.IMAGE_QUALITY_MODEL?.trim() ? `${env.IMAGE_QUALITY_MODEL.trim()} (über Replicate, gesetzt per IMAGE_QUALITY_MODEL)` : node.aiModel;
+    nodes[node.id] = { ...current, checks: { configured, reachable, functional }, ...(lastRun ? { lastRun } : {}), ...(aiModel ? { aiModel } : {}) };
   }
   const s = input.snapshot;
   const steps: StepRuntime[] = PROCESS_STEPS.map(step => {

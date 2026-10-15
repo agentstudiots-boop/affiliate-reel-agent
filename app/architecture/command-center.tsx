@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { Component, useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import type { ClusterId } from "@/lib/architecture/model";
 import type { SceneProps } from "@/app/architecture/scene";
-import { ClusterPanel, GroupedView, NodePanel, OverviewPanel, ProcessRibbon } from "@/app/architecture/panels";
+import { ClusterPanel, GroupedView, NodePanel, OverviewPanel, ProcessRibbon, ProfilesView } from "@/app/architecture/panels";
 import type { Hover, Payload, Selection } from "@/app/architecture/types";
 import { webglAvailable } from "@/lib/architecture/webgl";
 
@@ -19,14 +19,15 @@ class SceneBoundary extends Component<{ children: ReactNode; onFail: (message: s
 }
 
 
-export function CommandCenter() {
-  const [open, setOpen] = useState(false);
+// standalone: rendered as its own page (/architecture, protected by proxy.ts) instead of a dialog inside the studio.
+export function CommandCenter({ standalone = false }: { standalone?: boolean } = {}) {
+  const [open, setOpen] = useState(standalone);
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [selection, setSelection] = useState<Selection>(null);
   const [query, setQuery] = useState("");
-  const [mode, setMode] = useState<"architecture" | "process">("architecture");
+  const [mode, setMode] = useState<"architecture" | "process" | "profiles">(standalone ? "profiles" : "architecture");
   const [resetToken, setResetToken] = useState(0);
   const [use3d, setUse3d] = useState(true);
   const [webglSupported, setWebglSupported] = useState(false);
@@ -46,7 +47,7 @@ export function CommandCenter() {
 
   // Escape goes one level up (component → area → overview); only from the overview it closes the dialog.
   const up = () => setSelection(current => {
-    if (!current) { setOpen(false); return null; }
+    if (!current) { if (!standalone) setOpen(false); return null; }
     if (current.type === "node" && data) {
       const node = data.nodes.find(item => item.id === current.id);
       return node && node.cluster !== "core" ? { type: "cluster", id: node.cluster } : null;
@@ -58,7 +59,7 @@ export function CommandCenter() {
     const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { event.preventDefault(); up(); } };
     window.addEventListener("keydown", onKey);
     const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    if (!standalone) document.body.style.overflow = "hidden";
     return () => {
       window.removeEventListener("keydown", onKey); document.body.style.overflow = previous;
       // A pointer resting on a 3D object when the dialog closes would otherwise leave the page cursor and tooltip behind.
@@ -85,6 +86,14 @@ export function CommandCenter() {
     } catch (caught) { setError(caught instanceof Error ? caught.message : "Architekturdaten nicht erreichbar."); }
     finally { setLoading(false); }
   }
+
+  // The standalone page loads its data right away (the dialog loads on first open).
+  useEffect(() => {
+    if (!standalone) return;
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [standalone]);
 
   const clusters = useMemo(() => data ? (Object.keys(data.labels.clusters) as ClusterId[]).sort((a, b) => data.labels.clusters[a].order - data.labels.clusters[b].order) : [], [data]);
   const selectedNode = data && selection?.type === "node" ? data.nodes.find(node => node.id === selection.id) ?? null : null;
@@ -120,16 +129,21 @@ export function CommandCenter() {
   };
   const background = () => setSelection(current => current?.type === "node" && data
     ? (() => { const node = data.nodes.find(item => item.id === current.id); return node && node.cluster !== "core" ? { type: "cluster" as const, id: node.cluster } : null; })() : null);
-  const sceneProps: SceneProps | null = data ? { data, selection, expanded, mode, highlightIds: highlight, reducedMotion: reduced, active: open && use3d && !sceneError, resetToken,
+  const sceneProps: SceneProps | null = data ? { data, selection, expanded, mode: mode === "process" ? "process" : "architecture", highlightIds: highlight, reducedMotion: reduced, active: open && use3d && !sceneError && mode !== "profiles", resetToken,
     onSelect: select, onBackground: background, onHover: setHover } : null;
   const showScene = use3d && !sceneError;
   const announce = data ? selectedNode ? `${selectedNode.label}: ${data.labels.operation[data.runtime.nodes[selectedNode.id]?.status ?? "unknown"].label}`
     : selection?.type === "cluster" ? `Bereich ${data.labels.clusters[selection.id].label} geöffnet` : selection?.type === "jarvis" ? "Jarvis, Gesamtübersicht" : "Gesamtansicht" : "";
 
   return <>
-  <div className="ccLauncher"><button type="button" className="ghost" onClick={() => { setOpen(true); if (!data) void load(); }}>Jarvis 3D Command Center öffnen</button><small>Nur Lesezugriff. Keine Schreibzugriffe, keine Anbieteraufrufe, keine Veröffentlichung.</small></div>
-  <section className="ccRoot" hidden={!open} role="dialog" aria-modal="true" aria-label="Jarvis 3D Command Center" data-testid="command-center">
-    <div className="ccHead"><div><h3>Jarvis Command Center</h3><p className="muted">{data?.meta.basis}</p></div><button type="button" className="ghost" onClick={() => setOpen(false)}>Schließen</button></div>
+  {!standalone && <div className="ccLauncher"><button type="button" className="ghost" onClick={() => { setOpen(true); if (!data) void load(); }}>Jarvis 3D Command Center öffnen</button>
+    <a href="/architecture">Command Center als eigene Seite öffnen ↗</a><small>Nur Lesezugriff. Keine Schreibzugriffe, keine Anbieteraufrufe, keine Veröffentlichung.</small></div>}
+  <section className={`ccRoot${standalone ? " ccPage" : ""}`} hidden={!open} {...(standalone ? { "aria-label": "Jarvis Command Center" } : { role: "dialog", "aria-modal": true, "aria-label": "Jarvis 3D Command Center" })} data-testid="command-center">
+    <div className="ccHead"><div><h3>Jarvis Command Center</h3><p className="muted">{data?.meta.basis}</p></div>
+      {standalone ? <div className="ccHeadActions">{/* Plain <a>: the Link component with prefetching is banned project-wide (tests/affiliate-guard.test.cjs). */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+        <a className="ghost" href="/">← Zum Content Studio</a><form method="post" action="/api/auth/logout"><button type="submit" className="ghost">Abmelden</button></form></div>
+        : <button type="button" className="ghost" onClick={() => setOpen(false)}>Schließen</button>}</div>
     {loading && <p role="status" className="muted">Architekturdaten werden geladen …</p>}
     {error && <p role="alert" className="error">{error} <button type="button" className="ghost" onClick={() => void load()}>Erneut versuchen</button></p>}
     {data && <>
@@ -139,6 +153,7 @@ export function CommandCenter() {
         <div role="group" aria-label="Ansicht" className="ccSegment">
           <button type="button" className={mode === "architecture" ? "primary" : "ghost"} aria-pressed={mode === "architecture"} onClick={() => setMode("architecture")}>Architektur</button>
           <button type="button" className={mode === "process" ? "primary" : "ghost"} aria-pressed={mode === "process"} onClick={() => { setMode("process"); setSelection(null); }}>Ablauf</button>
+          <button type="button" className={mode === "profiles" ? "primary" : "ghost"} aria-pressed={mode === "profiles"} onClick={() => { setMode("profiles"); setSelection(null); }}>Steckbriefe</button>
         </div>
         <button type="button" className="ghost" onClick={() => { setSelection(null); setQuery(""); setResetToken(token => token + 1); }}>Gesamtansicht</button>
         {use3d && !sceneError && <button type="button" className="ghost" onClick={() => setUse3d(false)}>2D-Ansicht</button>}
@@ -148,7 +163,8 @@ export function CommandCenter() {
       <nav className="ccChips" aria-label="Hauptbereiche">{clusters.map(id => <button key={id} type="button" aria-pressed={expanded === id} className={`ccChip ${expanded === id ? "ccChipOn" : ""}`}
         style={{ borderColor: data.labels.clusters[id].color }} onClick={() => select({ type: "cluster", id })}>{data.labels.clusters[id].label}</button>)}</nav>
       {mode === "process" && <ProcessRibbon data={data} onSelect={select} />}
-      <div className="ccBody">
+      {mode === "profiles" && <ProfilesView data={data} query={query} onSelect={next => { setMode("architecture"); select(next); }} />}
+      <div className="ccBody" hidden={mode === "profiles"}>
         <div className="ccStage" data-testid="cc-stage" tabIndex={showScene ? 0 : -1} onKeyDown={showScene ? onStageKey : undefined}
           aria-label={showScene ? "3D-Ansicht. Pfeiltasten wechseln Bereiche und Komponenten, Enter öffnet, Pfeil hoch oder Escape geht zurück, Pos1 zeigt alles." : undefined}>
           {sceneMounted && !sceneError && sceneProps && <div style={{ height: "100%", display: showScene ? "block" : "none" }}><SceneBoundary onFail={setSceneError}><Scene {...sceneProps} onContextLost={() => setSceneError("WebGL-Kontext vom Browser beendet")} /></SceneBoundary></div>}

@@ -24,8 +24,71 @@ export function StatusRows({ data, node }: { data: Payload; node: ClientNode }) 
       <dd title={check.reason}>{{ yes: "Nachgewiesen", no: "Nicht erfüllt", unknown: "Unbekannt", not_required: "Nicht erforderlich" }[check.state]}<small> · {check.reason}</small></dd>
     </div>)}
     <div><dt>Betrieb</dt><dd>{op ? <OpChip data={data} status={op.status} /> : "–"}</dd></div>
+    <div><dt>KI-Modell</dt><dd>{op?.aiModel ?? node.aiModel ?? "Kein KI-Modell"}</dd></div>
+    <div><dt>Zuletzt erfolgreich</dt><dd><LastRunText run={op?.lastRun} /></dd></div>
     {op && <p className="ccReason">{op.reason}<small> · Quelle: {op.source}{op.source === "Datenbank" ? `, Stand ${time(data.runtime.evidence.generatedAt)}` : op.source === "Konfiguration" || op.source === "Preview-Sperre" ? `, Stand ${time(data.runtime.generatedAt)}` : ""}</small></p>}
   </dl>;
+}
+
+// "When did it last work?" – only database evidence; without evidence it says so instead of guessing.
+export function LastRunText({ run }: { run: NonNullable<Payload["runtime"]["nodes"][string]>["lastRun"] | undefined }) {
+  if (!run) return <span className="muted">Kein Laufzeitnachweis in der Datenbank</span>;
+  return <>{run.okAt ? time(run.okAt) : "noch nie erfolgreich belegt"}<small> · {run.label}</small>
+    {run.failedAt && <small className="error"> · Fehlschlag {time(run.failedAt)}{run.error ? `: ${run.error}` : ""}</small>}</>;
+}
+
+// Neighbours of a component from the documented data flows (edges), in plain words.
+function neighbours(data: Payload, id: string) {
+  const name = (nodeId: string) => data.nodes.find(node => node.id === nodeId)?.label ?? nodeId;
+  return {
+    from: data.edges.filter(edge => edge.to === id && !edge.planned).map(edge => `${name(edge.from)} (${edge.label})`),
+    to: data.edges.filter(edge => edge.from === id && !edge.planned).map(edge => `${name(edge.to)} (${edge.label})`),
+  };
+}
+
+// The four research components the operator asked about, explained side by side (from the model, not invented).
+export const RESEARCH_CHAIN = ["trend-agent", "topic-scout", "trendsetter", "jarvis"] as const;
+export function ResearchChain({ data, onSelect }: { data: Payload; onSelect: (selection: Selection) => void }) {
+  return <section className="ccChain" aria-label="Recherche-Kette" data-testid="cc-research-chain">
+    <h5>So entstehen Content-Ideen</h5>
+    <ol>{RESEARCH_CHAIN.map(id => {
+      const node = data.nodes.find(item => item.id === id);
+      if (!node) return null;
+      const op = data.runtime.nodes[id];
+      return <li key={id}><button type="button" className="ccLink" onClick={() => onSelect(node.cluster === "core" ? { type: "jarvis" } : { type: "node", id })}><b>{node.label}</b></button>
+        {op && <> <OpChip data={data} status={op.status} compact /></>}<br /><small>{node.plain}</small></li>;
+    })}</ol>
+    <p className="muted"><small>Keine Doppelung: Der Trend-Agent recherchiert (Web + Sprachmodell), die Themen-Quellen lesen Nachrichten-/Trend-/Kalendersignale ohne Sprachmodell, der Trendsetter recherchiert nicht selbst, sondern bündelt beides zu Content-Chancen, und Jarvis entscheidet, welche Pipeline sie bearbeitet.</small></p>
+  </section>;
+}
+
+// Plain-language profile of every working component: what it does, inputs, outputs, AI model, status, last success.
+export function ProfilesView({ data, query, onSelect }: { data: Payload; query: string; onSelect: (selection: Selection) => void }) {
+  const q = query.trim().toLowerCase();
+  const order = (Object.keys(data.labels.clusters) as ClusterId[]).sort((a, b) => data.labels.clusters[a].order - data.labels.clusters[b].order);
+  const nodes = data.nodes.filter(node => node.kind !== "external" && (!q || `${node.label} ${node.plain}`.toLowerCase().includes(q)))
+    .sort((a, b) => (a.cluster === "core" ? -1 : order.indexOf(a.cluster as ClusterId)) - (b.cluster === "core" ? -1 : order.indexOf(b.cluster as ClusterId)));
+  return <div className="ccProfiles" data-testid="cc-profiles">
+    <ResearchChain data={data} onSelect={onSelect} />
+    <div style={{ overflowX: "auto" }}><table>
+      <thead><tr><th>Komponente</th><th>Was macht sie?</th><th>Bekommt Daten von</th><th>Gibt Ergebnisse an</th><th>KI-Modell</th><th>Status</th><th>Zuletzt erfolgreich</th></tr></thead>
+      <tbody>{nodes.map(node => {
+        const op = data.runtime.nodes[node.id];
+        const { from, to } = neighbours(data, node.id);
+        return <tr key={node.id}>
+          <td><button type="button" className="ccLink" onClick={() => onSelect(node.cluster === "core" ? { type: "jarvis" } : { type: "node", id: node.id })}><b>{node.label}</b></button>
+            <br /><small className="muted">{node.cluster === "core" ? "Zentrale" : data.labels.clusters[node.cluster].label}</small></td>
+          <td><small>{node.plain}</small></td>
+          <td><small>{from.join(" · ") || "–"}</small></td>
+          <td><small>{to.join(" · ") || "–"}</small></td>
+          <td><small>{op?.aiModel ?? node.aiModel ?? "Kein KI-Modell"}</small></td>
+          <td>{op ? <><OpChip data={data} status={op.status} compact /><br /><small>{op.reason}</small></> : "–"}</td>
+          <td><small><LastRunText run={op?.lastRun} /></small></td>
+        </tr>;
+      })}</tbody>
+    </table></div>
+    <p className="muted"><small>Status aus Konfiguration (nur Variablennamen), Schaltern und lesenden Datenbankabfragen. „Zuletzt erfolgreich“ zeigt nur gespeicherte Nachweise; fehlt einer, steht das dort ausdrücklich.</small></p>
+  </div>;
 }
 
 export function countByStatus(data: Payload, nodes: ClientNode[]) {

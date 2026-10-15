@@ -169,4 +169,15 @@ select { width: 100%; min-height: 44px; padding: 12px; border: 1px solid #4c5549
 .ccCardOn{border-color:#7cf5ff!important;background:#122030}
 @media (max-width:900px){.ccBody{grid-template-columns:1fr}.ccStage{height:min(62vh,520px);min-height:340px}.ccDetail{max-height:none}}
 @media (max-width:520px){.ccChip{font-size:12px;padding:5px 10px}.ccSteps{grid-auto-columns:minmax(140px,72%)}}
-@media (prefers-reduced-motion:reduce){.ccRoot *{animation:none!important;transition:none!important}}
+@media (prefers-reduced-motion:reduce){.ccRoot *{animation:none!important;transition:none!important}}/* Command Center as its own page (/architecture) */
+.ccRoot.ccPage{position:static;inset:auto;z-index:auto;min-height:100vh}
+.ccPageMain{width:100%;max-width:none;padding:0}
+.ccHeadActions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ccHeadActions form{margin:0}
+.ccProfiles table{width:100%;border-collapse:collapse;font-size:13px}
+.ccProfiles th,.ccProfiles td{border-bottom:1px solid #222a33;padding:8px;text-align:left;vertical-align:top}
+.ccProfiles th{position:sticky;top:0;background:#0d1117}
+.ccChain{border:1px solid #2a3340;border-radius:12px;padding:12px 16px;margin:0 0 16px}
+.ccChain ol{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));padding-left:18px}
+.studioNav{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:0 0 18px}
+.studioNav form{margin:0}

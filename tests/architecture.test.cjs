@@ -234,7 +234,7 @@ test('snapshot: every section runs in its own READ ONLY transaction, so Postgres
   const db = { ...sql, query: async () => { throw new Error('direct query outside a read-only transaction'); },
     transaction: async fn => { transactions++; const first = statements.length; const result = await fn(sql); assert.equal(statements[first], 'SET TRANSACTION READ ONLY'); return result; } };
   const snapshot = await S.readSnapshot(NOW, () => db);
-  assert.equal(transactions, 6);
+  assert.equal(transactions, 15, '6 status sections + 9 activity sources (last success), each in its own read-only transaction');
   assert.equal(snapshot.available, true);
 });
 test('snapshot: a real read-only transaction refuses a write (PGlite), and one broken section leaves the others readable', async () => {
