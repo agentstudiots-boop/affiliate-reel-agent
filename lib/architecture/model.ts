@@ -48,6 +48,8 @@ export type ArchNode = {
   effects: boolean;
   /** Documented live proof from the repository docs (not measured by the Command Center). */
   proof?: string;
+  /** Which AI model does the work (from the code constants; "kein KI-Modell" = rule-based). Filled from AI_MODELS. */
+  aiModel?: string;
 };
 export type ArchEdge = { id: string; from: string; to: string; kind: EdgeKind; label: string; planned?: boolean };
 
@@ -94,6 +96,33 @@ export const KIND_LABEL: Record<ComponentKind, string> = {
 const n = (node: ArchNode): ArchNode => node;
 const CODE: OperationRule = { type: "code" };
 const TOPIC_FLAG: OperationRule = { type: "flag", flag: "TOPIC_PIPELINE_ENABLED", label: "Themen-Pipeline" };
+
+// AI model per component, taken from the code (lib/content/model.ts, lib/whatsapp/route-llm.ts, chat.ts, instruction.ts,
+// transcribe.ts, lib/content/image-quality/gate.ts, lib/content/image-provider.ts, lib/runway.ts, lib/visual/providers/heygen.ts).
+// Environment overrides (IMAGE_QUALITY_MODEL, REPLICATE_IMAGE_MODEL) are added at request time by the runtime.
+export const AI_MODELS: Record<string, string> = {
+  "jarvis": "Regelbasiert; im KI-Modus redaktionelle Prüfung mit openai/gpt-4.1 (über Replicate)",
+  "trend-agent": "openai/gpt-4.1 (über Replicate) + Tavily-Websuche",
+  "topic-scout": "Kein KI-Modell – regelbasierte Bewertung von Nachrichten-, Trend- und Kalendersignalen",
+  "trendsetter": "Kein KI-Modell – regelbasierte Bewertung und Duplikatprüfung",
+  "topic-orchestrator": "Kein eigenes Modell; WhatsApp-Antworten zu Themen: openai/gpt-5.6-terra (über Replicate)",
+  "product-scout": "Kein KI-Modell – Amazon-Produktsuche und Seiten-Prüfung",
+  "product-reviewer": "Kein KI-Modell – regelbasiert gegen die Amazon-Detailseite",
+  "creative-agent": "Referenzmodus: regelbasiert · KI-Modus: openai/gpt-4.1 (über Replicate)",
+  "video-agent": "Referenzmodus: regelbasiert · KI-Modus: openai/gpt-4.1 (über Replicate)",
+  "image-agent": "Referenzmodus: regelbasiert · KI-Modus: openai/gpt-4.1 (über Replicate)",
+  "text-agent": "Referenzmodus: regelbasiert · KI-Modus: openai/gpt-4.1 (über Replicate)",
+  "marketing-agent": "Referenzmodus: regelbasiert · KI-Modus: openai/gpt-4.1 (über Replicate)",
+  "script-writer": "Kein KI-Modell – Regelwerk und Vorlagen",
+  "format-router": "Kein KI-Modell – Regeln",
+  "vision-gate": "openai/gpt-5.6-terra mit Bildeingabe (über Replicate; überschreibbar mit IMAGE_QUALITY_MODEL)",
+  "whatsapp": "openai/gpt-5.6-terra (Router, Gespräch, Anweisungen) · Sprachnachrichten: openai/gpt-4o-transcribe",
+  "replicate": "Bilder: black-forest-labs/flux-1.1-pro · Sprache/Vision: openai/gpt-4.1, openai/gpt-5.6-terra",
+  "openai-image": "gpt-image-2.5-flare (nur Ausweich, nicht konfiguriert)",
+  "runway": "Runway wan3 (Video)",
+  "heygen": "HeyGen Avatar-Video (v2), Avatar und Stimme per Konfiguration",
+  "visual-engine": "Kein eigenes Modell – beauftragt Replicate/Runway/HeyGen",
+};
 
 export const NODES: ArchNode[] = [
   n({ id: "jarvis", label: "Jarvis (Content-Orchestrator)", short: "JARVIS", kind: "orchestrator", cluster: "core", since: "main", effects: true,
@@ -314,7 +343,7 @@ export const NODES: ArchNode[] = [
     plain: "Externe Schnittstelle von Meta für WhatsApp, Instagram und Facebook.", summary: "Externe API; keine eigene Logik.", responsibilities: [],
     code: ["lib/meta/connection.ts", "lib/whatsapp/client.ts"], tests: ["tests/meta.test.cjs"], gaps: [], operation: { type: "env", anyOf: [["META_SYSTEM_USER_TOKEN"], ["META_PAGE_ACCESS_TOKEN"]] },
     proof: "docs/CREDENTIALS.md: WhatsApp produktiv" }),
-];
+].map(node => AI_MODELS[node.id] ? { ...node, aiModel: AI_MODELS[node.id] } : node);
 
 export const EDGES: ArchEdge[] = [
   // Recherche → Trendsetter → Jarvis → Pipelines

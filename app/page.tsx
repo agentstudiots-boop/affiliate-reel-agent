@@ -1,6 +1,7 @@
 "use client";
 
 import { amazonProduct } from "@/lib/amazon";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ContentStudio } from "@/app/content-studio";
 import { MetaConnection } from "@/app/meta-connection";
@@ -157,6 +158,12 @@ export default function Home() {
         </div>
         <button className="ghost" onClick={reset}>Neuer Test</button>
       </header>
+
+      <nav className="studioNav" aria-label="Bereiche">
+        <Link className="primary" href="/architecture" style={{ width: "auto", textDecoration: "none" }}>Command Center öffnen – Agenten, Status &amp; Abläufe</Link>
+        <a className="ghost" href="/produkte" target="_blank" rel="noopener noreferrer">Öffentliche Produktseite ↗</a>
+        <form method="post" action="/api/auth/logout"><button type="submit" className="ghost">Abmelden</button></form>
+      </nav>
 
       <nav className="steps" aria-label="Workflow">
         {["Produkt", "Ideen & Format", "Entwurf & Prüfung", "Marketing & Freigabe"].map((label, i) => <span key={label}>{i + 1} {label}</span>)}

@@ -17,6 +17,21 @@ export type RuntimeSnapshot = {
   chances: { recent: { chanceId: string; title: string; recommendation: string; suitability: number; at: string }[]; openRoutes: number; last24h: number } | null;
   vision: { checked: number; lastStatus: string | null; lastAt: string | null } | null;
   visualJobs: { kind: string; status: string; at: string }[] | null;
+  // "When did it last work?" – newest successful / failed evidence per source (read-only, from existing tables).
+  activity: Activity | null;
+};
+export type ActivityEntry = { lastOkAt: string | null; lastAt: string | null; lastOk: boolean | null; lastError: string | null };
+export type Activity = {
+  models: Record<string, ActivityEntry>;          // model_calls per agent (migration 037)
+  cron: (ActivityEntry & { lastOutcome: string | null }) | null;  // daily_slot_runs (036)
+  whatsappInboundAt: string | null;               // whatsapp_events: last message received and processed
+  drafts: { lastAt: string | null; lastMode: string | null } | null;     // content_jobs that reached the approval step
+  productVerifiedAt: string | null;               // last content job with a verified Amazon product
+  contentApprovedAt: string | null;               // last explicit content approval
+  chancesSeenAt: string | null;                   // content_chances (035)
+  topicRun: { lastOkAt: string | null; lastAt: string | null; lastOutcome: string | null } | null;
+  // Affiliate posts (product pipeline): publication_requests (Facebook) and instagram_image_posts (Instagram feed).
+  affiliatePublished: { facebook: string | null; instagram: string | null } | null;
 };
 
 const iso = (value: unknown) => value ? new Date(String(value)).toISOString() : new Date(0).toISOString();
@@ -33,7 +48,7 @@ async function section<T>(db: Readable, work: (sql: Sql) => Promise<T>): Promise
 }
 
 export async function readSnapshot(now = new Date(), open: () => Readable = getDatabase): Promise<RuntimeSnapshot> {
-  const empty = { topic: null, affiliate: null, publications: null, chances: null, vision: null, visualJobs: null };
+  const empty = { topic: null, affiliate: null, publications: null, chances: null, vision: null, visualJobs: null, activity: null };
   let handle: Readable;
   try { handle = open(); }
   catch (error) {
@@ -75,6 +90,44 @@ export async function readSnapshot(now = new Date(), open: () => Readable = getD
   });
   const visualJobs = await section(handle, async db => (await db.query(`SELECT DISTINCT ON (kind) kind, status, updated_at FROM visual_jobs ORDER BY kind, updated_at DESC`)).rows
     .map(row => ({ kind: String(row.kind), status: String(row.status), at: iso(row.updated_at) })));
-  const any = [topic, affiliate, publications, chances, vision, visualJobs].some(item => item !== null);
-  return { available: any, reason: any ? null : "Keine erfolgreiche Datenbankabfrage; Verbindung oder Tabellen unbekannt", generatedAt: now.toISOString(), topic, affiliate, publications, chances, vision, visualJobs };
+  const activity = await readActivity(handle);
+  const any = [topic, affiliate, publications, chances, vision, visualJobs, activity].some(item => item !== null);
+  return { available: any, reason: any ? null : "Keine erfolgreiche Datenbankabfrage; Verbindung oder Tabellen unbekannt", generatedAt: now.toISOString(), topic, affiliate, publications, chances, vision, visualJobs, activity };
+}
+
+const at = (value: unknown) => value ? new Date(String(value)).toISOString() : null;
+
+// Each source separately: a missing table (e.g. migration 037 not applied yet) leaves only that entry empty.
+async function readActivity(handle: Readable): Promise<Activity | null> {
+  const models = await section(handle, async db => Object.fromEntries((await db.query(`SELECT agent, max(created_at) FILTER (WHERE ok) AS last_ok_at, max(created_at) AS last_at,
+      (array_agg(ok ORDER BY created_at DESC))[1] AS last_ok, (array_agg(error_class ORDER BY created_at DESC))[1] AS last_error
+      FROM model_calls WHERE created_at > now() - interval '30 days' GROUP BY agent`)).rows
+    .map(row => [String(row.agent), { lastOkAt: at(row.last_ok_at), lastAt: at(row.last_at), lastOk: row.last_ok === null ? null : row.last_ok === true, lastError: clean(row.last_error, 60) }])));
+  const cron = await section(handle, async db => {
+    const row = (await db.query(`SELECT max(invoked_at) FILTER (WHERE outcome NOT IN ('error','outside_berlin_slot')) AS last_ok_at, max(invoked_at) AS last_at,
+      (array_agg(outcome ORDER BY invoked_at DESC))[1] AS last_outcome, (array_agg(reason ORDER BY invoked_at DESC) FILTER (WHERE outcome='error'))[1] AS last_error
+      FROM daily_slot_runs WHERE invoked_at > now() - interval '30 days'`)).rows[0];
+    return row ? { lastOkAt: at(row.last_ok_at), lastAt: at(row.last_at), lastOk: row.last_outcome ? row.last_outcome !== "error" : null, lastError: clean(row.last_error, 80), lastOutcome: row.last_outcome ? String(row.last_outcome) : null } : null;
+  });
+  const whatsapp = await section(handle, async db => at((await db.query("SELECT max(received_at) AS last FROM whatsapp_events")).rows[0]?.last));
+  const drafts = await section(handle, async db => {
+    const row = (await db.query(`SELECT updated_at, snapshot->>'mode' AS mode FROM content_jobs WHERE status IN ('awaiting_approval','approved') ORDER BY updated_at DESC LIMIT 1`)).rows[0];
+    return { lastAt: at(row?.updated_at), lastMode: row?.mode ? String(row.mode) : null };
+  });
+  const product = await section(handle, async db => at((await db.query(`SELECT max(created_at) AS last FROM content_jobs WHERE opportunity->'product'->>'productVerifiedAt' IS NOT NULL`)).rows[0]?.last));
+  const approved = await section(handle, async db => at((await db.query(`SELECT max(decided_at) AS last FROM content_approval_requests WHERE status='approved'`)).rows[0]?.last));
+  const chances = await section(handle, async db => at((await db.query("SELECT max(last_seen_at) AS last FROM content_chances")).rows[0]?.last));
+  const topicRun = await section(handle, async db => {
+    const row = (await db.query(`SELECT max(created_at) FILTER (WHERE outcome <> 'failed') AS last_ok_at, max(created_at) AS last_at,
+      (array_agg(outcome ORDER BY created_at DESC))[1] AS last_outcome FROM topic_runs`)).rows[0];
+    return row ? { lastOkAt: at(row.last_ok_at), lastAt: at(row.last_at), lastOutcome: row.last_outcome ? String(row.last_outcome) : null } : null;
+  });
+  const affiliatePublished = await section(handle, async db => {
+    const row = (await db.query(`SELECT (SELECT max(updated_at) FROM publication_requests WHERE status='published' AND platform='facebook') AS facebook,
+      (SELECT max(updated_at) FROM instagram_image_posts WHERE status='published') AS instagram`)).rows[0];
+    return { facebook: at(row?.facebook), instagram: at(row?.instagram) };
+  });
+  const parts = [models, cron, whatsapp, drafts, product, approved, chances, topicRun, affiliatePublished];
+  if (parts.every(item => item === null)) return null;
+  return { models: models ?? {}, cron, whatsappInboundAt: whatsapp, drafts, productVerifiedAt: product, contentApprovedAt: approved, chancesSeenAt: chances, topicRun, affiliatePublished };
 }

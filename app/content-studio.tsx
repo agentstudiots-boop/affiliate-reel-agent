@@ -167,7 +167,7 @@ export function ContentStudio({ product, onFillReelTest }: { product: Product; o
     {targetPlatform === "instagram" && <label>Formatwahl<select value={formatPreference} onChange={e=>setFormatPreference(e.target.value as "automatic"|"video")}><option value="automatic">Automatisch wählen</option><option value="video">Instagram Reel gezielt testen (Video)</option></select><small>Ein gezielter Test erzeugt einen Videoentwurf. Der gewählte Produzent darf erst nach gesonderter WhatsApp-Kostenfreigabe starten.</small></label>}
     <label>Anwendungsgruppe für ähnliche Fälle<input value={useCaseKey} onChange={e=>setUseCaseKey(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,"-"))} maxLength={80} placeholder="z. B. sous-vide oder vorratshaltung" /><small>Für vergleichbare Anwendungen denselben Begriff verwenden. „general“ aktiviert noch keinen historischen Vergleich.</small></label>
     <p className="muted">Tavily recherchiert aktuelle Trends und Produktquellen. Die Content-Planung arbeitet regelbasiert ohne generative Modellkosten.</p>
-    <form method="post" action="/api/auth/logout" className="contentActions"><small>Angemeldet als Betreiber (Sitzung 12 h, HttpOnly-Cookie).</small><button type="submit" className="ghost">Abmelden</button></form>
+    <p className="muted"><small>Angemeldet als Betreiber (Sitzung 12 h). Abmelden oben in der Navigation.</small></p>
     <p className={databaseReady ? "muted" : "error"}>{databaseReady ? "Postgres konfiguriert. Verlauf laden prüft die Verbindung." : "Postgres muss noch eingerichtet werden. Neue Jobs werden erst mit zentralem Speicher gestartet."}</p>
     <OperationsPanel />
     <CommandCenter />

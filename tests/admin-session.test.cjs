@@ -148,5 +148,6 @@ test('protected routes accept the session cookie (e.g. operations) and refuse it
 test('frontend never holds the access code any more', () => {
   for (const file of ['app/page.tsx', 'app/content-studio.tsx', 'app/operations-panel.tsx', 'app/publication-gate.tsx', 'app/production-gate.tsx', 'app/architecture/command-center.tsx'])
     assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /x-content-password/, file);
-  assert.match(fs.readFileSync('app/content-studio.tsx', 'utf8'), /\/api\/auth\/logout/);
+  assert.match(fs.readFileSync('app/page.tsx', 'utf8'), /\/api\/auth\/logout/);
+  assert.match(fs.readFileSync('app/page.tsx', 'utf8'), /href="\/architecture"/);
 });
