@@ -54,6 +54,16 @@ Stand: **2026-10-15**, Claude-Code-Cloud-Sitzung, Branch `claude/clever-cori-b73
 - Angebunden: WhatsApp-Router, Themen-Router, Vision-Qualitätsprüfung, WhatsApp-Chat, Anweisungsparser, Transkription, Content-KI-Modus (je Agent `content_<agent>`).
 - Übersicht 7 Tage im Studio-Panel „Tageslauf & Ergebnisse“ (`/api/operations` → `modelUsage`). Keine erfundenen Euro-Beträge.
 
+## 2b. Nachtrag 15.10. abends
+
+| Schritt | Nachweis |
+|---|---|
+| PR #72 gemergt | `main` = `dc4dc7f` (nach vollständiger Prüfung: npm ci, typecheck, lint, 643/643, build, audit 0, CI grün; Merge auf ausdrückliche Betreiberanweisung) |
+| Production-Deployment #72 | `dpl_3QFYMTtg2Pj4BGd8gJtLjhz3ZJ1K` READY, Commit `dc4dc7f` = `main` |
+| Live geprüft (Vercel-Fetch) | `/` → Anmeldeseite (`x-matched-path: /login`); `/produkte` 200 öffentlich; `/api/architecture` ohne Sitzung 401 |
+| Production-Deployment #71 | `dpl_5RXUrKsywePrBsC1GiUZd2cZ6FZ2` READY, Commit `0e0f9b8` |
+| Command Center zugänglich (PR folgt) | Ursache: es gab keine Seite `/architecture`, nur einen Dialog tief im Studio. Neu: eigene geschützte Seite, Link oben im Studio, Ansicht „Steckbriefe“ (Funktion, Eingänge, Ausgänge, KI-Modell, Status, zuletzt erfolgreich aus DB) |
+
 ## 3. Status je Bereich
 
 | Bereich | Status (Stand Ende Sitzung) |
