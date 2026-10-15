@@ -1,3 +1,4 @@
+import { selectReelPatterns, type ReelPattern } from "./reel-intelligence";
 import type { LearningEvidence } from "../memory/schema";
 import { bindAmazonProduct, requireProduct, PRODUCT_UNRESOLVED } from "../amazon";
 import { creativeAgent } from "./agents/creative";
@@ -131,6 +132,7 @@ export async function runContentJob(raw: Opportunity, options: {
   mode?: "reference" | "ai"; signal?: AbortSignal; onUpdate?: (job: ContentJob) => void | Promise<void>;
   id?: string; loadLearning?: (opportunity: Opportunity) => Promise<LearningEvidence>;
   loadCorrections?: (opportunity: Opportunity) => Promise<ApprovedEditorialCorrection[]>;
+  loadReelPatterns?: (opportunity: Opportunity) => Promise<ReelPattern[]>;
   allowedFormats?: ReadonlyArray<Content["format"]>;
   generate?: Generator; // Dependency injection for deterministic, cost-free contract tests.
 } = {}): Promise<ContentJob> {
@@ -197,7 +199,8 @@ export async function runContentJob(raw: Opportunity, options: {
       mode: job.mode,
     });
     await status("ideating", "Creative Agent entwickelt drei Formatideen");
-    job.ideas = (await creativeAgent(opportunity, generate, inspiration, corrections)).ideas;
+    const reelPatterns = options.loadReelPatterns ? selectReelPatterns(await options.loadReelPatterns(opportunity), opportunity.category, opportunity.product.targetGroup) : [];
+    job.ideas = (await creativeAgent(opportunity, generate, inspiration, corrections, reelPatterns)).ideas;
     await status("selecting", "Orchestrator bewertet Ideen und wählt das Format");
     const learning = options.loadLearning ? await options.loadLearning(opportunity) : undefined;
     if (learning) await emit("orchestrator", "decision", learning.summary, learning);
@@ -227,7 +230,7 @@ export async function runContentJob(raw: Opportunity, options: {
       const rejected = job.review!;
       try {
         const reference = createGenerator({ mode: "reference", signal: options.signal });
-        const alternatives = (await creativeAgent(opportunity, reference, inspiration, corrections)).ideas;
+        const alternatives = (await creativeAgent(opportunity, reference, inspiration, corrections, reelPatterns)).ideas;
         const alternativeDecision = selectIdea(alternatives, opportunity, learning, options.allowedFormats);
         if (alternativeDecision.format !== "image") throw new Error("Kein Bildformat im Referenzentwurf.");
         const alternativeIdea = alternatives.find(item => item.id === alternativeDecision.ideaId)!;
