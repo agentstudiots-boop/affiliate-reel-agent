@@ -28,7 +28,7 @@ const modeLabel = {
   RUNWAY_SINGLE_CLIP: "Runway 30-Sekunden-Story",
 } as const;
 
-export function ProductionGate({ job, password, onRevised }: { job: ContentJob; password: string; onRevised?: (job: ContentJob) => void }) {
+export function ProductionGate({ job, onRevised }: { job: ContentJob; onRevised?: (job: ContentJob) => void }) {
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -43,27 +43,27 @@ export function ProductionGate({ job, password, onRevised }: { job: ContentJob; 
   const [selectedImage,setSelectedImage] = useState<File | null>(null);
 
   async function refresh(diagnostics = false) {
-    const response = await fetch(`/api/production?jobId=${encodeURIComponent(job.id)}${diagnostics ? "&diagnostics=1" : ""}`, { headers: { "x-content-password": password }, cache: "no-store" });
+    const response = await fetch(`/api/production?jobId=${encodeURIComponent(job.id)}${diagnostics ? "&diagnostics=1" : ""}`, { cache: "no-store" });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Status konnte nicht geladen werden.");
     setStatus(data);
   }
 
   useEffect(() => {
-    if (job.status !== "approved" || job.content?.format !== "video" || !password) return;
+    if (job.status !== "approved" || job.content?.format !== "video") return;
     let active = true;
-    fetch(`/api/production?jobId=${encodeURIComponent(job.id)}`, { headers: { "x-content-password": password }, cache: "no-store" })
+    fetch(`/api/production?jobId=${encodeURIComponent(job.id)}`, { cache: "no-store" })
       .then(async response => { if (!response.ok) throw new Error("Status konnte nicht geladen werden."); return response.json(); })
       .then(data => { if (active) setStatus(data); })
       .catch(() => { if (active) setError("Status konnte nicht geladen werden."); });
     return () => { active = false; };
-  }, [job.id, job.status, job.content?.format, password]);
+  }, [job.id, job.status, job.content?.format]);
 
   async function action(name: "quoteVideo" | "requestApproval" | "startVideo" | "pollVideo" | "reviseContent" | "requestRevision") {
     setBusy(true); setError("");
     try {
       const response = await fetch("/api/production", {
-        method: "POST", headers: { "Content-Type": "application/json", "x-content-password": password },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: name, jobId: job.id, ...(name === "requestApproval" ? { voiceId, imageUrl, rightsConfirmed } : {}), ...(name === "requestRevision" ? { feedback: revisionFeedback } : {}) }),
       });
       const data = await response.json();
@@ -80,7 +80,7 @@ export function ProductionGate({ job, password, onRevised }: { job: ContentJob; 
     try {
       const response = await fetch("/api/production", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-content-password": password },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "prepareVideo", jobId: job.id, provider: preferredProvider }),
       });
       const data = await response.json();
@@ -100,7 +100,7 @@ export function ProductionGate({ job, password, onRevised }: { job: ContentJob; 
     setBusy(true);setError("");
     try {
       const form=new FormData(); form.set("file",selectedImage); form.set("rightsConfirmed","true");
-      const response=await fetch("/api/assets/upload",{method:"POST",headers:{"x-content-password":password},body:form});
+      const response=await fetch("/api/assets/upload",{method:"POST",body:form});
       const data=await response.json();
       if(!response.ok) throw new Error(data.error || "Bild konnte nicht hochgeladen werden.");
       setImageUrl(data.url);
@@ -116,7 +116,7 @@ export function ProductionGate({ job, password, onRevised }: { job: ContentJob; 
     <h3>Produktionsfreigabe</h3>
     <p>Nach der Inhaltsfreigabe wird das Kostenangebot automatisch per WhatsApp gesendet. Deine Antwort dort reicht für genau einen Videostart; das Content Studio ist dafür nicht erforderlich. Das fertige Reel kommt vor Veröffentlichung nochmals per WhatsApp zur Prüfung.</p>
     {policy && <div className="reviewBox"><strong>Videoproduzent</strong><p>{policy.reason}</p></div>}
-    {!run && <><label>Produzent <select value={preferredProvider} onChange={event=>setPreferredProvider(event.target.value as "runway"|"faceless_video")}><option value="runway">Runway · 30-Sekunden-Story</option><option value="faceless_video">Faceless · Storyboard</option></select></label><button type="button" className="primary" disabled={busy || !password} onClick={prepare}>{busy ? "Produktionsweg wird vorbereitet …" : "Produktionsweg vorbereiten – noch keine Kosten"}</button></>}
+    {!run && <><label>Produzent <select value={preferredProvider} onChange={event=>setPreferredProvider(event.target.value as "runway"|"faceless_video")}><option value="runway">Runway · 30-Sekunden-Story</option><option value="faceless_video">Faceless · Storyboard</option></select></label><button type="button" className="primary" disabled={busy} onClick={prepare}>{busy ? "Produktionsweg wird vorbereitet …" : "Produktionsweg vorbereiten – noch keine Kosten"}</button></>}
     {run && <div className="marketingPlan">
       <p><b>Vorgesehener Renderer:</b> {modeLabel[run.providerMode]}</p>
       <p><b>Status:</b> {run.status === "needs_provider_quote" ? "Provider-Angebot / Kostenquote fehlt" : run.status}</p>
@@ -149,7 +149,7 @@ export function ProductionGate({ job, password, onRevised }: { job: ContentJob; 
       {run.status === "rendering" && <><p>Videostart wurde beansprucht. {run.providerJobId ? "Provider-Auftrag bestätigt." : "Provider-Ergebnis unklar: keinen zweiten kostenpflichtigen Start auslösen."}</p>{run.providerJobId && <button type="button" disabled={busy} onClick={() => action("pollVideo")}>Provider-Status abfragen / MP4 fertigstellen</button>}</>}
       {run.status === "failed" && <><p className="error">Der gestartete Provider-Auftrag ist fehlgeschlagen. Die tatsächliche Credit-Belastung im Provider-Konto prüfen; keine erneute Produktion ohne neue Kostenentscheidung starten.</p>{run.providerJobId && <button type="button" disabled={busy} onClick={() => refresh(true).catch(caught => setError(caught instanceof Error ? caught.message : "Provider-Fehler nicht lesbar"))}>Fehlerursache beim Provider lesen – keine Kosten</button>}{status?.providerDiagnostics && <p className="error">Provider-Status: {status.providerDiagnostics.status}. {status.providerDiagnostics.errorMessages?.join(" · ") || "Keine weitere Fehlerbeschreibung verfügbar."}</p>}</>}
       {run.status === "ready" && run.outputUrl && <p><a href={run.outputUrl} target="_blank" rel="noreferrer">Fertiges Video ansehen</a> · Veröffentlichung erfordert eine separate Freigabe.</p>}
-      {run.status === "ready" && job.marketing?.primary === "Instagram Reel" && <InstagramReelGate job={job} password={password} />}
+      {run.status === "ready" && job.marketing?.primary === "Instagram Reel" && <InstagramReelGate job={job} />}
       {run.status === "changes_requested" && <><p>Änderungsauftrag gespeichert. Der Orchestrator gibt ihn an den Video-Agenten weiter. Im Referenzmodus sind konkrete Szenen-, CTA- und Tempoänderungen unterstützt.</p><button type="button" disabled={busy} onClick={() => action("reviseContent")}>Änderung bearbeiten und neuen Content-Plan vorlegen</button></>}
       {status?.approval && <p><b>Freigabe:</b> {status.approval.status}{status.approval.whatsappMessageId ? " · WhatsApp-Nachricht bestätigt" : " · Versand nicht bestätigt; manuell prüfen"}</p>}
       {status && !status.configuration.whatsappApprovalReady && <p className="muted">WhatsApp ist teilweise vorbereitet. Für den signierten Freigabe-Webhook fehlen noch mindestens Verify-Token/App-Secret oder die freigegebene Empfänger-WA-ID.</p>}

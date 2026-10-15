@@ -1,3 +1,4 @@
+import { predictionMetrics, recordModelCall } from "../observability/model-calls";
 import { z } from "zod";
 import type { Generator } from "./agent";
 import { editorialPolicy } from "./agent";
@@ -48,6 +49,8 @@ export function createGenerator(options: { mode: "reference" | "ai"; signal?: Ab
     const request=options.request||fetch;
     const wait=options.wait||waitForLimit;
     const headers={Authorization:`Bearer ${token}`};
+    const started=Date.now();
+    let seen:unknown=null;
     try {
       const scheduled = nextPredictionAt - Date.now();
       if(scheduled>0) await wait(scheduled,signal);
@@ -69,6 +72,7 @@ export function createGenerator(options: { mode: "reference" | "ai"; signal?: Ab
       }
       if(!response.ok)throw new Error(`Modellantwort HTTP ${response.status}`);
       let prediction=await response.json();
+      seen=prediction;
       const id=prediction?.id;
       if(typeof id!=="string"||!/^[a-z0-9]{12,64}$/.test(id))throw new Error("Ungültige Modellantwort.");
       for(let attempt=0;["starting","processing"].includes(prediction.status)&&attempt<14;attempt++){
@@ -81,13 +85,17 @@ export function createGenerator(options: { mode: "reference" | "ai"; signal?: Ab
         const poll=await request(`https://api.replicate.com/v1/predictions/${id}`,{headers,redirect:"error",signal});
         if(!poll.ok)throw new Error("Modellstatus unklar.");
         prediction=await poll.json();
+        seen=prediction;
         if(prediction?.id!==id)throw new Error("Modellstatus widersprüchlich.");
       }
       const output=predictionText(prediction?.output);
       if(prediction.status!=="succeeded"||!output||output.length>28000)throw new Error("Modellantwort fehlt oder ist unklar.");
       // Models sometimes wrap the JSON in a markdown fence despite the instruction; the content is still validated by the schema.
-      return schema.parse(JSON.parse(output.trim().replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,"")));
+      const parsed=schema.parse(JSON.parse(output.trim().replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,"")));
+      await recordModelCall({agent:`content_${agent}`,model:MODEL,ok:true,latencyMs:Date.now()-started,...predictionMetrics(prediction)});
+      return parsed;
     }catch(error){
+      await recordModelCall({agent:`content_${agent}`,model:MODEL,ok:false,errorClass:options.signal?.aborted?"aborted":failureCategory(error),latencyMs:Date.now()-started,...predictionMetrics(seen)});
       if(options.signal?.aborted)throw error;
       console.warn(JSON.stringify({event:"editorial_model_failed",agent,model:MODEL,reason:failureCategory(error)}));
       throw new Error(failureCategory(error)==="http_429"?EDITORIAL_RATE_LIMIT_ERROR:EDITORIAL_MODEL_ERROR);

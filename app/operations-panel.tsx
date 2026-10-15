@@ -12,6 +12,8 @@ type Snapshot = {
   posts: Array<{ jobId: string; platform: string; product: string; url: string; publishedAt: string;
     measurement: null | { observedAt: string; clicks: number; conversions: number; revenueCents: number; costCents: number | null; source: string } }>;
   latestReport: null | { weekStart: string; status: string; text: string };
+  modelUsage?: null | Array<{ agent: string; model: string; calls: number; failures: number; failureRate: number; avgLatencyMs: number; p95LatencyMs: number;
+    inputTokens: number | null; outputTokens: number | null; predictTimeS: number | null; lastCallAt: string | null }>;
 };
 
 const euro = (cents: number) => new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(cents / 100);
@@ -26,14 +28,14 @@ const publicationLabels: Record<string,string> = {
   changes_requested: "Änderung angefragt", rejected: "Abgelehnt",
 };
 
-export function OperationsPanel({ password }: { password: string }) {
+export function OperationsPanel() {
   const [data, setData] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   async function refresh() {
     setLoading(true); setError("");
     try {
-      const response = await fetch("/api/operations", { cache: "no-store", headers: { "x-content-password": password } });
+      const response = await fetch("/api/operations", { cache: "no-store" });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Tageslauf nicht abrufbar.");
       setData(result);
@@ -43,7 +45,7 @@ export function OperationsPanel({ password }: { password: string }) {
   async function run(action: "daily" | "continue") {
     setLoading(true); setError("");
     try {
-      const response = await fetch("/api/operations", { method: "POST", headers: { "Content-Type": "application/json", "x-content-password": password }, body: JSON.stringify({ action }) });
+      const response = await fetch("/api/operations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
       const result = await response.json();
       if (!response.ok || result.status === "failed") throw new Error(result.error || "Tageslauf fehlgeschlagen; gespeicherten Status prüfen.");
       await refresh();
@@ -53,9 +55,9 @@ export function OperationsPanel({ password }: { password: string }) {
   return <section className="reviewBox">
     <h3>Tageslauf &amp; Ergebnisse</h3>
     <p>Zwei geplante Bildentwürfe täglich; zusätzliche Entwürfe per WhatsApp mit „Bildpost“ oder „Bildpost B0…“. Jede Bildproduktion und Veröffentlichung benötigt deine eigene WhatsApp-Freigabe.</p>
-    <button type="button" className="ghost" disabled={!password || loading} onClick={refresh}>{loading ? "Lade …" : "Aktuellen Stand laden"}</button>
-    <button type="button" className="ghost" disabled={!password || loading} onClick={() => run("daily")}>Zusätzlichen Bildentwurf starten</button>
-    <button type="button" className="ghost" disabled={!password || loading} onClick={() => run("continue")}>Freigegebene Reels fortsetzen</button>
+    <button type="button" className="ghost" disabled={loading} onClick={refresh}>{loading ? "Lade …" : "Aktuellen Stand laden"}</button>
+    <button type="button" className="ghost" disabled={loading} onClick={() => run("daily")}>Zusätzlichen Bildentwurf starten</button>
+    <button type="button" className="ghost" disabled={loading} onClick={() => run("continue")}>Freigegebene Reels fortsetzen</button>
     {error && <p role="alert" className="error">{error}</p>}
     {data && <>
       <p><strong>Umgebung:</strong> {data.environment === "production" ? "Production" : "Preview / lokal – kein automatischer Vercel-Cronlauf"}</p>
@@ -73,6 +75,14 @@ export function OperationsPanel({ password }: { password: string }) {
           <td>{post.measurement?.clicks ?? "–"}</td><td>{post.measurement?.conversions ?? "–"}</td>
           <td>{post.measurement ? `${euro(post.measurement.revenueCents)} / ${post.measurement.costCents === null ? "Kosten unbekannt" : euro(post.measurement.costCents)}` : "–"}</td></tr>)}
       </tbody></table></div> : <p>Noch kein veröffentlichter Beitrag gespeichert.</p>}
+      <h4>Modellaufrufe (7 Tage)</h4>
+      {data.modelUsage === null || data.modelUsage === undefined ? <p>Unbekannt – Protokoll (Migration 037) noch nicht verfügbar.</p>
+        : data.modelUsage.length ? <div style={{overflowX:"auto"}}><table><thead><tr><th>Agent</th><th>Modell</th><th>Aufrufe</th><th>Fehler</th><th>Latenz Ø / p95</th><th>Tokens ein / aus</th><th>Rechenzeit</th></tr></thead><tbody>
+          {data.modelUsage.map(row => <tr key={`${row.agent}-${row.model}`}><td>{row.agent}</td><td><small>{row.model}</small></td><td>{row.calls}</td>
+            <td>{row.failures} ({Math.round(row.failureRate * 100)} %)</td><td>{(row.avgLatencyMs / 1000).toFixed(1)} s / {(row.p95LatencyMs / 1000).toFixed(1)} s</td>
+            <td>{row.inputTokens ?? "–"} / {row.outputTokens ?? "–"}</td><td>{row.predictTimeS === null ? "–" : `${row.predictTimeS} s`}</td></tr>)}
+        </tbody></table></div> : <p>Keine Modellaufrufe protokolliert.</p>}
+      <p className="muted">Kosten: Anbieterkennzahlen (Tokens, Rechenzeit) statt geschätzter Euro-Beträge; Preise je Modell beim Anbieter prüfen.</p>
       {data.latestReport && <details><summary>Letzte Wochenbilanz · {data.latestReport.weekStart} · {data.latestReport.status}</summary><pre style={{whiteSpace:"pre-wrap"}}>{data.latestReport.text || "Bericht noch nicht erstellt."}</pre></details>}
       <p className="muted">Klicks, Verkäufe und Provisionen stammen aus erfassten Messständen. Zum Eintragen: „Gespeicherten Verlauf laden“, den Job wählen und dessen Leistungsformular öffnen. Ohne PartnerNet-Daten sind diese Werte unbekannt. Die Werte einer Beitragszeile sind der letzte Messstand dieses Beitrags, keine Tageswerte.</p>
     </>}

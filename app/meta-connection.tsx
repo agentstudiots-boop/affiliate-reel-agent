@@ -2,10 +2,10 @@
 import {useState} from "react";
 import type {publicMetaReport} from "@/lib/meta/connection";
 type Report=ReturnType<typeof publicMetaReport>&{pagePublishing:{status:string;source:string;httpStatus?:number;code?:number;subcode?:number}};
-export function MetaConnection({password=""}:{password?:string}){
+export function MetaConnection(){
   const [report,setReport]=useState<Report|null>(null);const [busy,setBusy]=useState(false);const [error,setError]=useState("");
   async function check(){setBusy(true);setError("");try{
-    const response=await fetch("/api/meta/connection",{cache:"no-store",headers:{"x-content-password":password}});
+    const response=await fetch("/api/meta/connection",{cache:"no-store"});
     if(response.status===401)throw new Error("Zugangscode erforderlich (Feld unter „Content-Planung“).");
     if(!response.ok)throw new Error("Verbindungstest derzeit nicht erreichbar.");
     setReport(await response.json());

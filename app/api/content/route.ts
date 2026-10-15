@@ -10,7 +10,8 @@ import { loadApprovedEditorialCorrections } from "@/lib/whatsapp/language-memory
 export const runtime = "nodejs";
 export const maxDuration = 300;
 const requestSchema = z.object({ requestId: z.string().uuid(), opportunity: opportunitySchema, mode: z.enum(["reference","ai"]).default("reference"), formatPreference: z.enum(["automatic","video"]).default("automatic") });
-export function GET() {
+export function GET(request: Request) {
+  if (!authorized(request)) return Response.json({ error: "Zugangscode erforderlich." }, { status: 401, headers: { "Cache-Control": "no-store" } });
   return Response.json({ databaseConfigured: databaseConfigured(), planningMode: process.env.REPLICATE_API_TOKEN?.trim()?"reference_or_ai":"reference", researchProvider: "tavily", maxAutomaticRevisions: 2, operatorRevisions: "until_approval", maxModelCalls: process.env.REPLICATE_API_TOKEN?.trim()?8:0 }, { headers: { "Cache-Control": "no-store" } });
 }
 export async function POST(request: Request) {

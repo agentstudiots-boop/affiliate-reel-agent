@@ -18,14 +18,11 @@ const labels: Record<JobStatus, string> = {
   reviewing: "Qualität prüfen", revising: "Überarbeiten", marketing: "Marketing planen", awaiting_approval: "Freigabe offen", needs_input: "Klärung nötig", failed: "Fehlgeschlagen", interrupted: "Unterbrochen", approved: "Plan freigegeben",
 };
 
-export function ContentStudio({ product, onFillReelTest, password: controlledPassword, onPasswordChange }: { product: Product; onFillReelTest: () => void; password?: string; onPasswordChange?: (value: string) => void }) {
+export function ContentStudio({ product, onFillReelTest }: { product: Product; onFillReelTest: () => void }) {
   const [useCase, setUseCase] = useState("");
   const [trend, setTrend] = useState("");
   const [goal, setGoal] = useState<Opportunity["goal"]>("conversion");
   const [budget, setBudget] = useState<Opportunity["budget"]>("balanced");
-  const [localPassword, setLocalPassword] = useState("");
-  const password = controlledPassword ?? localPassword;
-  const setPassword = onPasswordChange ?? setLocalPassword;
   const [jobs, setJobs] = useState<ContentJob[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [ready, setReady] = useState(false);
@@ -58,7 +55,7 @@ export function ContentStudio({ product, onFillReelTest, password: controlledPas
     setError("");
     try {
       const before=older && jobs.length ? `?before=${encodeURIComponent(jobs[jobs.length-1].createdAt)}` : "";
-      const response=await fetch(`/api/content/jobs${before}`,{headers:{"x-content-password":password}});
+      const response=await fetch(`/api/content/jobs${before}`);
       const data=await response.json();if(!response.ok)throw new Error(data.error);
       const loaded=(data.jobs as unknown[]).map(parseJob);
       setJobs(current=>older ? [...current,...loaded.filter(j=>!current.some(c=>c.id===j.id))] : loaded);
@@ -78,7 +75,7 @@ export function ContentStudio({ product, onFillReelTest, password: controlledPas
     let latest: ContentJob | undefined;
     const execute = async () => {
       const response = await fetch("/api/content", { method: "POST", signal: controller.signal,
-        headers: { "Content-Type": "application/json", "x-content-password": password },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ requestId: crypto.randomUUID(), opportunity: parsed.data, mode: "reference", formatPreference: targetPlatform === "instagram" ? formatPreference : "automatic" }) });
       if (!response.ok) { const data = await response.json(); throw new Error(data.error || "Planung konnte nicht starten."); }
       if (!response.body) throw new Error("Keine Antwort vom Orchestrator erhalten.");
@@ -115,21 +112,21 @@ export function ContentStudio({ product, onFillReelTest, password: controlledPas
   async function approve() {
     if (!job || job.status !== "awaiting_approval") return;
     try {
-      const response=await fetch("/api/content/jobs",{method:"POST",headers:{"Content-Type":"application/json","x-content-password":password},body:JSON.stringify({action:"requestContentApproval",jobId:job.id})});
+      const response=await fetch("/api/content/jobs",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"requestContentApproval",jobId:job.id})});
       const data=await response.json();if(!response.ok)throw new Error(data.error);
       setError("Inhaltsfreigabe per WhatsApp versendet. Antworte auf die Nachricht. Nach der Freigabe den gespeicherten Verlauf neu laden.");
     }catch(caught){setError(caught instanceof Error?caught.message:"Freigabe konnte nicht gespeichert werden.");}
   }
   async function checkApproval() {
     if(!job)return;
-    const response=await fetch(`/api/content/jobs?approvalJobId=${encodeURIComponent(job.id)}`,{headers:{"x-content-password":password},cache:"no-store"});
+    const response=await fetch(`/api/content/jobs?approvalJobId=${encodeURIComponent(job.id)}`,{cache:"no-store"});
     const data=await response.json();
     if(!response.ok)throw Error(data.error||"Freigabestatus nicht erreichbar.");
     setApprovalDelivery(data.approval?{jobId:job.id,...data.approval}:{jobId:job.id,status:"none",delivered:false});
   }
   async function resumeCorrection() {
     if(!job)return;
-    const response=await fetch("/api/content/jobs",{method:"POST",headers:{"Content-Type":"application/json","x-content-password":password},body:JSON.stringify({action:"resumeFailedVideoCorrection",jobId:job.id})});
+    const response=await fetch("/api/content/jobs",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"resumeFailedVideoCorrection",jobId:job.id})});
     const data=await response.json();
     if(!response.ok)throw Error(data.error||"Korrektur konnte nicht übernommen werden.");
     remember(parseJob(data.job));
@@ -137,7 +134,7 @@ export function ContentStudio({ product, onFillReelTest, password: controlledPas
   }
   async function reviseCaption() {
     if(!job)return;
-    const response=await fetch("/api/content/jobs",{method:"POST",headers:{"Content-Type":"application/json","x-content-password":password},body:JSON.stringify({action:"revisePendingVideoCaption",jobId:job.id})});
+    const response=await fetch("/api/content/jobs",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"revisePendingVideoCaption",jobId:job.id})});
     const data=await response.json();
     if(!response.ok)throw Error(data.error||"Begleittext konnte nicht überarbeitet werden.");
     remember(parseJob(data.job));
@@ -170,13 +167,13 @@ export function ContentStudio({ product, onFillReelTest, password: controlledPas
     {targetPlatform === "instagram" && <label>Formatwahl<select value={formatPreference} onChange={e=>setFormatPreference(e.target.value as "automatic"|"video")}><option value="automatic">Automatisch wählen</option><option value="video">Instagram Reel gezielt testen (Video)</option></select><small>Ein gezielter Test erzeugt einen Videoentwurf. Der gewählte Produzent darf erst nach gesonderter WhatsApp-Kostenfreigabe starten.</small></label>}
     <label>Anwendungsgruppe für ähnliche Fälle<input value={useCaseKey} onChange={e=>setUseCaseKey(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,"-"))} maxLength={80} placeholder="z. B. sous-vide oder vorratshaltung" /><small>Für vergleichbare Anwendungen denselben Begriff verwenden. „general“ aktiviert noch keinen historischen Vergleich.</small></label>
     <p className="muted">Tavily recherchiert aktuelle Trends und Produktquellen. Die Content-Planung arbeitet regelbasiert ohne generative Modellkosten.</p>
-    <label>Zugangscode für Planung & Datenbank<input type="password" autoComplete="off" value={password} onChange={e => setPassword(e.target.value)} /><small>Der Code wird nicht im Browser gespeichert.</small></label>
+    <form method="post" action="/api/auth/logout" className="contentActions"><small>Angemeldet als Betreiber (Sitzung 12 h, HttpOnly-Cookie).</small><button type="submit" className="ghost">Abmelden</button></form>
     <p className={databaseReady ? "muted" : "error"}>{databaseReady ? "Postgres konfiguriert. Verlauf laden prüft die Verbindung." : "Postgres muss noch eingerichtet werden. Neue Jobs werden erst mit zentralem Speicher gestartet."}</p>
-    <OperationsPanel password={password} />
-    <CommandCenter password={password} />
-    <div className="contentActions"><button type="button" className="ghost" disabled={busy || !password || !databaseReady} onClick={()=>loadHistory()}>Gespeicherten Verlauf laden</button>{jobs.length >= 50 && <button type="button" className="ghost" disabled={busy} onClick={()=>loadHistory(true)}>Ältere Jobs laden</button>}</div>
+    <OperationsPanel />
+    <CommandCenter />
+    <div className="contentActions"><button type="button" className="ghost" disabled={busy || !databaseReady} onClick={()=>loadHistory()}>Gespeicherten Verlauf laden</button>{jobs.length >= 50 && <button type="button" className="ghost" disabled={busy} onClick={()=>loadHistory(true)}>Ältere Jobs laden</button>}</div>
     {error && <p role="alert" className="error">{error}</p>}
-    <div className="contentActions"><button type="button" className="primary" disabled={!ready || busy || !databaseReady || !password} onClick={plan}>{busy ? "Orchestrator plant …" : "Ideen & passendes Format planen"}</button>{busy && <button type="button" className="ghost" onClick={() => abortRef.current?.abort()}>Stoppen</button>}</div>
+    <div className="contentActions"><button type="button" className="primary" disabled={!ready || busy || !databaseReady} onClick={plan}>{busy ? "Orchestrator plant …" : "Ideen & passendes Format planen"}</button>{busy && <button type="button" className="ghost" onClick={() => abortRef.current?.abort()}>Stoppen</button>}</div>
     <p className="muted">Dieser Auftrag erstellt einen Content-Plan. Medienproduktion und Veröffentlichung werden dadurch nicht gestartet.</p>
     {jobs.length > 0 && <label>Job-Verlauf<select disabled={busy} value={job?.id || ""} onChange={e => setSelectedId(e.target.value)}>{jobs.map(item => <option key={item.id} value={item.id}>{item.opportunity.product.name} · {labels[item.status]} · {new Date(item.createdAt).toLocaleString("de-DE")}</option>)}</select></label>}
     {job && <div className="contentJob">
@@ -197,8 +194,8 @@ export function ContentStudio({ product, onFillReelTest, password: controlledPas
       {job.marketing && <div className="marketingPlan"><h3>Marketing: {job.marketing.primary}</h3><p>{job.marketing.rationale}</p><p><b>Zielgruppe:</b> {job.marketing.audience}</p><p>{job.marketing.adaptation}</p><p><b>Linkplatzierung:</b> {job.marketing.linkPlacement}</p><p>{job.marketing.conversionHypothesis}</p><p><b>Messen:</b> {job.marketing.metrics.join(" · ")}</p><ul>{job.marketing.publishingChecks.map(c => <li key={c}>{c}</li>)}</ul></div>}
       <div className="contentActions">{job.status === "awaiting_approval" && <><button type="button" className="primary" onClick={approve}>Inhalt per WhatsApp zur Freigabe senden</button><button type="button" className="ghost" onClick={()=>checkApproval().catch(caught=>setError(caught instanceof Error?caught.message:"Freigabestatus nicht erreichbar."))}>WhatsApp-Freigabestatus prüfen</button>{approvalDelivery?.jobId===job.id&&approvalDelivery.status==="changes_requested"&&job.content?.format==="video"&&<button type="button" className="ghost" onClick={()=>resumeCorrection().catch(caught=>setError(caught instanceof Error?caught.message:"Korrektur nicht verfügbar."))}>Gespeicherte WhatsApp-Korrektur bearbeiten</button>}{approvalDelivery?.jobId===job.id&&approvalDelivery.status==="pending"&&job.content?.format==="video"&&<button type="button" className="ghost" onClick={()=>reviseCaption().catch(caught=>setError(caught instanceof Error?caught.message:"Begleittext nicht verfügbar."))}>Begleittext natürlich formulieren</button>}</>}<button type="button" className="ghost" onClick={download}>Job & Protokoll herunterladen</button></div>
       {approvalDelivery?.jobId===job.id && <p role="status">Inhaltsfreigabe: {approvalDelivery.status==="none"?"noch nicht angefordert":approvalDelivery.delivered?`${approvalDelivery.status} · WhatsApp-Nachrichten-ID gespeichert`:`${approvalDelivery.status} · Versand nicht bestätigt; nicht erneut senden`}</p>}
-      {job.status === "approved" && <><p className="success">Content-Plan freigegeben. Kostenpflichtige Produktion und Veröffentlichung benötigen getrennte Freigaben.</p><ProductionGate job={job} password={password} onRevised={remember} />{job.content && job.content.format !== "video" && <PublicationGate key={job.id} job={job} password={password} />}</>}
-      {terminalStatuses.includes(job.status) && <PerformanceEditor key={job.id} jobId={job.id} password={password} />}
+      {job.status === "approved" && <><p className="success">Content-Plan freigegeben. Kostenpflichtige Produktion und Veröffentlichung benötigen getrennte Freigaben.</p><ProductionGate job={job} onRevised={remember} />{job.content && job.content.format !== "video" && <PublicationGate key={job.id} job={job} />}</>}
+      {terminalStatuses.includes(job.status) && <PerformanceEditor key={job.id} jobId={job.id} />}
       <details className="jobTrace"><summary>Entscheidungen & Agentenantworten ({job.events.length})</summary>{job.events.map(event => <article key={event.sequence}><small>{event.sequence} · {event.agent} · {new Date(event.at).toLocaleTimeString("de-DE")}</small><p>{event.message}</p>{event.data !== undefined && <details><summary>Strukturierte Antwort</summary><pre>{JSON.stringify(event.data, null, 2)}</pre></details>}</article>)}</details>
     </div>}
     <small>Postgres speichert Jobs, Entscheidungen und Messwerte zentral. Abgebrochene Jobs werden nicht automatisch neu gestartet.</small>

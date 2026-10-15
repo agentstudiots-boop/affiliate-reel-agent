@@ -34,7 +34,13 @@ test('privacy policy matches the code: no cookies, analytics or third-party embe
   }
   const pkg = JSON.parse(read('package.json'));
   assert.ok(!Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }).some(name => /analytics|speed-insights|gtag|pixel/.test(name)));
-  assert.ok(!fs.existsSync(path.join(root, 'middleware.ts')) && !fs.existsSync(path.join(root, 'proxy.ts')));
+  // proxy.ts only guards the internal operator area: it never sets cookies and treats the public pages as public.
+  assert.ok(!fs.existsSync(path.join(root, 'middleware.ts')));
+  const proxy = read('proxy.ts');
+  assert.ok(!/cookies\.set|Set-Cookie/i.test(proxy), 'proxy must not set cookies');
+  const { classifyPath } = require(path.join(root, '.test-build/lib/security/access-policy.js'));
+  for (const page of ['/produkte', '/impressum', '/datenschutz']) assert.equal(classifyPath(page), 'public');
+  assert.match(read('app/datenschutz/page.tsx'), /öffentlichen Seiten setzen <strong>keine Cookies<\/strong>/);
   // The click beacon sends only an id and the click table stores no IP address or user agent.
   assert.match(read('app/api/landing/click/route.ts'), /INSERT INTO landing_clicks\(publication_id,job_id\)/);
   assert.ok(!/\\b(ip|ip_address|user_agent)\\b/i.test(read('db/migrations/025_landing_clicks.sql')));

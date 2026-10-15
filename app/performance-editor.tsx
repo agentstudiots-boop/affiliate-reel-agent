@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { performanceSchema, type PerformanceInput } from "@/lib/memory/schema";
 
-export function PerformanceEditor({ jobId, password }: { jobId: string; password: string }) {
+export function PerformanceEditor({ jobId }: { jobId: string }) {
   const [platform,setPlatform]=useState<"facebook"|"instagram">("facebook");
   const [status,setStatus]=useState<PerformanceInput["status"]>("draft");
   const [url,setUrl]=useState(""); const [publishedAt,setPublishedAt]=useState("");
@@ -16,7 +16,7 @@ export function PerformanceEditor({ jobId, password }: { jobId: string; password
   async function load() {
     setBusy(true);setMessage("");setLoaded(false);
     try {
-      const response=await fetch(`/api/content/jobs?jobId=${jobId}`,{headers:{"x-content-password":password}});
+      const response=await fetch(`/api/content/jobs?jobId=${jobId}`);
       const data=await response.json(); if(!response.ok)throw new Error(data.error);
       const row=data.performance.find((r:{platform:string})=>r.platform===platform);
       setStatus(row?.status || "draft");setUrl(row?.url || "");setPublishedAt(row?.published_at?.slice(0,16)||"");
@@ -35,7 +35,7 @@ export function PerformanceEditor({ jobId, password }: { jobId: string; password
     if(!parsed.success){setMessage(parsed.error.issues.map(i=>i.message).join(" "));return;}
     setBusy(true);
     try {
-      const response=await fetch("/api/content/jobs",{method:"POST",headers:{"Content-Type":"application/json","x-content-password":password},body:JSON.stringify({action:"performance",data:parsed.data})});
+      const response=await fetch("/api/content/jobs",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"performance",data:parsed.data})});
       const data=await response.json();if(!response.ok)throw new Error(data.error);
       setRevision(Number(data.result.revision));setResult({profit:data.result.profit_cents==null?null:Number(data.result.profit_cents)/100,roi:data.result.roi==null?null:Number(data.result.roi)});
       setMessage("In Postgres gespeichert. Vorherige Messstände bleiben nachvollziehbar.");
@@ -44,7 +44,7 @@ export function PerformanceEditor({ jobId, password }: { jobId: string; password
   return <section className="marketingPlan"><h3>Veröffentlichung & gemessene Ergebnisse</h3>
     <p>Gesamtwerte für das gewählte Messfenster eintragen, keine Tageszuwächse. Der letzte Stand ersetzt die Auswertungsbasis; alte Stände werden nicht addiert.</p>
     <label>Veröffentlichungsplattform<select value={platform} onChange={e=>{setPlatform(e.target.value as "facebook"|"instagram");setLoaded(false);setMessage("");}}><option value="facebook">Facebook</option><option value="instagram">Instagram</option></select></label>
-    <button type="button" className="ghost" disabled={busy||!password} onClick={load}>Messwerte laden</button>
+    <button type="button" className="ghost" disabled={busy} onClick={load}>Messwerte laden</button>
     {loaded && <>
       <label>Status<select value={status} onChange={e=>setStatus(e.target.value as PerformanceInput["status"])}><option value="draft">Noch nicht veröffentlicht</option><option value="published">Veröffentlicht</option><option value="archived">Archiviert</option></select></label>
       <label>Veröffentlichungslink<input type="url" value={url} onChange={e=>setUrl(e.target.value)} /></label>

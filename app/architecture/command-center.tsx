@@ -19,7 +19,7 @@ class SceneBoundary extends Component<{ children: ReactNode; onFail: (message: s
 }
 
 
-export function CommandCenter({ password }: { password: string }) {
+export function CommandCenter() {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState("");
@@ -70,7 +70,7 @@ export function CommandCenter({ password }: { password: string }) {
   async function load() {
     setLoading(true); setError("");
     try {
-      const response = await fetch("/api/architecture", { headers: { "x-content-password": password }, cache: "no-store" });
+      const response = await fetch("/api/architecture", { cache: "no-store" });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "Architekturdaten nicht erreichbar.");
       const first = !data;
@@ -131,7 +131,7 @@ export function CommandCenter({ password }: { password: string }) {
   <section className="ccRoot" hidden={!open} role="dialog" aria-modal="true" aria-label="Jarvis 3D Command Center" data-testid="command-center">
     <div className="ccHead"><div><h3>Jarvis Command Center</h3><p className="muted">{data?.meta.basis}</p></div><button type="button" className="ghost" onClick={() => setOpen(false)}>Schließen</button></div>
     {loading && <p role="status" className="muted">Architekturdaten werden geladen …</p>}
-    {error && <p role="alert" className="error">{error} {password ? "" : "Bitte zuerst den Zugangscode eintragen."} <button type="button" className="ghost" onClick={() => void load()}>Erneut versuchen</button></p>}
+    {error && <p role="alert" className="error">{error} <button type="button" className="ghost" onClick={() => void load()}>Erneut versuchen</button></p>}
     {data && <>
       {(!use3d || sceneError) && <p role="status" className="muted" data-testid="cc-fallback-note">{sceneError ? `3D-Szene nicht verfügbar (${sceneError}). ` : webglSupported ? "" : "WebGL wird von diesem Browser nicht unterstützt. "}2D-Ansicht aktiv – alle Informationen bleiben verfügbar.</p>}
       <div className="ccToolbar">

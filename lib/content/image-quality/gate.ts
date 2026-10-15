@@ -78,7 +78,7 @@ export async function replicateObserve(imageUrl: string, spec: ImageSpec): Promi
   const briefing = { hauptmotiv: spec.primary_object, hauptmotiv_begriffe: spec.primary_object_terms, prominenz: spec.primary_object_prominence,
     pflichtobjekte: spec.required_objects, ausgeschlossen: spec.forbidden_objects, komposition: spec.composition, produktart: spec.subject,
     werbezweck: spec.commercial_intent, darstellung: spec.representation };
-  return routerModelCall(SYSTEM, visionSchema, JSON.stringify({ briefing }), fetch, undefined, { model: QUALITY_MODEL(), input: { image_input: [imageUrl] } });
+  return routerModelCall(SYSTEM, visionSchema, JSON.stringify({ briefing }), fetch, undefined, { model: QUALITY_MODEL(), input: { image_input: [imageUrl] }, agent: "image_quality_vision" });
 }
 
 const empty = () => ({ primaryMissing: false, forbiddenSeen: [] as string[], wrongProduct: false, defects: false, composition: false, technical: false });
