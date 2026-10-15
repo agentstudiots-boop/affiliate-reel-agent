@@ -58,6 +58,7 @@ Freigabeschranke prüft das selbst (`authorizePublish`).
 | HeyGen | `HEYGEN_AVATAR_ID` | ja | Avatar | nein | ja | nein | ja | nein |
 | HeyGen | `HEYGEN_VOICE_ID` | ja | Stimme | nein | ja | nein | ja | nein |
 | HeyGen | `HEYGEN_MONTHLY_VIDEO_LIMIT` | ja | lokales Monatskontingent; ohne Limit kein Avatar-Video | nein | ja | nein | ja | – |
+| HeyGen | `HEYGEN_ENABLED` | ja | Schalter; nur exakt `true` erlaubt Avatar-Videos (Standard aus) | nein | ja | nein | ja | nein |
 | Runway (Standard-Video) | `RUNWAYML_API_SECRET` | ja | Standard-Video (bestehende Anbindung, opt-in) | nein | ja | nein | ja | Produkt-Pipeline: ja; Themen-Pfad: nein |
 | Runway | `RUNWAY_MONTHLY_BUDGET_CREDITS` | optional | Monatsbudget (bestehend) | nein | nein | nein | ja | – |
 | OpenAI (Bild-Fallback Produkt-Pipeline) | `OPENAI_API_KEY` | nur Produkt-Pipeline | Bildprovider, wenn Replicate fehlt; Themen-Pipeline nutzt ihn nicht | nein | nein | nein | ja | – |
