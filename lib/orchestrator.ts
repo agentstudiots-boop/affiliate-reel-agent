@@ -13,6 +13,9 @@ import { discoverOpportunities, type DiscoveryResult, type ResearchFn } from "@/
 import { createGenerator } from "@/lib/content/model";
 import type { Generator } from "@/lib/content/agent";
 import { affiliateTrendsetter, trendsetterAffiliateMode } from "@/lib/trendsetter/affiliate";
+import { chanceFromTrendTopic } from "@/lib/trendsetter/chance";
+import { recordChances } from "@/lib/trendsetter/repository";
+import { balanceByPriceTier, mixInstruction, mixState, productMixConfig, trendscoutTopicsEnabled } from "@/lib/content/research-mix";
 
 const MAX_PRODUCT_LOOKUPS = 5; // Existing five lookups per general scout run.
 
@@ -45,15 +48,31 @@ export async function runProductScout(productSearch?: string, selectionKey?: str
   const history = automatic ? await loadSelectionHistory(db) : null;
   // Jarvis assigns the discovery job to the trend/strategy agent first; on any failure it falls back to the seed ideas.
   let discovery: DiscoveryResult | null = null;
+  // Feature flags (default off = unchanged behaviour): shared topic research and price-tier balancing.
+  const topicsOn = trendscoutTopicsEnabled();
+  const mix = productMixConfig();
+  const mixNow = mix.enabled && history ? mixState(history.recent.map(item => item.name), mix) : null;
   if (automatic && history) {
     const now = new Date();
-    discovery = await discoverOpportunities({ now, slot: selectionKey || "", history,
+    discovery = await discoverOpportunities({ now, slot: selectionKey || "", history, topics: topicsOn, ...(mixNow ? { mixNote: mixInstruction(mix, mixNow) } : {}),
       seedIdeas: seedIdeas(now).filter(seed => seed.chance).map(seed => ({ name: seed.name, hook: seed.chance?.hook ?? null })),
       research: options.trend?.research ?? defaultResearch,
       generate: options.trend && "generate" in options.trend ? options.trend.generate ?? null : defaultGenerate() });
     console.info(JSON.stringify({ event: "trend_discovery", slot: selectionKey, source: discovery.source, outcome: discovery.outcome, failure: discovery.failure, evidence: discovery.evidenceCount,
       queries: discovery.queries, proposed: discovery.candidates.length, topics: discovery.topics.length, noGoodCandidate: discovery.noGoodCandidate,
-      dropped: discovery.dropped.slice(0, 6), ms: discovery.durationMs }));
+      dropped: discovery.dropped.slice(0, 6), ms: discovery.durationMs, topicResearch: topicsOn, productMix: mix.enabled,
+      topicTitles: topicsOn ? discovery.topics.map(topic => topic.title.slice(0, 80)).slice(0, 4) : undefined }));
+    // Topic research results are shared research data: stored as content chances so that Jarvis' topic selection
+    // (lib/trendsetter/topic.ts) can route them. Nothing is produced or published here. With TRENDSETTER_AFFILIATE
+    // record/route the Trendsetter below stores them anyway.
+    if (topicsOn && discovery.topics.length && trendsetterAffiliateMode() === "off") {
+      try {
+        const stored = await recordChances(db, discovery.topics.map(topic => chanceFromTrendTopic(topic, now, discovery!.evidence ?? [])), now);
+        console.info(JSON.stringify({ event: "topic_chances_recorded", slot: selectionKey, stored: stored.length, ids: stored.map(item => item.chance_id).slice(0, 4) }));
+      } catch (error) {
+        console.error(JSON.stringify({ event: "topic_chances_unsaved", slot: selectionKey, failure: error instanceof Error ? error.name : "unknown" }));
+      }
+    }
   }
   const agentRun = discovery?.source === "trend_agent" ? discovery : null;
   const result = agentRun
@@ -77,6 +96,14 @@ export async function runProductScout(productSearch?: string, selectionKey?: str
     for (const item of agentRun.rejectedIdeas) qualityRejected.push({ name: item.idea, score: 0, reason: item.reason });
     pool = assessed.filter(item => item.assessment.passed).sort((a, b) => a.candidate.priority - b.candidate.priority)
       .map(item => ({ ...item.candidate, searchQuery: item.candidate.searchQuery, assessment: item.assessment })) as unknown as typeof pool;
+    // Product mix (PRODUCT_MIX=balance): Jarvis breaks near-ties between already approved chances towards under-represented
+    // price tiers. Nothing is added or unlocked; every decision is logged with its reason.
+    if (mixNow) {
+      const balanced = balanceByPriceTier(pool as unknown as { name: string; priority: number; priceTier?: "low" | "mid" | "high" | null }[], mixNow);
+      pool = balanced.ordered as unknown as typeof pool;
+      console.info(JSON.stringify({ event: "product_mix_balance", slot: selectionKey, recent: mixNow.counts, deficit: Object.fromEntries(Object.entries(mixNow.deficit).map(([k, v]) => [k, Math.round(v)])),
+        decisions: balanced.decisions.slice(0, 8) }));
+    }
     // Trendsetter (TRENDSETTER_AFFILIATE, default off = unchanged). "route": Jarvis lets only chances routed to the affiliate
     // pipeline reach the Amazon lookup. A failure of that layer never stops the affiliate pipeline.
     const trendsetterMode = trendsetterAffiliateMode();

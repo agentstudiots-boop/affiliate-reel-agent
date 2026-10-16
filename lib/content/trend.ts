@@ -15,6 +15,8 @@ export type CandidateFromTrend = {
   name: string; searchQuery: string; kind: "Saisontrend" | "Dauerläufer"; category: string; season: string;
   whyNow: string; reelIdea: string; targetGroup: string; benefitsToVerify: string[]; confidence: number;
   chance: ContentChance; priority: number; agent: AgentProvenance; extraPenalties: ChanceAssessment["penalties"];
+  // Planning estimates (PRODUCT_MIX=balance only); never shown as a price.
+  priceTier?: "low" | "mid" | "high" | null; purchaseIntent?: "low" | "medium" | "high" | null;
 };
 
 const slug = (value: string) => value.toLocaleLowerCase("de-DE").normalize("NFKD").replace(/\p{M}/gu, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
@@ -58,7 +60,8 @@ export function intakeTrendReport(raw: unknown, evidence: EvidenceItem[]) {
     candidates.push({ name: idea, searchQuery: idea, kind: item.timing.relevance === "high" ? "Saisontrend" : "Dauerläufer", category: "Content-Chance",
       season: item.timing.season ?? "Ganzjährig", whyNow: item.timing.relevance === "high" && item.timing.season ? `${item.timing.season}: ${item.rationale}`.slice(0, 600) : item.rationale,
       reelIdea: item.hook, targetGroup: item.targetNeed, benefitsToVerify: ["Produktmerkmale und Lieferumfang laut Amazon-Seite", "Herstellerangaben zu Material und Maßen"],
-      confidence: Math.round(item.confidence), chance, priority: item.priority, agent, extraPenalties });
+      confidence: Math.round(item.confidence), chance, priority: item.priority, agent, extraPenalties,
+      ...(item.priceTier !== undefined ? { priceTier: item.priceTier } : {}), ...(item.purchaseIntent !== undefined ? { purchaseIntent: item.purchaseIntent } : {}) });
   }
   return { ok: true as const, candidates, topics, dropped, noGoodCandidate: report.noGoodCandidate || !candidates.length, rejectedIdeas: report.rejectedIdeas, summary: report.summary };
 }

@@ -142,6 +142,9 @@ export const trendOpportunitySchema = z.object({
   confidence: z.number().min(0).max(100),
   evidenceUrls: z.array(z.string()).max(6),
   priority: z.number().int().min(1).max(8),
+  // Only requested with PRODUCT_MIX=balance: estimated price tier of the product TYPE and purchase likelihood (planning data, never a price claim).
+  priceTier: z.enum(["low", "mid", "high"]).nullable().optional(),
+  purchaseIntent: level.nullable().optional(),
 }).strict();
 export type TrendOpportunity = z.infer<typeof trendOpportunitySchema>;
 
