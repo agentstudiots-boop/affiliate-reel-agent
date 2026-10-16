@@ -3,7 +3,7 @@
 **Pflicht zu Beginn jeder Sitzung:** diese Datei und `docs/PROJECT_STATUS.md` lesen, danach `AGENTS.md`
 (verbindliche Projektvorgaben, hat Vorrang) und bei Drehbuch/Produkt-Themen `docs/SCRIPT_WRITER_MANIFEST.md`.
 Diese Datei beschreibt nur die tatsächliche Architektur und verbindliche Regeln. Laufender Stand, offene PRs,
-Blocker und Übergabe stehen in `docs/PROJECT_STATUS.md`.
+Blocker und Übergabe stehen in `docs/PROJECT_STATUS.md`; Soll-Ist-Matrix des Audits in `docs/PRODUCTION_AUDIT_FINAL_2026-10-15.md`.
 
 ## 1. Projekt und Betrieb
 
@@ -39,13 +39,13 @@ Browser (Betreiber, Admin-Session)          WhatsApp (Betreiber)            Verc
 
 | Agent | Ort | Modell / Quelle |
 |---|---|---|
-| Trend-/Produkt-Scout | `lib/agents/product-scout.ts`, `lib/content/trend-scout.ts` | Tavily + Replicate `openai/gpt-4.1` |
+| Trend-/Produkt-Scout | `lib/agents/product-scout.ts`, `lib/content/trend-scout.ts`, `lib/content/research-mix.ts` | Tavily + Replicate `openai/gpt-4.1`; Themenrecherche `TRENDSCOUT_TOPICS=on` und Produktmix `PRODUCT_MIX=balance` (beide Standard aus) |
 | Produktprüfung | `lib/agents/product-reviewer.ts`, `lib/product-resolver.ts` | Amazon-Detailseite (ASIN), regelbasiert |
 | Content-Orchestrator + Creative/Bild/Video/Text/Marketing | `lib/content/orchestrator.ts`, `lib/content/agents/*` | Referenzmodus regelbasiert; KI-Modus Replicate `openai/gpt-4.1` (`lib/content/model.ts`) |
 | WhatsApp-Router / Chat / Anweisungen | `lib/whatsapp/route-llm.ts`, `chat.ts`, `instruction.ts` | Replicate `openai/gpt-5.6-terra` |
 | Bildqualität (Vision) | `lib/content/image-quality/gate.ts` | `IMAGE_QUALITY_MODEL` oder Router-Modell |
 | Bildgenerierung | `lib/content/image-provider.ts` | Replicate FLUX 1.1 pro (OpenAI-Bild nur Fallback, nicht konfiguriert) |
-| Video | `lib/production/*` (Runway, Faceless), `lib/visual/providers/heygen.ts` | nur nach Kostenfreigabe; HeyGen optional |
+| Video | `lib/production/*` (Runway, Faceless), `lib/visual/providers/heygen.ts`, `lib/visual/avatar-{briefing,preflight}.ts` | nur nach Kostenfreigabe; HeyGen nur mit `HEYGEN_ENABLED=true` (Standard aus), Briefing „Mia“ + Preflight ohne Netzaufruf |
 | Themen-Scout | `lib/topics/*` | Tavily + Modell |
 | Trendsetter | `lib/trendsetter/*` | Bewertung von Content-Chancen |
 
@@ -119,6 +119,8 @@ Kein Modellwechsel ohne nachvollziehbare Daten; kostenpflichtige Vergleiche nur 
 - Vor jedem PR: `npm run typecheck`, `npm run lint` (2 bekannte Warnungen), `npm test` (Node-Test, PGlite, keine echten
   Netzaufrufe), `npm run build`. Tests für Regressionen mit realem Code, nur I/O wird ersetzt (`tests/helpers/`).
 - Keine kostenpflichtigen Aufrufe (Bild, Video, Modellvergleich) und keine Live-Posts ohne ausdrückliche Freigabe.
+- Neue Funktionen hinter Schaltern mit Standard „aus“ (Rollback = Variable entfernen); Schalter nie eigenmächtig aktivieren.
+- Cloud-Sitzungen: nicht in einem Git-Worktree mit verlinktem `node_modules` bauen (Turbopack-Fehler), sondern im Hauptcheckout.
 - Nach Deployment: Production-Status mit echtem Aufruf prüfen (Build allein ist kein Nachweis). Begriffe strikt trennen:
   implementiert · getestet · gemergt · deployed · aktiviert · live verifiziert.
 - Commits ohne Modellkennung; Projektdoku (`CLAUDE.md`, `docs/PROJECT_STATUS.md`) nach jeder Phase prüfen und versionieren.
