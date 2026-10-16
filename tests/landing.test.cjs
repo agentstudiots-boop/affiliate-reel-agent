@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {PGlite}=require('@electric-sql/pglite');
 const {loadPublishedProducts,shortName,categoryLabel}=require('../.test-build/lib/landing/published');
-const {describeProduct}=require('../.test-build/lib/landing/description');
+const {describeProduct,shortDescription}=require('../.test-build/lib/landing/description');
 
 async function fixture(t){
   const pg=new PGlite();t.after(()=>pg.close());
@@ -123,4 +123,13 @@ test('click counting: only published items count, the target is never taken from
   assert.equal((await post({id:published.request},{origin:'https://evil.example'})).status,403);
   assert.equal((await f.pg.query('SELECT count(*)::int AS n FROM landing_clicks')).rows[0].n,3,'only valid published ids on the own origin were counted');
   assert.deepEqual(Object.keys((await f.pg.query('SELECT * FROM landing_clicks')).rows[0]).sort(),['clicked_at','id','job_id','publication_id'],'no IP, agent or other personal data is stored');
+});
+
+test('card text is one short line from the verified description only (features, else first sourced fact), never longer than the limit',()=>{
+  assert.equal(shortDescription({type:'Backform',features:['2er-Set','Antihaft','spülmaschinenfest','BPA-frei'],facts:[]}),'2er-Set · Antihaft · spülmaschinenfest');
+  assert.equal(shortDescription({type:'X',features:[],facts:[{claim:'Material: Silikon',source:'https://www.amazon.de/dp/B000000001'}]}),'Material: Silikon');
+  assert.equal(shortDescription({type:'X',features:[],facts:[]}),'');
+  const long=shortDescription({type:'X',features:[],facts:[{claim:'Wort '.repeat(60).trim(),source:'https://www.amazon.de/dp/B000000001'}]});
+  assert.ok(long.length<=140&&long.endsWith('…'));
+  assert.ok(shortDescription({type:'X',features:['a'.repeat(70),'b'.repeat(70),'c'.repeat(10)],facts:[]}).length<=140);
 });

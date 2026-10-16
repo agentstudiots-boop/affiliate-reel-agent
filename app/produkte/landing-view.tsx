@@ -1,5 +1,6 @@
 import { BRAND } from "@/lib/landing/brand";
 import type { loadPublishedProducts } from "@/lib/landing/published";
+import { shortDescription } from "@/lib/landing/description";
 import { TrackedLink } from "./track-link";
 import styles from "./landing.module.css";
 
@@ -54,15 +55,10 @@ export function LandingView({ data, wanted }: { data: Awaited<ReturnType<typeof 
                   </div>
                   <div className={styles.body}>
                     <h3>{item.name}</h3>
-                    <div className={styles.facts}>
-                      {item.description.features.length > 0 && <>
-                        <p className={styles.factsHead}>Laut Produkttitel:</p>
-                        <ul>{item.description.features.map(feature => <li key={feature}>{feature}</li>)}</ul>
-                      </>}
-                      {item.description.facts.length > 0 && <ul>{item.description.facts.map(fact => <li key={fact.claim}>{fact.claim}</li>)}</ul>}
-                      <p className={styles.factsNote}>Preis, Maße, Lieferumfang und aktuelle Details stehen auf der Amazon-Produktseite.</p>
-                    </div>
-                    <TrackedLink id={item.id} href={item.affiliateUrl} className={styles.button}>Bei Amazon ansehen <span aria-hidden="true">→</span></TrackedLink>
+                    {shortDescription(item.description) && <p className={styles.summary}>{shortDescription(item.description)}</p>}
+                    <TrackedLink id={item.id} href={item.affiliateUrl} className={styles.button}
+                      ariaLabel={`Zum Shop: ${item.name} bei Amazon.de ansehen (Affiliate-Link, öffnet in neuem Tab)`}>Zum Shop <span aria-hidden="true">→</span></TrackedLink>
+                    <p className={styles.factsNote}>Amazon.de · Affiliate-Link · Preis auf der Produktseite</p>
                   </div>
                 </li>
               ))}
@@ -82,7 +78,7 @@ export function LandingView({ data, wanted }: { data: Awaited<ReturnType<typeof 
           </nav>
         </div>
         <p id="affiliate-hinweis" className={styles.disclosure}>
-          <strong>Affiliate-Hinweis:</strong> Die Links zu „Bei Amazon ansehen“ sind Affiliate-Links (Werbung). Wenn du über einen solchen Link etwas kaufst, kann ich eine Provision erhalten.
+          <strong>Affiliate-Hinweis:</strong> Die Links „Zum Shop“ führen zu Amazon.de und sind Affiliate-Links (Werbung). Wenn du über einen solchen Link etwas kaufst, kann ich eine Provision erhalten.
           Als Amazon-Partner verdiene ich an qualifizierten Verkäufen.
         </p>
       </footer>
