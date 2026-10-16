@@ -10,7 +10,7 @@ import { assertEffectAllowed } from "../../security/runtime-guard";
 
 const API = "https://api.heygen.com";
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
-export type HeyGenDeps = { request?: typeof fetch; upload?: typeof put; apiKey?: string; avatarId?: string; voiceId?: string; monthlyLimit?: number; timeoutMs?: number };
+export type HeyGenDeps = { request?: typeof fetch; upload?: typeof put; apiKey?: string; avatarId?: string; voiceId?: string; monthlyLimit?: number; enabled?: boolean; timeoutMs?: number };
 
 export function heygenConfig(deps: HeyGenDeps = {}) {
   const apiKey = deps.apiKey ?? process.env.HEYGEN_API_KEY?.trim();
@@ -19,8 +19,10 @@ export function heygenConfig(deps: HeyGenDeps = {}) {
   const limit = deps.monthlyLimit ?? Number(process.env.HEYGEN_MONTHLY_VIDEO_LIMIT ?? "");
   const monthlyLimit = Number.isInteger(limit) && limit > 0 ? limit : 0;
   // HeyGen is a limited resource: without an explicit monthly limit no avatar video is produced.
+  // Feature flag: no avatar video unless the operator explicitly set HEYGEN_ENABLED=true (default off, rollback = unset).
+  const enabled = deps.enabled ?? process.env.HEYGEN_ENABLED?.trim() === "true";
   const missing = [!apiKey && "HEYGEN_API_KEY", !avatarId && "HEYGEN_AVATAR_ID", !voiceId && "HEYGEN_VOICE_ID", !monthlyLimit && "HEYGEN_MONTHLY_VIDEO_LIMIT"].filter(Boolean) as string[];
-  return { apiKey, avatarId, voiceId, monthlyLimit, missing };
+  return { apiKey, avatarId, voiceId, monthlyLimit, enabled, missing };
 }
 
 // Classifies HeyGen HTTP answers. Quota/credit refusals are distinguished from generic 4xx by the error text,
@@ -41,13 +43,14 @@ export function createHeyGenAvatarProvider(deps: HeyGenDeps = {}): VideoProvider
     kind: "avatar_video",
     available() {
       const config = heygenConfig(deps);
+      if (!config.enabled) return { ok: false, reason: "HEYGEN_ENABLED ist nicht aktiviert" };
       if (config.missing.length) return { ok: false, reason: `${config.missing.join(", ")} fehlt` };
       return { ok: true };
     },
     async create(input: VideoInput) {
       assertEffectAllowed("paid_provider");
       const config = heygenConfig(deps);
-      if (config.missing.length) throw new VideoProviderError("unavailable", false);
+      if (!config.enabled || config.missing.length) throw new VideoProviderError("unavailable", false);
       const clock = timed();
       let response: Response;
       try {

@@ -23,7 +23,7 @@ const copy = { title: 'Richtig lüften', hook: 'Drei Fehler beim Lüften im Herb
 const input = (format, over = {}) => ({ contentId: 'tc_fb', format, copy, style, dryRun: false, visualPotential: 80, ...over });
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const upload = async path => ({ url: `https://abc.public.blob.vercel-storage.com/${path}` });
-const HEYGEN = { apiKey: 'hg', avatarId: 'a1', voiceId: 'v1', monthlyLimit: 3 };
+const HEYGEN = { apiKey: 'hg', avatarId: 'a1', voiceId: 'v1', monthlyLimit: 3, enabled: true };
 
 function heygen(responses) {
   const calls = [];
@@ -41,7 +41,7 @@ const ctx = (over = {}) => ({ standardQuota: { store: memoryQuota(), limit: 3 },
 const chain = result => result.fallbacks.map(item => `${item.from}->${item.to}`);
 
 test('video provider not available (missing credentials): Avatar → Video → Karussell without any provider call', async () => {
-  const restore = require('./helpers/live-env.cjs').withEnv({ HEYGEN_API_KEY: undefined, HEYGEN_AVATAR_ID: undefined, HEYGEN_VOICE_ID: undefined, HEYGEN_MONTHLY_VIDEO_LIMIT: undefined, TOPIC_STANDARD_VIDEO_PROVIDER: undefined });
+  const restore = require('./helpers/live-env.cjs').withEnv({ HEYGEN_ENABLED: 'true', HEYGEN_API_KEY: undefined, HEYGEN_AVATAR_ID: undefined, HEYGEN_VOICE_ID: undefined, HEYGEN_MONTHLY_VIDEO_LIMIT: undefined, TOPIC_STANDARD_VIDEO_PROVIDER: undefined });
   try {
     const images = imageProvider();
     const result = await produceContent(input('AVATAR_VIDEO'), ctx({ imageProvider: images, avatarProvider: createHeyGenAvatarProvider({ request: async () => { throw new Error('no call'); } }),

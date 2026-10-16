@@ -14,7 +14,7 @@ const pgliteDatabase = require('./helpers/pglite-db.cjs');
 
 setEventSink(() => {});
 const noSleep = async () => {};
-const config = { apiKey: 'hg_test_key', avatarId: 'avatar_123', voiceId: 'voice_123', monthlyLimit: 3 };
+const config = { apiKey: 'hg_test_key', avatarId: 'avatar_123', voiceId: 'voice_123', monthlyLimit: 3, enabled: true };
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 const mp4 = () => new Response(Buffer.from('fake-mp4-bytes'), { headers: { 'content-type': 'video/mp4' } });
 const upload = async path => ({ url: `https://abc.public.blob.vercel-storage.com/${path}` });
@@ -112,6 +112,7 @@ test('invalid HeyGen answers are classified, keys never leak into errors', async
 test('missing HEYGEN credentials or monthly limit: provider unavailable, router never picks AVATAR_VIDEO', async () => {
   const saved = { ...process.env };
   for (const key of ['HEYGEN_API_KEY', 'HEYGEN_AVATAR_ID', 'HEYGEN_VOICE_ID', 'HEYGEN_MONTHLY_VIDEO_LIMIT']) delete process.env[key];
+  process.env.HEYGEN_ENABLED = 'true';
   try {
     const provider = createHeyGenAvatarProvider();
     assert.match(provider.available().reason, /HEYGEN_API_KEY.*HEYGEN_MONTHLY_VIDEO_LIMIT/);
@@ -196,4 +197,20 @@ test('paid video without quota and HeyGen 503 fail closed without a second creat
   const down = heygen([json({}, 503)]); const ledger = memoryLedger();
   assert.equal((await job(down.provider, { ledger })).retryable, false);
   await job(down.provider, { ledger }); assert.equal(down.calls.length, 1);
+});
+
+test('HEYGEN_ENABLED off (default): fully configured provider is unavailable and create() makes no request', async () => {
+  const saved = { ...process.env };
+  delete process.env.HEYGEN_ENABLED;
+  try {
+    let requests = 0;
+    const provider = createHeyGenAvatarProvider({ apiKey: 'hg', avatarId: 'a1', voiceId: 'v1', monthlyLimit: 3, upload,
+      request: async () => { requests++; throw new Error('no call'); } });
+    assert.equal(provider.available().ok, false);
+    assert.match(provider.available().reason, /HEYGEN_ENABLED/);
+    await assert.rejects(provider.create(input), error => error.category === 'unavailable');
+    assert.equal(requests, 0);
+    process.env.HEYGEN_ENABLED = 'yes';
+    assert.equal(provider.available().ok, false, 'only the exact value "true" enables HeyGen');
+  } finally { process.env = saved; }
 });
