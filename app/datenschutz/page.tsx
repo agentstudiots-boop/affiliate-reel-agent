@@ -55,7 +55,7 @@ export default function Page() {
 
       <h2>4. Anonymer Klickzähler für Produktlinks</h2>
       <p>
-        Beim Klick auf „Bei Amazon ansehen“ sendet Ihr Browser eine kurze Meldung an diese Website, die ausschließlich zählt, <em>welches Produkt</em> angeklickt wurde.
+        Beim Klick auf „Zum Shop“ sendet Ihr Browser eine kurze Meldung an diese Website, die ausschließlich zählt, <em>welches Produkt</em> angeklickt wurde.
         Gespeichert werden die interne Produkt-Kennung, die zugehörige Inhalts-Kennung und der Zeitpunkt des Klicks in einer Datenbank (Postgres, Neon). Es werden
         <strong> keine IP-Adresse, keine Cookies, keine Gerätekennung und kein Nutzerprofil</strong> gespeichert; ein Bezug zu Ihrer Person wird nicht hergestellt.
         Die Zählung dient der Auswertung, welche Empfehlungen interessieren (Art. 6 Abs. 1 lit. f DSGVO). Auch hier können technisch bedingt die unter Punkt 3 genannten Server-Verbindungsdaten anfallen.

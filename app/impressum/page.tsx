@@ -24,7 +24,7 @@ export default function Page() {
 
       <h2>Hinweis zu Affiliate-Links (Werbung)</h2>
       <p>
-        Die Links „Bei Amazon ansehen“ sind Affiliate-Links und als Werbung zu verstehen. Bei qualifizierten Käufen kann der Anbieter eine
+        Die Links „Zum Shop“ (zu Amazon.de) sind Affiliate-Links und als Werbung zu verstehen. Bei qualifizierten Käufen kann der Anbieter eine
         Provision erhalten; für Käufer entstehen dadurch keine Mehrkosten. Als Amazon-Partner verdient der Anbieter an qualifizierten Verkäufen.
       </p>
 

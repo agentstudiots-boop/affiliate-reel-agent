@@ -22,3 +22,17 @@ export function describeProduct(input: { name: unknown; verifiedName?: unknown; 
   }).slice(0, 4) : [];
   return { type, features, facts };
 }
+
+// One short line under the product name: the first verified title features (or the first sourced fact), joined, at most
+// ~140 characters. Only what describeProduct already extracted; nothing is reworded, added or advertised.
+export function shortDescription(description: ProductDescription, max = 140) {
+  const parts = description.features.length ? description.features.slice(0, 3) : description.facts.slice(0, 1).map(fact => fact.claim);
+  let text = "";
+  for (const part of parts) {
+    const next = text ? `${text} · ${part}` : part;
+    if (next.length > max) break;
+    text = next;
+  }
+  if (!text && parts[0]) text = `${parts[0].slice(0, max - 2).replace(/\s+\S*$/, "")} …`;
+  return text;
+}
