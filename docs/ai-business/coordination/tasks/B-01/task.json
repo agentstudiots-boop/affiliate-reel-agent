@@ -1,0 +1,176 @@
+{
+  "schema_version": 1,
+  "task_id": "B-01",
+  "title": "Executive-Kern v0: Plan-Vertrag, Richtlinien L0–L4 und Abteilungsregister (reine Funktionen)",
+  "module": "enterprise-kernel",
+  "phase": "B",
+  "status": "waiting_operator",
+  "planner": "claude-code",
+  "responsible": "gpt-work",
+  "implementer": "gpt-work",
+  "reviewer": "claude-code",
+  "base_commit": "c56711e",
+  "branch": null,
+  "depends_on": [
+    "A-01",
+    "A-02"
+  ],
+  "claims": {
+    "paths": [
+      "lib/enterprise/registry.ts",
+      "lib/enterprise/policy.ts",
+      "lib/enterprise/plan.ts",
+      "tests/enterprise-kernel.test.cjs"
+    ],
+    "hot_files": [],
+    "migration_numbers": [],
+    "foreign_paths": [
+      {
+        "path": "tsconfig.test.json",
+        "owner": "claude-code",
+        "agreement": "Planer erlaubt hiermit genau eine Zeile: \"lib/enterprise/**/*.ts\" in include (nötig, damit die Tests die kompilierten Module laden)."
+      }
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "registry.ts exportiert ein eingefrorenes Register der Abteilungen executive, controlling, opportunity, affiliate (nur lesend), engineering (extern, keine Laufzeitaktionen) mit erlaubten taskKinds und maxLevel; keine DB-Tabelle.",
+      "verification": "Unit-Test: Register unveränderlich (Object.isFrozen), unbekannte Abteilung → undefined",
+      "met": null
+    },
+    {
+      "id": "AC-2",
+      "criterion": "policy.ts bildet jede ActionKind deterministisch auf L0, L1, L2, L3a, L3b oder L4 ab (02 §3.5); unbekannte Aktion → L4 (fail closed).",
+      "verification": "Tabellentest über alle ActionKinds + unbekannte Aktion",
+      "met": null
+    },
+    {
+      "id": "AC-3",
+      "criterion": "plan.ts definiert ExecutivePlan (02 §3.3) als Zod-Schema und validatePlan(raw, registry, limits) mit Ergebnis { ok, plan, executable, decisionRequests, violations }.",
+      "verification": "Typecheck + Tests",
+      "met": null
+    },
+    {
+      "id": "AC-4",
+      "criterion": "Eine vom Modell mitgelieferte Stufe/Berechtigung wird ignoriert; die Stufe stammt nur aus policy.ts. Schritte mit L3b/L4 landen in decisionRequests, nie in executable.",
+      "verification": "Test: Plan mit gefälschtem level:'L0' für publish → decisionRequests",
+      "met": null
+    },
+    {
+      "id": "AC-5",
+      "criterion": "Abgelehnt werden: unbekannte Abteilung/Aufgabenart, Aufgabenart nicht erlaubt für Abteilung, Zyklus oder unbekannte Referenz in dependsOn, mehr als limits.maxSteps Schritte, Tiefe > limits.maxDepth, Summe maxCostCents > costCapCents oder > limits.budgetCents, negative/nicht ganzzahlige Beträge, expectedValue ohne Spanne (low > high).",
+      "verification": "je ein negativer Test",
+      "met": null
+    },
+    {
+      "id": "AC-6",
+      "criterion": "Evidenz mit kind 'fact' ohne source wird als Verstoß gemeldet (Fakten nur mit Quelle).",
+      "verification": "Test",
+      "met": null
+    },
+    {
+      "id": "AC-7",
+      "criterion": "Keine Imports aus anderen lib-Bereichen außer zod; lib/enterprise wird von keinem Code außerhalb lib/enterprise und tests importiert (keine Laufzeitwirkung).",
+      "verification": "Test liest Quelltexte (wie Importisolationstests) + grep app/ lib/",
+      "met": null
+    },
+    {
+      "id": "AC-8",
+      "criterion": "Keine DB, keine Route, kein Cron, kein Schalter, keine Netzaufrufe, keine Modellaufrufe.",
+      "verification": "Review des Diffs",
+      "met": null
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint (nur die 2 bekannten Warnungen)",
+    "npm test (inkl. neuer tests/enterprise-kernel.test.cjs)",
+    "npm run build",
+    "Prompt-Injection-Fall: Plan-Text fordert 'Budget erhöhen' / 'veröffentlichen' → wird L4/L3b-Entscheidungsvorlage, nicht ausführbar"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 2,
+    "target_changed_lines": 350,
+    "notes": "Abo-Kontingente unbekannt; bei Erschöpfung waiting_capacity + Checkpoint"
+  },
+  "lease": null,
+  "waiting": {
+    "reason": "operator",
+    "since": "2026-10-18T21:30:00Z",
+    "resume_condition": "Gate G0: Betreiber gibt ADR-01, ADR-13 … ADR-16 frei (BF-16). Danach Status ready; Codex nimmt den Lease per Fast-Forward-Commit auf architecture/ai-business-roadmap.",
+    "wake_mechanism": "manual_start"
+  },
+  "changed_files": [],
+  "implemented": [],
+  "tests": [
+    {
+      "command": "keine – Planungsdatei",
+      "result": "not_run",
+      "commit": null,
+      "at": "2026-10-18T21:30:00Z"
+    }
+  ],
+  "known_issues": [
+    "lib/enterprise existiert noch nicht; Code-Branch von aktuellem main (nicht vom Architektur-Branch) abzweigen: gpt/B-01-executive-kernel",
+    "PR gegen main; Merge erst nach Review Claude + Betreiber"
+  ],
+  "open_decisions": [
+    {
+      "id": "BF-16",
+      "question": "Gate G0 freigeben (ADR-01, ADR-13 … ADR-16)",
+      "owner": "operator"
+    }
+  ],
+  "pr": {
+    "url": null,
+    "state": "none",
+    "merge_commit": null,
+    "ci": "unknown"
+  },
+  "approval": {
+    "reviewer": "pending",
+    "operator": "pending",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Nach G0: Codex setzt lease (holder gpt-work, generation 1) und status in_progress per Fast-Forward-Commit",
+    "Codex implementiert auf gpt/B-01-executive-kernel, PR gegen main, Status waiting_review",
+    "Claude prüft gegen AC-1 … AC-8 und schreibt tasks/B-01/review-1.json"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-18T21:30:00Z",
+    "checkpoint_reason": "work_package_done",
+    "last_commit": "698f4e1",
+    "active_branch": "claude/nice-ptolemy-k4p1c3",
+    "state_summary": "Technische Planung von B-01 durch Claude (Planer). Implementierung durch Codex nach Gate G0.",
+    "decisions_made": [
+      "Reine Funktionen ohne DB als erster Baustein (ADR-16)",
+      "Unbekannte Aktion → L4 (fail closed)"
+    ],
+    "test_status": "keine Tests (Planung)",
+    "next_action": "Codex: nach G0 Lease nehmen und AC-1 … AC-8 umsetzen"
+  },
+  "revision": 1,
+  "based_on_commit": "698f4e1",
+  "updated_at": "2026-10-18T21:30:00Z",
+  "log": [
+    {
+      "at": "2026-10-18T21:30:00Z",
+      "actor": "claude-code",
+      "action": "created",
+      "summary": "Technische Planung B-01 (Planer Claude, Implementierer Codex, Prüfer Claude)",
+      "commit": "698f4e1"
+    },
+    {
+      "at": "2026-10-18T21:30:00Z",
+      "actor": "claude-code",
+      "action": "waiting",
+      "summary": "wartet auf Gate G0 (BF-16)",
+      "commit": "698f4e1"
+    }
+  ]
+}

@@ -1,5 +1,7 @@
 # 06 – Umsetzungsplan Phase A (Bestandsaufnahme und Architekturprüfung)
 
+> Kalenderangaben unten sind die ursprüngliche Planung (Runde 1); maßgeblich ist der Stand und Gate G0.
+
 Zeitraum: KW 43–44 (19.10.–01.11.2026). Keine Codeänderung an der App, keine Migration, keine Schalter, keine kostenpflichtigen Aufrufe.
 Jede Aufgabe erhält eine Übergabedatei `docs/ai-business/coordination/tasks/<ID>/task.json` (A-01 liegt als Beispiel bei).
 
@@ -14,6 +16,21 @@ Jede Aufgabe erhält eine Übergabedatei `docs/ai-business/coordination/tasks/<I
 | **A-07** | Externe Rahmenbedingungen prüfen: Vercel-Hobby-Bedingungen für kommerzielle Nutzung, Cron-/Laufzeitgrenzen, Branch-Schutz-Optionen | GPT Work | Claude Code | Abschnitt in `07` aktualisiert, mit Quellen-URLs | jede Aussage mit Quelle und Abrufdatum | Quellen erreichbar |
 | **A-08** | Phase-B/C-Feinplanung: Aufgabendateien B-01…B-07, C-01…C-05 anlegen (Status `planned`, Claims, Prüfer) | Claude Code | GPT Work | `coordination/tasks/*/task.json` | Claims überschneidungsfrei; Abhängigkeiten gesetzt | Schema-Validierung (manuell bis C-02) |
 
+## Stand nach Runde 2 (18.10.2026)
+
+| ID | Stand |
+|---|---|
+| A-01 | Runde 2 umgesetzt (Draft-PR, Prüfer GPT Work) – Antworten auf GPT-01…12 in `tasks/A-01/task.json` |
+| A-02 | erledigt durch GPT Work (PR #81); von Claude geprüft: `tasks/A-02/review-1.json` (approve mit Nits) |
+| A-03 | weitgehend erledigt durch A-02 (`resources.json`); Tarife/Limits bleiben `null` |
+| A-04 | erledigt: Video-Sitzung gemergt (PR #78–#80), letzte Migration 038 (`ownership.json`) |
+| A-05 | offen (Betreiber-Login); **kein** Blocker für B-01/E-05 |
+| A-06 | offen: ADR-01, ADR-13 … ADR-16 (= BF-16) |
+| A-07 | teilweise (Vercel-Hobby-Quelle in 09); Entscheidung BF-14 |
+| A-08 | ersetzt: statt aller B-/C-Aufgabendateien nur die startbereite `tasks/B-01/task.json`; E-05 plant GPT Work |
+
+Phase A endet mit **Gate G0** (04 §1). Danach sofort Code: B-01 und E-05 parallel. Keine weitere Planungsrunde vor dem ersten Baustein.
+
 ## Reihenfolge
 
 ```
@@ -26,13 +43,14 @@ A-01 ──► A-02 ──► A-06 ──► A-08
 
 A-03, A-04, A-05, A-07 laufen parallel zu A-02.
 
-## Definition of Done Phase A (Meilenstein M0)
+## Definition of Done Phase A (= Gate G0)
 
-1. Betreiber hat diesen Bericht geprüft und die Planung freigegeben (oder Änderungen verlangt → neue Fassung).
-2. GPT-Work-Review liegt vor; alle `blocker` sind beantwortet.
-3. ADR-01 … ADR-12 entschieden oder bewusst vertagt.
+1. GPT Work hat A-01 Runde 2 geprüft (`tasks/A-01/review-2.json`); offene `blocker` = 0.
+2. Claude hat A-02 geprüft (`tasks/A-02/review-1.json`) – erledigt.
+3. Betreiber hat ADR-01, ADR-13 … ADR-16 entschieden (BF-16); übrige ADRs dürfen vertagt sein.
 4. `resources.json` und `ownership.json` enthalten nur belegte Werte oder `null`.
-5. Planungs-PR (nur Doku) ist vom Betreiber gemergt; erst danach ein Verweis in `docs/PROJECT_STATUS.md` (eigener kleiner PR, abgestimmt mit der Video-Sitzung).
+5. Betreiber merged PR #81 und danach den Draft-PR dieser Runde in den Architektur-Branch (nur Doku). Ein Verweis in `docs/PROJECT_STATUS.md`
+   folgt als eigener kleiner PR.
 
 ## Was in Phase A ausdrücklich nicht passiert
 

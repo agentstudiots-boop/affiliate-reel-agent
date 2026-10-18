@@ -11,7 +11,8 @@ Maschinenlesbare Übergabestruktur (Konzept: `../05_ENTWICKLUNGSORGANISATION.md`
 | `resources.json` | Kontingente, Kontextgrößen, Fähigkeiten, Checkpoint-Schwellen; `null` = unbekannt | Betreiber / mit Quelle |
 | `schema/task.schema.json` | Aufbau einer Aufgabendatei inkl. Checkpoint (`session`) und Änderungsprotokoll (`log`) | – |
 | `schema/review.schema.json` | Aufbau eines Review-Ergebnisses | – |
-| `tasks/<ID>/task.json` | Stand der Aufgabe | **nur** implementierendes System |
+| `schema/decision.schema.json` | Betreiberentscheidung mit nachprüfbarer Quelle | – |
+| `tasks/<ID>/task.json` | Stand der Aufgabe (Rollen, Kriterien, Budget, Lease, Wartezustand, Befundantworten) | Planer bis zum Lease, danach **nur** implementierendes System |
 | `tasks/<ID>/review-<n>.json` | Review-Runde n | **nur** prüfendes System |
 | `tasks/<ID>/decision.json` | Betreiberentscheidung | **nur** Betreiber |
 
@@ -48,3 +49,15 @@ Neben **Claude Code** und **ChatGPT Work** darf auch **ChatGPT im normalen Chat*
 4. Die Abstimmung erfolgt asynchron über dieselben GitHub-Branches, PRs und Übergabedateien. Ein GitHub-Eintrag **startet keine Claude-Code- oder GPT-Work-Sitzung automatisch**. Es gibt keine Zusicherung autonomer Überwachung oder unmittelbarer Rückantwort.
 
 **Konkreter aktueller Prüfpunkt:** Ist ein gemeinsames Engineering-System mit getrennten Rollen für technische Planung, Implementierung und unabhängiges Review besser als zwei eigenständige Engineering-Systeme? Modelle/Rollen sollten austauschbar bleiben. Entscheidung anhand von Testaufwand, Berechtigungsgrenzen, Parallelisierbarkeit, Qualität, Betriebs- und Tokenkosten treffen; zunächst offen lassen.
+
+## Runde 2 (18.10.2026, A-01): was sich an der bestehenden Struktur ändert
+
+Keine neue Struktur, nur Ergänzungen dieser Dateien (Begründung: `../07_OFFENE_FRAGEN_RISIKEN_ENTSCHEIDUNGEN.md` §0):
+- `task.schema.json` Revision 2 (additiv, alte Instanzen bleiben gültig): `planner`, Wartezustände (`waiting_capacity`, `waiting_review`,
+  `waiting_operator`), `lease` mit `generation`, `waiting`, `acceptance_criteria`, `test_requirements`, `budget`, `claims.foreign_paths`,
+  `responses_to_review`; Teilnehmer `chatgpt-chat`.
+- Neu `decision.schema.json`. Eine von einem Modell eingetragene Entscheidung gilt nur mit nachprüfbarer Quelle.
+- **Zustands-Commits (ADR-13):** Lease, Status, Checkpoint und eigene review-/decision-Dateien dürfen als kleiner Fast-Forward-Commit
+  direkt auf `architecture/ai-business-roadmap` geschrieben werden (Connector: `expected_sha`). Abgelehnter Push = neu lesen. Inhaltliche
+  Änderungen (Architektur, Schemas, Regeln) weiter per PR mit Review des anderen Systems.
+- Prüfen lokal z. B. mit `python3` + `jsonschema` (Draft 2020-12). Ein CI-Validator folgt erst bei nachgewiesenem Bedarf.

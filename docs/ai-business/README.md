@@ -1,17 +1,21 @@
 # Autonomous AI Business System – Planungsbericht zur gemeinsamen Prüfung
 
-Stand **18.10.2026** · Branch `architecture/ai-business-roadmap` (Basis `main` = `ea0559a`) · Erstellt von Claude Code (Aufgabe A-01).
-**Nur Planung.** Kein neuer Agent, keine Codeänderung an der App, keine Migration, keine Schalter, keine Secrets, keine kostenpflichtigen
-Aufrufe, kein Merge. Dieser Branch enthält ausschließlich neue Dateien unter `docs/ai-business/`.
+Stand **18.10.2026, Runde 2** · Koordinationsbranch `architecture/ai-business-roadmap` · Arbeitsbranch dieser Runde `claude/nice-ptolemy-k4p1c3`
+(Draft-PR, Prüfer GPT Work). **Nur Planung.** Keine App-Codeänderung, keine Migration, keine Schalter, keine Secrets, keine kostenpflichtigen
+Aufrufe, kein Merge.
 
-Die Umsetzung beginnt erst nach ausdrücklicher Freigabe des Betreibers (BF-01).
+**Aktueller Stand in einem Satz:** GPT Work hat Runde 1 geprüft (PR #81, 12 Befunde); Claude hat alle Befunde bewertet (9 akzeptiert,
+3 teilweise, 0 abgelehnt – 07 §0), die bestehenden Dokumente korrigiert, PR #81 geprüft und den ersten Code-Baustein B-01 geplant.
+Nächster Schritt: GPT-Gegenprüfung dieser Runde und Betreiberentscheidung BF-16 (= Gate G0), danach sofort Code.
+
+> Abschnitte „Kurzfassung“ unten stammen aus Runde 1; maßgeblich für Executive, Engineering und Roadmap sind 02 §3, 05 §2 und 04 (Runde 2).
 
 ## Kurzfassung
 
 1. **Gute Ausgangslage, falsch benannt:** „Jarvis“ ist heute kein KI-Agent, sondern eine regelbasierte Ablaufsteuerung mit sehr belastbaren
    Freigabe-Gates, Budgets, Runtime-Guard, Modellaufruf-Protokoll und einem ehrlichen Command Center. Genau das ist das richtige Fundament.
-2. **Empfohlene Kernentscheidung:** Der Executive wird ein **deterministischer Kern** (Aufgabenbuch, Regeln, Budgets, Berechtigungsstufen
-   L0–L4) mit KI nur für Sprache. Er bekommt **kein** Freigaberecht; der Betreiber bleibt einzige Freigabeinstanz.
+2. **Kernentscheidung (Runde 2):** **Hybrid-Executive** – KI plant, analysiert, priorisiert und entscheidet im Mandat (L0–L2, Budget);
+   ein deterministischer Kern validiert jeden Plan. **Kein** Freigaberecht; der Betreiber bleibt einzige Freigabeinstanz.
 3. **Nicht jede Abteilung ist ein Agent:** Controlling ist reine Software. Engineering ist ein Entwicklungsprozess im Repository, kein
    Laufzeit-Agent in Production (Sicherheitsrisiko). Der Opportunity Scout ist der einzige neue KI-intensive Baustein – mit hartem Budget.
 4. **Größtes Risiko ist wirtschaftlich, nicht technisch:** Es gibt heute keine erfassten Erlöse und keine Euro-Kosten im System. Deshalb
@@ -33,7 +37,9 @@ Die Umsetzung beginnt erst nach ausdrücklicher Freigabe des Betreibers (BF-01).
 | [`05_ENTWICKLUNGSORGANISATION.md`](05_ENTWICKLUNGSORGANISATION.md) | Zusammenarbeit, Review-Prozess, Übergabe, Sitzungs-/Kontext- und Tokenmanagement |
 | [`06_PHASE_A_UMSETZUNGSPLAN.md`](06_PHASE_A_UMSETZUNGSPLAN.md) | Konkreter Plan der ersten Phase |
 | [`07_OFFENE_FRAGEN_RISIKEN_ENTSCHEIDUNGEN.md`](07_OFFENE_FRAGEN_RISIKEN_ENTSCHEIDUNGEN.md) | Offene Fragen, Risiken, ADRs, Betreiberfreigaben |
-| [`coordination/`](coordination/README.md) | Maschinenlesbare Übergabestruktur (Schemas, Besitz, Ressourcen, Aufgabe A-01) |
+| [`08_KAPAZITAETSGESTEUERTE_KOORDINATION.md`](08_KAPAZITAETSGESTEUERTE_KOORDINATION.md) | Betreiber-Chat-Notiz (in 04/05 übernommen) |
+| [`09_GPT_ARCHITEKTURPRUEFUNG.md`](09_GPT_ARCHITEKTURPRUEFUNG.md) | Unabhängige Prüfung durch GPT Work (A-02, PR #81) |
+| [`coordination/`](coordination/README.md) | Die **einzige** Übergabestruktur (Schemas, Besitz, Ressourcen, Aufgaben A-01, A-02, B-01) |
 
 ## Abdeckung der erwarteten Ergebnisse (Auftrag §17)
 
@@ -52,10 +58,9 @@ Die Umsetzung beginnt erst nach ausdrücklicher Freigabe des Betreibers (BF-01).
 
 ## Bitte um Entscheidung
 
-- **BF-01** Planung freigeben oder Änderungen verlangen.
-- **BF-03** ADR-01 … ADR-12 (07 §1) – Empfehlung jeweils „annehmen“.
-- **BF-05 / Q-03** Repository öffentlich lassen oder privat stellen.
-- **Q-01, Q-02** Reviewfenster des Betreibers im Winter; was genau „GPT Work“ ist und wie es auf GitHub zugreift.
+- **BF-16 (= Gate G0):** ADR-01 (Hybrid-Executive), ADR-13 (Lease per Fast-Forward-Commit), ADR-14 (Review-Übergangsregel bei gemeinsamem
+  Konto), ADR-15 (ein Engineering-System mit Rollen), ADR-16 (erster Baustein B-01 ∥ E-05).
+- **BF-14** Hosting-Tarif (Vercel Hobby ist laut Doku nichtkommerziell). **BF-15** eigene GitHub-Identität. **BF-05** Repo öffentlich/privat.
 
 ## Hinweise zur Isolation
 

@@ -1,89 +1,91 @@
-# 05 – Entwicklungsorganisation: Claude Code ↔ GPT Work
+# 05 – Entwicklungsorganisation: Claude Code ↔ GPT Work (Codex)
 
-Verbindlicher Vorschlag zur Prüfung. Gilt ab Freigabe für alle Arbeiten am KI-Unternehmenssystem; bestehende Regeln aus `CLAUDE.md` und
-`AGENTS.md` haben Vorrang.
+Verbindlicher Vorschlag zur Prüfung, **Runde 2** (nach GPT-03, -04, -05, -12 und Betreiberbeschlüssen vom 18.10. in `coordination/README.md`).
+Gilt ab Freigabe für alle Arbeiten am KI-Unternehmenssystem; `CLAUDE.md` und `AGENTS.md` haben Vorrang. Es gibt **ein** Koordinationssystem:
+`docs/ai-business/coordination/` – für Claude Code, GPT Work und den normalen ChatGPT-Chat.
 
-## 1. Was heute tatsächlich automatisierbar ist (Nachweisstand 18.10.2026)
+## 1. Was heute tatsächlich funktioniert (Nachweisstand 18.10.2026)
 
-| Fähigkeit | Claude Code (Cloud-Sitzung) | GPT Work | Status |
+| Fähigkeit | Claude Code | GPT Work (Codex) | Normaler ChatGPT-Chat |
 |---|---|---|---|
-| Repository lesen, Branch anlegen, pushen | ja (in dieser Sitzung genutzt) | laut Historie wahrscheinlich (PR #71 „Codex-Audit“, Commits über Betreiberkonto) | GPT: **nicht verifiziert** |
-| Pull Request erstellen | ja (GitHub-MCP `create_pull_request`) | unbekannt | offen (Q-10) |
-| PR-Review mit Zeilenkommentaren abgeben | ja (GitHub-MCP `pull_request_review_write`) | unbekannt | offen |
-| Auf PR-Ereignisse reagieren (Kommentare, CI) | ja, solange die Sitzung lebt (`subscribe_pr_activity`) | unbekannt | Claude: vorhanden |
-| Zeitgesteuerte Folgesitzung (z. B. „prüfe offene PRs täglich“) | ja (Routinen/`create_trigger`, `send_later`) | unbekannt | Claude: vorhanden, **nicht eingerichtet** |
-| Claude per `@claude`-Kommentar im PR auslösen | nur mit GitHub-Action `anthropics/claude-code-action` + API-Schlüssel als Repo-Secret | – | **nicht installiert** (nur `quality.yml`); kostenpflichtig → Betreiberfreigabe |
-| GPT per Kommentar/Ereignis aus GitHub auslösen | – | unbekannt | offen |
-| Direkte Kommunikation Claude ↔ GPT | **keine Schnittstelle** | **keine Schnittstelle** | nicht vorhanden |
-| Gemeinsame Qualitätsprüfung | CI `Quality` je PR (typecheck, lint, 660 Tests, build, audit) | dieselbe CI | vorhanden |
-| Merge-Sperre ohne grüne CI / Review | – | – | **nicht vorhanden** (kein Branch-Schutz) |
+| Repo lesen, Branch, Commit, Push | **getestet** | **getestet** über Connector (PR #81) | Commits auf dem Architektur-Branch belegt (`22272fd`, `a7f1b7e`, `aa6ce5a`) |
+| PR erstellen | **getestet** (dieser Draft-PR) | **getestet** (PR #81) | nicht belegt |
+| PR-Review | Kommentar **getestet**; **kein Approve möglich** | Werkzeug vorhanden, nicht getestet | – |
+| Eigene GitHub-Identität | **nein**: alle PRs laufen unter `agentstudiots-boop` | **nein**: ebenfalls `agentstudiots-boop` | ebenfalls |
+| Vercel | Werkzeuge vorhanden (lesend genutzt in früheren Sitzungen), hier nicht genutzt | nicht belegt | – |
+| Automatischer Start durch GitHub-Ereignis | **nein** (keine Action eingerichtet) | Quelle verfügbar, **nicht eingerichtet/getestet** | nein |
+| Zeitgesteuerte Folgearbeit | verfügbar, **nicht eingerichtet** | verfügbar, **nicht eingerichtet** | nein |
+| Direkte Kommunikation untereinander | **keine** | **keine** | **keine** |
 
-Folgerung: Die einzige verlässliche gemeinsame Schnittstelle ist **GitHub** (Branches, PRs, Reviews, CI) plus **Dateien im Repository**.
-Der Betreiber ist heute das Übergabeglied, wenn GPT Work eine Aufgabe beginnen soll. Nichts davon wird als automatisiert dargestellt,
-bevor es nachgewiesen ist.
+Folgerung: Die Übergabe über GitHub ist **real dokumentiert**, aber **kein automatischer Aufgabenwechsel**. Eine Übergabedatei startet keine
+Sitzung. Bis ein Trigger mit Testlauf nachgewiesen ist, stößt der Betreiber zweimal täglich manuell an (Betreiberbeschluss).
 
-## 2. Rollen und Zuständigkeitsprinzip
+## 2. Ein Engineering-System mit getrennten Rollen
 
-- Jede Aufgabe hat genau ein **implementierendes** und ein **prüfendes** Modell; nie dasselbe.
-- **Verantwortlich** ist das implementierende Modell bis zum Merge; der Betreiber merged.
-- Module haben einen **Besitzer** (`coordination/ownership.json`). Nur der Besitzer ändert Dateien eines Moduls; andere nur über eine
-  eigene Aufgabe mit ausdrücklichem Eintrag `foreign_paths` und Zustimmung des Besitzers im PR.
-- Vorschlag der Grundaufteilung (nach Kontext, nicht nach „Fähigkeit“ – ein belastbarer Fähigkeitsvergleich liegt nicht vor):
+Bewertung des Prüfpunkts aus `coordination/README.md` (Betreiberbeschluss `aa6ce5a`, als Prüfhypothese behandelt):
+**Empfehlung: ein gemeinsames Engineering-System mit drei je Aufgabe vergebenen Rollen, nicht zwei eigenständige Engineering-Systeme.**
 
-| Bereich | Implementiert | Prüft | Begründung |
-|---|---|---|---|
-| Executive-Kern, Aufgabenbuch, Migrationen, Integration in bestehende Gates/Router | Claude Code | GPT Work | tiefe Kopplung an bestehenden Code, den Claude-Sitzungen überwiegend geschrieben haben (59 Commits) |
-| Controlling: Preiskatalog, Kostenbuch-Importer, Kennzahlenfunktionen (reine Funktionen + SQL) | GPT Work | Claude Code | gut isolierbar, klarer Vertrag, unabhängige Sicht auf Zahlenlogik |
-| Opportunity-Bewertungsraster (reine Funktionen), Schemas | GPT Work | Claude Code | isoliert |
-| Opportunity-Orchestrator inkl. Recherche/Modellaufrufe | Claude Code | GPT Work | nutzt `tavily.ts`, `Generator`, `recordModelCall` |
-| Command-Center-Unternehmensebene | Claude Code | GPT Work | Konfliktzone `lib/architecture/*` |
-| Koordinationswerkzeuge (Schema-Validator, Besitzprüfung in CI) | GPT Work | Claude Code | unabhängig vom App-Code |
-| Sicherheits-Review jeder L3/L4-nahen Änderung | beide (zweites Review durch das jeweils andere Modell) | – | Vier-Augen-Prinzip |
+| Kriterium | Ein System, Rollen je Aufgabe | Zwei eigenständige Systeme |
+|---|---|---|
+| Infrastruktur | eine Koordination, eine CI, ein Regelwerk | doppelte Aufgabenlisten, Regeln, Übergaben – widerspricht „kein zweites Koordinationssystem“ |
+| Parallelität | über überschneidungsfreie Claims gleich gut | nur scheinbar höher; Konflikte an Hot Files bleiben |
+| Unabhängige Prüfung | Prüfer ist per Regel ein anderes System | gleich, aber mit Schnittstellenaufwand zwischen zwei Systemen |
+| Austauschbarkeit der Modelle | hoch (Rolle ≠ Modell) | gering (Modell = System) |
+| Kosten/Token | eine Pflege, geringerer Kontextaufwand je Übergabe | höher |
+| Risiko | gemeinsame Fehlerquelle in der Koordination | Abweichende Standards, doppelte Wahrheiten |
 
-Die Aufteilung ist eine **Startannahme** und wird nach Phase C anhand der Review-Befunde und Nacharbeitsquote überprüft.
+Prüfbare Erfolgskriterien (nach ca. 5 Paketen messen): Nacharbeitsquote, Befunde je Review, Durchlaufzeit, Wartezeit auf Review/Betreiber,
+Konflikte an Dateien, Kosten je akzeptiertem Paket. Weicht das Ergebnis deutlich ab, wird die Frage erneut vorgelegt (ADR-15).
+
+**Rollen (je Task-Datei festgelegt):**
+- **Planer** – technische Planung: Ziel, Schnittstellen, Dateien/Claims, Akzeptanzkriterien, Testanforderungen, Budget. Regel: das jeweils
+  **andere** System plant, als das, das implementiert.
+- **Implementierer** – setzt um, hält den Lease, pflegt `task.json` ab der Übernahme.
+- **Prüfer** – unabhängig vom Implementierer; schreibt `review-<n>.json` und einen PR-Kommentar mit geprüfter SHA. Der Planer darf Prüfer sein.
+- **Betreiber** – merged, entscheidet ADRs, Kosten, Production. Der normale ChatGPT-Chat dokumentiert Betreiberideen als Prüfhypothesen.
+
+Kein System gibt eigene Arbeit allein frei. Betreiberideen sind Prüfhypothesen: beide Systeme bewerten sie unabhängig am realen Code;
+abweichende Einschätzungen werden gegenübergestellt (Betreiberbeschluss `aa6ce5a`).
 
 ## 3. Workflow je Aufgabe
 
 ```
- Betreiber/Executive-Plan ──► Aufgabe anlegen (coordination/tasks/<ID>/task.json, Status planned)  [Koordinations-PR]
-          │
-          ▼
- Implementierer: Branch <modell>/<ID>-<kurzname> von aktuellem main · Status in_progress · Dateien in "claims"
-          │   kleine Commits mit Trailer · lokale Prüfungen
-          ▼
- PR (Vorlage: Ziel, Diff-Umfang, Tests, Risiken, Übergabedatei aktualisiert) · Status in_review
-          │
-          ▼
- Prüfer: Review gegen Prüfliste (§5) · schreibt coordination/tasks/<ID>/review-<n>.json · GitHub-Review
-          │            ├── Änderungen nötig ──► Implementierer behebt ──► neues Review (n+1)
-          ▼
- Freigabe Prüfer + CI grün ──► Betreiber merged (manuell) ──► Status merged ──► Deploy-Nachweis ──► Status deployed/verified
+Planer: tasks/<ID>/task.json (Status planned → ready, Kriterien, Claims, Budget)        [PR oder Zustands-Commit]
+   │
+Implementierer: Lease per Fast-Forward-Commit auf den Koordinationsbranch (ADR-13) → in_progress
+   │   Code-Branch <system>/<ID>-<kurz> von aktuellem main · kleine Commits mit Trailer · lokale Prüfungen
+   ▼
+PR gegen main (bzw. gegen den Architektur-Branch bei reiner Doku) · Status waiting_review
+   │
+Prüfer: review-<n>.json + PR-Kommentar mit SHA ──► changes_requested ──► Implementierer behebt ──► review-<n+1>
+   ▼
+approved_by_reviewer + CI grün ──► waiting_operator ──► Betreiber merged ──► merged ──► Deploy-Nachweis ──► deployed/verified
 ```
 
-Branch-Namen: `claude/<ID>-<kurz>`, `gpt/<ID>-<kurz>`, Planung `architecture/<thema>`. Basis immer das aktuelle `main`.
-Nie auf `main` direkt, nie Force-Push auf fremde Branches, nie Merge ohne Betreiber.
+Branch-Namen: `claude/<ID>-<kurz>`, `gpt/<ID>-<kurz>`; Cloud-Sitzungen mit vorgegebenem Branch nennen ihn in `task.json`. Nie auf `main` direkt,
+nie Force-Push auf fremde Branches, nie Merge ohne Betreiber.
 
-## 4. Urheberkennung (Pflicht)
+## 4. Urheberkennung und Reviewer-Identität (GPT-05)
 
-Jeder Commit trägt Trailer, damit Verantwortung nachvollziehbar ist, auch wenn GPT über das Betreiberkonto pusht:
-
-```
-Task: B-03
-Implemented-By: claude-code | gpt-work
-Reviewed-By: gpt-work | claude-code   (nur in Review-Fix-Commits / Merge-Beschreibung)
-```
-
-Keine Modellversionen in Commits (bestehende Regel); die Kennung nennt nur das System.
+Alle Systeme arbeiten heute unter **demselben GitHub-Konto**. Deshalb:
+- Jeder Commit trägt Trailer: `Task: <ID>`, `Implemented-By: claude-code | gpt-work`, bei Review-Fixes zusätzlich `Reviewed-By:`.
+- Model- bzw. Systemkennungen in JSON und Trailern sind **Selbstauskünfte**, kein manipulationssicherer Nachweis.
+- GitHub-„Approve“ ist unmöglich (Autor = Prüfer-Konto). Ein Review gilt als erbracht durch `review-<n>.json` **und** einen PR-Kommentar mit
+  geprüfter SHA. Vertrauensanker bleibt der **Betreiber-Merge**.
+- Mittelfristig (D-07, BF-15): eigene Identität für mindestens ein System (Machine User oder GitHub-App), danach Branch-Schutz mit Pflicht-Review
+  und Pflicht-Check `check`. Bis dahin keine technische Merge-Sperre behaupten.
 
 ## 5. Prüfliste für das prüfende Modell
+
+Zusätzlich prüft der Prüfer die **Akzeptanzkriterien und Testanforderungen der Task-Datei** einzeln (`acceptance_criteria[].met`).
 
 1. **Architekturkonformität:** Abteilungsvertrag, keine Importe zwischen Spezialisten/Abteilungen, Orchestrator-Regel aus `AGENTS.md`.
 2. **Freigabe-Invarianten:** keine neue Außenwirkung ohne Gate; `ACTIVE_APPROVAL_AUTHORITIES` unverändert; kein Schreiben in Freigabetabellen
    außerhalb `lib/publishing/`.
 3. **Sicherheit:** `authorized()` je Route, `proxy.ts`, Runtime-Guard je Wirkung, keine Secrets/Geschäftsdaten in Code/Logs/Repo,
    Prompt-Injection (Modellausgabe kann keine Stufe ≥ L3 auslösen).
-4. **Fehlerbehandlung:** unklare Anbieterantworten nicht wiederholen, Idempotenz, Leases, Budgetreservierung vor Aufruf.
-5. **Kosten:** jeder Modellaufruf über `recordModelCall`; Obergrenzen; keine kostenpflichtigen Aufrufe in Tests.
+4. **Fehlerbehandlung:** unklare Anbieterantworten nicht wiederholen (`outcome_unknown` + Abgleich), Idempotenz, Leases mit Fencing, Outbox.
+5. **Kosten:** jeder Modellaufruf über `recordModelCall`; harte Grenze nur über Budgetreservierung vor dem Aufruf; keine kostenpflichtigen Aufrufe in Tests.
 6. **Datenbank:** nur additiv, Nummer reserviert, Registrierung in `migrations.ts`, `ensure-automation-schema.ts`, Upgrade-Test.
 7. **Tests:** realer Code, nur I/O ersetzt; Regressionstest je Fehlerbehebung; Abdeckung der Fehlerpfade.
 8. **Integrationsrisiken:** Berührung von Konfliktzonen (01, §4), Schalter Standard „aus“.
@@ -92,23 +94,18 @@ Keine Modellversionen in Commits (bestehende Regel); die Kennung nennt nur das S
 
 Befunde werden klassifiziert: `blocker` (muss vor Merge behoben sein) · `major` · `minor` · `nit`. Ein PR mit offenem `blocker` wird nicht gemergt.
 
-## 6. Konfliktvermeidung zwischen den Modellen
+## 6. Konfliktvermeidung zwischen den Modellen (GPT-04)
 
-- **Datei-Claims:** `task.json` → `claims.paths` (Globs). Zwei offene Aufgaben dürfen sich nicht überschneiden. Prüfung zuerst manuell durch
-  den Implementierer beim Anlegen, ab Phase C per Skript in CI.
-- **Hot Files** (nur mit Koordination, nie parallel): `lib/memory/migrations.ts`, `lib/memory/ensure-automation-schema.ts`,
-  `tests/migration-upgrade.test.cjs`, `lib/architecture/model.ts`, `app/api/whatsapp/webhook/route.ts`, `lib/whatsapp/router.ts`,
-  `proxy.ts`, `lib/security/access-policy.ts`, `tests/admin-session.test.cjs`, `vercel.json`, `package.json`/`package-lock.json`,
-  `CLAUDE.md`, `AGENTS.md`, `docs/PROJECT_STATUS.md`.
-- **Migrationsnummern:** Reservierung in `coordination/ownership.json` → `migration_reservations` vor Beginn der Aufgabe.
-  Die parallele Video-Sitzung erhält Vorrang für die nächste freie Nummer, solange ihr Stand unbekannt ist.
-- **Veraltete Zustände verhindern:**
-  1. Jede Übergabedatei hat `revision` (Ganzzahl) und `based_on_commit`.
-  2. Vor jeder Änderung `git fetch` und Abgleich mit `origin/main` bzw. dem Aufgabenbranch; ist `revision` auf dem Remote höher als gelesen,
-     wird **nicht** überschrieben, sondern neu gelesen und zusammengeführt.
-  3. **Schreibrechte je Datei, nicht je Feld:** `task.json` schreibt nur der Implementierer, `review-<n>.json` nur der Prüfer,
-     `decision.json` nur der Betreiber. Damit überschreiben sich zwei Modelle nie gegenseitig.
-  4. Git-Merge-Konflikte in Übergabedateien werden nie automatisch zugunsten einer Seite aufgelöst.
+- **Datei-genaue Claims:** `claims.paths` nennt einzelne Dateien oder enge Globs, nie ganze Bäume wie `docs/ai-business/**`. Fremde Dateien nur
+  über `claims.foreign_paths` mit Link auf die Zustimmung des Besitzers.
+- **Hot Files** (`ownership.json`): nur mit Abstimmung, nie parallel; vorher `origin/main` und offene PRs prüfen.
+- **Migrationsnummern:** Reservierung in `ownership.json` → `migration_reservations` per Zustands-Commit; zuletzt auf `main`: **038**.
+- **Atomare Übernahme (ADR-13):** Lease und Statuswechsel werden als kleiner Commit auf den **Koordinationsbranch**
+  `architecture/ai-business-roadmap` geschrieben – per Fast-Forward-Push bzw. Connector mit `expected_sha`. Git prüft den Ref atomar: wer zuerst
+  schreibt, hält den Lease; ein abgelehnter Push heißt „neu lesen“, nie Force-Push. `generation` steigt bei jeder Übernahme (Fencing).
+- **Schreibrechte je Datei:** `task.json` (Planer bis Lease, danach Implementierer), `review-<n>.json` (Prüfer), `decision.json` (Betreiber;
+  ein Modell trägt nur mit nachprüfbarer Quelle ein). `resources.json`: jedes System nur seinen Abschnitt.
+- Merge-Konflikte in Koordinationsdateien werden nie automatisch zugunsten einer Seite aufgelöst.
 
 ## 7. Übergabeprotokoll (Branch, PR, Sitzungswechsel, Kontextkomprimierung)
 
@@ -121,12 +118,13 @@ coordination/
   resources.json            Modell-/Zeitressourcen; unbekannte Werte = null (offene Parameter)
   schema/task.schema.json   Aufgabe inkl. Änderungsprotokoll (log[])
   schema/review.schema.json Review-Ergebnis
-  tasks/<ID>/task.json      Aufgabe (Schreibrecht: Implementierer)
+  schema/decision.schema.json Betreiberentscheidung (mit nachprüfbarer Quelle)
+  tasks/<ID>/task.json      Aufgabe (Schreibrecht: Planer bis Lease, danach Implementierer)
   tasks/<ID>/review-<n>.json Review (Schreibrecht: Prüfer)
   tasks/<ID>/decision.json  Betreiberentscheidung (Schreibrecht: Betreiber)
 ```
 
-Pflichtfelder (Auszug): Aufgaben-ID, Modul, verantwortliches/implementierendes/prüfendes Modell, Ausgangscommit, Branch, geänderte Dateien,
+Pflichtfelder (Auszug): Aufgaben-ID, Modul, Planer/verantwortliches/implementierendes/prüfendes Modell, Akzeptanzkriterien, Testanforderungen, Budget, Lease, Wartezustand, Ausgangscommit, Branch, geänderte Dateien,
 implementierte Funktionen, Testergebnisse (Befehl, Ergebnis, Commit), bekannte Probleme, offene Entscheidungen, PR-Status, Freigabestatus,
 nächste Schritte, `updated_at`, `revision`, `log[]` (wer, wann, was, Commit).
 
@@ -141,7 +139,7 @@ Das Änderungsprotokoll beantwortet: wer implementiert (log `actor`), wer geprü
 ### 8.1 Messbarkeit
 - **Claude Code:** besitzt automatische Kontextkomprimierung; im CLI zeigt `/context` die Auslastung für den Bediener. Ob das Modell in einer
   Cloud-Sitzung die eigene Auslastung zuverlässig abfragen kann, ist **nicht nachgewiesen** → nicht als Messgröße verwenden.
-- **GPT Work:** Messbarkeit und Komprimierungsverhalten **unbekannt** (Q-11).
+- **GPT Work:** automatische Komprimierung laut eigener Umgebung vorgesehen, nicht ausgelöst getestet; keine verlässliche Prozentanzeige (A-02, `resources.json`).
 
 ### 8.2 Ersatzindikatoren für „≈ 80 %“ (beide Systeme)
 Ein Checkpoint wird geschrieben, sobald **einer** zutrifft:
@@ -158,28 +156,41 @@ Entwicklungsstand · letzter Commit · aktiver Branch · offene Aufgaben · beka
 **nächster konkreter Arbeitsschritt** (ein Satz, ausführbar). Checkpoint wird committet und gepusht – nur so überlebt er das Sitzungsende
 (Cloud-Container sind flüchtig).
 
-### 8.4 Wiederaufnahme
+Ein Commit kann seine eigene SHA nicht enthalten: `session.last_commit` nennt den letzten **bereits existierenden** Stand; der neue Stand ist
+über `git log` des Branches auffindbar.
+
+### 8.4 Wiederaufnahme und Aufgabenübernahme
 Neue Sitzung liest in dieser Reihenfolge: `CLAUDE.md` → `docs/PROJECT_STATUS.md` → `AGENTS.md` → `docs/ai-business/README.md` →
-`coordination/tasks/<ID>/task.json` (+ letzte `review-*.json`) → `git log` des Branches. Erst dann Arbeit fortsetzen.
+`coordination/tasks/<ID>/task.json` (+ letzte `review-*.json`) → offene PRs/CI/Remote-Heads. Erst dann Arbeit fortsetzen.
+Übernimmt ein **anderes** System eine Aufgabe (Kapazität erschöpft, Sitzung beendet), gilt: Lease abgelaufen oder vom Halter freigegeben →
+neuer Lease mit höherer `generation` per Fast-Forward-Commit → Arbeit auf dem vorhandenen Branch fortsetzen, nicht neu beginnen.
+
+### 8.5 Wartezustände
+`waiting_capacity` (Kontingent/Anstoß fehlt), `waiting_review`, `waiting_operator`, `blocked` (technisch/extern). Jeder Wartezustand nennt in
+`waiting.resume_condition` die konkrete Bedingung und in `waiting.wake_mechanism`, wie es weitergeht: heute `manual_start`;
+`tested_trigger` erst nach einem dokumentierten Testlauf.
+
 
 ## 9. Token-, Zeit- und Ressourcenmanagement
 
-**Keine erfundenen Limits.** Alle Kontingente, Kontextgrößen, Abo-Grenzen und Preise stehen in `coordination/resources.json`; unbekannte
-Werte sind `null` und werden vom Betreiber ergänzt.
+**Keine erfundenen Limits.** Kontingente, Kontextgrößen, Reset-Zeiten und Preise stehen in `coordination/resources.json`; unbekannt = `null`
+und nie „unendlich“.
 
-Strategie:
-1. **Engpass Betreiber:** WIP-Limit 2 offene Code-PRs; Reviewfenster des Betreibers als Taktgeber (Startannahme: 2 Fenster/Woche, je 30–60 min – Q-01).
-2. **Kleine Aufgaben:** Zielgröße je PR ≤ ca. 400 geänderte Zeilen ohne Tests; große Vorhaben in Folgen zerlegen.
-3. **Teure Schritte bündeln:** volle Testsuite (≈10 min) vor PR und nach Review-Fixes, dazwischen gezielte Tests (`node --test tests/<datei>`).
-4. **Parallelität nur bei disjunkten Claims:** Claude und GPT arbeiten gleichzeitig nur an Aufgaben ohne gemeinsame Dateien.
-5. **Review ist günstiger als Implementierung:** das prüfende Modell liest Diff + Übergabedatei, nicht das ganze Repo; gezielte Dateien.
-6. **Keine kostenpflichtigen Laufzeitaufrufe in der Entwicklung** (bestehende Regel); Modellvergleiche nur nach Freigabe.
-7. **Zeitfenster:** Implementierung kann asynchron laufen (Cloud-Sitzungen, Routinen); Merges nur in Betreiberfenstern; keine Merges
-   unmittelbar vor Cron-Slots (07/08/09/16/17/18 UTC), damit ein fehlerhaftes Deployment nicht direkt einen Tageslauf trifft.
+1. **Takt:** zwei manuelle Anstöße täglich (morgens, abends). Je Anstoß: offene Reviews → eigene `changes_requested` → laufende Aufgabe →
+   nächste startbereite Aufgabe per Lease (04, Einleitung).
+2. **Kapazität erschöpft:** Checkpoint schreiben, Status `waiting_capacity`, Lease freigeben oder ablaufen lassen; das andere System darf
+   übernehmen (8.4).
+3. **Kleine Aufgaben:** Zielgröße ≤ ca. 400 geänderte Zeilen ohne Tests; WIP höchstens 2 offene Code-PRs.
+4. **Teure Schritte bündeln:** volle Testsuite (≈ 10 min) vor PR und nach Review-Fixes, dazwischen gezielte Tests.
+5. **Review ist günstiger als Implementierung:** Prüfer liest Diff, Task-Datei und betroffene Dateien, nicht das ganze Repo.
+6. **Keine kostenpflichtigen Laufzeitaufrufe in der Entwicklung**; Modellvergleiche nur nach Freigabe.
+7. **GitHub/Vercel:** Schreibzugriffe nur auf eigene Branches/PRs; Vercel ausschließlich lesend (Deployment-Status, Laufzeitfehler,
+   Env-**Namen**); keine Änderung an Env, Domains, Crons, Projekteinstellungen ohne Betreiberfreigabe.
+8. **Automatisierung erst bei gemessenem Engpass** (Betreiberauftrag): z. B. wenn Reviews regelmäßig > 1 Anstoß warten → D-08 Trigger.
 
 ## 10. Merge-Regeln
 
-- Stufe 0 (ab sofort): Jeder Merge manuell durch den Betreiber nach grüner CI und freigebendem Review des anderen Modells.
-- Stufe 1 (optional, nach Phase D und Betreiberentscheidung): automatischer Merge **nur** für reine Koordinations-/Doku-PRs
-  (`docs/**`, `coordination/**`) bei grüner CI und Review-Freigabe. **Kein Auto-Merge für Code**, weil Merge = Production-Deployment.
-- Empfohlen: Branch-Schutz für `main` (erforderlicher Check `check`, keine Force-Pushes, keine Löschung) – Betreiberentscheidung (BF-04).
+- Jeder Merge manuell durch den Betreiber nach grüner CI und dokumentiertem Review des anderen Systems (ADR-10). Kein Auto-Merge für Code
+  (Merge = Production-Deployment).
+- Optional später: Auto-Merge nur für reine Doku-/Koordinations-PRs, frühestens nach D-07 (eigene Reviewer-Identität).
+- Empfohlen: Branch-Schutz für `main` (Pflicht-Check `check`, keine Force-Pushes) – Betreiberentscheidung BF-04; Pflicht-Review erst nach D-07.

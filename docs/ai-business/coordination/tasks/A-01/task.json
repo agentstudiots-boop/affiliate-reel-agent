@@ -1,25 +1,38 @@
 {
   "schema_version": 1,
   "task_id": "A-01",
-  "title": "Planungsdokumente: Bestandsaufnahme, Zielarchitektur, Roadmap, Entwicklungsorganisation",
+  "title": "Planungsdokumente und Architektur (Runde 2 nach GPT-Review A-01/review-1.json)",
   "module": "planning",
   "phase": "A",
-  "status": "in_review",
+  "status": "waiting_review",
   "responsible": "claude-code",
   "implementer": "claude-code",
   "reviewer": "gpt-work",
   "base_commit": "ea0559a",
-  "branch": "architecture/ai-business-roadmap",
+  "branch": "claude/nice-ptolemy-k4p1c3",
   "depends_on": [],
   "claims": {
     "paths": [
-      "docs/ai-business/**"
+      "docs/ai-business/0[1-7]_*.md",
+      "docs/ai-business/README.md",
+      "docs/ai-business/coordination/README.md",
+      "docs/ai-business/coordination/ownership.json",
+      "docs/ai-business/coordination/schema/*.json",
+      "docs/ai-business/coordination/tasks/A-01/task.json",
+      "docs/ai-business/coordination/tasks/A-02/review-1.json",
+      "docs/ai-business/coordination/tasks/B-01/task.json"
     ],
     "hot_files": [],
-    "migration_numbers": []
+    "migration_numbers": [],
+    "foreign_paths": [
+      {
+        "path": "docs/ai-business/coordination/resources.json",
+        "owner": "gpt-work",
+        "agreement": "gemeinsame Datei; nur Abschnitte systems.claude-code und operator geändert (Betreiberauftrag 18.10.)"
+      }
+    ]
   },
   "changed_files": [
-    "docs/ai-business/README.md",
     "docs/ai-business/01_BESTANDSAUFNAHME.md",
     "docs/ai-business/02_ZIELARCHITEKTUR.md",
     "docs/ai-business/03_ARCHITEKTURKRITIK.md",
@@ -27,12 +40,15 @@
     "docs/ai-business/05_ENTWICKLUNGSORGANISATION.md",
     "docs/ai-business/06_PHASE_A_UMSETZUNGSPLAN.md",
     "docs/ai-business/07_OFFENE_FRAGEN_RISIKEN_ENTSCHEIDUNGEN.md",
+    "docs/ai-business/README.md",
     "docs/ai-business/coordination/README.md",
     "docs/ai-business/coordination/ownership.json",
     "docs/ai-business/coordination/resources.json",
     "docs/ai-business/coordination/schema/task.schema.json",
-    "docs/ai-business/coordination/schema/review.schema.json",
-    "docs/ai-business/coordination/tasks/A-01/task.json"
+    "docs/ai-business/coordination/schema/decision.schema.json",
+    "docs/ai-business/coordination/tasks/A-01/task.json",
+    "docs/ai-business/coordination/tasks/A-02/review-1.json",
+    "docs/ai-business/coordination/tasks/B-01/task.json"
   ],
   "implemented": [
     "Bestandsaufnahme mit getrennten Statusbegriffen und Konfliktzonen zur parallelen Video-Sitzung",
@@ -40,79 +56,92 @@
     "Architekturkritik mit einfacherer Mindestvariante",
     "Roadmap A–J mit Zeitplan, Meilensteinen und Go/No-Go M5",
     "Entwicklungsorganisation Claude Code ↔ GPT Work mit Review-Prüfliste, Übergabe- und Checkpoint-Regeln",
-    "Maschinenlesbare Übergabestruktur (JSON Schema, Besitzregeln, Ressourcen mit offenen Parametern)"
+    "Maschinenlesbare Übergabestruktur (JSON Schema, Besitzregeln, Ressourcen mit offenen Parametern)",
+    "Runde 2: Hybrid-Executive (KI-Planung/-Entscheidung im Mandat, Kern validiert), L3a/L3b, Outbox/outcome_unknown, Budgetreservierung",
+    "Roadmap als DAG mit Gates G0–G6, kapazitätsgesteuert (2 manuelle Anstöße/Tag), Zyklus E-07↔H aufgelöst",
+    "Ein Engineering-System mit Rollen Planer/Implementierer/Prüfer (ADR-15, Prüfpunkt aus aa6ce5a)",
+    "Schema Revision 2 (additiv) + decision.schema.json; datei-genaue Ownership; Lease per Fast-Forward-Commit (ADR-13)",
+    "Review von A-02 (PR #81) und technische Planung des ersten Bausteins B-01"
   ],
   "tests": [
     {
-      "command": "node -e JSON.parse (alle JSON-Dateien unter docs/ai-business/coordination)",
+      "command": "python3 jsonschema Draft202012Validator (FormatChecker): alle Schemas und Instanzen unter coordination/",
       "result": "passed",
-      "detail": "Syntaxprüfung; Schema-Validator folgt in C-02",
-      "commit": "5bd49c8",
-      "at": "2026-10-18T17:04:47Z"
+      "detail": "siehe log; Ergebnis im PR",
+      "commit": "698f4e1",
+      "at": "2026-10-18T21:35:00Z"
     },
     {
       "command": "npm test / typecheck / lint / build",
       "result": "not_run",
-      "detail": "reine Doku-Änderung; CI läuft beim PR",
+      "detail": "reine Doku-/JSON-Änderung; node_modules nicht installiert; CI des PRs ist eigener Nachweis",
       "commit": null,
-      "at": "2026-10-18T17:04:47Z"
+      "at": "2026-10-18T21:35:00Z"
     }
   ],
   "known_issues": [
-    "Fähigkeiten und Limits von GPT Work unbekannt (Q-02, Q-10, Q-11)",
-    "Branch und Dateien der parallelen Video-Sitzung unbekannt (Q-12)",
-    "Produktionsdaten (model_calls, Erlöse) nicht gelesen – kein Zugang in der Sitzung"
+    "Gemeinsames GitHub-Konto: GitHub-Approve unmöglich (ADR-14)",
+    "Kein automatischer Start von GPT Work durch diese Übergabe – Betreiber muss anstoßen",
+    "Merge-Commit 6ce6fd1 nennt versehentlich 'A-09'; gemeint ist A-01 Runde 2",
+    "Tarife/Kontingente beider Systeme unbekannt (null)"
   ],
   "open_decisions": [
     {
-      "id": "BF-01",
-      "question": "Planung freigeben oder Änderungen verlangen",
+      "id": "BF-16",
+      "question": "Gate G0: ADR-01, ADR-13 … ADR-16 freigeben",
       "owner": "operator"
     },
     {
-      "id": "BF-03",
-      "question": "ADR-01 bis ADR-12 entscheiden",
+      "id": "BF-14",
+      "question": "Hosting-Tarif (Vercel Hobby nichtkommerziell)",
+      "owner": "operator"
+    },
+    {
+      "id": "BF-15",
+      "question": "Eigene GitHub-Identität für ein System",
       "owner": "operator"
     },
     {
       "id": "BF-05",
-      "question": "Repository öffentlich lassen oder privat stellen",
+      "question": "Repository öffentlich lassen?",
       "owner": "operator"
     }
   ],
   "pr": {
     "url": null,
-    "state": "none",
+    "state": "draft",
     "merge_commit": null,
     "ci": "unknown"
   },
   "approval": {
     "reviewer": "pending",
     "operator": "pending",
-    "latest_review_file": null
+    "latest_review_file": "tasks/A-01/review-1.json"
   },
   "next_steps": [
-    "Betreiber prüft docs/ai-business/README.md",
-    "GPT Work prüft die Planung (A-02) und legt review-1.json an",
-    "Betreiber klärt A-03 (GPT-Work-Fähigkeiten) und Q-01 (Reviewfenster)"
+    "GPT Work (Prüfer): Draft-PR am Head prüfen, tasks/A-01/review-2.json schreiben, Review-Aufgaben R1–R8 aus der PR-Beschreibung abarbeiten",
+    "GPT Work (Planer E-05): tasks/E-05/task.json anlegen",
+    "Betreiber: BF-16 entscheiden, dann PR #81 und diesen Draft-PR in den Architektur-Branch mergen",
+    "Danach: Codex nimmt B-01-Lease, Claude implementiert E-05"
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-18T17:05:20Z",
+    "last_checkpoint_at": "2026-10-18T21:35:00Z",
     "checkpoint_reason": "session_end",
-    "last_commit": "5bd49c8",
-    "active_branch": "architecture/ai-business-roadmap",
-    "state_summary": "Planungsphase abgeschlossen, Bericht liegt zur gemeinsamen Prüfung vor. Keine Implementierung begonnen.",
+    "last_commit": "698f4e1",
+    "active_branch": "claude/nice-ptolemy-k4p1c3",
+    "state_summary": "A-01 Runde 2 fertig, Draft-PR gegen architecture/ai-business-roadmap offen (enthält PR #81 und aa6ce5a). A-02 geprüft (approve mit Nits). B-01 geplant.",
     "decisions_made": [
-      "Nur neue Dateien unter docs/ai-business/; CLAUDE.md, PROJECT_STATUS.md und lib/architecture/* bleiben wegen der parallelen Sitzung unverändert",
-      "Offene Fragen als Q-xx, Entscheidungen als ADR-xx, Betreiberfreigaben als BF-xx"
+      "Ein Koordinationssystem (docs/ai-business/coordination); kein zweites",
+      "Kein Merge; Draft bleibt zur Gegenprüfung",
+      "Erster Code-Baustein B-01 ∥ E-05 statt Validator (ADR-16, Betreiber entscheidet)"
     ],
-    "test_status": "JSON-Syntax geprüft; keine Codeänderung",
-    "next_action": "Auf Betreiberfreigabe (BF-01) warten; danach A-02 bis A-08 gemäß 06_PHASE_A_UMSETZUNGSPLAN.md"
+    "test_status": "JSON-Schemas und Instanzen valide; App-Tests nicht ausgeführt (nur Doku)",
+    "next_action": "GPT Work: Draft-PR prüfen und tasks/A-01/review-2.json anlegen"
   },
-  "revision": 2,
-  "based_on_commit": "ea0559a",
-  "updated_at": "2026-10-18T17:05:20Z",
+  "revision": 3,
+  "based_on_commit": "698f4e1",
+  "updated_at": "2026-10-18T21:35:00Z",
   "log": [
     {
       "at": "2026-10-18T17:04:47Z",
@@ -127,6 +156,153 @@
       "action": "pushed",
       "summary": "Planungsdokumente auf architecture/ai-business-roadmap und claude/nice-ptolemy-k4p1c3 gepusht",
       "commit": "5bd49c8"
+    },
+    {
+      "at": "2026-10-18T19:40:00Z",
+      "actor": "claude-code",
+      "action": "review_received",
+      "summary": "GPT-Review A-01/review-1.json (PR #81) gelesen: 1 blocker, 8 major, 3 minor",
+      "commit": "d8c6c4e"
+    },
+    {
+      "at": "2026-10-18T21:35:00Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "Runde 2: alle 12 Befunde beantwortet (9 akzeptiert, 3 teilweise), aa6ce5a integriert",
+      "commit": "698f4e1"
+    },
+    {
+      "at": "2026-10-18T21:35:00Z",
+      "actor": "claude-code",
+      "action": "handoff",
+      "summary": "Übergabe an GPT Work als Prüfer (dokumentiert; startet keine GPT-Sitzung automatisch)",
+      "commit": "698f4e1"
     }
-  ]
+  ],
+  "planner": "claude-code",
+  "responses_to_review": [
+    {
+      "finding_id": "GPT-01",
+      "review_file": "tasks/A-01/review-1.json",
+      "verdict": "accepted",
+      "summary": "Hybrid-Executive; 01/02/03/07 korrigiert",
+      "changed_files": [
+        "docs/ai-business/02_ZIELARCHITEKTUR.md",
+        "docs/ai-business/03_ARCHITEKTURKRITIK.md",
+        "docs/ai-business/01_BESTANDSAUFNAHME.md"
+      ]
+    },
+    {
+      "finding_id": "GPT-02",
+      "review_file": "tasks/A-01/review-1.json",
+      "verdict": "accepted",
+      "summary": "ControllingSnapshot-Datenvertrag + 2D zuerst; H konsumiert",
+      "changed_files": [
+        "docs/ai-business/04_ROADMAP.md",
+        "docs/ai-business/02_ZIELARCHITEKTUR.md"
+      ]
+    },
+    {
+      "finding_id": "GPT-03",
+      "review_file": "tasks/A-01/review-1.json",
+      "verdict": "partially_accepted",
+      "summary": "Schema Rev. 2 + decision.schema; CI-Validator zurückgestellt bis Engpass",
+      "changed_files": [
+        "docs/ai-business/coordination/schema/task.schema.json",
+        "docs/ai-business/coordination/schema/decision.schema.json"
+      ]
+    },
+    {
+      "finding_id": "GPT-04",
+      "review_file": "tasks/A-01/review-1.json",
+      "verdict": "accepted",
+      "summary": "Datei-genaue Ownership; Atomarität über Git-Ref (ADR-13)",
+      "changed_files": [
+        "docs/ai-business/coordination/ownership.json",
+        "docs/ai-business/05_ENTWICKLUNGSORGANISATION.md"
+      ]
+    },
+    {
+      "finding_id": "GPT-05",
+      "review_file": "tasks/A-01/review-1.json",
+      "verdict": "partially_accepted",
+      "summary": "Fakt bestätigt; Übergangsregel ADR-14; eigene Identität mittelfristig (D-07/BF-15), keine Vorbedingung",
+      "changed_files": [
+        "docs/ai-business/05_ENTWICKLUNGSORGANISATION.md"
+      ]
+    },
+    {
+      "finding_id": "GPT-06",
+      "review_file": "tasks/A-01/review-1.json",
+      "verdict": "accepted",
+      "summary": "Outbox, outcome_unknown, Fencing, Abgleich",
+      "changed_files": [
+        "docs/ai-business/02_ZIELARCHITEKTUR.md"
+      ]
+    },
+    {
+      "finding_id": "GPT-07",
+      "review_file": "tasks/A-01/review-1.json",
+      "verdict": "partially_accepted",
+      "summary": "budget_reservations als harte Grenze; Rechnungsabgleich nicht Vorbedingung für E-05/E-07",
+      "changed_files": [
+        "docs/ai-business/02_ZIELARCHITEKTUR.md",
+        "docs/ai-business/04_ROADMAP.md"
+      ]
+    },
+    {
+      "finding_id": "GPT-08",
+      "review_file": "tasks/A-01/review-1.json",
+      "verdict": "accepted",
+      "summary": "038, 12 Crons, PR #78–#80 nachgezogen",
+      "changed_files": [
+        "docs/ai-business/01_BESTANDSAUFNAHME.md",
+        "docs/ai-business/coordination/ownership.json"
+      ]
+    },
+    {
+      "finding_id": "GPT-09",
+      "review_file": "tasks/A-01/review-1.json",
+      "verdict": "partially_accepted",
+      "summary": "Fakt übernommen (Quelle GPT); als Betreiberentscheidung BF-14 eingeordnet, nicht als Architekturblocker",
+      "changed_files": [
+        "docs/ai-business/03_ARCHITEKTURKRITIK.md",
+        "docs/ai-business/07_OFFENE_FRAGEN_RISIKEN_ENTSCHEIDUNGEN.md"
+      ]
+    },
+    {
+      "finding_id": "GPT-10",
+      "review_file": "tasks/A-01/review-1.json",
+      "verdict": "accepted",
+      "summary": "L3a/L3b",
+      "changed_files": [
+        "docs/ai-business/02_ZIELARCHITEKTUR.md"
+      ]
+    },
+    {
+      "finding_id": "GPT-11",
+      "review_file": "tasks/A-01/review-1.json",
+      "verdict": "accepted",
+      "summary": "„ungemessen“ statt 0 €",
+      "changed_files": [
+        "docs/ai-business/03_ARCHITEKTURKRITIK.md"
+      ]
+    },
+    {
+      "finding_id": "GPT-12",
+      "review_file": "tasks/A-01/review-1.json",
+      "verdict": "accepted",
+      "summary": "DAG + Gates G0–G6",
+      "changed_files": [
+        "docs/ai-business/04_ROADMAP.md"
+      ]
+    }
+  ],
+  "lease": null,
+  "waiting": {
+    "reason": "review",
+    "since": "2026-10-18T21:35:00Z",
+    "resume_condition": "GPT Work schreibt tasks/A-01/review-2.json zum Draft-PR-Head",
+    "wake_mechanism": "manual_start"
+  }
 }

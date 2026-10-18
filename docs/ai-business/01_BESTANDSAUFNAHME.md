@@ -1,4 +1,7 @@
-# 01 – Bestandsaufnahme (Stand 18.10.2026, `main` = `ea0559a`)
+# 01 – Bestandsaufnahme (Stand 18.10.2026; Runde 2 abgeglichen mit `main` = `c56711e`)
+
+> Runde 2 (GPT-08): Seit der ersten Fassung (`ea0559a`) wurden PR #78, #79 und #80 der Video-Sitzung nach `main` gemergt. Korrigiert:
+> Migration 038, 12 Cron-Einträge, Themen-Pipeline mit Cron (Schalter aus), KI-Urteile im Content-Orchestrator.
 
 Grundlage: Quellcode, Migrationen, Tests, `vercel.json`, CI-Workflow, Projektdoku (`CLAUDE.md`, `AGENTS.md`,
 `docs/PROJECT_STATUS.md`, `docs/PRODUCTION_AUDIT_FINAL_2026-10-15.md`, `docs/JARVIS_AUDIT_2026-10-10.md`), Git-Historie und
@@ -16,8 +19,8 @@ Production gesetzt) · **live verifiziert** (echter Production-Aufruf belegt) ·
 | Kein Branch-Schutz auf `main` | `CLAUDE.md` §1 | „Keine Merges ohne Qualitätsprüfung“ ist heute nur Konvention. Für öffentliche Repos ist Branch-Schutz kostenlos verfügbar → Betreiberentscheidung. |
 | Merge nach `main` ⇒ automatisches Production-Deployment | `CLAUDE.md` §1 | Jeder Auto-Merge wäre ein Auto-Deploy. |
 | Vercel **Hobby**-Plan, Region `fra1`, Funktionslaufzeit bis `maxDuration = 300` s | `CLAUDE.md`, `app/api/**/route.ts` | Kein Dauerprozess: ein Executive kann nur ereignis- (Webhook) oder zeitgesteuert (Cron) laufen. Ob der Hobby-Plan für ein Geschäftssystem mit Einnahmen nach Vercel-Nutzungsbedingungen zulässig ist, ist **ungeprüft** → offene Frage Q-04. |
-| Cron: 7 tägliche Einträge, Ausführung innerhalb der Stunde unscharf, Logs 1 h | `vercel.json`, `CLAUDE.md` §7 | Nachweise müssen in der DB liegen (wird bereits so gemacht: `daily_slot_runs`). |
-| Neon Postgres, 37 additive Migrationen, automatische Anwendung mit Advisory-Lock | `lib/memory/migrations.ts`, `ensure-automation-schema.ts` | Wiederverwendbar für Aufgaben-, Kosten- und Chancenmodell. **Migrationsnummern kollidieren**, wenn zwei Sitzungen gleichzeitig 038 anlegen → Reservierungsregel nötig (siehe 05, §6). |
+| Cron: **12** tägliche Einträge (6 × `daily-draft`, 1 × `weekly-report`, 2 × `topic-scout`, 3 × `topic-video`); `/continue` ungeplant; Ausführung innerhalb der Stunde unscharf, Logs 1 h | `vercel.json` auf `c56711e`, `CLAUDE.md` §7 | Nachweise müssen in der DB liegen (wird bereits so gemacht: `daily_slot_runs`). |
+| Neon Postgres, **38** additive Migrationen (038 = Themenzustellung/-video, PR #79), automatische Anwendung mit Advisory-Lock | `lib/memory/migrations.ts`, `ensure-automation-schema.ts` | Wiederverwendbar für Aufgaben-, Kosten- und Chancenmodell. **Migrationsnummern kollidieren**, wenn zwei Sitzungen gleichzeitig 039 anlegen → Reservierungsregel nötig (siehe 05, §6). |
 | Preview teilt DB/Blob/WhatsApp/Meta mit Production; `runtime-guard.ts` sperrt Wirkungen außerhalb Production | `lib/security/runtime-guard.ts` | Keine Schreibtests in Preview; neue Abteilungen müssen denselben Guard nutzen. |
 | CI `Quality`: `npm ci`, `npm audit`, typecheck, lint, test (660 Tests, ~10 min), build | `.github/workflows/quality.yml` | Grundlage für die gegenseitige Qualitätsprüfung; ist bereits je PR aktiv. |
 | Commits: 59 × „Claude“, 58 × Betreiberkonto `agentstudiots-boop` (darunter Merge-Commits und ein als „Codex-Audit“ bezeichneter PR #71) | `git log` | GPT-/Codex-Arbeit ist im Repo **nicht unterscheidbar** vom Betreiber. Für die Multi-Modell-Zusammenarbeit fehlt eine Urheberkennung → Commit-Trailer-Regel (05, §4). |
@@ -28,9 +31,9 @@ Production gesetzt) · **live verifiziert** (echter Production-Aufruf belegt) ·
 
 | Komponente | Ort | Status | Bemerkung |
 |---|---|---|---|
-| Öffentlicher Orchestrator (Scout, Review, Content-Job) | `lib/orchestrator.ts` | implementiert · getestet · aktiv (Affiliate) | regelbasiert; „Jarvis“ ist **kein** LLM-Agent, sondern Ablaufsteuerung |
-| Content-Orchestrator (einziger Importeur der Spezialisten) | `lib/content/orchestrator.ts` | implementiert · getestet · aktiv | Max. 2 Revisionen, 8 Modellaufrufe je Planung (AGENTS.md) |
-| Themen-Pipeline-Orchestrator | `lib/topic-pipeline/orchestrator.ts` | implementiert · getestet · **aus** (`TOPIC_PIPELINE_ENABLED`) | kein Cron |
+| Öffentlicher Orchestrator (Scout, Review, Content-Job) | `lib/orchestrator.ts` | implementiert · getestet · aktiv (Affiliate) | deterministische Ablaufsteuerung mit KI-Zulieferern; **kein** Unternehmens-Executive |
+| Content-Orchestrator (einziger Importeur der Spezialisten) | `lib/content/orchestrator.ts` | implementiert · getestet · aktiv | trifft im KI-Modus **eigene KI-Urteile** (`generate("orchestrator", STRATEGY_INSTRUCTION, …)`, semantisches Review); max. 2 Revisionen, 8 Modellaufrufe je Planung (AGENTS.md) |
+| Themen-Pipeline-Orchestrator | `lib/topic-pipeline/orchestrator.ts` | implementiert · getestet · deployed · **aus** (`TOPIC_PIPELINE_ENABLED`, `TOPIC_DAILY_VIDEO` fehlen) | Crons `topic-scout` 07/08 UTC und `topic-video` geplant, ohne Schalter wirkungslos |
 | Trendsetter / Jarvis-Routing (Affiliate ↔ Thema) | `lib/trendsetter/*`, Migration 035 | implementiert · getestet · **aus** (`TRENDSETTER_AFFILIATE`) | deterministisch, mit Zeitsperren und eindeutigem Routing-Index |
 | Executive-Agent | `lib/publishing/authority.ts` | **geplant** (nur Schnittstelle `ApprovalAuthority`) | ausdrücklich **nicht** in `ACTIVE_APPROVAL_AUTHORITIES`; Aktivierung nur per Codeänderung |
 | Automatische Fortsetzung | `lib/automation/continue.ts`, `/api/cron/continue` | implementiert · nicht geplant (kein Cron) | |
@@ -108,15 +111,16 @@ Intern (Login): `/api/content`, `/api/content/jobs`, `/api/production`, `/api/pu
 
 ## 4. Parallelarbeit: bekannte Konfliktzonen
 
-Die parallele Sitzung (Themen-Content/Video) hat zum Zeitpunkt dieser Analyse **keinen Branch auf GitHub** veröffentlicht
-(letzte Remote-Änderung: `main`/`claude/clever-cori-b73qxg`, 16.10.). Ihre Dateien sind daher unbekannt. Wahrscheinliche Berührungspunkte:
+Die Video-Sitzung (`claude/clever-cori-b73qxg`) hat PR #78–#80 nach `main` gebracht (Stand `c56711e`); sie kann weiterarbeiten. Deshalb vor
+jeder Aufgabe mit Hot Files `origin/main` und offene PRs prüfen. Die verbindliche Liste steht in `coordination/ownership.json` (`hot_files`,
+`frozen_for_this_project_until_phase_g`, `migration_reservations`); hier nur die Begründung:
 
-| Datei / Bereich | Risiko | Regel bis zur Klärung |
+| Datei / Bereich | Risiko | Regel |
 |---|---|---|
-| `lib/architecture/model.ts`, `runtime.ts`, `snapshot.ts`, `tests/architecture.test.cjs` | hoch (neue Videoknoten) | Diese Planung ändert sie **nicht**; Phase H erst nach Merge der Videoarbeit oder in eigener Datei |
-| `lib/memory/migrations.ts`, `db/migrations/038+` | hoch (Nummernkollision) | Nummernreservierung (05, §6) |
-| `docs/PROJECT_STATUS.md`, `CLAUDE.md` | mittel (beide Sitzungen pflegen) | Diese Planung ändert sie **nicht**; Verweis erst nach Freigabe |
-| `lib/topic-pipeline/*`, `lib/visual/*`, `lib/production/*` | hoch | Tabu für das KI-Unternehmensprojekt bis Phase G |
-| `lib/observability/model-calls.ts` | mittel | Erweiterung (Abteilungszuordnung) erst in Phase E, abgestimmt |
+| `lib/architecture/*`, `tests/architecture.test.cjs` | hoch (PR #79/#80 haben `model.ts` geändert) | Unternehmensebene in eigener Datei `lib/architecture/enterprise.ts` |
+| `lib/memory/migrations.ts`, `db/migrations/039+` | hoch (Nummernkollision) | Reservierung per Zustands-Commit |
+| `docs/PROJECT_STATUS.md`, `CLAUDE.md` | mittel | nur als eigener kleiner PR nach G0 |
+| `lib/topic-pipeline/*`, `lib/visual/*`, `lib/production/*`, `vercel.json` | hoch | Tabu für das KI-Unternehmensprojekt bis Phase G |
+| `lib/observability/model-calls.ts` | mittel | Erweiterung (Aufgabe/Abteilung) erst in Phase E, abgestimmt |
 
-Dieser Branch enthält ausschließlich neue Dateien unter `docs/ai-business/`.
+Der Architektur-Branch enthält ausschließlich Dateien unter `docs/ai-business/`.
