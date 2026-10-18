@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "note": "Modulbesitz und Konfliktregeln. Vorschlag zur Freigabe in Phase A (ADR-09). Keine Geschäftsdaten – öffentliches Repository.",
+  "revision": 1,
+  "updated_at": "2026-10-18T17:04:47Z",
+  "modules": [
+    { "id": "planning", "paths": ["docs/ai-business/**"], "owner": "claude-code", "reviewer": "gpt-work" },
+    { "id": "coordination-tooling", "paths": ["scripts/coordination-check.cjs", "tests/coordination-check.test.cjs"], "owner": "gpt-work", "reviewer": "claude-code", "status": "planned" },
+    { "id": "enterprise-kernel", "paths": ["lib/enterprise/contract.ts", "lib/enterprise/registry.ts", "lib/enterprise/executive/**", "app/api/cron/executive-cycle/**"], "owner": "claude-code", "reviewer": "gpt-work", "status": "planned" },
+    { "id": "controlling", "paths": ["lib/enterprise/departments/controlling/**"], "owner": "gpt-work", "reviewer": "claude-code", "status": "planned" },
+    { "id": "opportunity-scoring", "paths": ["lib/enterprise/departments/opportunity/scoring/**"], "owner": "gpt-work", "reviewer": "claude-code", "status": "planned" },
+    { "id": "opportunity-orchestrator", "paths": ["lib/enterprise/departments/opportunity/orchestrator.ts"], "owner": "claude-code", "reviewer": "gpt-work", "status": "planned" },
+    { "id": "affiliate-adapter", "paths": ["lib/enterprise/departments/affiliate.ts"], "owner": "claude-code", "reviewer": "gpt-work", "status": "planned" },
+    { "id": "command-center-enterprise", "paths": ["lib/architecture/enterprise.ts"], "owner": "claude-code", "reviewer": "gpt-work", "status": "planned" }
+  ],
+  "hot_files": [
+    "lib/memory/migrations.ts", "lib/memory/ensure-automation-schema.ts", "tests/migration-upgrade.test.cjs",
+    "lib/architecture/model.ts", "lib/architecture/runtime.ts", "lib/architecture/snapshot.ts", "tests/architecture.test.cjs",
+    "app/api/whatsapp/webhook/route.ts", "lib/whatsapp/router.ts", "lib/whatsapp/route-llm.ts",
+    "proxy.ts", "lib/security/access-policy.ts", "tests/admin-session.test.cjs",
+    "lib/publishing/authority.ts", "lib/observability/model-calls.ts", "lib/reporting/weekly.ts",
+    "vercel.json", "package.json", "package-lock.json", ".github/workflows/quality.yml",
+    "CLAUDE.md", "AGENTS.md", "docs/PROJECT_STATUS.md"
+  ],
+  "frozen_for_this_project_until_phase_g": [
+    "lib/topic-pipeline/**", "lib/visual/**", "lib/production/**", "lib/content/**", "lib/daily/**", "lib/meta/**", "lib/distribution/**"
+  ],
+  "migration_reservations": {
+    "last_on_main": "037",
+    "reserved": [],
+    "rule": "Vor Beginn einer Aufgabe mit Migration die nächste freie Nummer hier per Koordinations-PR reservieren. Die parallele Video-Sitzung hat Vorrang für 038, solange ihr Stand unbekannt ist (Q-12)."
+  },
+  "parallel_sessions": [
+    { "name": "Themen-Content- und Videopipeline (Claude Code)", "branch": null, "known_paths": [], "status": "Branch am 18.10. nicht auf GitHub sichtbar – in A-04 erfassen" }
+  ]
+}
