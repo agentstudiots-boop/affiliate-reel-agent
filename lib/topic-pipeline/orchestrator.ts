@@ -33,6 +33,9 @@ import type { ProductionResult } from "../visual/types";
 import { writeTopicCopy, type TopicCopy } from "./copy";
 import { productSuggestionsText, proposalText, publishApprovalText } from "./messages";
 import { closeRoute } from "../trendsetter/repository";
+import { spokenText, videoProviderPrompt, writeVideoBriefing, type VideoBriefing } from "./video-briefing";
+import { approvedVideoSpendThisMonth, maxCostPerVideo, monthlyVideoBudget, planTopicVideo, type VideoPlan } from "./video-plan";
+import { VIDEO_REVIEW_CHECKLIST, videoCostText, videoProposalText } from "./video-messages";
 import { jarvisSelectTopic } from "../trendsetter/topic";
 import { productCouplingBlocked, productListCommand, productSelection, suggestProducts, type ProductState, type ProductSuggester } from "./product-coupling";
 
@@ -78,7 +81,21 @@ export type TopicContentRow = {
   proposal_message_id: string | null; product_message_id: string | null; model_calls: number; last_error: string | null;
   // Migration 038; written only by dedicated updates, never by save().
   delivery?: "awaiting_window" | "sending" | "unknown" | null; notification_message_id?: string | null;
+  video?: TopicVideoState | null; cost_message_id?: string | null;
 };
+
+// Daily topic video (one regular proposal per Berlin day). Content approval, cost approval and publish approval are
+// three separate decisions; only the cost approval can start a paid render.
+export type TopicVideoState = {
+  kind: "daily_video"; day: string; briefing: VideoBriefing | null; briefingNote: string | null; plan: VideoPlan | null;
+  estimateUsd: number | null; contentApprovedAt: string | null; contentApprovalMessageId: string | null;
+  costApprovedAt: string | null; costApprovalMessageId: string | null; costRejectedAt: string | null;
+};
+const newVideoState = (day: string): TopicVideoState => ({ kind: "daily_video", day, briefing: null, briefingNote: null, plan: null, estimateUsd: null,
+  contentApprovedAt: null, contentApprovalMessageId: null, costApprovedAt: null, costApprovalMessageId: null, costRejectedAt: null });
+async function saveVideo(db: Database, contentId: string, video: TopicVideoState) {
+  await db.query("UPDATE topic_contents SET video=$2, updated_at=now() WHERE content_id=$1", [contentId, JSON.stringify(video)]);
+}
 
 const now = (deps: TopicPipelineDeps) => (deps.now ?? (() => new Date()))();
 // Activated platforms come from the central capability check (TOPIC_PLATFORMS); deps can only narrow them.
@@ -131,12 +148,33 @@ async function plan(deps: TopicPipelineDeps, row: TopicContentRow): Promise<Topi
   return { ...row, decision, copy, model_calls: modelCalls, production, format: production.producedFormat, override: { ...row.override, newHook: false, newTopic: false } };
 }
 
-const proposalFor = (row: TopicContentRow & { decision: FormatDecision; copy: TopicCopy }, note: string | null) => proposalText({ candidate: row.candidate.candidate,
+const proposalFor = (row: TopicContentRow & { decision: FormatDecision; copy: TopicCopy }, note: string | null) => row.video?.briefing && row.video.plan
+  ? videoProposalText({ contentId: row.content_id, briefing: row.video.briefing, plan: row.video.plan, revision: row.revision, contentApproved: !!row.video.contentApprovedAt,
+    note: [row.video.briefingNote, note].filter(Boolean).join("\n") || null })
+  : proposalText({ candidate: row.candidate.candidate,
   decision: row.decision, copy: row.copy, production: row.production, revision: row.revision,
   product: row.product.status === "selected" ? { status: "selected", name: row.product.product.name } : { status: row.product.status }, note });
 
+// Video rows: (re)write the production briefing when the copy changed, plan provider and cost (no provider call), and put
+// the exact spoken text and storyboard prompt into the production copy the renderer hands to the provider.
+async function planVideo(deps: TopicPipelineDeps, row: TopicContentRow & { decision: FormatDecision; copy: TopicCopy }, copyChanged: boolean) {
+  if (!row.video) return row;
+  let video = row.video;
+  let modelCalls = row.model_calls;
+  if (!video.briefing || copyChanged) {
+    const written = await writeVideoBriefing(row.candidate.candidate, row.copy, { generate: modelCalls < MAX_MODEL_CALLS_PER_CONTENT ? deps.generate ?? null : null });
+    modelCalls += written.modelCalls;
+    video = { ...video, briefing: written.briefing, briefingNote: written.fallbackReason ? `Hinweis: KI-Drehbuch nicht verwendet (${written.fallbackReason}); Referenzvorlage.` : null };
+  }
+  const spent = await approvedVideoSpendThisMonth(deps.db, now(deps)).catch(() => 0);
+  const videoPlan = await planTopicVideo(deps.render, video.briefing!.durationSeconds, { spentThisMonth: spent, now: now(deps) });
+  video = { ...video, plan: videoPlan, estimateUsd: videoPlan.estimateUsd };
+  const copy = { ...row.copy, videoScript: spokenText(video.briefing!).slice(0, 1400), videoPrompt: videoProviderPrompt(video.briefing!) };
+  return { ...row, video, copy, model_calls: modelCalls };
+}
+
 async function propose(deps: TopicPipelineDeps, row: TopicContentRow, note: string | null = null): Promise<TopicContentRow> {
-  const planned = await plan(deps, row);
+  const planned = await planVideo(deps, await plan(deps, row), row.copy === null);
   const candidate = planned.candidate.candidate;
   // Outside the 24 h window a free-form text is accepted by Meta but never delivered. The proposal is stored and held;
   // the operator's next message delivers it (deliverHeldProposals). The topic counts as proposed for today.
@@ -144,6 +182,7 @@ async function propose(deps: TopicPipelineDeps, row: TopicContentRow, note: stri
   const messageId = await deps.send(proposalFor(planned, note));
   const updated: TopicContentRow = { ...planned, stage: "proposed", proposal_message_id: messageId };
   await save(deps.db, updated);
+  if (updated.video) await saveVideo(deps.db, updated.content_id, updated.video);
   if (row.proposal_message_id && row.proposal_message_id !== messageId) await rememberOutdated(deps.db, row.content_id, row.proposal_message_id);
   await recordTopicHistory(deps.db, candidate, "proposed", `${row.content_id}:${row.revision}`);
   emitEvent("topic_approval_requested", { contentId: row.content_id, stage: "proposal", revision: row.revision, format: updated.format });
@@ -153,6 +192,7 @@ async function propose(deps: TopicPipelineDeps, row: TopicContentRow, note: stri
 async function hold(deps: TopicPipelineDeps, planned: TopicContentRow): Promise<TopicContentRow> {
   const held: TopicContentRow = { ...planned, stage: "proposed", proposal_message_id: null };
   await save(deps.db, held);
+  if (held.video) await saveVideo(deps.db, held.content_id, held.video);
   await deps.db.query("UPDATE topic_contents SET delivery='awaiting_window', updated_at=now() WHERE content_id=$1", [held.content_id]);
   await recordTopicHistory(deps.db, held.candidate.candidate, "proposed", `${held.content_id}:${held.revision}`);
   emitEvent("topic_proposal_held", { contentId: held.content_id, reason: "whatsapp_service_window_closed" });
@@ -203,8 +243,8 @@ function styleFor(row: TopicContentRow) {
 
 const newContentId = () => `tc_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
 
-function newRow(candidate: TopicCandidate, cluster: StoredCandidate["cluster"], runId: string | null, contentId = newContentId(), chanceId: string | null = null): TopicContentRow {
-  return { content_id: contentId, run_id: runId, topic_id: candidate.topic_id, category: "topic", stage: "proposed", format: candidate.suggested_format,
+function newRow(candidate: TopicCandidate, cluster: StoredCandidate["cluster"], runId: string | null, contentId = newContentId(), chanceId: string | null = null, videoDay: string | null = null): TopicContentRow {
+  return { ...(videoDay ? { video: newVideoState(videoDay) } : {}), content_id: contentId, run_id: runId, topic_id: candidate.topic_id, category: "topic", stage: "proposed", format: candidate.suggested_format,
     revision: 1, candidate: { candidate, cluster, variant: 0, ...(chanceId ? { chance_id: chanceId } : {}) }, decision: null, override: emptyOverride(), copy: null, production: null,
     master: null, product: { status: "none" }, proposal_message_id: null, product_message_id: null, model_calls: 0, last_error: null };
 }
@@ -214,7 +254,7 @@ function newRow(candidate: TopicCandidate, cluster: StoredCandidate["cluster"], 
 export const dailyTopicLimit = (env: Record<string, string | undefined> = process.env) => Math.max(1, Math.min(4, Math.floor(Number(env.TOPIC_POSTS_PER_DAY)) || 1));
 
 // Cron entry point. Never throws: a failing topic run cannot affect the product pipeline.
-export async function runTopicPipeline(deps: TopicPipelineDeps, input: { slotKey: string | null; exclude?: string[] }) {
+export async function runTopicPipeline(deps: TopicPipelineDeps, input: { slotKey: string | null; exclude?: string[]; videoDay?: string }) {
   try {
     await ensureAutomationSchema(deps.db);
     const day = input.slotKey?.match(/^(\d{4}-\d{2}-\d{2}):/)?.[1];
@@ -245,7 +285,7 @@ export async function runTopicPipeline(deps: TopicPipelineDeps, input: { slotKey
     }
     await saveTopicRun(deps.db, runId, selection.scout, selection.verdicts, selection.candidates, pick?.candidate ?? null, pick ? null : failure);
     if (!pick) return { status: "no_topic" as const, runId, failure };
-    const row = await propose(deps, newRow(pick.candidate, pick.cluster, runId, pick.contentId, pick.chanceId));
+    const row = await propose(deps, newRow(pick.candidate, pick.cluster, runId, pick.contentId, pick.chanceId, input.videoDay ?? null));
     return { status: "proposed" as const, runId, contentId: row.content_id, format: row.format };
   } catch (error) {
     emitEvent("topic_pipeline_failed", { stage: "run", failure: error instanceof Error ? error.name : "unknown" }, "error");
@@ -271,7 +311,7 @@ async function requestPublishApproval(deps: TopicPipelineDeps, row: TopicContent
   const version = await registerContentVersion(deps.db, publishableContent(master, variants));
   const plan = await publishAll(deps.db, { master, variants, publishers: deps.publishers ?? [], origin: "approval_preview", dryRun: true });
   const live = liveFor(deps);
-  const messageId = await deps.send(publishApprovalText(master, variants, plan.plan, version.version, live));
+  const messageId = await deps.send(`${publishApprovalText(master, variants, plan.plan, version.version, live)}${row.video ? `\n\n${VIDEO_REVIEW_CHECKLIST}` : ""}`.slice(0, 4000));
   await bindApprovalRequest(deps.db, row.content_id, version.version, messageId);
   const updated: TopicContentRow = { ...row, production, format: production.producedFormat, category: master.category, master: { master, variants, version: version.version }, stage: "awaiting_publish_approval" };
   await save(deps.db, updated);
@@ -346,7 +386,7 @@ export async function handleTopicReply(deps: TopicPipelineDeps, message: Inbound
   if (!message.replyToMessageId) return false;
   const db = deps.db;
   await ensureAutomationSchema(db);
-  const byProposal = (await db.query("SELECT content_id FROM topic_contents WHERE proposal_message_id=$1 OR product_message_id=$1", [message.replyToMessageId])).rows[0];
+  const byProposal = (await db.query("SELECT content_id FROM topic_contents WHERE proposal_message_id=$1 OR product_message_id=$1 OR cost_message_id=$1", [message.replyToMessageId])).rows[0];
   const byApproval = byProposal ? null : await contentIdForRequestMessage(db, message.replyToMessageId);
   const contentId = byProposal ? String(byProposal.content_id) : byApproval?.contentId;
   if (!contentId) {
@@ -368,7 +408,8 @@ export async function handleTopicReply(deps: TopicPipelineDeps, message: Inbound
     [message.id, message.from, message.replyToMessageId, message.body, JSON.stringify(message.payload ?? {})]);
   if (!claimed.rows.length) return true; // webhook replay
   await guarded(deps, row, async () => {
-    if (row.product_message_id === message.replyToMessageId) await onProductReply(deps, row, message);
+    if (row.cost_message_id && row.cost_message_id === message.replyToMessageId) await onCostReply(deps, row, message);
+    else if (row.product_message_id === message.replyToMessageId) await onProductReply(deps, row, message);
     else if (row.proposal_message_id === message.replyToMessageId) await onProposalReply(deps, row, message);
     else await onPublishReply(deps, row, message);
   });
@@ -432,6 +473,7 @@ async function requestProducts(deps: TopicPipelineDeps, row: TopicContentRow, wi
 async function onProposalReply(deps: TopicPipelineDeps, row: TopicContentRow, message: Inbound) {
   if (row.stage !== "proposed") { await deps.send("Dieser Themenvorschlag ist nicht mehr offen. Es wurde nichts geändert."); return; }
   const intent = classifyWhatsAppReply(message.body).intent;
+  if (intent === "approve" && row.video) { await approveVideoContent(deps, row, message.id); return; }
   if (intent === "approve") { await produce(deps, row); return; }
   if (intent === "reject") {
     await save(deps.db, { ...row, stage: "rejected" });
@@ -487,9 +529,22 @@ async function applyWish(deps: TopicPipelineDeps, row: TopicContentRow, wish: Fo
   }
   const override = mergeOverrides(row.override, wish);
   const changedCopy = wish.newHook || wish.tone.length > 0;
-  const updated: TopicContentRow = { ...row, candidate, override, revision: row.revision + 1, copy: changedCopy ? null : row.copy };
+  // A change voids the content approval of a topic video and its open cost approval (new version, new decisions).
+  const video = row.video ? { ...row.video, contentApprovedAt: null, contentApprovalMessageId: null } : row.video;
+  if (row.video && row.cost_message_id) {
+    await rememberOutdated(deps.db, row.content_id, row.cost_message_id);
+    await deps.db.query("UPDATE topic_contents SET cost_message_id=NULL WHERE content_id=$1", [row.content_id]);
+  }
+  const updated: TopicContentRow = { ...row, video, cost_message_id: null, candidate, override, revision: row.revision + 1, copy: changedCopy ? null : row.copy };
   emitEvent("topic_instruction_applied", { contentId: row.content_id, stage, matched: wish.matched });
   if (stage === "proposal") { await propose(deps, updated, `Übernommen: ${wish.matched.join(", ")}`); return; }
+  // A rendered topic video is never re-rendered on a change without new decisions: back to the proposal, which needs a
+  // new content approval and a new cost approval (a changed script is a new, paid job).
+  if (updated.video) {
+    await propose(deps, { ...updated, stage: "proposed", production: null, master: null, video: { ...updated.video, costApprovedAt: null, costApprovalMessageId: null, costRejectedAt: null } },
+      `Übernommen: ${wish.matched.join(", ")}. Das bereits gerenderte Video wird nicht verwendet; neue Inhalts- und Kostenfreigabe nötig.`);
+    return;
+  }
   // After production: re-plan (format/slides), produce again (finished slides/images are reused via the job ledger),
   // then a new version and a new approval request.
   await produce(deps, await plan(deps, updated));
@@ -517,6 +572,63 @@ async function onProductReply(deps: TopicPipelineDeps, row: TopicContentRow, mes
   if (row.stage === "awaiting_publish_approval" && row.production) { await requestPublishApproval(deps, selected, row.production); return; }
   await save(deps.db, selected);
   await deps.send(`Produkt „${resolved.name}“ gespeichert; es wird mit der nächsten Fassung zur Freigabe vorgelegt.`);
+}
+
+// ---------- daily topic video: content approval → separate cost approval → render ----------
+async function approveVideoContent(deps: TopicPipelineDeps, row: TopicContentRow, messageId: string) {
+  if (!row.video) return;
+  const video: TopicVideoState = row.video.contentApprovedAt ? row.video : { ...row.video, contentApprovedAt: now(deps).toISOString(), contentApprovalMessageId: messageId };
+  await saveVideo(deps.db, row.content_id, video);
+  await requestVideoCost(deps, { ...row, video });
+}
+
+async function requestVideoCost(deps: TopicPipelineDeps, row: TopicContentRow) {
+  if (!row.video?.briefing) throw new Error("video_briefing_missing");
+  const spent = await approvedVideoSpendThisMonth(deps.db, now(deps));
+  const videoPlan = await planTopicVideo(deps.render, row.video.briefing.durationSeconds, { spentThisMonth: spent, now: now(deps) });
+  const video: TopicVideoState = { ...row.video, plan: videoPlan, estimateUsd: videoPlan.estimateUsd };
+  const text = videoCostText({ contentId: row.content_id, briefing: row.video.briefing, plan: videoPlan, monthSpent: spent, monthBudget: monthlyVideoBudget(), maxPerVideo: maxCostPerVideo() });
+  const messageId = await deps.send(text);
+  await saveVideo(deps.db, row.content_id, video);
+  if (videoPlan.blockers.length || videoPlan.estimateUsd === null) return; // information only: nothing to approve
+  if (row.cost_message_id && row.cost_message_id !== messageId) await rememberOutdated(deps.db, row.content_id, row.cost_message_id);
+  await deps.db.query("UPDATE topic_contents SET cost_message_id=$2 WHERE content_id=$1", [row.content_id, messageId]);
+  emitEvent("topic_video_cost_requested", { contentId: row.content_id, provider: videoPlan.provider, estimateUsd: videoPlan.estimateUsd });
+}
+
+async function onCostReply(deps: TopicPipelineDeps, row: TopicContentRow, message: Inbound) {
+  const video = row.video;
+  if (!video || row.stage !== "proposed" || video.costApprovedAt || video.costRejectedAt || !video.contentApprovedAt) {
+    await deps.send("Diese Kostenfreigabe ist nicht mehr offen. Es wurde nichts produziert oder bezahlt.");
+    return;
+  }
+  const intent = classifyWhatsAppReply(message.body).intent;
+  if (intent === "reject") {
+    await saveVideo(deps.db, row.content_id, { ...video, costRejectedAt: now(deps).toISOString() });
+    await save(deps.db, { ...row, stage: "rejected" });
+    await recordTopicHistory(deps.db, row.candidate.candidate, "rejected", message.id);
+    await closeTopicRoute(deps, row, "rejected");
+    await deps.send(`Kosten abgelehnt: „${row.candidate.candidate.title}“ wird nicht gerendert. Es entstehen keine Kosten.`);
+    return;
+  }
+  if (intent !== "approve") { await deps.send("Bitte antworte auf die Kostenfreigabe mit „Freigeben“ oder „Ablehnen“. Es wurde nichts produziert."); return; }
+  // Re-check provider, ceiling and monthly budget at the moment of the decision.
+  const spent = await approvedVideoSpendThisMonth(deps.db, now(deps));
+  const videoPlan = await planTopicVideo(deps.render, video.briefing!.durationSeconds, { spentThisMonth: spent, now: now(deps) });
+  if (videoPlan.blockers.length || !videoPlan.format || videoPlan.estimateUsd === null) {
+    await deps.send(`Rendering nicht gestartet: ${videoPlan.blockers.join(" ") || "kein Anbieter"} Es wurde nichts bezahlt.`);
+    return;
+  }
+  if (videoPlan.provider !== video.plan?.provider || videoPlan.estimateUsd !== video.estimateUsd) {
+    await deps.send("Anbieter oder Kostenschätzung haben sich seit der Kostenfreigabe-Nachricht geändert. Ich schicke dir eine neue Kostenfreigabe; die alte gilt nicht. Es wurde nichts produziert.");
+    await requestVideoCost(deps, row);
+    return;
+  }
+  const approved: TopicVideoState = { ...video, plan: videoPlan, estimateUsd: videoPlan.estimateUsd, costApprovedAt: now(deps).toISOString(), costApprovalMessageId: message.id };
+  await saveVideo(deps.db, row.content_id, approved);
+  emitEvent("topic_video_cost_approved", { contentId: row.content_id, provider: videoPlan.provider, estimateUsd: videoPlan.estimateUsd });
+  await deps.send(`Kosten freigegeben (${videoPlan.provider}, ca. ${videoPlan.estimateUsd.toFixed(2)} USD). Das Video wird jetzt genau einmal gerendert; danach kommt eine eigene Veröffentlichungsfreigabe.`);
+  await produce(deps, { ...row, video: approved, decision: { ...row.decision!, format: videoPlan.format, slides: null } });
 }
 
 async function onPublishReply(deps: TopicPipelineDeps, row: TopicContentRow, message: Inbound) {
