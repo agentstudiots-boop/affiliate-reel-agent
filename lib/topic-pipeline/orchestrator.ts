@@ -9,6 +9,7 @@ import { FORMAT_LABEL, PLATFORM_LABEL, type Platform } from "../formats/catalog"
 import { emptyOverride, hasOverride, mergeOverrides, type FormatOverride } from "../formats/override";
 import { interpretTopicMessage, type TopicRoute, type TopicRouteContext } from "../whatsapp/topic-route";
 import { RouterUnavailable } from "../whatsapp/route-llm";
+import { WhatsAppRejectedError } from "../whatsapp/client";
 import { loadRouteContext } from "../whatsapp/route-context";
 import { overrideFromTopicRoute } from "./instructions";
 import { decideFormat, type FormatDecision } from "../formats/router";
@@ -60,6 +61,11 @@ export type TopicPipelineDeps = {
   liveEnabled?: boolean;
   // Semantic understanding of free messages (existing router transport). Injected in tests.
   interpret?: (body: string, context: TopicRouteContext) => Promise<TopicRoute>;
+  // WhatsApp 24 h service window. Free-form texts reach the operator only while it is open; without this check (tests)
+  // the window counts as open. Production wiring reads the operator's last inbound message.
+  serviceWindowOpen?: () => Promise<boolean>;
+  // Optional approved notification template (never an approval). Returns the message id, or null when not configured.
+  notify?: () => Promise<string | null>;
 };
 
 type Stage = "proposed" | "producing" | "in_production" | "awaiting_publish_approval" | "publishing" | "published" | "partially_published" | "not_published" | "rejected" | "discarded" | "failed";
@@ -70,6 +76,8 @@ export type TopicContentRow = {
   candidate: StoredCandidate; decision: FormatDecision | null; override: FormatOverride; copy: TopicCopy | null; production: ProductionResult | null;
   master: { master: MasterContent; variants: PlatformVariant[]; version: number } | null; product: ProductState;
   proposal_message_id: string | null; product_message_id: string | null; model_calls: number; last_error: string | null;
+  // Migration 038; written only by dedicated updates, never by save().
+  delivery?: "awaiting_window" | "sending" | "unknown" | null; notification_message_id?: string | null;
 };
 
 const now = (deps: TopicPipelineDeps) => (deps.now ?? (() => new Date()))();
@@ -123,17 +131,70 @@ async function plan(deps: TopicPipelineDeps, row: TopicContentRow): Promise<Topi
   return { ...row, decision, copy, model_calls: modelCalls, production, format: production.producedFormat, override: { ...row.override, newHook: false, newTopic: false } };
 }
 
+const proposalFor = (row: TopicContentRow & { decision: FormatDecision; copy: TopicCopy }, note: string | null) => proposalText({ candidate: row.candidate.candidate,
+  decision: row.decision, copy: row.copy, production: row.production, revision: row.revision,
+  product: row.product.status === "selected" ? { status: "selected", name: row.product.product.name } : { status: row.product.status }, note });
+
 async function propose(deps: TopicPipelineDeps, row: TopicContentRow, note: string | null = null): Promise<TopicContentRow> {
   const planned = await plan(deps, row);
   const candidate = planned.candidate.candidate;
-  const messageId = await deps.send(proposalText({ candidate, decision: planned.decision, copy: planned.copy, production: planned.production, revision: row.revision,
-    product: row.product.status === "selected" ? { status: "selected", name: row.product.product.name } : { status: row.product.status }, note }));
+  // Outside the 24 h window a free-form text is accepted by Meta but never delivered. The proposal is stored and held;
+  // the operator's next message delivers it (deliverHeldProposals). The topic counts as proposed for today.
+  if (deps.serviceWindowOpen && !(await deps.serviceWindowOpen())) return hold(deps, planned);
+  const messageId = await deps.send(proposalFor(planned, note));
   const updated: TopicContentRow = { ...planned, stage: "proposed", proposal_message_id: messageId };
   await save(deps.db, updated);
   if (row.proposal_message_id && row.proposal_message_id !== messageId) await rememberOutdated(deps.db, row.content_id, row.proposal_message_id);
   await recordTopicHistory(deps.db, candidate, "proposed", `${row.content_id}:${row.revision}`);
   emitEvent("topic_approval_requested", { contentId: row.content_id, stage: "proposal", revision: row.revision, format: updated.format });
   return updated;
+}
+
+async function hold(deps: TopicPipelineDeps, planned: TopicContentRow): Promise<TopicContentRow> {
+  const held: TopicContentRow = { ...planned, stage: "proposed", proposal_message_id: null };
+  await save(deps.db, held);
+  await deps.db.query("UPDATE topic_contents SET delivery='awaiting_window', updated_at=now() WHERE content_id=$1", [held.content_id]);
+  await recordTopicHistory(deps.db, held.candidate.candidate, "proposed", `${held.content_id}:${held.revision}`);
+  emitEvent("topic_proposal_held", { contentId: held.content_id, reason: "whatsapp_service_window_closed" });
+  // The optional approved template only says that something is waiting; it is never an approval.
+  if (deps.notify) {
+    try {
+      const notification = await deps.notify();
+      if (notification) await deps.db.query("UPDATE topic_contents SET notification_message_id=$2 WHERE content_id=$1", [held.content_id, notification]);
+    } catch (error) {
+      emitEvent("topic_pipeline_failed", { stage: "notify", contentId: held.content_id, failure: error instanceof Error ? error.name : "unknown" }, "warn");
+    }
+  }
+  return { ...held, delivery: "awaiting_window" };
+}
+
+// Sends proposals that were held while the service window was closed. Called after an inbound operator message (which
+// opens the window). Each proposal is claimed once; a definite rejection by Meta releases the claim, an unknown result
+// stays visible in „Status“ and is never sent twice automatically.
+export async function deliverHeldProposals(deps: TopicPipelineDeps) {
+  await ensureAutomationSchema(deps.db);
+  const rows = await deps.db.query(`SELECT content_id FROM topic_contents WHERE delivery='awaiting_window' AND stage='proposed'
+    AND updated_at > now() - interval '3 days' ORDER BY updated_at LIMIT 3`);
+  let sent = 0;
+  for (const item of rows.rows) {
+    const contentId = String(item.content_id);
+    const claimed = await deps.db.query("UPDATE topic_contents SET delivery='sending' WHERE content_id=$1 AND delivery='awaiting_window' RETURNING content_id", [contentId]);
+    if (!claimed.rows.length) continue;
+    const row = await load(deps.db, contentId);
+    if (!row?.decision || !row.copy) { await deps.db.query("UPDATE topic_contents SET delivery='unknown' WHERE content_id=$1", [contentId]); continue; }
+    let messageId: string;
+    try { messageId = await deps.send(proposalFor(row as TopicContentRow & { decision: FormatDecision; copy: TopicCopy }, "Nachgeliefert: Dieser Vorschlag wartete auf dein WhatsApp-Fenster (24 Stunden).")); }
+    catch (error) {
+      const rejected = error instanceof WhatsAppRejectedError;
+      await deps.db.query("UPDATE topic_contents SET delivery=$2 WHERE content_id=$1", [contentId, rejected ? "awaiting_window" : "unknown"]);
+      emitEvent("topic_pipeline_failed", { stage: "deliver_held", contentId, failure: rejected ? "rejected" : "unknown" }, "error");
+      continue;
+    }
+    await deps.db.query("UPDATE topic_contents SET proposal_message_id=$2, delivery=NULL, updated_at=now() WHERE content_id=$1", [contentId, messageId]);
+    emitEvent("topic_approval_requested", { contentId, stage: "proposal", revision: row.revision, format: row.format, delivered: "after_window" });
+    sent++;
+  }
+  return sent;
 }
 
 function styleFor(row: TopicContentRow) {

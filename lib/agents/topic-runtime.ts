@@ -16,7 +16,8 @@ import { createHeyGenAvatarProvider, heygenConfig } from "@/lib/visual/providers
 import { createReplicateBriefProvider } from "@/lib/visual/providers/replicate";
 import { createRunwayStandardVideoProvider } from "@/lib/visual/providers/runway-video";
 import { postgresQuota } from "@/lib/visual/video";
-import { sendWhatsAppText } from "@/lib/whatsapp/client";
+import { dailyNotificationTemplateConfigured, sendDailyNotificationTemplate, sendWhatsAppText } from "@/lib/whatsapp/client";
+import { serviceWindowClosesAt } from "@/lib/daily/evidence";
 
 // Production wiring of the topic pipeline (app layer). Tests inject their own dependencies instead.
 
@@ -82,5 +83,15 @@ export function topicPipelineDeps(): TopicPipelineDeps {
     publishers: defaultPublishers(),
     suggester: topicProductSuggester,
     resolveProduct: query => resolveTopicProduct(query).catch(() => null),
+    // Free-form proposals only inside the operator's 24 h window; otherwise held until the next message.
+    serviceWindowOpen: async () => !!(await serviceWindowClosesAt(db, process.env.WHATSAPP_APPROVER_WA_ID || "")),
+    // Optional approved template (WHATSAPP_DAILY_TEMPLATE_*; currently switched off by the operator). At most one
+    // notification per six hours across the affiliate and the topic pipeline.
+    notify: async () => {
+      if (!dailyNotificationTemplateConfigured()) return null;
+      const recent = await db.query(`SELECT 1 FROM daily_drafts WHERE notification_message_id IS NOT NULL AND updated_at > now() - interval '6 hours'
+        UNION ALL SELECT 1 FROM topic_contents WHERE notification_message_id IS NOT NULL AND updated_at > now() - interval '6 hours' LIMIT 1`);
+      return recent.rows.length ? null : String(await sendDailyNotificationTemplate());
+    },
   };
 }

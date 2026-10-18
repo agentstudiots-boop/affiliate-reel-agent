@@ -12,7 +12,18 @@ import { reconcileTopicPublications, resumeTopicProductions, runTopicPipeline, t
 //   proposed / no_topic  normal outcomes
 //   failed       an isolated step failed; the other steps still ran
 //   daily_limit  the configured number of topic proposals for today (TOPIC_POSTS_PER_DAY, default 1) is reached
-export type CronExit = "disabled" | "locked" | "already_ran" | "daily_limit" | "proposed" | "no_topic" | "failed";
+//   outside_window  the call lies outside the proposal window (Berlin time); running jobs were still continued
+export type CronExit = "disabled" | "locked" | "already_ran" | "daily_limit" | "outside_window" | "proposed" | "no_topic" | "failed";
+
+// Scheduled topic proposals arrive in the morning: Berlin 08:00–11:00. vercel.json calls the cron at 07:00 and 08:00 UTC,
+// which is 09:00/10:00 in summer time and 08:00/09:00 in winter time – both inside the window in both seasons. Together
+// with the daily limit this yields at most one regular proposal per Berlin day; the second call only retries a day
+// without a proposal (e.g. no topic passed the gate).
+export const TOPIC_PROPOSAL_WINDOW = { from: 8, until: 11 } as const;
+export const insideWindow = (slotKey: string, window: { from: number; until: number }) => {
+  const hour = Number(slotKey.slice(-2));
+  return hour >= window.from && hour < window.until;
+};
 export type CronResult = { status: CronExit; slotKey: string | null; steps: Record<string, string>; contentId?: string; durationMs: number };
 
 const LEASE_MS = 280_000; // below the function's maxDuration (300 s): a crashed run frees the lease in time
@@ -31,12 +42,12 @@ async function release(db: Database, holder: string) {
   await db.query("UPDATE topic_cron_lease SET expires_at='1970-01-01T00:00:00Z' WHERE id=1 AND holder=$1", [holder]);
 }
 
-export async function runTopicCron(input: { enabled: boolean; now?: Date; deps: () => TopicPipelineDeps }): Promise<CronResult> {
+export async function runTopicCron(input: { enabled: boolean; now?: Date; deps: () => TopicPipelineDeps; proposalWindow?: { from: number; until: number } }): Promise<CronResult> {
   const started = Date.now();
   const now = input.now ?? new Date();
   const done = (status: CronExit, slotKey: string | null, steps: Record<string, string>, extra: Partial<CronResult> = {}): CronResult => {
     const result = { status, slotKey, steps, durationMs: Date.now() - started, ...extra };
-    emitEvent(status === "disabled" || status === "locked" || status === "already_ran" || status === "daily_limit" ? "topic_cron_skipped" : "topic_cron_completed", { status, slotKey, steps }, status === "failed" ? "error" : "info");
+    emitEvent(status === "disabled" || status === "locked" || status === "already_ran" || status === "daily_limit" || status === "outside_window" ? "topic_cron_skipped" : "topic_cron_completed", { status, slotKey, steps }, status === "failed" ? "error" : "info");
     return result;
   };
   if (!input.enabled) return done("disabled", null, {});
@@ -51,6 +62,10 @@ export async function runTopicCron(input: { enabled: boolean; now?: Date; deps: 
     // Each step is isolated: a failing step is recorded and the others still run.
     try { steps.resume = `${await resumeTopicProductions(deps)} fortgesetzt`; } catch (error) { steps.resume = `failed:${error instanceof Error ? error.name : "unknown"}`; }
     try { steps.reconcile = `${await reconcileTopicPublications(deps)} abgeglichen`; } catch (error) { steps.reconcile = `failed:${error instanceof Error ? error.name : "unknown"}`; }
+    if (input.proposalWindow && !insideWindow(slotKey, input.proposalWindow)) {
+      steps.scout = "outside_window";
+      return done(Object.values(steps).some(value => value.startsWith("failed")) ? "failed" : "outside_window", slotKey, steps);
+    }
     const run = await runTopicPipeline(deps, { slotKey });
     steps.scout = run.status;
     const failed = Object.values(steps).some(value => value.startsWith("failed"));
