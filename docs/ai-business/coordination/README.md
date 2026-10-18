@@ -48,3 +48,16 @@ Neben **Claude Code** und **ChatGPT Work** darf auch **ChatGPT im normalen Chat*
 4. Die Abstimmung erfolgt asynchron über dieselben GitHub-Branches, PRs und Übergabedateien. Ein GitHub-Eintrag **startet keine Claude-Code- oder GPT-Work-Sitzung automatisch**. Es gibt keine Zusicherung autonomer Überwachung oder unmittelbarer Rückantwort.
 
 **Konkreter aktueller Prüfpunkt:** Ist ein gemeinsames Engineering-System mit getrennten Rollen für technische Planung, Implementierung und unabhängiges Review besser als zwei eigenständige Engineering-Systeme? Modelle/Rollen sollten austauschbar bleiben. Entscheidung anhand von Testaufwand, Berechtigungsgrenzen, Parallelisierbarkeit, Qualität, Betriebs- und Tokenkosten treffen; zunächst offen lassen.
+
+## Betreiberbeschluss vom 18.10.2026: keine zusätzlichen KI-Credits
+
+**Verbindliche Kostengrenze für die Entwicklungskoordination:** Der Betreiber kauft für ChatGPT Work/Codex oder Claude Code **keine zusätzlichen Credits, Aufladungen oder nutzungsabhängigen Zusatzkontingente**. Entwicklungsplanung, Implementierung und Reviews müssen innerhalb der bereits bezahlten Abonnements und ihrer tatsächlich verfügbaren Inklusivkontingente erfolgen. Neue kostenpflichtige Tarife oder Upgrades sind dadurch **nicht** genehmigt. Diese Regel betrifft KI-Entwicklungs-Credits; andere laufende Infrastrukturkosten werden hierdurch nicht neu freigegeben.
+
+**Für GPT Work/Codex und Claude Code (Opus) gleichermaßen lesbare Arbeitsregel:**
+- Vor größeren Arbeitspaketen Kapazität und Aufwand einschätzen, kritische Aufgaben priorisieren und möglichst kleine, testbare Pakete wählen. Keine Annahme unbegrenzter Modellkapazität.
+- Bei Credits-/Sitzungslimits keine kostenpflichtige Umgehung. Fortschritt, Commit/Branch, offene Fragen, nächste konkrete Aktion und den Grund des Stopps in den vorhandenen, rollenberechtigten Übergabedateien sichern. Wenn der Reset-Zeitpunkt unbekannt ist, ausdrücklich **unbekannt** vermerken.
+- Aufgaben bis zur nächsten regulären Verfügbarkeit auf Warten stellen; nur bereits autorisierte, verfügbare Modelle können andere geeignete Aufgaben übernehmen, ohne unabhängige Prüfung und Ownership-Regeln zu umgehen.
+- Zwei manuelle Anstöße pro Tag sind eine **Oberflächenroutine, keine Garantie gleichzeitiger Verfügbarkeit** beider Systeme. Eine GitHub-Übergabe startet keine weitere Session automatisch.
+- Verbrauch je Arbeitspaket nur erfassen, soweit belastbare Nutzungswerte vorliegen; fehlende Credit-Daten nicht schätzen oder als gemessen ausgeben. Prozessaufwand reduzieren, bevor zusätzliche Koordinationsautomatisierung vorgeschlagen wird.
+
+**Aktuelle Auswirkung:** Die unabhängige GPT-Work-Gegenprüfung von Draft-PR #82 bleibt bei aufgebrauchtem Work-Guthaben ausstehend. Keine Freigabe oder Merge allein wegen bestandener CI. Claudes Sitzungslimit ist ebenfalls zu beachten; keine unbestätigte Wiederaufnahme behaupten.
