@@ -60,6 +60,11 @@ export async function topicPipelineStatus(db: Database, render: RenderContext): 
     const error = (await db.query("SELECT last_error, updated_at FROM topic_contents WHERE last_error IS NOT NULL AND last_error<>'dry_run' ORDER BY updated_at DESC LIMIT 1")).rows[0];
     if (error) lines.push(`Letzter Fehler (${time(error.updated_at)}): ${String(error.last_error).replace(/https?:\/\/\S+/g, "[URL]").slice(0, 160)}`);
   } catch { /* table may not exist yet */ }
+  try {
+    const held = (await db.query("SELECT count(*) FILTER (WHERE delivery='awaiting_window')::int AS waiting, count(*) FILTER (WHERE delivery='unknown')::int AS unknown FROM topic_contents WHERE stage='proposed'")).rows[0] ?? {};
+    if (held.waiting) lines.push(`${held.waiting} Themenvorschlag/-vorschläge warten auf dein WhatsApp-Fenster und kommen mit dieser Nachricht.`);
+    if (held.unknown) lines.push(`${held.unknown} Themenvorschlag/-vorschläge mit unklarer Zustellung (nicht automatisch wiederholt).`);
+  } catch { /* migration 038 not applied yet */ }
   // Last published topic posts with the links the platforms returned (stored per platform, never constructed).
   try {
     const rows = (await db.query(`SELECT candidate->'candidate'->>'title' AS title, stage, master FROM topic_contents

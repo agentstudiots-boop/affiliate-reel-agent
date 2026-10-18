@@ -17,6 +17,7 @@ export const PIPELINE_EVENTS = [
   "image_prompt_rejected", "image_quality_passed", "image_quality_failed", "image_quality_skipped",
   "trendsetter_routed", "trendsetter_unavailable",
   "model_call",
+  "topic_proposal_held", "topic_video_cron", "topic_video_proposed", "topic_video_cost_requested", "topic_video_cost_approved",
 ] as const;
 export type PipelineEvent = (typeof PIPELINE_EVENTS)[number];
 

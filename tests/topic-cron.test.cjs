@@ -85,7 +85,7 @@ test('route: unauthorized without the cron secret; disabled without loading the 
   assert.equal(berlinSlotKey(new Date('2026-12-31T23:30:00Z')), '2027-01-01:00');
 });
 
-test('vercel.json does not schedule the topic cron (activation is a separate approved step)', () => {
+test('vercel.json schedules the topic cron at 07:00 and 08:00 UTC; without TOPIC_PIPELINE_ENABLED every call stays "disabled"', () => {
   const config = JSON.parse(require('node:fs').readFileSync('vercel.json', 'utf8'));
-  assert.ok(!config.crons.some(cron => cron.path.includes('topic-scout')));
+  assert.deepEqual(config.crons.filter(cron => cron.path === '/api/cron/topic-scout').map(cron => cron.schedule), ['0 7 * * *', '0 8 * * *']);
 });

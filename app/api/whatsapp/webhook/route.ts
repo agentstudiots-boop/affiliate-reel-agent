@@ -28,7 +28,7 @@ import { deliverWeeklyReport } from "@/lib/reporting/weekly";
 import { latestImagePostsStatus } from "@/lib/reporting/whatsapp-status";
 import { formatPublishReport } from "@/lib/publishing/report";
 import { publishApprovedAffiliateImage } from "@/lib/distribution/affiliate";
-import { handleTopicReply, reconcileTopicPublications, resumeTopicProductions, routeTopicMessage } from "@/lib/topic-pipeline/orchestrator";
+import { deliverHeldProposals, handleTopicReply, reconcileTopicPublications, resumeTopicProductions, routeTopicMessage } from "@/lib/topic-pipeline/orchestrator";
 import { topicPipelineStatus } from "@/lib/topic-pipeline/status";
 import { extractIncomingWhatsAppMessages, extractWhatsAppDeliveryStatuses, verifyMetaWebhookSignature, verifyWhatsAppChallenge } from "@/lib/whatsapp/security";
 import { recordDeliveryStatuses, slotEvidenceLines } from "@/lib/daily/evidence";
@@ -281,6 +281,14 @@ export async function POST(request: Request) {
     && messages.some(message => message.from.replace(/\D/g, "") === approverId)) {
     try { await sendPendingDailyApprovals(getDatabase()); }
     catch { console.error(JSON.stringify({ event: "daily_approval_flush_unavailable" })); }
+  }
+  // Same for topic proposals held while the window was closed (topic pipeline only; isolated from the product flow).
+  if (!failed && approverId && process.env.TOPIC_PIPELINE_ENABLED === "true"
+    && messages.some(message => message.from.replace(/\D/g, "") === approverId)) {
+    try {
+      const { topicPipelineDeps } = await import("@/lib/agents/topic-runtime");
+      await deliverHeldProposals(topicPipelineDeps());
+    } catch { console.error(JSON.stringify({ event: "topic_proposal_flush_unavailable" })); }
   }
   // Successful message IDs deduplicate when Meta redelivers the batch.
   if (failed) return new Response("Storage unavailable", { status: 503, headers: { "Cache-Control": "no-store" } });
