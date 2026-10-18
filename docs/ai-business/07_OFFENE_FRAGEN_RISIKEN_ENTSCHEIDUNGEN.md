@@ -87,6 +87,7 @@ zum Hauptprojekt wird.
 | R-15 | Gemeinsames GitHub-Konto: Reviews/Urheberschaft sind Selbstauskünfte | sicher (Ist-Zustand) | mittel | ADR-14, D-07 |
 | R-16 | Externe Wirkung mit unklarem Ausgang wird doppelt ausgelöst | mittel | hoch | Outbox, `outcome_unknown`, keine automatische Wiederholung |
 | R-17 | Koordination wird zum Hauptprojekt | mittel | hoch | ADR-16, Validator zurückgestellt, Automatisierung nur bei gemessenem Engpass |
+| R-18 | Ein System ist längere Zeit am Abo-Limit (keine Zusatz-Credits, `e7692d0`); Reviews stauen sich, und das verfügbare System könnte versucht sein, eigene Arbeit selbst freizugeben | hoch (aktuell GPT Work) | mittel | `waiting_capacity` + Checkpoint; nur andere Aufgaben übernehmen; keine Selbstfreigabe, kein Merge nur wegen grüner CI |
 
 ## 4. Ungeklärte Abhängigkeiten
 

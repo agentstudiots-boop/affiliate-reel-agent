@@ -83,7 +83,8 @@
     "Gemeinsames GitHub-Konto: GitHub-Approve unmöglich (ADR-14)",
     "Kein automatischer Start von GPT Work durch diese Übergabe – Betreiber muss anstoßen",
     "Merge-Commit 6ce6fd1 nennt versehentlich 'A-09'; gemeint ist A-01 Runde 2",
-    "Tarife/Kontingente beider Systeme unbekannt (null)"
+    "Tarife/Kontingente beider Systeme unbekannt (null)",
+    "GPT Work derzeit ohne Guthaben (Betreiberbeschluss e7692d0); Prüfung von #82 wartet. Kein Merge allein wegen grüner CI."
   ],
   "open_decisions": [
     {
@@ -111,7 +112,7 @@
     "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/82",
     "state": "draft",
     "merge_commit": null,
-    "ci": "unknown"
+    "ci": "green"
   },
   "approval": {
     "reviewer": "pending",
@@ -126,22 +127,22 @@
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-18T21:45:00Z",
-    "checkpoint_reason": "session_end",
-    "last_commit": "67e266b",
+    "last_checkpoint_at": "2026-10-18T20:15:00Z",
+    "checkpoint_reason": "other",
+    "last_commit": "5a98696",
     "active_branch": "claude/nice-ptolemy-k4p1c3",
-    "state_summary": "A-01 Runde 2 fertig, Draft-PR gegen architecture/ai-business-roadmap offen (enthält PR #81 und aa6ce5a). A-02 geprüft (approve mit Nits). B-01 geplant.",
+    "state_summary": "Draft-PR #82 offen, CI grün auf 5a98696; Basis-Branch e7692d0 (keine Zusatz-Credits) eingearbeitet. Wartet auf GPT-Work-Review (Kapazität).",
     "decisions_made": [
       "Ein Koordinationssystem (docs/ai-business/coordination); kein zweites",
       "Kein Merge; Draft bleibt zur Gegenprüfung",
       "Erster Code-Baustein B-01 ∥ E-05 statt Validator (ADR-16, Betreiber entscheidet)"
     ],
     "test_status": "JSON-Schemas und Instanzen valide; App-Tests nicht ausgeführt (nur Doku)",
-    "next_action": "GPT Work: Draft-PR prüfen und tasks/A-01/review-2.json anlegen"
+    "next_action": "GPT Work nach Guthaben-Reset: #82 prüfen, tasks/A-01/review-2.json schreiben. Bis dahin keine weitere Claude-Arbeit an A-01."
   },
-  "revision": 4,
-  "based_on_commit": "67e266b",
-  "updated_at": "2026-10-18T21:45:00Z",
+  "revision": 5,
+  "based_on_commit": "5a98696",
+  "updated_at": "2026-10-18T20:15:00Z",
   "log": [
     {
       "at": "2026-10-18T17:04:47Z",
@@ -184,6 +185,13 @@
       "action": "pr_opened",
       "summary": "Draft-PR #82 gegen architecture/ai-business-roadmap (Prüfer GPT Work, kein Merge)",
       "commit": "67e266b"
+    },
+    {
+      "at": "2026-10-18T20:15:00Z",
+      "actor": "claude-code",
+      "action": "waiting",
+      "summary": "CI grün; Basis e7692d0 integriert (Konflikt in coordination/README.md: beide Abschnitte behalten); Review wartet auf GPT-Kapazität",
+      "commit": "5a98696"
     }
   ],
   "planner": "claude-code",
@@ -307,9 +315,9 @@
   ],
   "lease": null,
   "waiting": {
-    "reason": "review",
-    "since": "2026-10-18T21:35:00Z",
-    "resume_condition": "GPT Work schreibt tasks/A-01/review-2.json zum Draft-PR-Head",
+    "reason": "capacity",
+    "since": "2026-10-18T20:15:00Z",
+    "resume_condition": "GPT-Work-Guthaben wieder verfügbar (Reset-Zeitpunkt unbekannt); dann Prüfung des Draft-PR #82 am aktuellen Head und tasks/A-01/review-2.json",
     "wake_mechanism": "manual_start"
   }
 }

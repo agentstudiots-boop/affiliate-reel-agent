@@ -176,7 +176,12 @@ neuer Lease mit höherer `generation` per Fast-Forward-Commit → Arbeit auf dem
 **Keine erfundenen Limits.** Kontingente, Kontextgrößen, Reset-Zeiten und Preise stehen in `coordination/resources.json`; unbekannt = `null`
 und nie „unendlich“.
 
-1. **Takt:** zwei manuelle Anstöße täglich (morgens, abends). Je Anstoß: offene Reviews → eigene `changes_requested` → laufende Aufgabe →
+**Harte Kostengrenze (Betreiberbeschluss `e7692d0`):** Entwicklung nur innerhalb der bezahlten Abonnements – keine zusätzlichen Credits,
+Aufladungen oder nutzungsabhängigen Kontingente, keine kostenpflichtige Umgehung von Limits. Ist ein System am Limit: Checkpoint, Status
+`waiting_capacity`, Reset-Zeit „unbekannt“, wenn nicht belegt. Ein anderes, bereits verfügbares System darf **andere** Aufgaben übernehmen,
+aber nie die unabhängige Prüfung der eigenen Arbeit ersetzen.
+
+1. **Takt:** zwei manuelle Anstöße täglich (morgens, abends) – eine Routine, keine Garantie, dass beide Systeme verfügbar sind. Je Anstoß: offene Reviews → eigene `changes_requested` → laufende Aufgabe →
    nächste startbereite Aufgabe per Lease (04, Einleitung).
 2. **Kapazität erschöpft:** Checkpoint schreiben, Status `waiting_capacity`, Lease freigeben oder ablaufen lassen; das andere System darf
    übernehmen (8.4).

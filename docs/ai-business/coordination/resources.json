@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "note": "Ressourcen der Entwicklung. null = unbekannt/offener Konfigurationsparameter. Kein Wert ohne Quelle eintragen. Nachweisstatus explizit: verfügbar ist nicht eingerichtet oder Ende-zu-Ende getestet. Unbekannte Limits bleiben null. Jedes System pflegt nur seinen eigenen Abschnitt unter systems.<id>; gemeinsame Abschnitte per PR.",
-  "revision": 4,
-  "updated_at": "2026-10-18T20:30:00Z",
+  "revision": 5,
+  "updated_at": "2026-10-18T20:15:00Z",
   "systems": {
     "claude-code": {
       "plan_or_tier": null,
@@ -92,13 +92,20 @@
         "value": true,
         "status": "available_not_configured_for_project",
         "source": "Automations-Werkzeuge verfügbar; private Bestandsabfrage erfolgreich. Kein autonomer Entwicklungsloop eingerichtet."
+      },
+      "current_availability": {
+        "value": "credits_exhausted",
+        "status": "reported_by_operator",
+        "source": "Betreiberbeschluss e7692d0: Work-Guthaben aufgebraucht; Reset-Zeitpunkt unbekannt",
+        "checked_at": "2026-10-18T20:15:00Z"
       }
     }
   },
   "operator": {
     "manual_starts_per_day": {
       "value": 2,
-      "source": "Betreiberauftrag 18.10.2026 (morgens und abends) + coordination/README.md Betreiberbeschluss"
+      "source": "Betreiberauftrag 18.10.2026 (morgens und abends) + coordination/README.md Betreiberbeschluss",
+      "note": "Oberflächenroutine, keine Garantie gleichzeitiger Verfügbarkeit beider Systeme (e7692d0)"
     },
     "review_windows_per_week": null,
     "minutes_per_window": null,
@@ -106,6 +113,10 @@
     "merge_authority": {
       "value": "operator",
       "source": "CLAUDE.md §8, ADR-10"
+    },
+    "extra_ai_credits_allowed": {
+      "value": false,
+      "source": "Betreiberbeschluss e7692d0 (coordination/README.md): keine zusätzlichen Credits/Aufladungen für Claude Code oder ChatGPT Work"
     }
   },
   "checkpoint_thresholds": {
