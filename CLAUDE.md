@@ -82,7 +82,8 @@ Kein Modellwechsel ohne nachvollziehbare Daten; kostenpflichtige Vergleiche nur 
    (`image_quality_notices`); Antworten gelten nur für die **neueste** Notice des Jobs, dieselbe Content-Fassung und
    solange die Inhaltsfreigabe gilt. Übersteuern („Bild trotzdem senden“) nur bei *unsicherer* Prüfung oder *rein
    gestalterischen* Mängeln, nie bei harten Prüfregeln (`overrideClass`). Freie Formulierungen („Mach es trotzdem“) → Rückfrage.
-3. **Videokosten:** eigene WhatsApp-Kostenfreigabe (`lib/production/request-cost-approval.ts`).
+3. **Videokosten:** eigene WhatsApp-Kostenfreigabe (`lib/production/request-cost-approval.ts`; Themenvideos: Kostenfreigabe-Nachricht `cost_message_id`,
+   Höchstbetrag/Monatsbudget `lib/topic-pipeline/video-plan.ts`). Eine Inhaltsfreigabe startet nie ein Rendering.
 4. **Veröffentlichungsfreigabe:** Affiliate-Bildpost über `lib/meta/publication-gate.ts`; Themen-Pipeline ausschließlich über
    `lib/publishing/approval-gate.ts` (Content-ID + Version + Fingerprint, jede Änderung = neue Version). Eine Bild- oder
    Inhaltsfreigabe ist nie eine Veröffentlichungsfreigabe. Keine Schreibzugriffe auf Freigabetabellen außerhalb `lib/publishing/`.
@@ -105,12 +106,15 @@ Kein Modellwechsel ohne nachvollziehbare Daten; kostenpflichtige Vergleiche nur 
   durch `ensureAutomationSchema` (transaktional, Advisory-Lock) oder `/api/admin/migrate` (angemeldet).
 - **Nur additive Migrationen** (`CREATE … IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`), keine destruktiven Änderungen.
   Neue Migration ⇒ Liste in `migrations.ts`, Prüfung in `ensure-automation-schema.ts`, `tests/migration-upgrade.test.cjs`,
-  Anzeige in `lib/architecture/model.ts` anpassen. Aktuell: 001–037 (037 = `model_calls`).
+  Anzeige in `lib/architecture/model.ts` anpassen. Aktuell: 001–038 (037 = `model_calls`, 038 = Zustellstatus/Themenvideo).
 
 ## 7. Cron-Jobs (`vercel.json`, UTC)
 
 - `/api/cron/daily-draft` 07/08/09/16/17/18 UTC → Slots morning/afternoon (Europe/Berlin), Claim je (Tag, Slot), Nachweis in `daily_slot_runs`.
-- `/api/cron/weekly-report` Mo 08:15 UTC. `/api/cron/continue` und `/api/cron/topic-scout` existieren, sind aber nicht geplant.
+- `/api/cron/topic-scout` 07/08 UTC → ein Themenvorschlag im Fenster 08–11 Uhr Berlin (Tageslimit); `/api/cron/topic-video` 10/11/12 UTC →
+  höchstens ein Themenvideo-Vorschlag je Berliner Tag (Fenster 12–14 Uhr, Claim `topic_video_days`). Beide wirken nur mit `TOPIC_PIPELINE_ENABLED=true`
+  (Video zusätzlich `TOPIC_DAILY_VIDEO=true`). Außerhalb des 24-h-Fensters werden Themenvorschläge gehalten und mit der nächsten Betreiber-Nachricht nachgeliefert.
+- `/api/cron/weekly-report` Mo 08:15 UTC. `/api/cron/continue` existiert, ist aber nicht geplant.
 - Hobby-Plan: Ausführungszeit innerhalb der Stunde unscharf, Runtime-Logs nur 1 h → Nachweise in der DB.
 
 ## 8. Entwicklungs-, Test- und Deployment-Regeln

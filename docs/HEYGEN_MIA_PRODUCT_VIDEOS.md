@@ -1,6 +1,6 @@
 # HeyGen-Produktvideos mit Markenavatar „Mia“ – technische Prüfung und Vorbereitung
 
-Stand 15.10.2026. **Keine kostenpflichtige Produktion, kein Abo, keine Aktivierung.** `HEYGEN_ENABLED` bleibt aus.
+Stand 15.10.2026, ergänzt 18.10.2026 (Abschnitt 6). **Keine kostenpflichtige Produktion, kein Abo, keine Aktivierung.** `HEYGEN_ENABLED` bleibt aus.
 
 ## 1. Product Placement: Webstudio vs. API
 
@@ -47,6 +47,18 @@ Jarvis wählt Avatar-Video → Video-Agent (Drehbuch) → Skriptprüfung → **I
 4. Entscheidung „Produkt in der Hand“: Webstudio manuell oder Szenenschnitt mit eigenem Produktfoto (automatisierbar).
 5. Freigabe für **einen** Testclip (≈ 20–30 s, geschätzt 1–1,50 USD) und erst dann `HEYGEN_ENABLED=true`.
 6. Danach v3-Umstellung des Providers (1080p) mit dem Testclip als Live-Nachweis.
+
+## 6. Nachtrag 18.10.2026: API v3, Video Agent, Themenvideos
+
+| Punkt | Befund | Folge im Code |
+|---|---|---|
+| Avatar-Video v3 | `POST /v3/videos` mit `type: "avatar"`, `avatar_id`, `script`, `voice_id`; optional `resolution`, `title`, `output_format`, `engine` (Avatar IV Standard, Avatar V wählbar). `aspect_ratio` muss ausdrücklich `"9:16"` sein (Beispiele/Standard 16:9). Stimmen über `GET /v3/voices`. | Provider bleibt **v2** (720 × 1280). Umstellung erst mit Konto, Avatar und einem freigegebenen Testclip (sonst kein Nachweis). |
+| Video Agent | Prompt-zu-Video mit Dateien (Produktbilder); Enterprise-Doku: 0,0667 Credits/s bei 0,50 USD/Credit ≈ 2 USD/Minute (Drittquellen nennen bis 5,82 USD/Minute). Szenen bestimmt HeyGen. | nicht angebunden; für Produktvideos mit echten Produktbildern die dokumentierte Alternative zu „Produkt in der Hand“. |
+| Avatar-Kosten API | ca. 0,0167–0,0667 USD/s je nach Engine/Avatar-Typ; Prepaid ab 5 USD, kein Abo. | Planung mit `HEYGEN_COST_PER_SECOND_USD` (Standard 0,05). |
+| Produktplatzierung | weiterhin nur Webstudio; über die API nicht dokumentiert. | Priorität A (in der Hand) nur manuell; B (neben Mia) über Studio-Szenen; C (Mia spricht, Produkt als Zwischenschnitt) automatisierbar – Briefing plant das bereits. |
+| Themenvideos ohne Produkt | keine Produktplatzierung nötig. | Täglicher Themenvideo-Vorschlag (PR #79) nutzt HeyGen nur, wenn aktiv; sonst Runway WAN 3. |
+
+Quellen (Nachtrag): [Create Video](https://developers.heygen.com/reference/create-video), [Digital Twin](https://docs.heygen.com/docs/create-video), [HeyGen Studio](https://developers.heygen.com/studio-videos), [HeyGen Video](https://developers.heygen.com/docs/models/heygen-video), [Enterprise Pricing](https://developers.heygen.com/docs/enterprise-pricing), [G2 – HeyGen API Pricing](https://www.g2.com/articles/heygen-api-pricing), [Sume – HeyGen API pricing](https://www.sume.com/blog/heygen-api-pricing) (Drittquellen widersprechen sich teilweise; maßgeblich ist der Preis bei HeyGen vor der Generierung).
 
 ## Quellen
 
