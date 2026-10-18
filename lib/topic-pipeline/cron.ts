@@ -34,11 +34,11 @@ export function berlinSlotKey(now: Date) {
   return `${get("year")}-${get("month")}-${get("day")}:${get("hour")}`;
 }
 
-async function acquire(db: Database, holder: string) {
+export async function acquire(db: Database, holder: string) {
   const result = await db.query("UPDATE topic_cron_lease SET holder=$1, expires_at=now()+($2::text||' milliseconds')::interval WHERE id=1 AND expires_at<now() RETURNING holder", [holder, String(LEASE_MS)]);
   return result.rows.length > 0;
 }
-async function release(db: Database, holder: string) {
+export async function release(db: Database, holder: string) {
   await db.query("UPDATE topic_cron_lease SET expires_at='1970-01-01T00:00:00Z' WHERE id=1 AND holder=$1", [holder]);
 }
 

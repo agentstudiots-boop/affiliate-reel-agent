@@ -28,7 +28,7 @@ export function createRunwayStandardVideoProvider(deps: RunwayVideoDeps = {}): V
     },
     async create(input: VideoInput) {
       try {
-        const task = await client().textToVideo.create({ model: RUNWAY_MODEL, promptText: input.visualPrompt.slice(0, 1000), ratio: RUNWAY_RATIO, duration: RUNWAY_DURATION_SECONDS, audio: true });
+        const task = await client().textToVideo.create({ model: RUNWAY_MODEL, promptText: input.visualPrompt.slice(0, 3800), ratio: RUNWAY_RATIO, duration: RUNWAY_DURATION_SECONDS, audio: true });
         if (!task?.id) throw new VideoProviderError("invalid_response", false);
         return { jobId: task.id };
       } catch (error) {

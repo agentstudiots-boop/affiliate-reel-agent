@@ -65,6 +65,16 @@ export async function topicPipelineStatus(db: Database, render: RenderContext): 
     if (held.waiting) lines.push(`${held.waiting} Themenvorschlag/-vorschläge warten auf dein WhatsApp-Fenster und kommen mit dieser Nachricht.`);
     if (held.unknown) lines.push(`${held.unknown} Themenvorschlag/-vorschläge mit unklarer Zustellung (nicht automatisch wiederholt).`);
   } catch { /* migration 038 not applied yet */ }
+  // Daily topic video: today's (or the latest) day claim and the decision state of its proposal.
+  try {
+    const day = (await db.query(`SELECT d.day::text AS day, d.status, d.attempts, d.reason, c.stage, c.video FROM topic_video_days d
+      LEFT JOIN topic_contents c ON c.content_id=d.content_id ORDER BY d.day DESC LIMIT 1`)).rows[0];
+    if (day) {
+      const video = day.video as { contentApprovedAt?: string | null; costApprovedAt?: string | null; costRejectedAt?: string | null; plan?: { provider?: string; estimateUsd?: number | null } | null } | null;
+      const decisions = video ? [video.contentApprovedAt ? "Inhalt freigegeben" : "Inhalt offen", video.costApprovedAt ? "Kosten freigegeben" : video.costRejectedAt ? "Kosten abgelehnt" : "Kosten offen"].join(", ") : "";
+      lines.push(`Themenvideo ${day.day}: ${day.status === "proposed" ? `vorgeschlagen (${day.stage ?? "–"}; ${decisions}${video?.plan?.provider ? `; ${video.plan.provider}${video.plan.estimateUsd ? `, ca. ${Number(video.plan.estimateUsd).toFixed(2)} USD` : ""}` : ""})` : `${day.status} nach ${day.attempts} Versuch(en)${day.reason ? ` (${String(day.reason).slice(0, 60)})` : ""}`}`);
+    }
+  } catch { /* migration 038 not applied yet */ }
   // Last published topic posts with the links the platforms returned (stored per platform, never constructed).
   try {
     const rows = (await db.query(`SELECT candidate->'candidate'->>'title' AS title, stage, master FROM topic_contents
