@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "note": "Ressourcen der Entwicklung. null = unbekannt/offener Konfigurationsparameter. Kein Wert ohne Quelle eintragen. Nachweisstatus explizit: verfügbar ist nicht eingerichtet oder Ende-zu-Ende getestet. Unbekannte Limits bleiben null. Jedes System pflegt nur seinen eigenen Abschnitt unter systems.<id>; gemeinsame Abschnitte per PR.",
-  "revision": 5,
+  "revision": 6,
   "updated_at": "2026-10-18T20:15:00Z",
   "systems": {
     "claude-code": {
@@ -92,12 +92,6 @@
         "value": true,
         "status": "available_not_configured_for_project",
         "source": "Automations-Werkzeuge verfügbar; private Bestandsabfrage erfolgreich. Kein autonomer Entwicklungsloop eingerichtet."
-      },
-      "current_availability": {
-        "value": "credits_exhausted",
-        "status": "reported_by_operator",
-        "source": "Betreiberbeschluss e7692d0: Work-Guthaben aufgebraucht; Reset-Zeitpunkt unbekannt",
-        "checked_at": "2026-10-18T20:15:00Z"
       }
     }
   },
@@ -117,6 +111,14 @@
     "extra_ai_credits_allowed": {
       "value": false,
       "source": "Betreiberbeschluss e7692d0 (coordination/README.md): keine zusätzlichen Credits/Aufladungen für Claude Code oder ChatGPT Work"
+    },
+    "reported_availability": {
+      "gpt-work": {
+        "value": "credits_exhausted",
+        "status": "reported_by_operator",
+        "source": "Betreiberbeschluss e7692d0: Work-Guthaben aufgebraucht; Reset-Zeitpunkt unbekannt",
+        "checked_at": "2026-10-18T20:15:00Z"
+      }
     }
   },
   "checkpoint_thresholds": {
