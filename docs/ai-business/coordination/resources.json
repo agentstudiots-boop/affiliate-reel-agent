@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "note": "Ressourcen der Entwicklung. null = unbekannt/offener Konfigurationsparameter. Kein Wert ohne Quelle eintragen. Nachweisstatus explizit: verfügbar ist nicht eingerichtet oder Ende-zu-Ende getestet. Unbekannte Limits bleiben null.",
-  "revision": 2,
-  "updated_at": "2026-10-18T18:45:05.680794Z",
+  "revision": 3,
+  "updated_at": "2026-10-18T18:46:26.097919Z",
   "systems": {
     "claude-code": {
       "plan_or_tier": null,
@@ -52,13 +52,13 @@
       },
       "can_push_branches": {
         "value": true,
-        "status": "partially_tested",
-        "source": "create_branch erfolgreich; Git-Transport-Push nicht getestet. Commits über Connector separat nachweisen."
+        "status": "tested_via_connector",
+        "source": "create_branch/create_tree/create_commit/update_ref erfolgreich; Commit 025fd8887846788f6bb5f8bf72eeffd39ff77a3a. Git-Transport-Push nicht getestet."
       },
       "can_open_pr": {
         "value": true,
-        "status": "available_not_tested",
-        "source": "GitHub create_pull_request verfügbar; Ergebnis folgt im A-02-Checkpoint."
+        "status": "tested",
+        "source": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/81"
       },
       "can_review_pr": {
         "value": true,

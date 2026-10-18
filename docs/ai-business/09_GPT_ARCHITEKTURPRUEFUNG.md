@@ -92,7 +92,7 @@ Review fertiger Arbeit vor neuer Implementierung. Maximal zwei aktive Code-PRs a
 |---|---|
 | Repository lesen | erfolgreich über GitHub-Connector und öffentliches git clone |
 | Separaten Branch anlegen | lokal und per Connector erfolgreich; gpt/A-02-architecture-review |
-| Dateien/Commits schreiben, PR öffnen | Werkzeuge vorhanden; Ausführungsergebnis im A-02-Checkpoint/PR nachtragen |
+| Dateien/Commits schreiben, PR öffnen | per Connector erfolgreich: Commit 025fd8887846788f6bb5f8bf72eeffd39ff77a3a und PR #81; Git-Transport-Push nicht getestet |
 | Reviews/Zeilenkommentare | Werkzeug vorhanden, in dieser Sitzung nicht als GitHub-Review getestet; Review-JSON ist kein GitHub-Approve |
 | Automatische Kontextkomprimierung | in dieser Umgebung vorgesehen; hier nicht als ausgelöster Sitzungswechsel getestet |
 | Prozentuale Kontextmessung / verbleibende Abo-Tokens | keine verlässliche Abfrageschnittstelle in dieser Sitzung; null, keine 80%-Behauptung |
@@ -154,3 +154,7 @@ Jetzt entscheidungsreif: Hybrid-Executive als Zielrichtung bestätigen oder änd
 - S3: https://vercel.com/docs/cron-jobs/usage-and-pricing — Cron-Intervalle und Präzision.
 - S4: https://docs.github.com/en/pull-requests/how-tos/review-pull-requests/approving-a-pull-request-with-required-reviews — keine Selbstgenehmigung, Wirkung von Reviews/Rulesets.
 - Repository-Nachweise gelten ausschließlich für die oben genannten SHAs; Betriebsdaten wurden nicht daraus abgeleitet.
+
+## Abschlussnachweis dieser Sitzung
+
+[PR #81](https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/81) ist gegen den Architektur-Branch geöffnet, nicht gemergt. Initialer Veröffentlichungscommit: `025fd8887846788f6bb5f8bf72eeffd39ff77a3a`. JSON-Syntax, beide Draft-2020-12-Schemas und alle drei Task-/Review-Instanzen wurden erfolgreich validiert; die Negativprobe bestätigt die fehlende Unterstützung für `waiting_capacity`. Keine erneuten App-Tests, kein unabhängiges Claude-Review und kein ausgelöster Automationslauf behauptet.
