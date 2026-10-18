@@ -1,33 +1,80 @@
 {
   "schema_version": 1,
-  "note": "Ressourcen der Entwicklung. null = unbekannt/offener Konfigurationsparameter. Kein Wert ohne Quelle eintragen.",
-  "revision": 1,
-  "updated_at": "2026-10-18T17:04:47Z",
+  "note": "Ressourcen der Entwicklung. null = unbekannt/offener Konfigurationsparameter. Kein Wert ohne Quelle eintragen. Nachweisstatus explizit: verfügbar ist nicht eingerichtet oder Ende-zu-Ende getestet. Unbekannte Limits bleiben null.",
+  "revision": 2,
+  "updated_at": "2026-10-18T18:45:05.680794Z",
   "systems": {
     "claude-code": {
       "plan_or_tier": null,
       "usage_limits": null,
       "context_window_tokens": null,
       "context_usage_measurable_by_model": null,
-      "auto_compaction": { "value": true, "source": "Claude-Code-Sitzungsumgebung (automatische Zusammenfassung langer Sitzungen)" },
-      "can_push_branches": { "value": true, "source": "diese Sitzung, 18.10.2026" },
-      "can_open_pr": { "value": true, "source": "GitHub-MCP create_pull_request in der Sitzung verfügbar (nicht ausgeführt)" },
-      "can_review_pr": { "value": true, "source": "GitHub-MCP pull_request_review_write in der Sitzung verfügbar (nicht ausgeführt)" },
-      "can_schedule_followups": { "value": true, "source": "Routinen/send_later in der Sitzung verfügbar (nicht eingerichtet)" },
-      "triggerable_from_github_comment": { "value": false, "source": "keine claude-code-action im Repo (.github/workflows enthält nur quality.yml)" }
+      "auto_compaction": {
+        "value": true,
+        "source": "Claude-Code-Sitzungsumgebung (automatische Zusammenfassung langer Sitzungen)"
+      },
+      "can_push_branches": {
+        "value": true,
+        "source": "diese Sitzung, 18.10.2026"
+      },
+      "can_open_pr": {
+        "value": true,
+        "source": "GitHub-MCP create_pull_request in der Sitzung verfügbar (nicht ausgeführt)"
+      },
+      "can_review_pr": {
+        "value": true,
+        "source": "GitHub-MCP pull_request_review_write in der Sitzung verfügbar (nicht ausgeführt)"
+      },
+      "can_schedule_followups": {
+        "value": true,
+        "source": "Routinen/send_later in der Sitzung verfügbar (nicht eingerichtet)"
+      },
+      "triggerable_from_github_comment": {
+        "value": false,
+        "source": "keine claude-code-action im Repo (.github/workflows enthält nur quality.yml)"
+      }
     },
     "gpt-work": {
-      "product": null,
+      "product": "ChatGPT Work (Web/Cloud)",
       "plan_or_tier": null,
       "usage_limits": null,
       "context_window_tokens": null,
       "context_usage_measurable": null,
-      "auto_compaction": null,
-      "github_identity": { "value": null, "hint": "Historie deutet auf Pushes über das Betreiberkonto hin (z. B. PR #71 'Codex-Audit'); zu bestätigen" },
-      "can_push_branches": null,
-      "can_open_pr": null,
-      "can_review_pr": null,
-      "triggerable_from_github": null
+      "auto_compaction": {
+        "value": true,
+        "status": "available_not_exercised",
+        "source": "Sitzungsumgebung sieht automatische Kontextkomprimierung vor; kein ausgelöster Wechsel in diesem Test."
+      },
+      "github_identity": {
+        "value": "agentstudiots-boop",
+        "status": "tested",
+        "source": "GitHub get_user_login, 18.10.2026"
+      },
+      "can_push_branches": {
+        "value": true,
+        "status": "partially_tested",
+        "source": "create_branch erfolgreich; Git-Transport-Push nicht getestet. Commits über Connector separat nachweisen."
+      },
+      "can_open_pr": {
+        "value": true,
+        "status": "available_not_tested",
+        "source": "GitHub create_pull_request verfügbar; Ergebnis folgt im A-02-Checkpoint."
+      },
+      "can_review_pr": {
+        "value": true,
+        "status": "available_not_tested",
+        "source": "GitHub add_review_to_pr verfügbar; keine eigene PR genehmigen. Review-JSON ist kein GitHub-Approve."
+      },
+      "triggerable_from_github": {
+        "value": null,
+        "status": "source_available_not_configured",
+        "source": "automations.list_event_sources liefert GitHub; https://learn.chatgpt.com/docs/automations beschreibt PR-Ereignisse. Kein Projekttrigger angelegt oder ausgeführt."
+      },
+      "can_schedule_followups": {
+        "value": true,
+        "status": "available_not_configured_for_project",
+        "source": "Automations-Werkzeuge verfügbar; private Bestandsabfrage erfolgreich. Kein autonomer Entwicklungsloop eingerichtet."
+      }
     }
   },
   "operator": {
@@ -48,7 +95,10 @@
   },
   "ci": {
     "workflow": ".github/workflows/quality.yml",
-    "full_test_minutes_approx": { "value": 10, "source": "docs/PROJECT_STATUS.md §8" },
+    "full_test_minutes_approx": {
+      "value": 10,
+      "source": "docs/PROJECT_STATUS.md §8"
+    },
     "github_actions_minutes_limit": null
   }
 }
