@@ -12,7 +12,9 @@
   "branch": "architecture/ai-business-roadmap",
   "depends_on": [],
   "claims": {
-    "paths": ["docs/ai-business/**"],
+    "paths": [
+      "docs/ai-business/**"
+    ],
     "hot_files": [],
     "migration_numbers": []
   },
@@ -41,8 +43,20 @@
     "Maschinenlesbare Übergabestruktur (JSON Schema, Besitzregeln, Ressourcen mit offenen Parametern)"
   ],
   "tests": [
-    { "command": "node -e JSON.parse (alle JSON-Dateien unter docs/ai-business/coordination)", "result": "passed", "detail": "Syntaxprüfung; Schema-Validator folgt in C-02", "commit": null, "at": "2026-10-18T17:04:47Z" },
-    { "command": "npm test / typecheck / lint / build", "result": "not_run", "detail": "reine Doku-Änderung; CI läuft beim PR", "commit": null, "at": "2026-10-18T17:04:47Z" }
+    {
+      "command": "node -e JSON.parse (alle JSON-Dateien unter docs/ai-business/coordination)",
+      "result": "passed",
+      "detail": "Syntaxprüfung; Schema-Validator folgt in C-02",
+      "commit": "5bd49c8",
+      "at": "2026-10-18T17:04:47Z"
+    },
+    {
+      "command": "npm test / typecheck / lint / build",
+      "result": "not_run",
+      "detail": "reine Doku-Änderung; CI läuft beim PR",
+      "commit": null,
+      "at": "2026-10-18T17:04:47Z"
+    }
   ],
   "known_issues": [
     "Fähigkeiten und Limits von GPT Work unbekannt (Q-02, Q-10, Q-11)",
@@ -50,12 +64,33 @@
     "Produktionsdaten (model_calls, Erlöse) nicht gelesen – kein Zugang in der Sitzung"
   ],
   "open_decisions": [
-    { "id": "BF-01", "question": "Planung freigeben oder Änderungen verlangen", "owner": "operator" },
-    { "id": "BF-03", "question": "ADR-01 bis ADR-12 entscheiden", "owner": "operator" },
-    { "id": "BF-05", "question": "Repository öffentlich lassen oder privat stellen", "owner": "operator" }
+    {
+      "id": "BF-01",
+      "question": "Planung freigeben oder Änderungen verlangen",
+      "owner": "operator"
+    },
+    {
+      "id": "BF-03",
+      "question": "ADR-01 bis ADR-12 entscheiden",
+      "owner": "operator"
+    },
+    {
+      "id": "BF-05",
+      "question": "Repository öffentlich lassen oder privat stellen",
+      "owner": "operator"
+    }
   ],
-  "pr": { "url": null, "state": "none", "merge_commit": null, "ci": "unknown" },
-  "approval": { "reviewer": "pending", "operator": "pending", "latest_review_file": null },
+  "pr": {
+    "url": null,
+    "state": "none",
+    "merge_commit": null,
+    "ci": "unknown"
+  },
+  "approval": {
+    "reviewer": "pending",
+    "operator": "pending",
+    "latest_review_file": null
+  },
   "next_steps": [
     "Betreiber prüft docs/ai-business/README.md",
     "GPT Work prüft die Planung (A-02) und legt review-1.json an",
@@ -63,9 +98,9 @@
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-18T17:04:47Z",
-    "checkpoint_reason": "work_package_done",
-    "last_commit": "ea0559a",
+    "last_checkpoint_at": "2026-10-18T17:05:20Z",
+    "checkpoint_reason": "session_end",
+    "last_commit": "5bd49c8",
     "active_branch": "architecture/ai-business-roadmap",
     "state_summary": "Planungsphase abgeschlossen, Bericht liegt zur gemeinsamen Prüfung vor. Keine Implementierung begonnen.",
     "decisions_made": [
@@ -75,10 +110,23 @@
     "test_status": "JSON-Syntax geprüft; keine Codeänderung",
     "next_action": "Auf Betreiberfreigabe (BF-01) warten; danach A-02 bis A-08 gemäß 06_PHASE_A_UMSETZUNGSPLAN.md"
   },
-  "revision": 1,
+  "revision": 2,
   "based_on_commit": "ea0559a",
-  "updated_at": "2026-10-18T17:04:47Z",
+  "updated_at": "2026-10-18T17:05:20Z",
   "log": [
-    { "at": "2026-10-18T17:04:47Z", "actor": "claude-code", "action": "created", "summary": "Aufgabe angelegt und Planungsdokumente erstellt", "commit": null }
+    {
+      "at": "2026-10-18T17:04:47Z",
+      "actor": "claude-code",
+      "action": "created",
+      "summary": "Aufgabe angelegt und Planungsdokumente erstellt",
+      "commit": null
+    },
+    {
+      "at": "2026-10-18T17:05:20Z",
+      "actor": "claude-code",
+      "action": "pushed",
+      "summary": "Planungsdokumente auf architecture/ai-business-roadmap und claude/nice-ptolemy-k4p1c3 gepusht",
+      "commit": "5bd49c8"
+    }
   ]
 }
