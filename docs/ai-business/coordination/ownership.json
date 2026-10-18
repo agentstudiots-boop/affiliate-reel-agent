@@ -1,24 +1,39 @@
 {
   "schema_version": 1,
-  "note": "Modulbesitz und Konfliktregeln. Vorschlag zur Freigabe in Phase A (ADR-09). Keine Geschäftsdaten – öffentliches Repository.",
-  "revision": 1,
-  "updated_at": "2026-10-18T17:04:47Z",
+  "note": "Modulbesitz und Konfliktregeln (ADR-09, korrigiert nach GPT-04/GPT-08). Datei-genaue Zuständigkeit statt Baum-Claims. Keine Geschäftsdaten – öffentliches Repository.",
+  "revision": 2,
+  "updated_at": "2026-10-18T20:30:00Z",
+  "coordination_branch": {
+    "name": "architecture/ai-business-roadmap",
+    "rule": "Inhaltliche Änderungen (Architektur-Doku, Schemas, diese Datei) nur per PR mit Review des anderen Systems. Zustandsänderungen (Lease, Status, Checkpoint, eigene review-/decision-Datei) dürfen als kleiner direkter Commit per Fast-Forward-Push bzw. Connector mit expected_sha erfolgen; ein abgelehnter Push bedeutet: neu lesen, nicht überschreiben (ADR-13). Nie main."
+  },
+  "documents": [
+    { "path": "docs/ai-business/README.md", "owner": "shared", "change_via": "pr" },
+    { "path": "docs/ai-business/0[1-7]_*.md", "owner": "claude-code", "reviewer": "gpt-work", "change_via": "pr" },
+    { "path": "docs/ai-business/08_KAPAZITAETSGESTEUERTE_KOORDINATION.md", "owner": "chatgpt-chat", "reviewer": "claude-code", "change_via": "pr", "note": "Betreiber-Chat-Notiz; Inhalte sind in 04/05 übernommen" },
+    { "path": "docs/ai-business/09_GPT_ARCHITEKTURPRUEFUNG.md", "owner": "gpt-work", "reviewer": "claude-code", "change_via": "pr" },
+    { "path": "docs/ai-business/coordination/README.md", "owner": "shared", "change_via": "pr" },
+    { "path": "docs/ai-business/coordination/{ownership,resources}.json", "owner": "shared", "change_via": "pr", "note": "resources.json: jedes System pflegt nur seinen eigenen Abschnitt systems.<id>" },
+    { "path": "docs/ai-business/coordination/schema/**", "owner": "shared", "change_via": "pr" },
+    { "path": "docs/ai-business/coordination/tasks/<ID>/task.json", "owner": "planner bis Lease, danach implementer", "change_via": "direct_ff_or_pr" },
+    { "path": "docs/ai-business/coordination/tasks/<ID>/review-<n>.json", "owner": "reviewer der Aufgabe", "change_via": "direct_ff_or_pr" },
+    { "path": "docs/ai-business/coordination/tasks/<ID>/decision.json", "owner": "operator (Eintrag durch Modell nur mit Quelle)", "change_via": "direct_ff_or_pr" }
+  ],
   "modules": [
-    { "id": "planning", "paths": ["docs/ai-business/**"], "owner": "claude-code", "reviewer": "gpt-work" },
-    { "id": "coordination-tooling", "paths": ["scripts/coordination-check.cjs", "tests/coordination-check.test.cjs"], "owner": "gpt-work", "reviewer": "claude-code", "status": "planned" },
-    { "id": "enterprise-kernel", "paths": ["lib/enterprise/contract.ts", "lib/enterprise/registry.ts", "lib/enterprise/executive/**", "app/api/cron/executive-cycle/**"], "owner": "claude-code", "reviewer": "gpt-work", "status": "planned" },
+    { "id": "enterprise-kernel", "paths": ["lib/enterprise/registry.ts", "lib/enterprise/policy.ts", "lib/enterprise/plan.ts", "tests/enterprise-kernel.test.cjs"], "owner": "gpt-work", "reviewer": "claude-code", "planner": "claude-code", "status": "planned", "task": "B-01" },
+    { "id": "enterprise-ledger", "paths": ["lib/enterprise/tasks/**", "app/api/cron/executive-cycle/**"], "owner": "claude-code", "reviewer": "gpt-work", "status": "planned" },
     { "id": "controlling", "paths": ["lib/enterprise/departments/controlling/**"], "owner": "gpt-work", "reviewer": "claude-code", "status": "planned" },
-    { "id": "opportunity-scoring", "paths": ["lib/enterprise/departments/opportunity/scoring/**"], "owner": "gpt-work", "reviewer": "claude-code", "status": "planned" },
-    { "id": "opportunity-orchestrator", "paths": ["lib/enterprise/departments/opportunity/orchestrator.ts"], "owner": "claude-code", "reviewer": "gpt-work", "status": "planned" },
+    { "id": "opportunity", "paths": ["lib/enterprise/departments/opportunity/**"], "owner": "open", "status": "planned" },
     { "id": "affiliate-adapter", "paths": ["lib/enterprise/departments/affiliate.ts"], "owner": "claude-code", "reviewer": "gpt-work", "status": "planned" },
-    { "id": "command-center-enterprise", "paths": ["lib/architecture/enterprise.ts"], "owner": "claude-code", "reviewer": "gpt-work", "status": "planned" }
+    { "id": "command-center-enterprise", "paths": ["lib/architecture/enterprise.ts"], "owner": "claude-code", "reviewer": "gpt-work", "status": "planned" },
+    { "id": "coordination-tooling", "paths": ["scripts/coordination-check.cjs", "tests/coordination-check.test.cjs"], "owner": "gpt-work", "reviewer": "claude-code", "status": "deferred", "note": "erst wenn Koordinationsfehler als Engpass nachgewiesen sind (Betreiberauftrag: gezielt automatisieren)" }
   ],
   "hot_files": [
     "lib/memory/migrations.ts", "lib/memory/ensure-automation-schema.ts", "tests/migration-upgrade.test.cjs",
     "lib/architecture/model.ts", "lib/architecture/runtime.ts", "lib/architecture/snapshot.ts", "tests/architecture.test.cjs",
     "app/api/whatsapp/webhook/route.ts", "lib/whatsapp/router.ts", "lib/whatsapp/route-llm.ts",
     "proxy.ts", "lib/security/access-policy.ts", "tests/admin-session.test.cjs",
-    "lib/publishing/authority.ts", "lib/observability/model-calls.ts", "lib/reporting/weekly.ts",
+    "lib/publishing/authority.ts", "lib/observability/model-calls.ts", "lib/observability/events.ts", "lib/reporting/weekly.ts",
     "vercel.json", "package.json", "package-lock.json", ".github/workflows/quality.yml",
     "CLAUDE.md", "AGENTS.md", "docs/PROJECT_STATUS.md"
   ],
@@ -26,11 +41,12 @@
     "lib/topic-pipeline/**", "lib/visual/**", "lib/production/**", "lib/content/**", "lib/daily/**", "lib/meta/**", "lib/distribution/**"
   ],
   "migration_reservations": {
-    "last_on_main": "037",
+    "last_on_main": "038",
+    "source": "origin/main c56711e: db/migrations/038_topic_delivery_and_video.sql (PR #79)",
     "reserved": [],
-    "rule": "Vor Beginn einer Aufgabe mit Migration die nächste freie Nummer hier per Koordinations-PR reservieren. Die parallele Video-Sitzung hat Vorrang für 038, solange ihr Stand unbekannt ist (Q-12)."
+    "rule": "Vor Beginn einer Aufgabe mit Migration die nächste freie Nummer per Zustands-Commit hier und in claims.migration_numbers reservieren; vor dem PR erneut gegen origin/main prüfen."
   },
   "parallel_sessions": [
-    { "name": "Themen-Content- und Videopipeline (Claude Code)", "branch": null, "known_paths": [], "status": "Branch am 18.10. nicht auf GitHub sichtbar – in A-04 erfassen" }
+    { "name": "Themen-Content- und Videopipeline (Claude Code)", "branch": "claude/clever-cori-b73qxg", "head": "713f2855d3544cc581feea7dcb84c8f93c6698c5", "status": "PR #78, #79, #80 nach main gemergt (main c56711e); neue Arbeit dort weiterhin möglich – vor jeder Aufgabe mit Hot Files origin/main und offene PRs prüfen" }
   ]
 }

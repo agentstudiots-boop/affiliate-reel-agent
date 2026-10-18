@@ -1,110 +1,645 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/agentstudiots-boop/affiliate-reel-agent/docs/ai-business/coordination/schema/task.schema.json",
-  "title": "Übergabedatei einer Entwicklungsaufgabe (Schreibrecht: implementierendes System)",
-  "description": "Keine Geschäftsdaten, Finanzzahlen, Secrets oder personenbezogenen Daten – das Repository ist öffentlich.",
+  "title": "Übergabedatei einer Entwicklungsaufgabe (Schreibrecht: Planer bis zur Übernahme, danach implementierendes System)",
+  "description": "Keine Geschäftsdaten, Finanzzahlen, Secrets oder personenbezogenen Daten – das Repository ist öffentlich. Revision 2 des Schemas (18.10.2026, A-01 Runde 2): nur additive Felder; alle Instanzen nach Revision 1 bleiben gültig.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "task_id", "title", "module", "phase", "status", "responsible", "implementer", "reviewer",
-    "base_commit", "branch", "depends_on", "claims", "changed_files", "implemented", "tests", "known_issues", "open_decisions",
-    "pr", "approval", "next_steps", "session", "revision", "updated_at", "log"],
+  "required": [
+    "schema_version",
+    "task_id",
+    "title",
+    "module",
+    "phase",
+    "status",
+    "responsible",
+    "implementer",
+    "reviewer",
+    "base_commit",
+    "branch",
+    "depends_on",
+    "claims",
+    "changed_files",
+    "implemented",
+    "tests",
+    "known_issues",
+    "open_decisions",
+    "pr",
+    "approval",
+    "next_steps",
+    "session",
+    "revision",
+    "updated_at",
+    "log"
+  ],
   "$defs": {
-    "system": { "enum": ["claude-code", "gpt-work", "operator"] },
-    "sha": { "type": ["string", "null"], "pattern": "^[0-9a-f]{7,40}$" },
-    "timestamp": { "type": "string", "format": "date-time" }
+    "system": {
+      "enum": [
+        "claude-code",
+        "gpt-work",
+        "chatgpt-chat",
+        "operator"
+      ],
+      "description": "gpt-work = ChatGPT Work/Codex; chatgpt-chat = normaler ChatGPT-Chat (nur Planung/Dokumentation, kein Implementierer)"
+    },
+    "sha": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{7,40}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
   },
   "properties": {
-    "schema_version": { "const": 1 },
-    "task_id": { "type": "string", "pattern": "^[A-J]-[0-9]{2}$" },
-    "title": { "type": "string", "minLength": 3, "maxLength": 140 },
-    "module": { "type": "string", "description": "Modul-ID aus ownership.json" },
-    "phase": { "enum": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"] },
-    "status": { "enum": ["planned", "in_progress", "in_review", "changes_requested", "approved_by_reviewer", "merged", "deployed", "verified", "blocked", "cancelled"] },
-    "responsible": { "$ref": "#/$defs/system" },
-    "implementer": { "$ref": "#/$defs/system" },
-    "reviewer": { "$ref": "#/$defs/system", "description": "Muss sich vom implementer unterscheiden (Prüfung im Validator, Phase C)." },
-    "base_commit": { "$ref": "#/$defs/sha" },
-    "branch": { "type": ["string", "null"] },
-    "depends_on": { "type": "array", "items": { "type": "string", "pattern": "^[A-J]-[0-9]{2}$" } },
-    "claims": {
-      "type": "object", "additionalProperties": false, "required": ["paths", "hot_files", "migration_numbers"],
-      "properties": {
-        "paths": { "type": "array", "items": { "type": "string" }, "description": "Globs, die nur diese Aufgabe ändert" },
-        "hot_files": { "type": "array", "items": { "type": "string" }, "description": "Hot Files mit dokumentierter Abstimmung" },
-        "migration_numbers": { "type": "array", "items": { "type": "string", "pattern": "^[0-9]{3}$" } }
-      }
+    "schema_version": {
+      "const": 1
     },
-    "changed_files": { "type": "array", "items": { "type": "string" } },
-    "implemented": { "type": "array", "items": { "type": "string" }, "description": "Implementierte Funktionen in einem Satz je Eintrag" },
-    "tests": {
+    "task_id": {
+      "type": "string",
+      "pattern": "^[A-J]-[0-9]{2}$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 140
+    },
+    "module": {
+      "type": "string",
+      "description": "Modul-ID aus ownership.json"
+    },
+    "phase": {
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "H",
+        "I",
+        "J"
+      ]
+    },
+    "status": {
+      "enum": [
+        "planned",
+        "ready",
+        "in_progress",
+        "waiting_capacity",
+        "waiting_review",
+        "waiting_operator",
+        "in_review",
+        "changes_requested",
+        "approved_by_reviewer",
+        "merged",
+        "deployed",
+        "verified",
+        "blocked",
+        "cancelled",
+        "superseded"
+      ]
+    },
+    "responsible": {
+      "$ref": "#/$defs/system"
+    },
+    "implementer": {
+      "$ref": "#/$defs/system"
+    },
+    "reviewer": {
+      "$ref": "#/$defs/system",
+      "description": "Muss sich vom implementer unterscheiden (Prüfung im Validator, Phase C)."
+    },
+    "base_commit": {
+      "$ref": "#/$defs/sha"
+    },
+    "branch": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "depends_on": {
       "type": "array",
       "items": {
-        "type": "object", "additionalProperties": false, "required": ["command", "result", "commit", "at"],
-        "properties": {
-          "command": { "type": "string" },
-          "result": { "enum": ["passed", "failed", "skipped", "not_run"] },
-          "detail": { "type": "string" },
-          "commit": { "$ref": "#/$defs/sha" },
-          "at": { "$ref": "#/$defs/timestamp" }
+        "type": "string",
+        "pattern": "^[A-J]-[0-9]{2}$"
+      }
+    },
+    "claims": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "paths",
+        "hot_files",
+        "migration_numbers"
+      ],
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Globs, die nur diese Aufgabe ändert"
+        },
+        "hot_files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Hot Files mit dokumentierter Abstimmung"
+        },
+        "migration_numbers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9]{3}$"
+          }
+        },
+        "foreign_paths": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "owner",
+              "agreement"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "owner": {
+                "$ref": "#/$defs/system"
+              },
+              "agreement": {
+                "type": "string",
+                "description": "Link/Commit der Zustimmung des Besitzers"
+              }
+            }
+          }
         }
       }
     },
-    "known_issues": { "type": "array", "items": { "type": "string" } },
+    "changed_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "implemented": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Implementierte Funktionen in einem Satz je Eintrag"
+    },
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "command",
+          "result",
+          "commit",
+          "at"
+        ],
+        "properties": {
+          "command": {
+            "type": "string"
+          },
+          "result": {
+            "enum": [
+              "passed",
+              "failed",
+              "skipped",
+              "not_run"
+            ]
+          },
+          "detail": {
+            "type": "string"
+          },
+          "commit": {
+            "$ref": "#/$defs/sha"
+          },
+          "at": {
+            "$ref": "#/$defs/timestamp"
+          }
+        }
+      }
+    },
+    "known_issues": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "open_decisions": {
       "type": "array",
       "items": {
-        "type": "object", "additionalProperties": false, "required": ["id", "question", "owner"],
-        "properties": { "id": { "type": "string" }, "question": { "type": "string" }, "owner": { "$ref": "#/$defs/system" } }
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "question",
+          "owner"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "owner": {
+            "$ref": "#/$defs/system"
+          }
+        }
       }
     },
     "pr": {
-      "type": "object", "additionalProperties": false, "required": ["url", "state"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "url",
+        "state"
+      ],
       "properties": {
-        "url": { "type": ["string", "null"] },
-        "state": { "enum": ["none", "draft", "open", "merged", "closed"] },
-        "merge_commit": { "$ref": "#/$defs/sha" },
-        "ci": { "enum": ["unknown", "pending", "green", "red"] }
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "enum": [
+            "none",
+            "draft",
+            "open",
+            "merged",
+            "closed"
+          ]
+        },
+        "merge_commit": {
+          "$ref": "#/$defs/sha"
+        },
+        "ci": {
+          "enum": [
+            "unknown",
+            "pending",
+            "green",
+            "red"
+          ]
+        }
       }
     },
     "approval": {
-      "type": "object", "additionalProperties": false, "required": ["reviewer", "operator"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reviewer",
+        "operator"
+      ],
       "properties": {
-        "reviewer": { "enum": ["pending", "approved", "changes_requested"] },
-        "operator": { "enum": ["pending", "approved", "rejected", "not_required"] },
-        "latest_review_file": { "type": ["string", "null"] }
+        "reviewer": {
+          "enum": [
+            "pending",
+            "approved",
+            "changes_requested"
+          ]
+        },
+        "operator": {
+          "enum": [
+            "pending",
+            "approved",
+            "rejected",
+            "not_required"
+          ]
+        },
+        "latest_review_file": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       }
     },
-    "next_steps": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "next_steps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
     "session": {
-      "type": "object", "additionalProperties": false,
-      "required": ["system", "last_checkpoint_at", "last_commit", "active_branch", "state_summary", "decisions_made", "test_status", "next_action"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "system",
+        "last_checkpoint_at",
+        "last_commit",
+        "active_branch",
+        "state_summary",
+        "decisions_made",
+        "test_status",
+        "next_action"
+      ],
       "description": "Checkpoint für Sitzungswechsel und Kontextkomprimierung",
       "properties": {
-        "system": { "$ref": "#/$defs/system" },
-        "last_checkpoint_at": { "$ref": "#/$defs/timestamp" },
-        "checkpoint_reason": { "enum": ["work_package_done", "tool_output_volume", "elapsed_time", "compaction_observed", "before_long_step", "session_end", "other"] },
-        "last_commit": { "$ref": "#/$defs/sha" },
-        "active_branch": { "type": ["string", "null"] },
-        "state_summary": { "type": "string" },
-        "decisions_made": { "type": "array", "items": { "type": "string" } },
-        "test_status": { "type": "string" },
-        "next_action": { "type": "string", "description": "Ein konkreter, ausführbarer nächster Schritt" }
+        "system": {
+          "$ref": "#/$defs/system"
+        },
+        "last_checkpoint_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "checkpoint_reason": {
+          "enum": [
+            "work_package_done",
+            "tool_output_volume",
+            "elapsed_time",
+            "compaction_observed",
+            "before_long_step",
+            "session_end",
+            "other"
+          ]
+        },
+        "last_commit": {
+          "$ref": "#/$defs/sha"
+        },
+        "active_branch": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state_summary": {
+          "type": "string"
+        },
+        "decisions_made": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "test_status": {
+          "type": "string"
+        },
+        "next_action": {
+          "type": "string",
+          "description": "Ein konkreter, ausführbarer nächster Schritt"
+        }
       }
     },
-    "revision": { "type": "integer", "minimum": 1, "description": "Bei jeder Änderung +1; nie überschreiben, wenn der Remote-Stand höher ist" },
-    "based_on_commit": { "$ref": "#/$defs/sha" },
-    "updated_at": { "$ref": "#/$defs/timestamp" },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Bei jeder Änderung +1; nie überschreiben, wenn der Remote-Stand höher ist"
+    },
+    "based_on_commit": {
+      "$ref": "#/$defs/sha"
+    },
+    "updated_at": {
+      "$ref": "#/$defs/timestamp"
+    },
     "log": {
-      "type": "array", "minItems": 1,
+      "type": "array",
+      "minItems": 1,
       "description": "Append-only Änderungsprotokoll",
       "items": {
-        "type": "object", "additionalProperties": false, "required": ["at", "actor", "action", "summary"],
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "at",
+          "actor",
+          "action",
+          "summary"
+        ],
         "properties": {
-          "at": { "$ref": "#/$defs/timestamp" },
-          "actor": { "$ref": "#/$defs/system" },
-          "action": { "enum": ["created", "started", "checkpoint", "pushed", "pr_opened", "review_received", "fixed", "approved", "merged", "deployed", "verified", "blocked", "cancelled", "note"] },
-          "summary": { "type": "string" },
-          "commit": { "$ref": "#/$defs/sha" }
+          "at": {
+            "$ref": "#/$defs/timestamp"
+          },
+          "actor": {
+            "$ref": "#/$defs/system"
+          },
+          "action": {
+            "enum": [
+              "created",
+              "started",
+              "checkpoint",
+              "pushed",
+              "pr_opened",
+              "review_received",
+              "fixed",
+              "approved",
+              "merged",
+              "deployed",
+              "verified",
+              "blocked",
+              "cancelled",
+              "note",
+              "lease_acquired",
+              "lease_released",
+              "waiting",
+              "resumed",
+              "handoff"
+            ]
+          },
+          "summary": {
+            "type": "string"
+          },
+          "commit": {
+            "$ref": "#/$defs/sha"
+          }
+        }
+      }
+    },
+    "planner": {
+      "$ref": "#/$defs/system",
+      "description": "Erstellt die technische Planung. Soll sich vom implementer unterscheiden (Regel, Prüfung im Validator)."
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "criterion",
+          "verification"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "criterion": {
+            "type": "string"
+          },
+          "verification": {
+            "type": "string",
+            "description": "Wie der Prüfer das Kriterium nachprüft"
+          },
+          "met": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "test_requirements": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Ressourcenrahmen der Aufgabe; null = unbekannt, nie unendlich",
+      "properties": {
+        "paid_runtime_calls_allowed": {
+          "type": "boolean"
+        },
+        "max_cost_cents": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "max_sessions": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "target_changed_lines": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "lease": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "holder",
+        "acquired_at",
+        "expires_at",
+        "coordination_sha"
+      ],
+      "description": "Exklusive Übernahme. Gültig nur, wenn per Fast-Forward-Push (bzw. Connector mit expected_sha) auf den Koordinationsbranch geschrieben; abgelehnter Push = Lease nicht erhalten.",
+      "properties": {
+        "holder": {
+          "$ref": "#/$defs/system"
+        },
+        "acquired_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "expires_at": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "coordination_sha": {
+          "$ref": "#/$defs/sha",
+          "description": "Kopf des Koordinationsbranches, auf dem der Lease-Commit aufsetzte"
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotoner Fencing-Zähler; ein abgelaufener Halter darf mit älterer Generation nichts mehr schreiben"
+        }
+      }
+    },
+    "waiting": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "reason",
+        "since",
+        "resume_condition"
+      ],
+      "properties": {
+        "reason": {
+          "enum": [
+            "capacity",
+            "review",
+            "operator",
+            "dependency",
+            "external",
+            "ci"
+          ]
+        },
+        "since": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "resume_condition": {
+          "type": "string",
+          "description": "Konkrete Bedingung, unter der es weitergeht"
+        },
+        "wake_mechanism": {
+          "enum": [
+            "manual_start",
+            "documented_only",
+            "tested_trigger"
+          ],
+          "description": "tested_trigger nur mit nachgewiesenem Lauf"
+        }
+      }
+    },
+    "responses_to_review": {
+      "type": "array",
+      "description": "Antworten des Implementierers auf Review-Befunde (Review-Dateien selbst bleiben Eigentum des Prüfers)",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "finding_id",
+          "verdict",
+          "summary"
+        ],
+        "properties": {
+          "finding_id": {
+            "type": "string"
+          },
+          "review_file": {
+            "type": "string"
+          },
+          "verdict": {
+            "enum": [
+              "accepted",
+              "partially_accepted",
+              "rejected"
+            ]
+          },
+          "summary": {
+            "type": "string"
+          },
+          "changed_files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       }
     }

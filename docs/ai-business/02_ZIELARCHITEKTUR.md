@@ -1,11 +1,13 @@
 # 02 – Grobe Zielarchitektur „Autonomous AI Business System“
 
-Status: **Entwurf zur Prüfung.** Nichts davon ist implementiert. Alle Code- und SQL-Skizzen sind Diskussionsgrundlage, keine Migrationen.
+Status: **Entwurf zur Prüfung, Runde 2** (nach GPT-Review A-01/review-1.json, Befunde GPT-01, -06, -07, -10). Nichts davon ist implementiert.
+Alle Code- und SQL-Skizzen sind Diskussionsgrundlage, keine Migrationen.
 
 ## 1. Leitprinzipien
 
-1. **Software zuerst, KI nur wo Sprache oder Urteil nötig ist.** Steuerung, Zustände, Budgets, Berechtigungen, Kennzahlen,
-   Bewertungsformeln und Fristen sind deterministischer Code. KI-Modelle formulieren, recherchieren, fassen zusammen, klassifizieren.
+1. **KI plant und urteilt, Code sichert ab.** Der Executive und der Opportunity Scout nutzen KI für Planung, Analyse, Priorisierung
+   und Entscheidungsvorbereitung. Zustände, Budgets, Berechtigungen, Kennzahlen, Formeln und Fristen sind deterministischer Code,
+   der jeden KI-Vorschlag prüft, bevor etwas geschieht. Ein Modell kann nie selbst Rechte, Budgets oder Stufen festlegen.
 2. **Der Betreiber ist die einzige Freigabeinstanz** für alles mit Außenwirkung, Geld, Verträgen oder Strategie.
    Der Executive bereitet Entscheidungen vor, er trifft sie nicht (`ACTIVE_APPROVAL_AUTHORITIES` bleibt `["whatsapp_operator"]`).
 3. **Bestehendes wiederverwenden:** Freigabe-Gate-Muster, Runtime-Guard, `model_calls`, `provider_usage`, Wochenbericht,
@@ -14,8 +16,10 @@ Status: **Entwurf zur Prüfung.** Nichts davon ist implementiert. Alle Code- und
    Der Kern ändert sich dafür nicht.
 5. **Kein Wert ohne Herkunft:** Jede Zahl trägt `value_kind` (gemessen / geschätzt / prognostiziert / angenommen) und eine Quelle.
    Fehlt die Zahl, bleibt sie `null` und wird als „unbekannt“ angezeigt.
-6. **Ereignis- und zeitgesteuert, nicht Dauerschleife:** passt zu Vercel (Cron, Webhooks, `maxDuration` ≤ 300 s).
-   Keine rekursiven Agentenschleifen; jede Aufgabe hat Budget, Frist und maximale Versuchszahl.
+6. **Ereignis- und zeitgesteuert, nicht Dauerschleife:** passt zu Vercel (Cron, Webhooks, `maxDuration` ≤ 300 s; Hobby-Cron nur
+   stundengenau). Keine rekursiven Agentenschleifen; jede Aufgabe hat Budget, Frist und maximale Versuchszahl.
+8. **Externe Wirkung ist nie „genau einmal“ garantiert:** Postgres-Idempotenz schützt nur die eigene Datenbank. Für Anbieter- und
+   Kanalaufrufe gilt das bestehende Muster: Absicht vorher speichern, unklares Ergebnis = `outcome_unknown`, Abgleich statt Wiederholung.
 7. **Öffentliches Repository:** Geschäftsdaten leben ausschließlich in der Datenbank, nie im Repo.
 
 ## 2. Schichtenmodell
@@ -26,11 +30,11 @@ Status: **Entwurf zur Prüfung.** Nichts davon ist implementiert. Alle Code- und
 └───────────────▲───────────────────────────────────────────────┬──────────────────────┘
                 │ Berichte, Entscheidungsanfragen               │ Aufträge, Freigaben
 ┌───────────────┴───────────────────────────────────────────────▼──────────────────────┐
-│ EXECUTIVE  (lib/enterprise/executive/*)                                              │
-│  Kern (deterministisch): Register · Aufgabenbuch · Richtlinien/Berechtigungen ·      │
-│  Budgetwächter · Eskalation · Berichtsplaner                                         │
-│  KI-Teil (eng begrenzt): Intake natürlicher Sprache (bestehender WhatsApp-Router),   │
-│  Berichtsformulierung, Zusammenfassung von Abteilungsergebnissen                     │
+│ EXECUTIVE  (lib/enterprise/*) – organisatorisch unabhängig vom Affiliate-Jarvis      │
+│  Planer (KI): Ziele zerlegen, Alternativen, Priorisierung, Bewertung von Ergebnissen, │
+│  Entscheidungsvorlagen, Berichte · Intake über den bestehenden WhatsApp-Router       │
+│  Kern (Code): Register · Plan-Validator · Richtlinien L0–L4 · Budgetreservierung ·   │
+│  Aufgabenbuch mit Lease · Outbox · Eskalation · Audit                                │
 └──────┬──────────────┬──────────────┬──────────────┬──────────────┬───────────────────┘
        │ Abteilungsvertrag (Task-Request / Task-Result / Decision-Request / Health)
 ┌──────▼─────┐ ┌──────▼─────┐ ┌──────▼──────┐ ┌─────▼──────────┐ ┌─▼────────────────────┐
@@ -50,50 +54,79 @@ Status: **Entwurf zur Prüfung.** Nichts davon ist implementiert. Alle Code- und
 ## 3. Executive
 
 ### 3.1 Rolle
-Operativer Koordinator („KI-Geschäftsführer“ im Sinne von *Vorbereitung und Koordination*, nicht *Zeichnungsbefugnis*).
+Zentrale, KI-gestützte Unternehmensführung zwischen Betreiber und Abteilungen. **Organisatorisch unabhängig** vom Affiliate Content Studio:
+Jarvis bleibt der Orchestrator *dieser* Abteilung; der Executive steuert sie nur über Aufträge und Kennzahlen. Der Executive plant,
+analysiert, priorisiert und **entscheidet selbst innerhalb seines Mandats** (Stufen L0–L2 und freigegebenes Budget). Alles darüber
+bereitet er als Entscheidungsvorlage für den Betreiber vor.
 
-### 3.2 Aufbau (Empfehlung: Kern regelbasiert, KI als Werkzeug)
+### 3.2 Hybrid-Aufbau (ADR-01, Runde 2)
 
-| Baustein | Umsetzung | KI? | Begründung |
-|---|---|---|---|
-| Abteilungsregister | statischer, versionierter Code (`lib/enterprise/registry.ts`), analog `lib/architecture/model.ts` | nein | Änderungen sollen geprüfte Codeänderungen sein |
-| Aufgabenbuch (Tasks, Zustände, Leases) | Postgres-Tabellen, `FOR UPDATE SKIP LOCKED` | nein | Idempotenz und Nachvollziehbarkeit |
-| Priorisierung | Formel: Dringlichkeit × erwarteter Nutzen ÷ Kosten, Gewichte vom Betreiber | nein | reproduzierbar, prüfbar |
-| Richtlinien/Berechtigungen | Code-Tabelle Aktion → Stufe (siehe 3.4) | nein | darf nie durch Modellausgabe geändert werden |
-| Budgetwächter | atomare Reservierung wie `provider_usage` | nein | vorhandenes Muster |
-| Eskalation | Regeln (Fehlerquote, Fristüberschreitung, Budget > 80 %) | nein | |
-| Intake (Betreiber schreibt frei per WhatsApp) | bestehender semantischer Router um Absicht `executive.*` erweitern | ja (`gpt-5.6-terra`, vorhanden) | keine zweite Router-Instanz |
-| Zusammenführung/Bewertung von Ergebnissen | strukturierte Ergebnisse + Regeln; KI nur für Zusammenfassungstext | teilweise | |
-| Berichte | Daten per SQL, Text optional per 1 Modellaufruf/Bericht | optional | Bericht muss auch ohne KI vollständig sein (Fallback) |
+| Baustein | Umsetzung | KI? |
+|---|---|---|
+| **Planer** | Modellaufruf erzeugt einen strukturierten `ExecutivePlan` (siehe 3.3) aus Zielen, Kennzahlen, Abteilungsstatus und offenen Entscheidungen | ja |
+| **Analyse/Bewertung** | Modell bewertet Abteilungsergebnisse gegen Ziel und Belege, benennt Abweichungen und Gegenargumente | ja |
+| **Intake** | bestehender semantischer WhatsApp-Router mit neuer Absicht `executive.*` (keine zweite Router-Instanz) | ja (vorhanden) |
+| **Berichte** | Daten per SQL; Text und Einordnung per Modell; ohne Modell bleibt ein vollständiger Datenbericht (Fallback) | ja, optional |
+| **Plan-Validator** | Zod-Vertrag, bekannte Abteilungen/Aufgabenarten, Abhängigkeiten ohne Zyklen, Tiefe/Schritte begrenzt, Kostensumme ≤ Deckel ≤ Budget | nein |
+| **Richtlinien** | Stufe wird aus der **Aktion** abgeleitet, nie aus der Modellausgabe übernommen; L3b/L4-Schritte werden zu Entscheidungsvorlagen | nein |
+| **Budgetwächter** | Reservierung **vor** jedem kostenpflichtigen Schritt, Abrechnung danach; unklarer Anbieterstatus gibt die Reservierung nicht frei | nein |
+| **Aufgabenbuch** | Postgres, Lease mit Fencing-Zähler, Outbox, Ereignisprotokoll | nein |
+| **Eskalation** | Regeln (Fehlerquote, Frist, Budget > 80 %, `outcome_unknown`) | nein |
 
-### 3.3 Ablauf (Beispiel Wochenzyklus)
-1. Cron `executive-cycle` (z. B. täglich 1 ×) liest Aufgabenbuch, Budgets, Health aller Abteilungen.
-2. Regeln erzeugen fällige Aufgaben (z. B. „Controlling: Wochenabschluss“, „Scout: Recherche Thema X“, sofern Budget frei).
-3. Abteilungen bearbeiten Aufgaben innerhalb ihres Budgets und liefern strukturierte Ergebnisse.
-4. Executive prüft Ergebnisse gegen Vertrag (Zod) und Regeln; Abweichungen → Eskalation.
-5. Entscheidungsbedürftiges wird gesammelt und **gebündelt** per WhatsApp vorgelegt (max. 1 Sammelnachricht/Tag, außer kritisch).
-6. Wochenbericht (erweitert den bestehenden `weekly-report`).
+Damit hat der Executive echte Planungs- und Entscheidungsfähigkeit, aber kein Modellfehler oder Prompt-Injection kann Rechte erweitern,
+Geld ausgeben oder etwas veröffentlichen.
 
-### 3.4 Berechtigungsstufen (verbindlich, im Code)
+### 3.3 Plan-Vertrag (Skizze, Baustein B-01)
+
+```ts
+type ExecutivePlan = {
+  goal: string;
+  evidence: { claim: string; kind: "fact" | "assumption" | "forecast"; source?: string }[];
+  alternatives: { title: string; why_not?: string }[];
+  steps: { id: string; department: DepartmentId; taskKind: string; action: ActionKind; dependsOn: string[];
+           maxCostCents: number; maxModelCalls: number; deadline?: string }[];
+  expectedValue: { low: number; high: number; unit: string; kind: "forecast" } | null;   // immer Spanne
+  costCapCents: number;
+  abortCriteria: string[];
+  openDecisions: { question: string; options: string[]; recommendation?: string }[];
+};
+// validatePlan(raw, registry, limits) → { ok, plan, executable: Step[], decisionRequests: Step[], violations: string[] }
+```
+
+Ungültiger Plan oder fehlende Daten ⇒ stoppen und eskalieren, keine stillschweigende Ausweitung. Qualität wird nicht über identische
+Antworten gemessen, sondern über feste Evaluationsfälle (widersprüchliche Ziele, fehlende Daten, Quellen-Injection, unrealistische
+Renditen, abgelaufene Freigaben, Budgetmangel) und zunächst im **Schattenbetrieb** gegen Betreiberentscheidungen. Modellwahl bleibt offen,
+bis `model_calls`-Daten und eine Kostenfreigabe vorliegen.
+
+### 3.4 Ablauf (Beispiel)
+1. Anstoß: Cron `executive-cycle` (Schalter, Standard aus), Betreiber-WhatsApp oder manueller Start.
+2. Kern sammelt Kennzahlen, Abteilungsstatus, Budgets, offene Entscheidungen → Planer erzeugt Plan → Validator prüft.
+3. Ausführbare Schritte (L0–L2, im Budget) werden Aufgaben der Abteilungen; L3b/L4-Schritte werden Entscheidungsvorlagen.
+4. Abteilungen liefern strukturierte Ergebnisse; der Executive bewertet sie (KI) und der Kern prüft Vertrag und Budget.
+5. Entscheidungsvorlagen gebündelt per WhatsApp (max. 1 Sammelnachricht/Tag, außer kritisch); Wochenbericht.
+
+### 3.5 Berechtigungsstufen (verbindlich, im Code; korrigiert nach GPT-10)
 
 | Stufe | Beispiele | Wer darf auslösen |
 |---|---|---|
 | **L0 Beobachten** | lesen, Kennzahlen berechnen, Health | Abteilung selbst |
-| **L1 Intern analysieren** | Recherche mit Budgetdeckel, Entwürfe, Bewertungen | Abteilung innerhalb Budget |
-| **L2 Intern umkehrbar schreiben** | Aufgaben anlegen, Status setzen, Notizen | Executive/Abteilung |
-| **L3 Außenwirkung** | WhatsApp-Nachricht, Veröffentlichung, kostenpflichtiger Medienauftrag über Budgetrest | nur über bestehende Freigabe-Gates mit Betreiberfreigabe |
-| **L4 Geld, Verträge, Strategie, Zugänge** | Abos, Käufe, Verträge, neue Abteilung aktivieren, Schalter/Secrets ändern, Budgets erhöhen | **nur Betreiber**, außerhalb des Systems ausgeführt; das System erzeugt nur eine Entscheidungsvorlage |
+| **L1 Intern analysieren** | Recherche/Modellaufrufe innerhalb des reservierten Budgets, Entwürfe, Bewertungen | Executive/Abteilung |
+| **L2 Intern umkehrbar schreiben** | Aufgaben anlegen, priorisieren, Status setzen, Notizen | Executive/Abteilung |
+| **L3a Vorab autorisierte Mitteilung** | Bericht oder Entscheidungsanfrage **an den Betreiber** über den bestehenden Kanal, im 24-h-Fenster, gedrosselt | Executive (Regel, keine Einzelfreigabe) |
+| **L3b Außenwirkung** | Veröffentlichung, Nachricht an Dritte, kostenpflichtiger Auftrag über dem reservierten Budget | nur über bestehende Freigabe-Gates mit Betreiberfreigabe |
+| **L4 Geld, Verträge, Strategie, Zugänge** | Abos, Käufe, Verträge, neue Abteilung, Schalter/Secrets, Budgeterhöhung | **nur Betreiber**, außerhalb des Systems; das System liefert nur die Vorlage |
 
-Der Executive besitzt **keine** Zahlungsmittel, keine Secrets-Schreibrechte, keine GitHub-Schreibrechte und kein Freigaberecht.
+Der Executive besitzt **keine** Zahlungsmittel, keine Secrets-Schreibrechte, keine GitHub-/Vercel-Schreibrechte und kein Freigaberecht
+(`ACTIVE_APPROVAL_AUTHORITIES` bleibt `["whatsapp_operator"]`).
 
 ## 4. Abteilungen: Zuständigkeiten und Schnittstellen
 
 | Abteilung | Verantwortung | Eingaben | Ausgaben | Orchestrator | Unteragenten / Bausteine | KI-Anteil |
 |---|---|---|---|---|---|---|
-| **Executive** | Koordination, Priorisierung, Eskalation, Berichte | Betreiberaufträge, Abteilungsergebnisse, Health, Budgets | Aufgaben, Entscheidungsvorlagen, Berichte | `executive/kernel.ts` | Intake (vorh. Router), Berichtsschreiber | gering |
-| **Controlling** | Kosten, Erlöse, Budgets, Deckungsbeiträge, ROI | `model_calls`, `provider_usage`, `production_runs`, `performance_observations`, manuelle Rechnungs-/Erlösbelege, Preiskatalog | Kennzahlen je Abteilung/Agent/Monat, Budgetwarnungen, Rentabilitätsrechnungen | `controlling/orchestrator.ts` | Importer (Software), Kennzahlenrechner (SQL), Prognose (Formel) | **keiner** |
+| **Executive** | Planung, Priorisierung, Bewertung, Entscheidungen im Mandat, Eskalation, Berichte | Betreiberziele/-aufträge, Abteilungsergebnisse, Health, Budgets, Controlling-Kennzahlen | Pläne, Aufgaben, Entscheidungsvorlagen, Berichte | `lib/enterprise/executive/*` | Planer, Bewerter, Intake (vorh. Router), Berichtsschreiber | **hoch, gedeckelt** |
+| **Controlling** | Kosten, Erlöse, Budgets, Deckungsbeiträge, ROI | `model_calls`, `provider_usage`, `production_runs`, `performance_observations`, manuelle Rechnungs-/Erlösbelege, Preiskatalog | **Datenvertrag** `ControllingSnapshot` (lesend), Budgetwarnungen, Rentabilitätsrechnungen | `controlling/orchestrator.ts` | Importer, Kennzahlenrechner, Formeln | **keiner** (Interpretation übernimmt der Executive) |
 | **Opportunity Scout** | Geschäftschancen finden und einheitlich bewerten | Suchaufträge, Betreiberinteressen, Ausschlusslisten | bewertete Chancen mit Fakten/Annahmen/Prognosen getrennt, Empfehlung | `opportunity/orchestrator.ts` | Recherche (Tavily, vorhanden), Extraktion (LLM, strukturiert), Bewertungsraster (Regeln), Wirtschaftlichkeit (über Controlling-Formeln) | mittel, gedeckelt |
-| **Engineering** | technische Weiterentwicklung | Anforderungen, Fehlerberichte, Review-Befunde | Aufgabendateien, Branches, PRs, Reviews, Releases | **kein Laufzeit-Agent** – Prozess im Repo (05) | Claude Code, GPT Work, CI, Validator | extern |
+| **Engineering** | technische Weiterentwicklung in drei getrennten Rollen: **Planung → Implementierung → unabhängige Prüfung** | genehmigte Vorhaben, Fehlerberichte, Review-Befunde | Aufgabendateien, Branches, PRs, Reviews, Releases | **kein Laufzeit-Agent** in der Production-App – Prozess im Repo (05) | Claude-Code- und Codex-Agenten je Rolle, CI | extern |
 | **Affiliate Content Studio** | bestehende Geschäftseinheit | Chancen, Aufträge | Beiträge, Veröffentlichungen, Kosten, Klicks | bestehend: `lib/orchestrator.ts` + `lib/content/orchestrator.ts` | bestehende Agenten | unverändert |
 | **Immobilien-Analyse** | (geplant) Markt-/Objektanalyse | – | – | – | – | erst nach Machbarkeitsprüfung (Phase I) |
 
@@ -101,18 +134,21 @@ Der Executive besitzt **keine** Zahlungsmittel, keine Secrets-Schreibrechte, kei
 
 ```ts
 // lib/enterprise/contract.ts (Skizze – nicht implementiert)
-export type PermissionLevel = "L0" | "L1" | "L2" | "L3" | "L4";
+export type PermissionLevel = "L0" | "L1" | "L2" | "L3a" | "L3b" | "L4";
 export interface DepartmentModule<K extends string = string> {
   id: string;                       // "controlling", "opportunity", "affiliate"
   version: number;                  // Vertragsversion
   accepts: readonly K[];            // Aufgabenarten, z. B. "controlling.monthly_close"
-  maxLevel: PermissionLevel;        // höchste Stufe, die das Modul selbst ausführen darf (nie L3/L4)
+  maxLevel: PermissionLevel;        // höchste Stufe, die das Modul selbst ausführen darf (nie L3b/L4)
   schemas: Record<K, { input: ZodType; output: ZodType }>;
   handle(task: TaskEnvelope<K>, ctx: DepartmentContext): Promise<TaskResult>;  // ohne Zugriff auf andere Abteilungen
   health(ctx: DepartmentContext): Promise<HealthReport>;                        // nur lesend
 }
 // ctx stellt bereit: db (eingeschränkt), budget.reserve()/settle(), recordModelCall, emitEvent, guard (runtime-guard), clock
 ```
+
+`ctx` gibt **begrenzte Fähigkeiten** statt eines ungefilterten DB-Handles: je Abteilung lesende Abfragen auf freigegebene Sichten,
+schreibend nur das eigene Ergebnis über den Kern (GPT-Review D.1).
 
 Regeln wie heute in `AGENTS.md`: Abteilungen importieren einander **nicht**; nur der Executive-Kern ruft Module auf.
 Abteilungen, die eine andere brauchen (Scout braucht Wirtschaftlichkeitsrechnung), erzeugen eine **Folgeaufgabe** über den Kern.
@@ -137,20 +173,28 @@ Abteilungen, die eine andere brauchen (Scout braucht Wirtschaftlichkeitsrechnung
 }
 ```
 
-Transport: Postgres-Tabelle als Warteschlange (kein externer Broker, keine zusätzlichen Kosten). Zustellung „mindestens einmal“,
-Wirkung „genau einmal“ über `idempotency_key` (gleiches Muster wie `whatsapp_events.message_id`).
+Transport: Postgres-Tabelle als Warteschlange (kein externer Broker). Zustellung „mindestens einmal“; `idempotency_key` verhindert
+doppelte **interne** Verarbeitung (Muster `whatsapp_events.message_id`). Für **externe** Wirkungen (korrigiert nach GPT-06):
+1. Zustandsänderung + Ereignis + Outbox-Eintrag in **einer** Transaktion; keine DB-Transaktion über einen Modell-/Anbieteraufruf halten.
+2. Lease mit Halter und monotonem Fencing-Zähler; ein abgelaufener Worker mit älterem Zähler kann nichts mehr festschreiben.
+3. Anbieter-Idempotenz nutzen, wo vorhanden; sonst Ergebnis `outcome_unknown` und Abgleich (Muster: `provider_usage` planned/succeeded/failed,
+   Statusabgleich der Publisher). `outcome_unknown` wird nie automatisch wiederholt und gibt keine Budgetreservierung frei.
+4. Heartbeat, Wiederaufnahme, Dead-Letter = manuelle Prüfung mit Eskalation.
 
 ## 5. Datenmodell (Skizze, additive Tabellen)
 
 ```sql
 -- Aufgabenbuch
-enterprise_tasks(id, department, task_kind, status /*queued|leased|running|succeeded|failed|needs_decision|cancelled*/,
-  priority, permission_level, parent_id, correlation_id, idempotency_key UNIQUE, input jsonb, output jsonb,
-  attempts, max_attempts, lease_until, deadline, budget_cents_reserved, created_by /*operator|executive|cron|department*/,
+enterprise_tasks(id, department, task_kind, status /*queued|leased|running|succeeded|failed|outcome_unknown|needs_decision|cancelled|dead*/,
+  priority, permission_level, parent_id, plan_id, correlation_id, idempotency_key UNIQUE, input jsonb, output jsonb,
+  attempts, max_attempts, lease_holder, lease_until, fencing_token bigint, deadline, created_by /*operator|executive|cron|department*/,
   created_at, updated_at)
+enterprise_outbox(id, task_id, kind, payload jsonb, status /*pending|sent|outcome_unknown|failed*/, external_ref, created_at, settled_at)
+budget_reservations(id, task_id, department, period, amount_cents, currency,
+  status /*reserved|settled|released|disputed*/, settled_amount_cents, created_at, settled_at)   -- harter Budgetwächter (GPT-07)
 enterprise_task_events(id, task_id, seq, kind, actor, detail jsonb, created_at)          -- append-only
 -- Betreiberentscheidungen (Muster wie content_approval_requests / publish_approvals)
-enterprise_decisions(id, task_id, level /*L3|L4*/, subject, options jsonb, recommendation jsonb, fingerprint, version,
+enterprise_decisions(id, task_id, plan_id, level /*L3b|L4*/, subject, options jsonb, recommendation jsonb, fingerprint, version,
   status /*pending|approved|rejected|expired|superseded*/, request_message_id, decided_message_id, decided_at, evidence jsonb)
 -- Controlling
 price_catalog(id, provider, item /*Modell, Einheit*/, unit /*input_token|output_token|second|image|video_second|month*/,
@@ -172,6 +216,12 @@ executive_reports(id, period, kind /*daily_digest|weekly|monthly*/, content json
 
 Bezug zum Bestand: `cost_entries` wird aus `model_calls`, `provider_usage` und `production_runs` **abgeleitet** (Importlauf, idempotent über
 `source_ref`), die Quelltabellen bleiben unverändert. `revenue_entries` ergänzt `performance_observations`, ersetzt sie nicht.
+
+Wichtig (GPT-07): `model_calls` ist ein **Messprotokoll mit Best-Effort-Speicherung** (Speicherfehler werden verschluckt) und kennt weder
+Aufgabe noch Abteilung. Es ist deshalb **kein Budgetwächter** und kein vollständiges Kostenbuch. Harte Grenzen setzt nur
+`budget_reservations` vor dem Aufruf; `model_calls` und Anbieterrechnungen dienen dem Abgleich. Ein Aufruf darf nicht doppelt gezählt
+werden, wenn er in mehreren Quellen erscheint (Zuordnung über `prediction_id` bzw. `source_ref`). Umsätze werden nicht aus bloßen
+Landing-Klicks einzelnen Beiträgen zugerechnet.
 
 ## 6. Opportunity Scout – Bewertungsraster
 
@@ -222,6 +272,11 @@ Betreiberkontakt angekündigt.
 
 ## 9. Command Center – Planetarium
 
+Abhängigkeitsrichtung (korrigiert nach GPT-02): **Controlling liefert einen lesenden Datenvertrag** (`ControllingSnapshot`, über
+`/api/operations` bzw. eine eigene lesende Route) und zeigt ihn zuerst in der vorhandenen 2D-Betriebsübersicht. Das Planetarium
+**konsumiert** diesen Vertrag nur; Controlling hängt nie vom Command Center ab.
+
+
 Erweiterung, keine Neuentwicklung:
 - Neue oberste Ebene „Unternehmen“: **Executive** im Zentrum, Abteilungen als Planeten. Das heutige Jarvis-System wird zum Planeten
   „Affiliate Content Studio“; seine sieben Cluster werden beim Öffnen als Monde gezeigt (bestehende Szene wird wiederverwendet).
@@ -234,6 +289,9 @@ Erweiterung, keine Neuentwicklung:
 
 - Neue APIs: `authorized()` je Route, `proxy.ts`-Schutz, keine neuen öffentlichen Routen (außer bewusster Entscheidung + Testeintrag).
 - Jede Wirkung über `runtime-guard`; neue Wirkungsart `enterprise_task` (Cron) braucht alle Isolationsressourcen in Preview.
-- Prompt-Injection: Rechercheinhalte (Webseiten) sind Daten; Modellausgaben können keine Aufgaben mit Stufe ≥ L3 erzeugen und keine
+- Prompt-Injection: Rechercheinhalte (Webseiten) sind Daten; Modellausgaben können keine Aufgaben mit Stufe ≥ L3b erzeugen und keine
   Berechtigungen ändern (Validierung im Kern, Test).
+- Runtime-Guard sperrt nur auf Vercel-Preview/Development; lokal und in Tests ist alles erlaubt, Sandbox-Isolation ist eine Erklärung des
+  Betreibers. Wirkungs-E2E-Tests deshalb nur in einem echt isolierten Testsystem; Entwicklungsprüfungen ohne Produktionszugänge.
+- Dauerhafter Audit: jeder Plan, jede Entscheidung und jede Richtlinienprüfung wird versions- und fingerprintgebunden gespeichert.
 - Keine Geschäftsdaten im öffentlichen Repo (auch keine Beispielwerte aus Produktion in Tests).

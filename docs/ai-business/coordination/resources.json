@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "note": "Ressourcen der Entwicklung. null = unbekannt/offener Konfigurationsparameter. Kein Wert ohne Quelle eintragen. Nachweisstatus explizit: verfügbar ist nicht eingerichtet oder Ende-zu-Ende getestet. Unbekannte Limits bleiben null.",
-  "revision": 3,
-  "updated_at": "2026-10-18T18:46:26.097919Z",
+  "note": "Ressourcen der Entwicklung. null = unbekannt/offener Konfigurationsparameter. Kein Wert ohne Quelle eintragen. Nachweisstatus explizit: verfügbar ist nicht eingerichtet oder Ende-zu-Ende getestet. Unbekannte Limits bleiben null. Jedes System pflegt nur seinen eigenen Abschnitt unter systems.<id>; gemeinsame Abschnitte per PR.",
+  "revision": 4,
+  "updated_at": "2026-10-18T20:30:00Z",
   "systems": {
     "claude-code": {
       "plan_or_tier": null,
@@ -19,19 +19,37 @@
       },
       "can_open_pr": {
         "value": true,
-        "source": "GitHub-MCP create_pull_request in der Sitzung verfügbar (nicht ausgeführt)"
+        "status": "tested",
+        "source": "Draft-PR zu A-01 Runde 2 per GitHub-MCP create_pull_request, 18.10.2026 (Link in tasks/A-01/task.json)"
       },
       "can_review_pr": {
         "value": true,
-        "source": "GitHub-MCP pull_request_review_write in der Sitzung verfügbar (nicht ausgeführt)"
+        "status": "tested_comment_only",
+        "source": "Review-Kommentar zu PR #81 per GitHub-MCP. Kein Approve möglich: alle PRs laufen unter dem Konto agentstudiots-boop (GitHub erlaubt keine Selbstgenehmigung, GPT-05)."
       },
       "can_schedule_followups": {
         "value": true,
-        "source": "Routinen/send_later in der Sitzung verfügbar (nicht eingerichtet)"
+        "status": "available_not_configured_for_project",
+        "source": "Routinen/send_later in der Sitzung verfügbar; keine Entwicklungsautomation eingerichtet"
       },
       "triggerable_from_github_comment": {
         "value": false,
         "source": "keine claude-code-action im Repo (.github/workflows enthält nur quality.yml)"
+      },
+      "github_identity": {
+        "value": "agentstudiots-boop (PR-Autor) / Commit-Autor 'Claude'",
+        "status": "tested",
+        "source": "PR-Liste #74–#81: user.login agentstudiots-boop; git log Autor Claude <noreply@anthropic.com>"
+      },
+      "vercel_access": {
+        "value": true,
+        "status": "available_not_exercised",
+        "source": "Vercel-MCP-Werkzeuge (u. a. Deployments, Laufzeitfehler, Env-Namen) in der Sitzung verfügbar; in dieser Aufgabe nicht genutzt. Schreibende Vercel-Aktionen sind ohne Betreiberfreigabe verboten."
+      },
+      "session_resume_from_checkpoint": {
+        "value": true,
+        "status": "tested_once",
+        "source": "Diese Sitzung hat nach Betreiber-Anstoß aus PR #81 + tasks/A-02/task.json fortgesetzt (gleiche Sitzung mit Gesprächskontext – kein Nachweis für eine kalte Folgesitzung)"
       }
     },
     "gpt-work": {
@@ -78,9 +96,17 @@
     }
   },
   "operator": {
+    "manual_starts_per_day": {
+      "value": 2,
+      "source": "Betreiberauftrag 18.10.2026 (morgens und abends) + coordination/README.md Betreiberbeschluss"
+    },
     "review_windows_per_week": null,
     "minutes_per_window": null,
-    "unavailable_periods": null
+    "unavailable_periods": null,
+    "merge_authority": {
+      "value": "operator",
+      "source": "CLAUDE.md §8, ADR-10"
+    }
   },
   "checkpoint_thresholds": {
     "note": "Ersatzindikatoren für ~80 % Kontextauslastung (Startwerte, nach Phase C anpassen)",
