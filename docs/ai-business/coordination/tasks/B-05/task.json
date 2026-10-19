@@ -4,7 +4,7 @@
   "title": "Budgetwächter: Reservierung vor dem Aufruf, Abrechnung danach, unklarer Status hält die Reservierung",
   "module": "enterprise-ledger",
   "phase": "B",
-  "status": "in_progress",
+  "status": "waiting_review",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -106,10 +106,10 @@
     },
     {
       "command": "npm run typecheck / lint / test / build",
-      "result": "not_run",
-      "detail": "läuft im Hauptcheckout",
+      "result": "passed",
+      "detail": "alle vier Exit 0, 713/713",
       "commit": "5d55d13",
-      "at": "2026-10-19T07:31:00Z"
+      "at": "2026-10-19T07:44:00Z"
     }
   ],
   "known_issues": [
@@ -120,10 +120,10 @@
   ],
   "open_decisions": [],
   "pr": {
-    "url": null,
-    "state": "none",
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/91",
+    "state": "draft",
     "merge_commit": null,
-    "ci": "unknown"
+    "ci": "pending"
   },
   "approval": {
     "reviewer": "pending",
@@ -131,31 +131,39 @@
     "latest_review_file": null
   },
   "next_steps": [
-    "Volle Prüfungen, Draft-PR gegen main"
+    "Review",
+    "Merge durch Betreiber nach #84, #86, #89, #90"
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T07:31:00Z",
+    "last_checkpoint_at": "2026-10-19T07:44:00Z",
     "checkpoint_reason": "other",
     "last_commit": "5d55d13",
     "active_branch": "claude/B-05-budget-guard",
-    "state_summary": "B-05 implementiert, gezielte Tests grün",
+    "state_summary": "Draft-PR #91 offen",
     "decisions_made": [
       "Abrechnung im Repository in derselben Transaktion wie das Ergebnis",
       "Verlorene Worker ⇒ disputed"
     ],
     "test_status": "39/39 gezielt",
-    "next_action": "Volle Prüfungen, Draft-PR"
+    "next_action": "Review abwarten"
   },
-  "revision": 1,
+  "revision": 2,
   "based_on_commit": "7502b48",
-  "updated_at": "2026-10-19T07:31:00Z",
+  "updated_at": "2026-10-19T07:44:00Z",
   "log": [
     {
       "at": "2026-10-19T07:31:00Z",
       "actor": "claude-code",
       "action": "created",
       "summary": "B-05 geplant und implementiert (Solo-Betrieb), Commit 5d55d13",
+      "commit": "5d55d13"
+    },
+    {
+      "at": "2026-10-19T07:44:00Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Volle Prüfung grün (713/713), Draft-PR #91",
       "commit": "5d55d13"
     }
   ]
