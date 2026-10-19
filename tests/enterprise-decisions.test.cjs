@@ -17,7 +17,10 @@ const OPTIONS=[{id:'yes',label:'Freigeben'},{id:'no',label:'Ablehnen'}];
 const request=(db,extra={})=>D.requestDecision(db,{step:publishStep(),subjectKey:'affiliate:post:42',subject:'Beitrag 42 auf Facebook veröffentlichen',options:OPTIONS,
   recommendation:{optionId:'yes',reason:'Inhalt freigegeben'},...extra});
 const row=async(db,id)=>(await db.query('SELECT status,authority,decided_message_id,request_message_id FROM enterprise_decisions WHERE id=$1',[id])).rows[0];
-const reply=(r,extra={})=>({id:r.id,fingerprint:r.fingerprint,decision:'approved',authority:'whatsapp_operator',requestMessageId:'wamid.request',decidedMessageId:`wamid.reply.${crypto.randomUUID()}`,...extra});
+// What the WhatsApp webhook would pass: the operator's configured number and the inbound message as evidence.
+const OPERATOR='491701234567';
+const reply=(r,{evidence={},...extra}={})=>({authority:'whatsapp_operator',trustedWaId:OPERATOR,expected:{id:r.id,fingerprint:r.fingerprint},
+  evidence:{channel:'whatsapp',messageId:`wamid.reply.${crypto.randomUUID()}`,replyToMessageId:'wamid.request',senderWaId:'+49 170 1234567',body:'Freigeben',...evidence},...extra});
 
 test('migration 041 is additive, idempotent and registered (AC-1)',async()=>{
   assert.doesNotMatch(SQL,/\b(DROP|ALTER|TRUNCATE|DELETE|UPDATE|RENAME)\b/i);
@@ -52,10 +55,14 @@ test('only decision levels become requests; content is fingerprinted and validat
   const l4=await D.requestDecision(db,{step:budgetStep(),subjectKey:'budget:opportunity:2026-11',subject:'Budget erhöhen',options:OPTIONS});
   assert.equal(l4.level,'L4');
   // Key order does not change the fingerprint; content does.
-  const a=D.decisionFingerprint({level:'L3b',department:'a',taskKind:'a.b',subject:'s',options:OPTIONS,recommendation:{optionId:'yes',reason:'r'},evidence:[],maxCostCents:0});
-  const b=D.decisionFingerprint({maxCostCents:0,evidence:[],recommendation:{reason:'r',optionId:'yes'},options:OPTIONS,subject:'s',taskKind:'a.b',department:'a',level:'L3b'});
+  const content={level:'L3b',department:'a',taskKind:'a.b',handlerId:'a.handler',subject:'s',options:OPTIONS,recommendation:{optionId:'yes',reason:'r'},evidence:[],
+    maxCostCents:0,maxModelCalls:0,taskId:null};
+  const a=D.decisionFingerprint(content);
+  const b=D.decisionFingerprint({taskId:null,maxModelCalls:0,maxCostCents:0,evidence:[],recommendation:{reason:'r',optionId:'yes'},options:OPTIONS,subject:'s',
+    handlerId:'a.handler',taskKind:'a.b',department:'a',level:'L3b'});
   assert.equal(a,b);
-  assert.notEqual(a,D.decisionFingerprint({level:'L3b',department:'a',taskKind:'a.b',subject:'s ',options:OPTIONS,recommendation:{optionId:'yes',reason:'r'},evidence:[],maxCostCents:0}));
+  for(const change of [{subject:'s '},{handlerId:'a.other'},{maxModelCalls:1},{maxCostCents:1},{taskId:'00000000-0000-4000-8000-000000000000'}])
+    assert.notEqual(a,D.decisionFingerprint({...content,...change}),JSON.stringify(change));
   await db.close();
 });
 
@@ -71,22 +78,42 @@ test('a changed request supersedes the open one; old answers no longer count (AC
   await db.close();
 });
 
-test('only the operator, answering exactly the request message with the right fingerprint, decides (AC-4)',async()=>{
+test('only the operator, from the trusted number, answering exactly the request message with the literal word, decides (AC-4)',async()=>{
   const db=await pgliteDatabase();
   const r=await request(db);
   assert.deepEqual(await D.recordDecision(db,reply(r)),{ok:false,reason:'wrong_message'},'not sent yet');
   assert.equal(await D.attachRequestMessage(db,r.id,'wamid.request'),true);
   assert.equal(await D.attachRequestMessage(db,r.id,'wamid.again'),false,'bound once');
-  assert.deepEqual(await D.recordDecision(db,reply(r,{authority:'executive_agent'})),{ok:false,reason:'not_operator'});
-  assert.deepEqual(await D.recordDecision(db,reply(r,{authority:'model'})),{ok:false,reason:'not_operator'});
-  assert.deepEqual(await D.recordDecision(db,reply(r,{requestMessageId:'wamid.other'})),{ok:false,reason:'wrong_message'});
-  assert.deepEqual(await D.recordDecision(db,reply(r,{fingerprint:'b'.repeat(64)})),{ok:false,reason:'fingerprint_mismatch'});
-  assert.deepEqual(await D.recordDecision(db,reply(r,{decision:'maybe'})),{ok:false,reason:'unknown_or_closed'});
+  const refused=[
+    [{authority:'executive_agent'},'not_operator'],[{authority:'model'},'not_operator'],
+    [{evidence:{senderWaId:'+49 170 9999999'}},'untrusted_sender'],[{trustedWaId:''},'untrusted_sender'],[{evidence:{senderWaId:''}},'untrusted_sender'],
+    [{evidence:{messageId:''}},'evidence_incomplete'],[{evidence:{replyToMessageId:''}},'evidence_incomplete'],[{evidence:{channel:'sms'}},'evidence_incomplete'],
+    [{evidence:{body:'vielleicht'}},'unclear_reply'],[{evidence:{body:'Mach es trotzdem'}},'unclear_reply'],[{evidence:{body:''}},'unclear_reply'],
+    [{evidence:{replyToMessageId:'wamid.other'}},'wrong_message'],
+    [{expected:{id:r.id,fingerprint:'b'.repeat(64)}},'fingerprint_mismatch'],[{expected:{id:crypto.randomUUID(),fingerprint:r.fingerprint}},'wrong_message'],
+  ];
+  for(const [extra,reason] of refused)assert.deepEqual(await D.recordDecision(db,reply(r,extra)),{ok:false,reason},JSON.stringify(extra));
   assert.equal((await row(db,r.id)).status,'pending','nothing recorded so far');
-  assert.deepEqual(await D.recordDecision(db,reply(r)),{ok:true,status:'approved'});
+  const message=`wamid.reply.${crypto.randomUUID()}`;
+  assert.deepEqual(await D.recordDecision(db,reply(r,{evidence:{messageId:message,body:' freigeben! '}})),{ok:true,id:r.id,status:'approved'});
   const decided=await row(db,r.id);
-  assert.deepEqual([decided.status,decided.authority,decided.request_message_id],['approved','whatsapp_operator','wamid.request']);
-  assert.deepEqual(await D.recordDecision(db,reply(r,{decision:'rejected'})),{ok:false,reason:'unknown_or_closed'},'decided once');
+  assert.deepEqual([decided.status,decided.authority,decided.request_message_id,decided.decided_message_id],['approved','whatsapp_operator','wamid.request',message]);
+  assert.deepEqual(await D.recordDecision(db,reply(r,{evidence:{body:'Ablehnen'}})),{ok:false,reason:'unknown_or_closed'},'decided once');
+
+  // Rejection works the same way, and the caller cannot turn a rejection text into an approval.
+  const second=await request(db,{subjectKey:'affiliate:post:44'});
+  await D.attachRequestMessage(db,second.id,'wamid.request44');
+  assert.deepEqual(await D.recordDecision(db,{...reply(second,{evidence:{replyToMessageId:'wamid.request44',body:'Nein'}}),decision:'approved'}),
+    {ok:true,id:second.id,status:'rejected'});
+  await db.close();
+});
+
+test('an expired open request is never reused; the same content gets a new version (review #96)',async()=>{
+  const db=await pgliteDatabase();
+  const r=await request(db);
+  await db.query("UPDATE enterprise_decisions SET expires_at=now() - interval '1 second', created_at=now() - interval '2 seconds' WHERE id=$1",[r.id]);
+  const again=await request(db);
+  assert.deepEqual([again.id!==r.id,again.version,(await row(db,r.id)).status],[true,2,'expired']);
   await db.close();
 });
 
@@ -102,7 +129,7 @@ test('missing answers expire and never approve; an approval executes nothing (AC
   const fresh=await request(db,{subjectKey:'affiliate:post:43'});
   await D.attachRequestMessage(db,fresh.id,'wamid.request2');
   const before=(await db.query("SELECT (SELECT count(*) FROM enterprise_tasks) AS tasks,(SELECT count(*) FROM enterprise_outbox) AS outbox,(SELECT count(*) FROM publish_attempts) AS publish")).rows[0];
-  assert.equal((await D.recordDecision(db,reply(fresh,{requestMessageId:'wamid.request2'}))).ok,true);
+  assert.equal((await D.recordDecision(db,reply(fresh,{evidence:{replyToMessageId:'wamid.request2'}}))).ok,true);
   const after=(await db.query("SELECT (SELECT count(*) FROM enterprise_tasks) AS tasks,(SELECT count(*) FROM enterprise_outbox) AS outbox,(SELECT count(*) FROM publish_attempts) AS publish")).rows[0];
   assert.deepEqual(after,before,'an approved decision creates no task, no outbox entry and no publish attempt');
   await db.close();
@@ -110,7 +137,7 @@ test('missing answers expire and never approve; an approval executes nothing (AC
 
 test('module is isolated: no WhatsApp sending, no publishing, not wired into app code; authorities unchanged (AC-6)',()=>{
   const source=fs.readFileSync('lib/enterprise/decisions.ts','utf8');
-  assert.deepEqual([...source.matchAll(/from\s+"([^"]+)"/g)].map(m=>m[1]).sort(),['../memory/db','../publishing/authority','./plan','./policy','node:crypto']);
+  assert.deepEqual([...source.matchAll(/from\s+"([^"]+)"/g)].map(m=>m[1]).sort(),['../memory/db','../publishing/authority','../whatsapp/intent','./plan','./policy','node:crypto']);
   assert.doesNotMatch(source,/process\.env|fetch\(|getDatabase|sendWhatsApp|publish\(|INSERT INTO enterprise_outbox|new Date\(\)|Date\.now/);
   assert.deepEqual(require('../.test-build/lib/publishing/authority').ACTIVE_APPROVAL_AUTHORITIES,['whatsapp_operator']);
   const users=[];
