@@ -219,7 +219,7 @@
         "name": "040_controlling_cost_ledger.sql",
         "reserved_by": "claude-code",
         "at": "2026-10-19T07:35:00Z",
-        "note": "Unabhängig von 039 (B-02) auf main; wird 039 zuerst gemergt, bleibt 040; wird E-01 zuerst gemergt, Lücke 039 ist für den Lader unkritisch, aber vorher prüfen"
+        "note": "Auf B-02 gestapelt (040 nach 039)"
       }
     ],
     "rule": "Vor Beginn einer Aufgabe mit Migration die nächste freie Nummer per Zustands-Commit hier und in claims.migration_numbers reservieren; vor dem PR erneut gegen origin/main prüfen."
