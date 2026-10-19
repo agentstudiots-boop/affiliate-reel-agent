@@ -81,5 +81,17 @@ test('pure read module, not wired into app code yet (AC-5)',()=>{
     if(entry.isDirectory()){if(entry.name!=='node_modules'&&!full.startsWith(path.join('lib','enterprise')))walk(full);}
     else if(/\.(ts|tsx)$/.test(entry.name)&&/controlling\/snapshot/.test(fs.readFileSync(full,'utf8')))users.push(full);}};
   walk('app');walk('lib');
-  assert.deepEqual(users,[]);
+  // Only the read-only operations overview (E-07 display) uses the contract.
+  assert.deepEqual(users,[path.join('lib','reporting','operations.ts')]);
+});
+
+test('operations overview carries the controlling contract (AC-6)',async()=>{
+  const {getOperationsSnapshot}=require('../.test-build/lib/reporting/operations');
+  const db=await pgliteDatabase();
+  const snap=await getOperationsSnapshot(db);
+  assert.equal(controllingSnapshotSchema.safeParse(snap.controlling).success,true);
+  assert.deepEqual(snap.controlling.parts,{modelUsage:'ok',costs:'ok',revenue:'ok'});
+  const panel=fs.readFileSync('app/operations-panel.tsx','utf8');
+  for(const text of ['keine Daten','unbekannt','mind. ','nicht verfügbar'])assert.ok(panel.includes(text),text);
+  await db.close();
 });
