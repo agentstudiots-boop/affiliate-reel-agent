@@ -53,8 +53,10 @@ async function requestPublication(db,plan){
   assert.equal(await D.attachRequestMessage(db,request.id,requestMessageId),true);
   return {request,requestMessageId};
 }
-const reply=(r,requestMessageId,extra={})=>({id:r.id,fingerprint:r.fingerprint,decision:'approved',authority:'whatsapp_operator',requestMessageId,
-  decidedMessageId:`wamid.reply.${crypto.randomUUID()}`,...extra});
+// What the WhatsApp webhook would pass: the operator's configured number and the inbound reply as evidence.
+const OPERATOR='491701234567';
+const reply=(r,requestMessageId,{body='Freigeben',evidence={},...extra}={})=>({authority:'whatsapp_operator',trustedWaId:OPERATOR,expected:{id:r.id,fingerprint:r.fingerprint},
+  evidence:{channel:'whatsapp',messageId:`wamid.reply.${crypto.randomUUID()}`,replyToMessageId:requestMessageId,senderWaId:OPERATOR,body,...evidence},...extra});
 const status=async(db,id)=>(await db.query('SELECT status FROM enterprise_decisions WHERE id=$1',[id])).rows[0].status;
 
 test('scenario 1: the plan splits into an executable read and a publication that waits for the operator (J-01)',async()=>{
@@ -75,13 +77,15 @@ test('scenario 1: the plan splits into an executable read and a publication that
   await db.close();
 });
 
-test('scenario 2: rejection, a wrong sender, a reply to another message or a changed request never approve (J-01)',async()=>{
+test('scenario 2: rejection, a wrong sender, unclear text, a reply to another message or a changed request never approve (J-01)',async()=>{
   const db=await pgliteDatabase();
   const plan=operatorPlan();
   const {request,requestMessageId}=await requestPublication(db,plan);
   assert.deepEqual(await D.recordDecision(db,reply(request,requestMessageId,{authority:'executive_agent'})),{ok:false,reason:'not_operator'});
+  assert.deepEqual(await D.recordDecision(db,reply(request,requestMessageId,{evidence:{senderWaId:'491709999999'}})),{ok:false,reason:'untrusted_sender'});
+  assert.deepEqual(await D.recordDecision(db,reply(request,requestMessageId,{body:'Mach es trotzdem'})),{ok:false,reason:'unclear_reply'});
   assert.deepEqual(await D.recordDecision(db,reply(request,'wamid.other')),{ok:false,reason:'wrong_message'});
-  assert.deepEqual(await D.recordDecision(db,reply(request,requestMessageId,{fingerprint:'0'.repeat(64)})),{ok:false,reason:'fingerprint_mismatch'});
+  assert.deepEqual(await D.recordDecision(db,reply(request,requestMessageId,{expected:{id:request.id,fingerprint:'0'.repeat(64)}})),{ok:false,reason:'fingerprint_mismatch'});
   // The request changes (new version): an answer to the old version no longer counts.
   const changed=await D.requestDecision(db,{step:plan.decisionRequests[0],subjectKey:'affiliate:post:7',subject:'Beitrag 7 auf Facebook und Instagram veröffentlichen',options:OPTIONS});
   assert.notEqual(changed.id,request.id);
@@ -89,7 +93,7 @@ test('scenario 2: rejection, a wrong sender, a reply to another message or a cha
   assert.equal((await D.recordDecision(db,reply(request,requestMessageId))).ok,false);
   const newMessage=`wamid.req.${crypto.randomUUID()}`;
   await D.attachRequestMessage(db,changed.id,newMessage);
-  assert.deepEqual(await D.recordDecision(db,reply(changed,newMessage,{decision:'rejected'})),{ok:true,status:'rejected'});
+  assert.deepEqual(await D.recordDecision(db,reply(changed,newMessage,{body:'Ablehnen'})),{ok:true,id:changed.id,status:'rejected'});
   assert.equal((await D.recordDecision(db,reply(changed,newMessage))).ok,false,'a rejection is final');
   const effects=await counts(db);
   assert.deepEqual(Object.values(effects).filter(n=>n),[],'no task, no outbox entry, no publish attempt');
@@ -107,7 +111,7 @@ test('scenario 3: missing answers expire and never become approvals; an approval
   const next=await D.requestDecision(db,{step:plan.decisionRequests[0],subjectKey:'affiliate:post:8',subject:'Beitrag 8 veröffentlichen',options:OPTIONS});
   const message=`wamid.req.${crypto.randomUUID()}`;
   await D.attachRequestMessage(db,next.id,message);
-  assert.deepEqual(await D.recordDecision(db,reply(next,message)),{ok:true,status:'approved'});
+  assert.deepEqual(await D.recordDecision(db,reply(next,message)),{ok:true,id:next.id,status:'approved'});
   await cycle(db);
   const effects=await counts(db);
   assert.deepEqual(Object.values(effects).filter(n=>n),[],'approval alone starts nothing: execution of approvals is a separate, later step');
