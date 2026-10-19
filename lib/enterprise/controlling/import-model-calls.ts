@@ -79,8 +79,12 @@ export async function importModelCalls(db: Database, options: { afterId?: number
 export async function repriceModelCallEntries(db: Database, options: { limit?: number } = {}): Promise<{ checked: number; repriced: number }> {
   const limit = Math.min(Math.max(Number.isSafeInteger(options.limit) ? options.limit! : MAX_BATCH, 1), MAX_BATCH);
   return db.transaction(async sql => {
-    const open = (await sql.query(`SELECT id, provider, item, unit, quantity::float8 AS quantity, occurred_at FROM cost_entries
-      WHERE source='model_calls' AND amount_micros IS NULL AND item IS NOT NULL ORDER BY occurred_at, id LIMIT $1 FOR UPDATE`, [limit])).rows;
+    // Only lines for which a price now exists: lines that can never be priced must not block the batch forever.
+    const open = (await sql.query(`SELECT c.id, c.provider, c.item, c.unit, c.quantity::float8 AS quantity, c.occurred_at FROM cost_entries c
+      WHERE c.source='model_calls' AND c.amount_micros IS NULL AND c.item IS NOT NULL
+        AND EXISTS (SELECT 1 FROM price_catalog p WHERE p.provider=c.provider AND p.item=c.item AND p.unit=c.unit
+          AND p.valid_from <= c.occurred_at AND (p.valid_to IS NULL OR p.valid_to > c.occurred_at))
+      ORDER BY c.occurred_at, c.id LIMIT $1 FOR UPDATE`, [limit])).rows;
     let repriced = 0;
     for (const line of open) {
       const price = (await sql.query(PRICE_AT, [String(line.provider), String(line.item), String(line.unit), line.occurred_at])).rows[0];

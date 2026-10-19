@@ -37,7 +37,7 @@ export const controllingSnapshotSchema = z.object({
     costs: byKind.nullable(),
     revenue: byKind.nullable(),
   })),
-  unassigned: z.object({ modelUsage: usage.extend({ agents: z.array(z.string()) }).nullable(), costs: byKind.nullable() }),
+  unassigned: z.object({ modelUsage: usage.extend({ agents: z.array(z.string()) }).nullable(), costs: byKind.nullable(), revenue: byKind.nullable() }),
   sources: z.array(z.object({ part: z.string(), table: z.string() })),
 });
 export type ControllingSnapshot = z.infer<typeof controllingSnapshotSchema>;
@@ -73,7 +73,7 @@ export async function readControllingSnapshot(db: Database, now: Date = new Date
     const sources: { part: string; table: string }[] = [];
     const departments = Object.fromEntries(DEPARTMENT_IDS.map(id => [id, { department: id, modelUsage: null as z.infer<typeof usage> | null,
       costs: null as ReturnType<typeof emptyKinds> | null, revenue: null as ReturnType<typeof emptyKinds> | null }]));
-    const unassigned: ControllingSnapshot["unassigned"] = { modelUsage: null, costs: null };
+    const unassigned: ControllingSnapshot["unassigned"] = { modelUsage: null, costs: null, revenue: null };
     const parts: ControllingSnapshot["parts"] = { modelUsage: "unavailable", costs: "unavailable", revenue: "unavailable" };
 
     if (await tableExists(sql, "model_calls")) {
@@ -111,6 +111,7 @@ export async function readControllingSnapshot(db: Database, now: Date = new Date
 
     if (await tableExists(sql, "revenue_entries")) {
       for (const id of DEPARTMENT_IDS) departments[id].revenue = emptyKinds();
+      unassigned.revenue = emptyKinds();
       // Revenue rows cover a period; a row counts for the month its period starts in.
       const rows = (await sql.query(`SELECT department, value_kind, count(*)::int AS entries,
           count(*) FILTER (WHERE amount_cents IS NULL OR currency <> 'EUR')::int AS unknown_amount,
@@ -118,8 +119,9 @@ export async function readControllingSnapshot(db: Database, now: Date = new Date
         FROM revenue_entries WHERE period_start >= ($1::timestamptz AT TIME ZONE 'Europe/Berlin')::date AND period_start < ($2::timestamptz AT TIME ZONE 'Europe/Berlin')::date
         GROUP BY department, value_kind`, [month.start, month.end])).rows;
       for (const row of rows) {
-        const target = departments[String(row.department)]?.revenue;
-        if (target) addMoney(target[String(row.value_kind) as ValueKind], row);
+        // A department outside the register is shown as unassigned, never dropped.
+        const target = Object.prototype.hasOwnProperty.call(departments, String(row.department)) ? departments[String(row.department)].revenue : unassigned.revenue;
+        addMoney(target![String(row.value_kind) as ValueKind], row);
       }
       parts.revenue = "ok";
       sources.push({ part: "revenue", table: "revenue_entries" });
