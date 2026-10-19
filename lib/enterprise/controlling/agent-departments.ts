@@ -25,6 +25,8 @@ export const MODEL_AGENT_DEPARTMENTS: Readonly<Record<string, DepartmentId>> = O
   whatsapp_instruction: "affiliate",
   whatsapp_transcription: "affiliate",
   topic_router: "affiliate",
+  // Executive kernel (B-08): the AI planner in shadow mode.
+  executive_planner: "executive",
 });
 
 export function departmentForAgent(agent: unknown): DepartmentId | null {
