@@ -2,10 +2,14 @@
 //
 // Each model call becomes up to three measured cost lines (input tokens, output tokens, provider compute seconds), one per
 // unit that the provider actually reported. An amount is only computed when the price catalogue holds a price for this
-// provider, model and unit that was valid at the time of the call; otherwise the amount stays NULL ("unbekannt") – no
-// price is ever assumed. Lines are keyed by (source, source_ref), so running the import again changes nothing and a call
-// is never counted twice. The department is supplied by the caller (e.g. the register mapping of E-06); without it the
-// line stays unassigned. Reads model_calls, writes only cost_entries; not wired into the app.
+// provider, model and unit that was valid at the time of the call; otherwise the amount and its currency stay NULL
+// ("unbekannt") – no price is ever assumed. Amounts are exact micro currency units per line (a call usually costs less
+// than a cent); cents only appear in sums (E-07). Lines are keyed by (source, source_ref), so running the import again
+// changes nothing and a call is never counted twice; a price entered later is applied by repriceModelCallEntries, which
+// only fills lines whose amount is still unknown. Calls younger than a minute are left for the next run, so a call whose
+// insert committed late (lower id, parallel instances) is not skipped by the cursor. The department is supplied by the
+// caller (e.g. the register mapping of E-06); without it the line stays unassigned. Reads model_calls and price_catalog,
+// writes only cost_entries; not wired into the app.
 
 import { randomUUID } from "node:crypto";
 import type { Database } from "../../memory/db";
@@ -21,12 +25,18 @@ const UNITS = [
 const MAX_BATCH = 1000;
 const DEPARTMENT = /^[a-z][a-z_]{1,39}$/;
 
-// Cents from a quantity and a price in micro currency units per unit, rounded half up; null if not representable.
-export function amountCents(quantity: number, priceMicros: number): number | null {
+// Micro currency units from a quantity and a price in micro units per unit, rounded half up (only fractional quantities such
+// as seconds round at all); null if not representable.
+export function amountMicros(quantity: number, priceMicros: number): number | null {
   if (!(quantity >= 0) || !(priceMicros >= 0) || !Number.isFinite(quantity) || !Number.isFinite(priceMicros)) return null;
-  const cents = Math.round((quantity * priceMicros) / 10_000);
-  return Number.isSafeInteger(cents) ? cents : null;
+  const micros = Math.round(quantity * priceMicros);
+  return Number.isSafeInteger(micros) ? micros : null;
 }
+
+// The catalogue price valid at a point in time: the newest valid_from that has started and not ended (overlaps allowed).
+const PRICE_AT = `SELECT id, price_micros, currency FROM price_catalog
+  WHERE provider=$1 AND item=$2 AND unit=$3 AND valid_from <= $4::timestamptz AND (valid_to IS NULL OR valid_to > $4::timestamptz)
+  ORDER BY valid_from DESC LIMIT 1`;
 
 // Imports calls with id > afterId (oldest first, at most `limit`). The caller keeps the returned lastCallId as cursor;
 // re-importing an id range is harmless because existing lines are skipped.
@@ -35,7 +45,7 @@ export async function importModelCalls(db: Database, options: { afterId?: number
   const limit = Math.min(Math.max(Number.isSafeInteger(options.limit) ? options.limit! : MAX_BATCH, 1), MAX_BATCH);
   return db.transaction(async sql => {
     const calls = (await sql.query(`SELECT id, agent, model, provider, input_tokens, output_tokens, predict_time_s, created_at
-      FROM model_calls WHERE id > $1 ORDER BY id LIMIT $2`, [afterId, limit])).rows;
+      FROM model_calls WHERE id > $1 AND created_at < now() - interval '1 minute' ORDER BY id LIMIT $2`, [afterId, limit])).rows;
     const result: ImportResult = { calls: calls.length, inserted: 0, priced: 0, unpriced: 0, lastCallId: null };
     for (const call of calls) {
       result.lastCallId = Number(call.id);
@@ -46,16 +56,14 @@ export async function importModelCalls(db: Database, options: { afterId?: number
         if (call[column] === null || call[column] === undefined) continue;
         const quantity = Number(call[column]);
         if (!Number.isFinite(quantity) || quantity < 0) continue;
-        const price = (await sql.query(`SELECT id, price_micros, currency FROM price_catalog
-          WHERE provider=$1 AND item=$2 AND unit=$3 AND valid_from <= $4::timestamptz AND (valid_to IS NULL OR valid_to > $4::timestamptz)
-          ORDER BY valid_from DESC LIMIT 1`, [String(call.provider), String(call.model), unit, call.created_at])).rows[0];
-        const amount = price ? amountCents(quantity, Number(price.price_micros)) : null;
-        const inserted = await sql.query(`INSERT INTO cost_entries(id,occurred_at,department,agent,provider,category,quantity,unit,amount_cents,currency,
+        const price = (await sql.query(PRICE_AT, [String(call.provider), String(call.model), unit, call.created_at])).rows[0];
+        const amount = price ? amountMicros(quantity, Number(price.price_micros)) : null;
+        const inserted = await sql.query(`INSERT INTO cost_entries(id,occurred_at,department,agent,provider,item,category,quantity,unit,amount_micros,currency,
             value_kind,source,source_ref,price_catalog_id)
-          VALUES($1,$2::timestamptz,$3,$4,$5,'model',$6,$7,$8,$9,'measured','model_calls',$10,$11)
+          VALUES($1,$2::timestamptz,$3,$4,$5,$6,'model',$7,$8,$9,$10,'measured','model_calls',$11,$12)
           ON CONFLICT (source, source_ref) DO NOTHING RETURNING id`,
-          [randomUUID(), call.created_at, department, agent, String(call.provider), quantity, unit, amount,
-            price ? String(price.currency) : "EUR", `model_calls:${call.id}:${unit}`, amount === null ? null : price.id]);
+          [randomUUID(), call.created_at, department, agent, String(call.provider), String(call.model), quantity, unit, amount,
+            amount === null ? null : String(price.currency), `model_calls:${call.id}:${unit}`, amount === null ? null : price.id]);
         if (inserted.rows.length) {
           result.inserted++;
           if (amount === null) result.unpriced++; else result.priced++;
@@ -63,5 +71,25 @@ export async function importModelCalls(db: Database, options: { afterId?: number
       }
     }
     return result;
+  });
+}
+
+// Applies prices entered after the import to model_calls lines whose amount is still unknown (oldest first, at most
+// `limit`). A known amount is never changed. Returns how many lines got an amount.
+export async function repriceModelCallEntries(db: Database, options: { limit?: number } = {}): Promise<{ checked: number; repriced: number }> {
+  const limit = Math.min(Math.max(Number.isSafeInteger(options.limit) ? options.limit! : MAX_BATCH, 1), MAX_BATCH);
+  return db.transaction(async sql => {
+    const open = (await sql.query(`SELECT id, provider, item, unit, quantity::float8 AS quantity, occurred_at FROM cost_entries
+      WHERE source='model_calls' AND amount_micros IS NULL AND item IS NOT NULL ORDER BY occurred_at, id LIMIT $1 FOR UPDATE`, [limit])).rows;
+    let repriced = 0;
+    for (const line of open) {
+      const price = (await sql.query(PRICE_AT, [String(line.provider), String(line.item), String(line.unit), line.occurred_at])).rows[0];
+      const amount = price ? amountMicros(Number(line.quantity), Number(price.price_micros)) : null;
+      if (amount === null) continue;
+      const updated = await sql.query(`UPDATE cost_entries SET amount_micros=$2, currency=$3, price_catalog_id=$4
+        WHERE id=$1 AND amount_micros IS NULL RETURNING id`, [line.id, amount, String(price.currency), price.id]);
+      repriced += updated.rows.length;
+    }
+    return { checked: open.length, repriced };
   });
 }

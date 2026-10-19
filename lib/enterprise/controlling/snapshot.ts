@@ -2,7 +2,9 @@
 //
 // No number without a source and no invented zero: every sum says where it comes from and whether it is complete. Amounts
 // that are unknown (cost lines without a catalogue price, revenue not yet reported) are counted as such instead of being
-// added as 0; a table that does not exist yet makes its part "unavailable". Model usage comes from model_calls and is
+// added as 0; a table that does not exist yet makes its part "unavailable". All sums are in EUR: an amount in another
+// currency is not converted and counts as unknown. Cost lines carry exact micro units (migration 040); a group's sum is
+// rounded to cents only once, so many sub-cent model calls add up to their real cost. Model usage comes from model_calls and is
 // allocated to departments by the reviewed register mapping (E-06). Everything is read in one READ ONLY transaction.
 // The 2D operations view and the command center (H) only consume this contract.
 
@@ -25,6 +27,7 @@ const usage = z.object({ calls: z.number().int().nonnegative(), failures: z.numb
 
 export const controllingSnapshotSchema = z.object({
   contractVersion: z.literal(1),
+  currency: z.literal("EUR"),
   period: z.string().regex(/^[0-9]{4}-(0[1-9]|1[0-2])$/),
   generatedAt: z.string().datetime({ offset: true }),
   parts: z.object({ modelUsage: z.enum(["ok", "unavailable"]), costs: z.enum(["ok", "unavailable"]), revenue: z.enum(["ok", "unavailable"]) }),
@@ -93,8 +96,9 @@ export async function readControllingSnapshot(db: Database, now: Date = new Date
     if (await tableExists(sql, "cost_entries")) {
       for (const id of DEPARTMENT_IDS) departments[id].costs = emptyKinds();
       unassigned.costs = emptyKinds();
-      const rows = (await sql.query(`SELECT department, value_kind, count(*)::int AS entries, count(*) FILTER (WHERE amount_cents IS NULL)::int AS unknown_amount,
-          sum(amount_cents)::bigint AS amount_cents
+      const rows = (await sql.query(`SELECT department, value_kind, count(*)::int AS entries,
+          count(*) FILTER (WHERE amount_micros IS NULL OR currency <> 'EUR')::int AS unknown_amount,
+          round(sum(amount_micros) FILTER (WHERE currency = 'EUR') / 10000.0)::bigint AS amount_cents
         FROM cost_entries WHERE occurred_at >= $1::timestamptz AND occurred_at < $2::timestamptz GROUP BY department, value_kind`, [month.start, month.end])).rows;
       for (const row of rows) {
         const kind = String(row.value_kind) as ValueKind;
@@ -108,8 +112,9 @@ export async function readControllingSnapshot(db: Database, now: Date = new Date
     if (await tableExists(sql, "revenue_entries")) {
       for (const id of DEPARTMENT_IDS) departments[id].revenue = emptyKinds();
       // Revenue rows cover a period; a row counts for the month its period starts in.
-      const rows = (await sql.query(`SELECT department, value_kind, count(*)::int AS entries, count(*) FILTER (WHERE amount_cents IS NULL)::int AS unknown_amount,
-          sum(amount_cents)::bigint AS amount_cents
+      const rows = (await sql.query(`SELECT department, value_kind, count(*)::int AS entries,
+          count(*) FILTER (WHERE amount_cents IS NULL OR currency <> 'EUR')::int AS unknown_amount,
+          sum(amount_cents) FILTER (WHERE currency = 'EUR')::bigint AS amount_cents
         FROM revenue_entries WHERE period_start >= ($1::timestamptz AT TIME ZONE 'Europe/Berlin')::date AND period_start < ($2::timestamptz AT TIME ZONE 'Europe/Berlin')::date
         GROUP BY department, value_kind`, [month.start, month.end])).rows;
       for (const row of rows) {
@@ -120,7 +125,7 @@ export async function readControllingSnapshot(db: Database, now: Date = new Date
       sources.push({ part: "revenue", table: "revenue_entries" });
     }
 
-    return controllingSnapshotSchema.parse({ contractVersion: 1, period: month.period, generatedAt: now.toISOString(), parts,
+    return controllingSnapshotSchema.parse({ contractVersion: 1, currency: "EUR", period: month.period, generatedAt: now.toISOString(), parts,
       departments: DEPARTMENT_IDS.map(id => departments[id]), unassigned, sources });
   });
 }
