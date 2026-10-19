@@ -67,6 +67,13 @@ test('terminal states carry their evidence; outcome_unknown is its own class (AC
   await task(db,{status:'outcome_unknown',failure_class:'outcome_unknown'});
   await rejects(task(db,{status:'outcome_unknown',failure_class:'provider_error'}),'outcome_unknown with other class');
   await rejects(task(db,{status:'failed',failure_class:'timeout'}),'class outside the B-04 contract');
+  // Review #89: the class outcome_unknown only on outcome_unknown tasks; no class outside failure states.
+  await rejects(task(db,{status:'failed',failure_class:'outcome_unknown'}),'failed with class outcome_unknown');
+  for(const status of ['queued','needs_decision','cancelled','succeeded'])await rejects(task(db,{status,failure_class:'provider_error',output:'{}'}),`${status} with a class`);
+  const unknown=await task(db,{status:'outcome_unknown',failure_class:'outcome_unknown'});
+  await rejects(db.query("UPDATE enterprise_tasks SET status='queued' WHERE id=$1",[unknown]),'outcome_unknown back to queued with its class');
+  await rejects(task(db,{handler_id:'Affiliate status'}),'handler id format');
+  await task(db,{max_cost_cents:3_000_000_000}); // amounts are bigint like the contract's safe integers
   for(const status of ['queued','needs_decision','cancelled'])await task(db,{status});
   await db.close();
 });

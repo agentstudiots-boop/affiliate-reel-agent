@@ -3,14 +3,17 @@
 --
 -- Invariants held by the schema itself:
 -- * only executable levels L0–L2 enter the ledger; decision levels (L3a/L3b/L4) become decision requests (B-06), never tasks;
--- * lease fields are set exactly while a task is leased or running; the fencing token only grows (enforced by B-03);
--- * at most one ledger entry per idempotency key, one outbox entry per external idempotency key;
--- * outcome_unknown is a settled state of its own: it is never retried automatically and keeps its budget reservation.
+-- * lease fields are set exactly while a task is leased or running;
+-- * a failure class exists only on failed, dead and outcome_unknown tasks, and the class outcome_unknown only on
+--   outcome_unknown tasks, so such a task cannot silently become queued again with its class kept;
+-- * at most one ledger entry per idempotency key, one outbox entry per external idempotency key.
+-- Held by convention of the repository (B-03), not by the schema (the codebase uses no triggers): events are only
+-- inserted, the fencing token only grows, and outcome_unknown is never moved to another state automatically.
 CREATE TABLE IF NOT EXISTS enterprise_tasks (
   id uuid PRIMARY KEY,
   department text NOT NULL CHECK (department ~ '^[a-z][a-z_]{1,39}$'),
   task_kind text NOT NULL CHECK (task_kind ~ '^[a-z][a-z_]*\.[a-z][a-z_]*$'),
-  handler_id text NOT NULL,
+  handler_id text NOT NULL CHECK (handler_id ~ '^[a-z][a-z_]*\.[a-zA-Z][a-zA-Z_]*$'),
   status text NOT NULL DEFAULT 'queued'
     CHECK (status IN ('queued','leased','running','succeeded','failed','outcome_unknown','needs_decision','cancelled','dead')),
   priority smallint NOT NULL DEFAULT 0 CHECK (priority BETWEEN -100 AND 100),
@@ -23,7 +26,7 @@ CREATE TABLE IF NOT EXISTS enterprise_tasks (
   output jsonb,
   -- Same classes as FAILURE_CLASSES in lib/enterprise/contract.ts (B-04).
   failure_class text CHECK (failure_class IN ('invalid_input','budget_exhausted','deadline_exceeded','provider_error','outcome_unknown','internal')),
-  max_cost_cents integer NOT NULL DEFAULT 0 CHECK (max_cost_cents >= 0),
+  max_cost_cents bigint NOT NULL DEFAULT 0 CHECK (max_cost_cents >= 0),
   max_model_calls integer NOT NULL DEFAULT 0 CHECK (max_model_calls >= 0),
   attempts integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),
   max_attempts integer NOT NULL DEFAULT 1 CHECK (max_attempts BETWEEN 1 AND 10),
@@ -36,7 +39,8 @@ CREATE TABLE IF NOT EXISTS enterprise_tasks (
   updated_at timestamptz NOT NULL DEFAULT now(),
   CHECK (attempts <= max_attempts),
   CHECK ((status IN ('leased','running')) = (lease_holder IS NOT NULL AND lease_until IS NOT NULL)),
-  CHECK (status NOT IN ('failed','outcome_unknown','dead') OR failure_class IS NOT NULL),
+  CHECK ((status IN ('failed','outcome_unknown','dead')) = (failure_class IS NOT NULL)),
+  CHECK (failure_class IS DISTINCT FROM 'outcome_unknown' OR status = 'outcome_unknown'),
   CHECK (status <> 'outcome_unknown' OR failure_class = 'outcome_unknown'),
   CHECK (status <> 'succeeded' OR (output IS NOT NULL AND failure_class IS NULL))
 );
@@ -44,7 +48,7 @@ CREATE INDEX IF NOT EXISTS enterprise_tasks_queue ON enterprise_tasks(priority D
 CREATE INDEX IF NOT EXISTS enterprise_tasks_leases ON enterprise_tasks(lease_until) WHERE status IN ('leased','running');
 CREATE INDEX IF NOT EXISTS enterprise_tasks_correlation ON enterprise_tasks(correlation_id, created_at);
 
--- Append-only history of every state change (written in the same transaction as the change; no updates or deletes).
+-- History of every state change, written in the same transaction as the change; only inserted (by convention, see above).
 CREATE TABLE IF NOT EXISTS enterprise_task_events (
   id bigserial PRIMARY KEY,
   task_id uuid NOT NULL REFERENCES enterprise_tasks(id),
@@ -79,10 +83,10 @@ CREATE TABLE IF NOT EXISTS budget_reservations (
   task_id uuid NOT NULL REFERENCES enterprise_tasks(id),
   department text NOT NULL CHECK (department ~ '^[a-z][a-z_]{1,39}$'),
   period text NOT NULL CHECK (period ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'),
-  amount_cents integer NOT NULL CHECK (amount_cents > 0),
+  amount_cents bigint NOT NULL CHECK (amount_cents > 0),
   currency text NOT NULL DEFAULT 'EUR' CHECK (currency ~ '^[A-Z]{3}$'),
   status text NOT NULL DEFAULT 'reserved' CHECK (status IN ('reserved','settled','released','disputed')),
-  settled_amount_cents integer CHECK (settled_amount_cents >= 0),
+  settled_amount_cents bigint CHECK (settled_amount_cents >= 0),
   created_at timestamptz NOT NULL DEFAULT now(),
   settled_at timestamptz,
   CHECK ((status IN ('reserved','disputed')) = (settled_at IS NULL)),
