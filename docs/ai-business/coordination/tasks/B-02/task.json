@@ -4,7 +4,7 @@
   "title": "Migration 039: Aufgabenbuch, Ereignisse, Outbox, Budgetreservierungen (additiv, ungenutzt)",
   "module": "enterprise-ledger",
   "phase": "B",
-  "status": "waiting_review",
+  "status": "waiting_operator",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -138,13 +138,12 @@
     "ci": "pending"
   },
   "approval": {
-    "reviewer": "changes_requested",
+    "reviewer": "approved",
     "operator": "pending",
     "latest_review_file": null
   },
   "next_steps": [
-    "Review durch zweite Sitzung",
-    "Merge durch Betreiber (Migration in Production!)"
+    "Merge durch Betreiber in Stapelreihenfolge"
   ],
   "session": {
     "system": "claude-code",
@@ -160,9 +159,9 @@
     "test_status": "34/34 gezielt",
     "next_action": "Nachprüfung #89"
   },
-  "revision": 4,
+  "revision": 5,
   "based_on_commit": "d19edb1",
-  "updated_at": "2026-10-19T11:34:00Z",
+  "updated_at": "2026-10-19T12:19:00Z",
   "log": [
     {
       "at": "2026-10-19T06:52:00Z",
@@ -197,6 +196,13 @@
       "actor": "claude-code",
       "action": "fixed",
       "summary": "CHECK Fehlerklasse nur in Fehlerzuständen, bigint, handler_id-Format, Kommentar per Konvention",
+      "commit": "73e76c7"
+    },
+    {
+      "at": "2026-10-19T12:19:00Z",
+      "actor": "claude-code",
+      "action": "review_received",
+      "summary": "Nachprüfung zweite Sitzung (PR #89): approve",
       "commit": "73e76c7"
     }
   ]

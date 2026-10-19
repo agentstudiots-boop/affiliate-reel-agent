@@ -4,7 +4,7 @@
   "title": "Repository Aufgabenbuch: Lease mit Fencing, SKIP LOCKED, Idempotenz, Outbox, outcome_unknown, Dead-Letter",
   "module": "enterprise-ledger",
   "phase": "B",
-  "status": "waiting_review",
+  "status": "waiting_operator",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -129,13 +129,12 @@
     "ci": "pending"
   },
   "approval": {
-    "reviewer": "changes_requested",
+    "reviewer": "approved",
     "operator": "pending",
     "latest_review_file": null
   },
   "next_steps": [
-    "Review durch zweite Sitzung",
-    "Merge durch Betreiber nach #84, #86, #89"
+    "Merge durch Betreiber in Stapelreihenfolge"
   ],
   "session": {
     "system": "claude-code",
@@ -151,9 +150,9 @@
     "test_status": "33/33 gezielt",
     "next_action": "Nachprüfung #90"
   },
-  "revision": 3,
+  "revision": 4,
   "based_on_commit": "5f0f9e0",
-  "updated_at": "2026-10-19T11:34:00Z",
+  "updated_at": "2026-10-19T12:19:00Z",
   "log": [
     {
       "at": "2026-10-19T07:08:00Z",
@@ -181,6 +180,13 @@
       "actor": "claude-code",
       "action": "fixed",
       "summary": "DB-Uhr, running+abgelaufen ⇒ outcome_unknown, keine Outbox in completeTask, Budgetklasse aus Zahlen, Idempotenz inkl. Budget/Payload",
+      "commit": "26d778c"
+    },
+    {
+      "at": "2026-10-19T12:19:00Z",
+      "actor": "claude-code",
+      "action": "review_received",
+      "summary": "Nachprüfung zweite Sitzung (PR #90): approve",
       "commit": "26d778c"
     }
   ]

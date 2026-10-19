@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "task_id": "E-07",
+  "title": "ControllingSnapshot (lesender Datenvertrag) und Anzeige in der 2D-Betriebsübersicht",
+  "module": "controlling-snapshot",
+  "phase": "E",
+  "status": "in_progress",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "operator",
+  "base_commit": "a398e5a",
+  "branch": "claude/E-07-controlling-snapshot",
+  "depends_on": [
+    "E-03",
+    "E-06"
+  ],
+  "claims": {
+    "paths": [
+      "lib/enterprise/controlling/snapshot.ts",
+      "tests/controlling-snapshot.test.cjs"
+    ],
+    "hot_files": [
+      "lib/reporting/operations.ts",
+      "app/operations-panel.tsx",
+      "tsconfig.test.json"
+    ],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Berliner Kalendermonat als Periode",
+      "verification": "Test",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Leeres Kostenbuch: alle Abteilungen sichtbar, keine erfundenen Zahlen (null statt 0)",
+      "verification": "PGlite-Test",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Summen je Abteilung und Art; unbekannte Beträge machen die Summe zur Untergrenze; nicht zugeordnete Agenten/Kosten getrennt",
+      "verification": "PGlite-Test",
+      "met": true
+    },
+    {
+      "id": "AC-4",
+      "criterion": "Fehlende Tabellen ⇒ Teil unavailable; nur SELECT in READ-ONLY-Transaktion",
+      "verification": "Test mit Fake-DB",
+      "met": true
+    },
+    {
+      "id": "AC-5",
+      "criterion": "Nur die Betriebsübersicht nutzt den Vertrag",
+      "verification": "Isolationstest",
+      "met": true
+    },
+    {
+      "id": "AC-6",
+      "criterion": "Betriebsübersicht liefert controlling; Anzeige mit keine Daten / unbekannt / mind. / nicht verfügbar",
+      "verification": "Test",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 300,
+    "notes": "Solo-Betrieb, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "lib/enterprise/controlling/snapshot.ts",
+    "tests/controlling-snapshot.test.cjs",
+    "lib/reporting/operations.ts",
+    "app/operations-panel.tsx",
+    "tsconfig.test.json"
+  ],
+  "implemented": [
+    "readControllingSnapshot",
+    "controllingSnapshotSchema",
+    "berlinMonth",
+    "Anzeige Controlling in der Betriebsübersicht"
+  ],
+  "tests": [
+    {
+      "command": "node --test tests/controlling-snapshot.test.cjs tests/operations.test.cjs tests/admin-session.test.cjs tests/architecture.test.cjs",
+      "result": "passed",
+      "detail": "42/42 gezielt",
+      "commit": "e37d656",
+      "at": "2026-10-19T12:19:00Z"
+    }
+  ],
+  "known_issues": [
+    "Gestapelt auf E-03 (#93) mit E-06 (#88) per Merge",
+    "Liest model_calls im laufenden Monat bei jedem Aufruf der Betriebsübersicht (lesend, begrenzt)",
+    "Deckungsbeitrag (E-05) noch nicht angezeigt"
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": null,
+    "state": "none",
+    "merge_commit": null,
+    "ci": "unknown"
+  },
+  "approval": {
+    "reviewer": "pending",
+    "operator": "pending",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Volle Prüfung, Draft-PR"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-19T12:19:00Z",
+    "checkpoint_reason": "other",
+    "last_commit": "e37d656",
+    "active_branch": "claude/E-07-controlling-snapshot",
+    "state_summary": "E-07 implementiert",
+    "decisions_made": [
+      "Keine erfundene Null: null/unbekannt/mind./nicht verfügbar"
+    ],
+    "test_status": "42/42 gezielt",
+    "next_action": "Volle Prüfung, Draft-PR"
+  },
+  "revision": 1,
+  "based_on_commit": "77c26e8",
+  "updated_at": "2026-10-19T12:19:00Z",
+  "log": [
+    {
+      "at": "2026-10-19T12:19:00Z",
+      "actor": "claude-code",
+      "action": "created",
+      "summary": "E-07 geplant und implementiert, Commits 8910edb, e37d656",
+      "commit": "e37d656"
+    }
+  ]
+}
