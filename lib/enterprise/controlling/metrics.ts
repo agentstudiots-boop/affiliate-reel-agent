@@ -4,6 +4,8 @@
 // forecast) and a missing or invalid value yields { status: "unknown", reason } – never a silent zero. Money stays in
 // integer cents of one currency; there is no currency conversion and no rounding (display rounding belongs to the caller).
 // A contribution margin covers only the direct costs passed in; it is not the company's profit.
+// Currency codes are compared exactly after trimming: the caller passes normalised codes (ISO 4217, e.g. "EUR").
+// Results never return negative zero.
 
 export type ValueKind = "measured" | "estimated" | "forecast";
 export type MoneyInput = { amountCents: number | null; currency: string; kind: ValueKind };
@@ -20,6 +22,7 @@ export type ContributionMargin = {
 
 const KINDS: readonly ValueKind[] = ["measured", "estimated", "forecast"];
 const unknown = (reason: string): { status: "unknown"; reason: string } => ({ status: "unknown", reason });
+const noNegativeZero = (value: number) => value + 0;
 
 // Reason why `input` is not a usable amount, or null. Negative amounts are a domain decision of each function.
 function invalidMoney(input: unknown, label: string, allowNegative: boolean): string | null {
@@ -71,10 +74,10 @@ export function contributionMargin(revenue: MoneyInput, directCosts: readonly Mo
   if (!Number.isSafeInteger(contribution)) return unknown("Deckungsbeitrag außerhalb des sicheren Zahlenbereichs");
   return { status: "known", value: {
     currency: revenue.currency.trim(),
-    measuredRevenueCents: revenue.amountCents as number,
+    measuredRevenueCents: noNegativeZero(revenue.amountCents as number),
     measuredDirectCostsCents: measured,
     estimatedDirectCostsCents: estimated,
-    contributionCents: contribution,
+    contributionCents: noNegativeZero(contribution),
     includesEstimates: directCosts.some(cost => cost.kind === "estimated"),
   } };
 }
@@ -89,7 +92,7 @@ export function simpleRoi(netReturn: MoneyInput, investment: MoneyInput): Metric
   if (currency) return unknown(currency);
   if ((investment.amountCents as number) <= 0) return unknown("ROI: Investition muss größer als 0 sein");
   const roi = ((netReturn.amountCents as number) / (investment.amountCents as number)) * 100;
-  return Number.isFinite(roi) ? { status: "known", value: roi } : unknown("ROI: Ergebnis nicht endlich");
+  return Number.isFinite(roi) ? { status: "known", value: noNegativeZero(roi) } : unknown("ROI: Ergebnis nicht endlich");
 }
 
 // Simple static payback in months: investment / monthly net inflow. No interest, no return forecast. A non-positive
@@ -102,5 +105,5 @@ export function simplePayback(investment: MoneyInput, monthlyNetInflow: MoneyInp
   if (currency) return unknown(currency);
   if ((monthlyNetInflow.amountCents as number) <= 0) return unknown("Amortisation: monatlicher Nettozufluss muss größer als 0 sein");
   const months = (investment.amountCents as number) / (monthlyNetInflow.amountCents as number);
-  return Number.isFinite(months) ? { status: "known", value: months } : unknown("Amortisation: Ergebnis nicht endlich");
+  return Number.isFinite(months) ? { status: "known", value: noNegativeZero(months) } : unknown("Amortisation: Ergebnis nicht endlich");
 }

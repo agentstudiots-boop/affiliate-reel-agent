@@ -21,6 +21,8 @@ test('empty cost list is confirmed zero cost, a missing list is unknown (AC-3)',
   assert.equal(known(contributionMargin(eur(500),[])).contributionCents,500);
   unknown(contributionMargin(eur(500),null),/Kostenliste fehlt/);
   unknown(contributionMargin(eur(500),undefined),/Kostenliste fehlt/);
+  unknown(contributionMargin(eur(500),{length:0}),/Kostenliste fehlt/);
+  unknown(contributionMargin(eur(500),'[]'),/Kostenliste fehlt/);
 });
 
 test('forecasts and non-measured revenue never enter a margin (AC-2)',()=>{
@@ -61,6 +63,8 @@ test('simple ROI is netReturn / investment * 100, not annualised (AC-4)',()=>{
   unknown(simpleRoi(eur(2000),eur(10000,'forecast')),/nur gemessene Werte/);
   unknown(simpleRoi(eur(2000),eur(10000,'measured','USD')),/unterschiedliche Währungen/);
   unknown(simpleRoi(eur(null),eur(10000)),/Betrag fehlt/);
+  unknown(simpleRoi(eur(10.5),eur(10000)),/Bruchteile/);
+  unknown(simpleRoi(eur(2000),eur(10000,'measured','')),/Währung fehlt/);
 });
 
 test('simple payback in months; non-positive inflow never pays back (AC-5)',()=>{
@@ -73,6 +77,15 @@ test('simple payback in months; non-positive inflow never pays back (AC-5)',()=>
   unknown(simplePayback(eur(-1),eur(10000)),/negativer Betrag/);
   unknown(simplePayback(eur(120000,'estimated'),eur(10000)),/nur gemessene Werte/);
   unknown(simplePayback(eur(120000),eur(10000,'measured','CHF')),/unterschiedliche Währungen/);
+  unknown(simplePayback(eur(120000),eur(0.5)),/Bruchteile/);
+  unknown(simplePayback(eur(120000,'measured',' '),eur(10000)),/Währung fehlt/);
+});
+
+test('results never contain negative zero',()=>{
+  assert.ok(Object.is(known(simplePayback(eur(-0),eur(100))),0));
+  assert.ok(Object.is(known(simpleRoi(eur(-0),eur(100))),0));
+  const margin=known(contributionMargin(eur(-0),[]));
+  assert.ok(Object.is(margin.contributionCents,0)&&Object.is(margin.measuredRevenueCents,0));
 });
 
 test('inputs are not mutated and results are deterministic (AC-1)',()=>{
@@ -88,12 +101,16 @@ test('module is pure and isolated: no imports, no clock, not used by app code (A
   const source=fs.readFileSync('lib/enterprise/controlling/metrics.ts','utf8');
   assert.doesNotMatch(source,/^\s*import\s/m);
   assert.doesNotMatch(source,/require\(|Date\.|new Date|Math\.random|process\.|fetch\(/);
+  // Production paths: app/, lib/ (except lib/enterprise, whose kernel modules may use the metrics later), scripts/ and
+  // the root entry points. Tests are not production code.
   const users=[];
+  const uses=file=>/enterprise\/controlling\/metrics/.test(fs.readFileSync(file,'utf8'));
   const walk=dir=>{for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
     const full=path.join(dir,entry.name);
     if(entry.isDirectory()){if(entry.name!=='node_modules'&&!full.startsWith(path.join('lib','enterprise')))walk(full);}
-    else if(/\.(ts|tsx)$/.test(entry.name)&&/enterprise\/controlling\/metrics/.test(fs.readFileSync(full,'utf8')))users.push(full);
+    else if(/\.(ts|tsx|js|cjs|mjs)$/.test(entry.name)&&uses(full))users.push(full);
   }};
-  walk('app');walk('lib');
+  walk('app');walk('lib');walk('scripts');
+  for(const file of ['proxy.ts','instrumentation.ts','next.config.ts'])if(fs.existsSync(file)&&uses(file))users.push(file);
   assert.deepEqual(users,[]);
 });
