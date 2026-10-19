@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "note": "Ressourcen der Entwicklung. null = unbekannt/offener Konfigurationsparameter. Kein Wert ohne Quelle eintragen. Nachweisstatus explizit: verfügbar ist nicht eingerichtet oder Ende-zu-Ende getestet. Unbekannte Limits bleiben null. Jedes System pflegt nur seinen eigenen Abschnitt unter systems.<id>; gemeinsame Abschnitte per PR.",
-  "revision": 8,
-  "updated_at": "2026-10-19T06:15:00Z",
+  "revision": 9,
+  "updated_at": "2026-10-19T06:35:00Z",
   "systems": {
     "claude-code": {
       "plan_or_tier": null,
@@ -117,7 +117,12 @@
         "value": "credits_exhausted",
         "status": "reported_by_operator",
         "source": "Betreiberbeschluss e7692d0: Work-Guthaben aufgebraucht; Reset-Zeitpunkt unbekannt",
-        "checked_at": "2026-10-18T20:15:00Z"
+        "checked_at": "2026-10-18T20:15:00Z",
+        "automation": {
+          "value": "deleted",
+          "status": "reported_by_operator",
+          "source": "Betreiber 19.10.2026: stündliche GPT-Routine „Claude-GPT-Übergaben prüfen“ gelöscht (Solo-Betrieb)"
+        }
       }
     },
     "collaboration_mode": {
