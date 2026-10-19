@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import type { DepartmentView, EnterpriseView } from "@/lib/architecture/enterprise";
-import type { DepartmentId } from "@/lib/enterprise/registry";
 
 // Enterprise level of the Command Center in 2D (tasks H-04/H-05): one card per department of the executive register and a
 // detail panel. Pure presentation of the `enterprise` contract (H-01): every value is shown with its source, and a part
 // without evidence says "keine Daten" – nothing is filled in on the client. Buttons are plain, so the view works without
 // WebGL and with the keyboard (Tab, Enter/Leertaste).
 
+type DepartmentId = DepartmentView["id"];
 type Health = NonNullable<DepartmentView["health"]>;
 type Money = NonNullable<NonNullable<DepartmentView["controlling"]>["costs"]>["measured"];
 
