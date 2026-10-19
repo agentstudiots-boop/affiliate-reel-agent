@@ -86,7 +86,9 @@ Kein Modellwechsel ohne nachvollziehbare Daten; kostenpflichtige Vergleiche nur 
    Höchstbetrag/Monatsbudget `lib/topic-pipeline/video-plan.ts`). Eine Inhaltsfreigabe startet nie ein Rendering.
 4. **Veröffentlichungsfreigabe:** Affiliate-Bildpost über `lib/meta/publication-gate.ts`; Themen-Pipeline ausschließlich über
    `lib/publishing/approval-gate.ts` (Content-ID + Version + Fingerprint, jede Änderung = neue Version). Eine Bild- oder
-   Inhaltsfreigabe ist nie eine Veröffentlichungsfreigabe. Keine Schreibzugriffe auf Freigabetabellen außerhalb `lib/publishing/`.
+   Inhaltsfreigabe ist nie eine Veröffentlichungsfreigabe. Keine Schreibzugriffe auf Freigabetabellen außerhalb `lib/publishing/`;
+   einzige Ausnahme: Executive-Entscheidungsvorlagen (`enterprise_decisions`, Migration 041) nur in `lib/enterprise/decisions.ts`, mit denselben
+   Beweisregeln (vertrauenswürdige Nummer, Antwort auf genau die Anfrage, wörtliches „Freigeben“/„Ablehnen“). Eine solche Freigabe führt nichts aus.
 5. Ablehnung, Änderungswunsch oder fehlende Antwort ⇒ kein Publish. Cron, Retries, Fallbacks veröffentlichen nie selbst.
 6. Ein expliziter WhatsApp-Auftrag (`lib/whatsapp/manual-order.ts`) übersteuert nur die 7-Tage-Sperre des Trendscouts,
    nie Prüfungen/Freigaben; er legt keinen zweiten Entwurf für einen laufenden oder freigegebenen Auftrag an.
