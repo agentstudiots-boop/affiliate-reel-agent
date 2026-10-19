@@ -84,7 +84,7 @@ export async function repriceModelCallEntries(db: Database, options: { limit?: n
       WHERE c.source='model_calls' AND c.amount_micros IS NULL AND c.item IS NOT NULL
         AND EXISTS (SELECT 1 FROM price_catalog p WHERE p.provider=c.provider AND p.item=c.item AND p.unit=c.unit
           AND p.valid_from <= c.occurred_at AND (p.valid_to IS NULL OR p.valid_to > c.occurred_at))
-      ORDER BY c.occurred_at, c.id LIMIT $1 FOR UPDATE OF c`, [limit])).rows;
+      ORDER BY c.occurred_at, c.id LIMIT $1 FOR UPDATE`, [limit])).rows;
     let repriced = 0;
     for (const line of open) {
       const price = (await sql.query(PRICE_AT, [String(line.provider), String(line.item), String(line.unit), line.occurred_at])).rows[0];
