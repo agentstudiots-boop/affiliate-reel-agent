@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "task_id": "B-07",
+  "title": "Executive-Zyklus und Cron-Route (Schalter EXECUTIVE_ENABLED aus, nicht geplant)",
+  "module": "enterprise-ledger",
+  "phase": "B",
+  "status": "in_progress",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "operator",
+  "base_commit": "2f0e572",
+  "branch": "claude/B-07-executive-cycle",
+  "depends_on": [
+    "B-03",
+    "B-05",
+    "B-06",
+    "G-01"
+  ],
+  "claims": {
+    "paths": [
+      "lib/enterprise/cycle.ts",
+      "app/api/cron/executive-cycle/route.ts",
+      "tests/enterprise-cycle.test.cjs"
+    ],
+    "hot_files": [
+      "tests/admin-session.test.cjs",
+      "tests/enterprise-affiliate-adapter.test.cjs",
+      "tsconfig.test.json"
+    ],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Zyklus führt Aufgaben über das Abteilungsmodul aus und hält das Ergebnis fest; ohne Laufzeitmodul ⇒ failed",
+      "verification": "PGlite-Tests",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Werfende Abteilung, falsche Modul-ID oder Budgetüberschreitung ergeben nie succeeded",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Höchstens 10 Aufgaben je Zyklus; zuerst Aufräumen (abgelaufene Leases, Vorlagen)",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-4",
+      "criterion": "Route: CRON_SECRET, dann EXECUTIVE_ENABLED exakt true (sonst kein DB-Zugriff), dann Runtime-Guard (nie Preview)",
+      "verification": "Route-Tests mit load-route",
+      "met": true
+    },
+    {
+      "id": "AC-5",
+      "criterion": "Nicht in vercel.json geplant; neue öffentliche Route bewusst im Zugriffstest eingetragen",
+      "verification": "Tests",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 300,
+    "notes": "Solo-Betrieb, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "lib/enterprise/cycle.ts",
+    "app/api/cron/executive-cycle/route.ts",
+    "tests/enterprise-cycle.test.cjs",
+    "tests/admin-session.test.cjs",
+    "tests/enterprise-affiliate-adapter.test.cjs",
+    "tsconfig.test.json"
+  ],
+  "implemented": [
+    "runExecutiveCycle",
+    "GET /api/cron/executive-cycle"
+  ],
+  "tests": [
+    {
+      "command": "node --test tests/enterprise-*.test.cjs tests/runtime-guard.test.cjs tests/admin-session.test.cjs",
+      "result": "passed",
+      "detail": "83/83 gezielt",
+      "commit": "c74a0a7",
+      "at": "2026-10-19T12:11:00Z"
+    }
+  ],
+  "known_issues": [
+    "Gestapelt auf B-05 (#91) mit B-06 (#96) und G-01 (#87) per Merge",
+    "Zeitplan in vercel.json und Schalter EXECUTIVE_ENABLED sind eigene Betreiberentscheidungen",
+    "Neue öffentliche Route (CRON_SECRET) im Zugriffstest eingetragen"
+  ],
+  "open_decisions": [
+    {
+      "id": "OD-B07-1",
+      "question": "Route /api/cron/executive-cycle als öffentliche Cron-Route (CRON_SECRET) zulassen? Planung und EXECUTIVE_ENABLED bleiben getrennt",
+      "owner": "operator"
+    }
+  ],
+  "pr": {
+    "url": null,
+    "state": "none",
+    "merge_commit": null,
+    "ci": "unknown"
+  },
+  "approval": {
+    "reviewer": "pending",
+    "operator": "pending",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Review zweite Sitzung",
+    "Merge durch Betreiber in Stapelreihenfolge"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-19T12:11:00Z",
+    "checkpoint_reason": "other",
+    "last_commit": "c74a0a7",
+    "active_branch": "claude/B-07-executive-cycle",
+    "state_summary": "implementiert, volle Prüfung auf B-08-Stapel läuft",
+    "decisions_made": [
+      "Betreiberauftrag 19.10.: in Abwesenheit durchgehend weiterarbeiten; Wirkung bleibt hinter Schaltern/Entscheidungen"
+    ],
+    "test_status": "83/83 gezielt",
+    "next_action": "Review abwarten"
+  },
+  "revision": 1,
+  "based_on_commit": "d9e9d1e",
+  "updated_at": "2026-10-19T12:11:00Z",
+  "log": [
+    {
+      "at": "2026-10-19T12:11:00Z",
+      "actor": "claude-code",
+      "action": "created",
+      "summary": "B-07 geplant und implementiert (Solo-Betrieb), Commit c74a0a7",
+      "commit": "c74a0a7"
+    }
+  ]
+}
