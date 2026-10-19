@@ -20,6 +20,9 @@
   },
   "include": [
     "lib/content/**/*.ts",
+    "lib/enterprise/registry.ts",
+    "lib/enterprise/policy.ts",
+    "lib/enterprise/plan.ts",
     "lib/product-resolver.ts",
     "lib/daily/product-lock.ts",
     "lib/daily/slots.ts",
@@ -43,6 +46,7 @@
     "lib/capabilities/**/*.ts",
     "lib/security/**/*.ts",
     "lib/enterprise/controlling/import-model-calls.ts",
+    "lib/enterprise/controlling/agent-departments.ts",
     "lib/trendsetter/**/*.ts",
     "lib/architecture/**/*.ts",
     "lib/tavily.ts"
