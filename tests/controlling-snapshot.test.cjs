@@ -84,8 +84,8 @@ test('pure read module; only the read-only operations overview uses it (AC-5)',(
     if(entry.isDirectory()){if(entry.name!=='node_modules'&&!full.startsWith(path.join('lib','enterprise')))walk(full);}
     else if(/\.(ts|tsx)$/.test(entry.name)&&/controlling\/snapshot/.test(fs.readFileSync(full,'utf8')))users.push(full);}};
   walk('app');walk('lib');
-  // Only the read-only operations overview (E-07 display) uses the contract.
-  assert.deepEqual(users,[path.join('lib','reporting','operations.ts')]);
+  // Only read-only consumers use the contract: the operations overview (E-07 display) and the enterprise level (H-01).
+  assert.deepEqual(users.sort(),[path.join('lib','architecture','enterprise-snapshot.ts'),path.join('lib','architecture','enterprise.ts'),path.join('lib','reporting','operations.ts')].sort());
 });
 
 test('operations overview carries the controlling contract (AC-6)',async()=>{

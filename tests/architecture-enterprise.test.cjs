@@ -1,0 +1,122 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const pgliteDatabase=require('./helpers/pglite-db.cjs');
+const loadRoute=require('./helpers/load-route.cjs');
+const {withEnv}=require('./helpers/live-env.cjs');
+const {buildEnterpriseView,enterpriseViewSchema}=require('../.test-build/lib/architecture/enterprise');
+const {readEnterpriseView}=require('../.test-build/lib/architecture/enterprise-snapshot');
+const {NonProductionEffectError}=require('../.test-build/lib/security/runtime-guard');
+const {validatePlan}=require('../.test-build/lib/enterprise/plan');
+const {envelopeFromStep}=require('../.test-build/lib/enterprise/contract');
+const {DEPARTMENT_IDS}=require('../.test-build/lib/enterprise/registry');
+const R=require('../.test-build/lib/enterprise/tasks/repository');
+const D=require('../.test-build/lib/enterprise/decisions');
+
+const NOW=new Date('2026-11-15T12:00:00Z');
+const LIMITS={maxSteps:5,maxDepth:3,budgetCents:10_000};
+const dept=(view,id)=>view.departments.find(d=>d.id===id);
+const health=(department,status='ok')=>({department,status,checkedAt:NOW.toISOString(),evidence:[{label:'x',value:1,source:'daily_slot_runs'}]});
+let counter=0;
+async function enqueue(db,department,taskKind){
+  const plan=validatePlan({goal:'x',steps:[{id:'s',department,taskKind,dependsOn:[],maxCostCents:0,maxModelCalls:0}],expectedValue:null,costCapCents:0},LIMITS);
+  const built=envelopeFromStep(plan.executable[0],{messageId:`m${++counter}`,correlationId:'c',from:'executive',idempotencyKey:`k${counter}`,createdAt:new Date().toISOString()});
+  return (await R.enqueueTask(db,{envelope:built.envelope,createdBy:'executive'})).id;
+}
+const publishStep=()=>validatePlan({goal:'x',steps:[{id:'s',department:'affiliate',taskKind:'affiliate.publication_request',dependsOn:[],maxCostCents:0,maxModelCalls:0}],
+  expectedValue:null,costCapCents:0},LIMITS).decisionRequests[0];
+
+test('no evidence: every register department is listed, every part null, nothing invented (AC-1)',()=>{
+  const view=buildEnterpriseView({now:NOW,health:null,tasks:null,decisions:null,controlling:null,unavailableReason:'Test'});
+  assert.equal(enterpriseViewSchema.safeParse(view).success,true);
+  assert.deepEqual(view.departments.map(d=>d.id),[...DEPARTMENT_IDS]);
+  assert.deepEqual([view.available,view.reason],[false,'Test']);
+  assert.deepEqual(view.parts,{health:'unavailable',tasks:'unavailable',decisions:'unavailable',controlling:'unavailable'});
+  for(const d of view.departments)assert.deepEqual([d.module,d.health,d.tasks,d.decisions,d.controlling],['none',null,null,null,null],d.id);
+  assert.deepEqual(dept(view,'engineering'),{...dept(view,'engineering'),runtime:false,taskKinds:[]});
+});
+
+test('counts per department from the ledger; unknown departments listed separately, never reassigned (AC-2)',()=>{
+  const view=buildEnterpriseView({now:NOW,health:{affiliate:health('affiliate','degraded')},
+    tasks:[{department:'affiliate',status:'succeeded',count:3,lastAt:'2026-11-14T08:00:00.000Z'},{department:'affiliate',status:'failed',count:1,lastAt:'2026-11-15T09:00:00.000Z'},
+      {department:'ghost',status:'queued',count:2,lastAt:null}],
+    decisions:[{department:'affiliate',pending:2,nextExpiry:'2026-11-16T08:00:00.000Z'},{department:'ghost',pending:1,nextExpiry:null}],
+    controlling:null});
+  const a=dept(view,'affiliate');
+  assert.deepEqual(a.tasks,{total:4,byStatus:{succeeded:3,failed:1},lastActivityAt:'2026-11-15T09:00:00.000Z'});
+  assert.deepEqual(a.decisions,{pending:2,nextExpiry:'2026-11-16T08:00:00.000Z'});
+  assert.deepEqual(dept(view,'controlling').tasks,{total:0,byStatus:{},lastActivityAt:null},'readable ledger without rows = real zero');
+  assert.deepEqual(view.unknownDepartments,[{department:'ghost',tasks:2,pendingDecisions:1}]);
+  assert.deepEqual([a.module,a.health.status,dept(view,'controlling').module],['connected','degraded','none']);
+  assert.ok(a.agents.includes('content_text'),'agents come from the reviewed register mapping (E-06)');
+  assert.deepEqual(view.parts,{health:'ok',tasks:'ok',decisions:'ok',controlling:'unavailable'});
+});
+
+test('a connected department whose report is unreadable shows no health instead of a guess (AC-3)',()=>{
+  const view=buildEnterpriseView({now:NOW,health:{affiliate:null},tasks:null,decisions:null,controlling:null});
+  assert.deepEqual([dept(view,'affiliate').module,dept(view,'affiliate').health,view.parts.health,view.available],['connected',null,'unavailable',false]);
+});
+
+test('preview/development: the runtime guard blocks the database and the view says so (AC-4)',async()=>{
+  const view=await readEnterpriseView(NOW,()=>{throw new NonProductionEffectError('database');});
+  assert.equal(view.available,false);
+  assert.match(view.reason,/Runtime-Guard/);
+});
+
+test('migrated database: real counts, affiliate health from the adapter, controlling line attached (AC-5)',async()=>{
+  const db=await pgliteDatabase();
+  const now=new Date();
+  const empty=await readEnterpriseView(now,()=>db);
+  assert.deepEqual(empty.parts,{health:'ok',tasks:'ok',decisions:'ok',controlling:'ok'});
+  assert.deepEqual(dept(empty,'affiliate').tasks,{total:0,byStatus:{},lastActivityAt:null});
+  assert.equal(dept(empty,'affiliate').health.status,'unknown','no cron evidence ⇒ unknown, never ok');
+  assert.equal(dept(empty,'affiliate').controlling.department,'affiliate');
+  await enqueue(db,'affiliate','affiliate.status_report');await enqueue(db,'controlling','controlling.monthly_close');
+  await D.requestDecision(db,{step:publishStep(),subjectKey:'affiliate:post:7',subject:'Beitrag 7 veröffentlichen',options:[{id:'yes',label:'Freigeben'},{id:'no',label:'Ablehnen'}]});
+  const view=await readEnterpriseView(now,()=>db);
+  assert.equal(enterpriseViewSchema.safeParse(view).success,true);
+  assert.deepEqual(dept(view,'affiliate').tasks.byStatus,{queued:1});
+  assert.deepEqual(dept(view,'controlling').tasks.byStatus,{queued:1});
+  assert.equal(dept(view,'affiliate').decisions.pending,1);
+  const later=await readEnterpriseView(new Date(Date.now()+400*24*3600*1000),()=>db);
+  assert.equal(dept(later,'affiliate').decisions.pending,0,'expired requests are not shown as open');
+  await db.close();
+});
+
+test('reads only: every statement is SET TRANSACTION READ ONLY or SELECT/WITH, also inside the adapter (AC-6)',async()=>{
+  const db=await pgliteDatabase();
+  const statements=[];
+  const spy=sql=>({query:(text,values)=>{statements.push(text.trim().split(/\s+/).slice(0,3).join(' '));return sql.query(text,values);},exec:text=>{statements.push(`EXEC ${text}`);return sql.exec(text);}});
+  const watched={...spy(db),transaction:fn=>db.transaction(sql=>fn(spy(sql)))};
+  await readEnterpriseView(new Date(),()=>watched);
+  assert.ok(statements.length>5);
+  for(const s of statements)assert.match(s,/^(SET TRANSACTION READ|SELECT|WITH)\b/,s);
+  await db.close();
+});
+
+test('missing ledger tables make their part unavailable instead of zero (AC-7)',async()=>{
+  const fake={query:async()=>({rows:[]}),exec:async()=>{},transaction:async fn=>fn({query:async text=>({rows:/to_regclass/.test(text)?[{ok:false}]:[]}),exec:async()=>{}})};
+  const view=await readEnterpriseView(NOW,()=>fake,{});
+  assert.deepEqual(view.parts,{health:'unavailable',tasks:'unavailable',decisions:'unavailable',controlling:'ok'});
+  assert.equal(dept(view,'affiliate').tasks,null);
+  assert.equal(view.controlling.parts.costs,'unavailable');
+});
+
+test('API: operator-protected, carries the enterprise level, no secret value; only lib/architecture reads it (AC-8)',async()=>{
+  const restore=withEnv({CONTENT_STUDIO_PASSWORD:'right-code-123',REPLICATE_API_TOKEN:'r8_SECRET-VALUE-123',VERCEL_ENV:undefined,VERCEL:undefined});
+  try{
+    const enterprise=buildEnterpriseView({now:NOW,health:null,tasks:null,decisions:null,controlling:null});
+    const route=loadRoute('app/api/architecture/route.ts',{
+      '@/lib/architecture/snapshot':{readSnapshot:async()=>({available:false,reason:'test',generatedAt:NOW.toISOString(),topic:null,affiliate:null,publications:null,chances:null,vision:null,visualJobs:null,activity:null})},
+      '@/lib/architecture/enterprise-snapshot':{readEnterpriseView:async()=>enterprise}});
+    assert.equal((await route.GET(new Request('http://localhost/api/architecture'))).status,401);
+    const ok=await route.GET(new Request('http://localhost/api/architecture',{headers:{'x-content-password':'right-code-123'}}));
+    const text=await ok.text();
+    assert.ok(!text.includes('SECRET-VALUE-123')&&!text.includes('right-code-123'));
+    assert.deepEqual(JSON.parse(text).enterprise,enterprise);
+  }finally{restore();}
+  for(const file of ['lib/architecture/enterprise.ts','lib/architecture/enterprise-snapshot.ts']){
+    const source=fs.readFileSync(file,'utf8');
+    assert.doesNotMatch(source,/\b(INSERT|UPDATE|DELETE|ALTER|CREATE|DROP|TRUNCATE)\b|process\.env|fetch\(|\.handle\(|enqueueTask|recordDecision|requestDecision/,file);
+  }
+});

@@ -120,5 +120,6 @@ test('module is isolated: no WhatsApp sending, no publishing, not wired into app
     else if(/\.(ts|tsx|js|mjs|cjs)$/.test(entry.name)&&/enterprise\/decisions|enterprise_decisions/.test(fs.readFileSync(full,'utf8')))users.push(full);
   }};
   walk('app');walk('lib');
-  assert.deepEqual(users.sort(),[path.join('lib','memory','ensure-automation-schema.ts'),path.join('lib','memory','migrations.ts')]);
+  // H-01 only counts open requests (SELECT in a READ ONLY transaction); nothing outside lib/enterprise records or answers them.
+  assert.deepEqual(users.sort(),[path.join('lib','architecture','enterprise-snapshot.ts'),path.join('lib','memory','ensure-automation-schema.ts'),path.join('lib','memory','migrations.ts')].sort());
 });

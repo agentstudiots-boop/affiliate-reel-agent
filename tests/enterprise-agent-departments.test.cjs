@@ -76,5 +76,6 @@ test('pure module: only the registry is imported, not wired into app code (AC-5)
   assert.deepEqual([...source.matchAll(/from\s+"([^"]+)"/g)].map(m=>m[1]),['../registry']);
   assert.doesNotMatch(source,/process\.env|fetch\(|getDatabase|\.query\(/);
   const users=files.filter(file=>!file.startsWith(path.join('lib','enterprise'))&&/enterprise\/controlling\/agent-departments/.test(read(file)));
-  assert.deepEqual(users,[]);
+  // Only the read-only enterprise level of the Command Center (H-01) lists the mapped agents per department.
+  assert.deepEqual(users,[path.join('lib','architecture','enterprise.ts')]);
 });
