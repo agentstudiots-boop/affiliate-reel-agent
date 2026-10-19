@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "task_id": "A-01",
+  "round": 2,
+  "reviewer": "gpt-work",
+  "reviewed_commit": "1fdbbee7b17dfee4a192cf7ee1c78e0727834377",
+  "pr_url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/82",
+  "verdict": "changes_requested",
+  "checklist": {
+    "architecture": "issue",
+    "approval_invariants": "issue",
+    "security": "issue",
+    "error_handling": "issue",
+    "costs": "n/a",
+    "database": "n/a",
+    "tests": "issue",
+    "integration": "n/a",
+    "tech_debt": "ok",
+    "honest_status": "issue"
+  },
+  "findings": [
+    {
+      "id": "GPT-R2-01",
+      "severity": "major",
+      "file": "docs/ai-business/04_ROADMAP.md",
+      "summary": "G0 ist uneinheitlich: 04 nennt ADR-01/13/14; 06 und B-01 zusätzlich ADR-15/16. 06 fordert außerdem null Blocker und Doku-Merges.",
+      "failure_scenario": "Ein System startet nach der schwächeren Definition, obwohl andere Voraussetzungen fehlen.",
+      "resolution": "Eine kanonische G0-Definition referenzieren; B-01 resume_condition muss alle Bedingungen enthalten.",
+      "status": "open"
+    },
+    {
+      "id": "GPT-R2-02",
+      "severity": "major",
+      "file": "docs/ai-business/coordination/tasks/B-01/task.json",
+      "summary": "AC-4/5 prüfen action und taskKind separat, verlangen aber keine verbindliche Zuordnung taskKind→ActionKind/Handler und keine Prüfung gegen department.maxLevel.",
+      "failure_scenario": "Ein erlaubter taskKind mit falsch deklarierter harmloser action könnte eine niedrigere Stufe erhalten.",
+      "resolution": "Registry muss die zulässige Aktion je Aufgabenart festlegen. Widersprüche ablehnen; maxLevel erzwingen; Negativtests ergänzen.",
+      "status": "open"
+    },
+    {
+      "id": "GPT-R2-03",
+      "severity": "major",
+      "file": "docs/ai-business/coordination/tasks/B-01/task.json",
+      "summary": "AC-5 lässt doppelte Schritt-IDs und die Behandlung von Nachfolgern freigabepflichtiger Schritte offen; bei ungültigem Gesamtplan ist executable nicht ausdrücklich leer.",
+      "failure_scenario": "Ein L0-Schritt nach einem blockierten L3b-Schritt könnte als ausführbar zurückgegeben werden.",
+      "resolution": "Eindeutige IDs verlangen. Gesperrte Abhängigkeiten transitiv sperren; bei ok=false executable=[]; Tests für gemischte Pläne.",
+      "status": "open"
+    },
+    {
+      "id": "GPT-R2-04",
+      "severity": "major",
+      "file": "docs/ai-business/05_ENTWICKLUNGSORGANISATION.md",
+      "summary": "Fast-Forward schützt vor konkurrierenden Ref-Updates, erzwingt aber weder Lease-Inhaberschaft noch Fencing auf späteren Schreibvorgängen. generation allein ist kein Schutz.",
+      "failure_scenario": "Ein alter Worker liest nach Lease-Wechsel neu und schreibt dennoch einen gültigen Fast-Forward-Commit.",
+      "resolution": "Vor jedem Zustandswrite holder/generation/expiry am gleichen gelesenen Ref prüfen, Commit exakt darauf aufbauen, nicht erzwingen. Nach Konflikt Lease erneut prüfen. Kooperationstreue Regel und technisch erzwungene Sperre unterscheiden; Rennen noch nicht getestet.",
+      "status": "open"
+    },
+    {
+      "id": "GPT-R2-05",
+      "severity": "minor",
+      "file": "docs/ai-business/02_ZIELARCHITEKTUR.md",
+      "summary": "Die absolute Aussage, kein Modellfehler könne Geld ausgeben, ist durch eine Architekturskizze nicht belegt; L1 erlaubt ausdrücklich budgetierte Modellaufrufe.",
+      "failure_scenario": "Die Dokumentation vermittelt bereits nachgewiesene Sicherheitsgarantien.",
+      "resolution": "Als Ziel formulieren: keine unautorisierten Wirkungen, begrenzte autorisierte Kosten. Nachweis erst mit Implementierung und adversarialen Tests.",
+      "status": "open"
+    }
+  ],
+  "tests_run": [
+    "Dokumentationsgegenprüfung von 02, 04, 05, 06, coordination/README und B-01 am angegebenen Commit; AGENTS.md gelesen.",
+    "Verbesserungen bestätigt: Hybrid-Executive, Auflösung der E/H-Rückkante, budgetierte reine Startbausteine. Ein gemeinsames Engineering-System und spätere CI-Automatisierung sind für den manuellen Start vertretbar.",
+    "Begrenzter Review-Abschluss: kein vollständiger R1–R8-Nachweis. Schema-Rückwärtskompatibilität, decision.schema.json und E-05-Planung bleiben offen. Keine Laufzeit-, Race- oder Produktionstests.",
+    "Automatische JSON-Schema-Validierung nicht ausgeführt: jsonschema im lokalen Standard-Python nicht installiert. Review-Felder manuell mit review.schema.json abgeglichen."
+  ],
+  "created_at": "2026-10-19T05:36:07.816Z"
+}
