@@ -145,6 +145,13 @@
       "detail": "11/11 nach Fixes",
       "commit": "81aa6ce",
       "at": "2026-10-19T06:59:00Z"
+    },
+    {
+      "command": "npm run typecheck / lint / test / build (auf G-01-Stapel fd4b1f7, enthält B-01 81aa6ce und B-04 19890a4)",
+      "result": "passed",
+      "detail": "alle vier Exit 0, 702/702",
+      "commit": "81aa6ce",
+      "at": "2026-10-19T07:11:00Z"
     }
   ],
   "known_issues": [
@@ -188,9 +195,9 @@
     "test_status": "685/685",
     "next_action": "Nachprüfung anfordern"
   },
-  "revision": 6,
+  "revision": 7,
   "based_on_commit": "e002446",
-  "updated_at": "2026-10-19T06:59:00Z",
+  "updated_at": "2026-10-19T07:11:00Z",
   "log": [
     {
       "at": "2026-10-18T21:30:00Z",

@@ -108,6 +108,13 @@
       "detail": "alle vier Exit 0 im Hauptcheckout, 699/699 Tests",
       "commit": "c5c77a8",
       "at": "2026-10-19T06:48:00Z"
+    },
+    {
+      "command": "npm run typecheck / lint / test / build (auf G-01-Stapel fd4b1f7, enthält B-01 81aa6ce und B-04 19890a4)",
+      "result": "passed",
+      "detail": "alle vier Exit 0, 702/702",
+      "commit": "fd4b1f7",
+      "at": "2026-10-19T07:11:00Z"
     }
   ],
   "known_issues": [
@@ -146,9 +153,9 @@
     "test_status": "volle Prüfungen grün",
     "next_action": "CI/Review #87 verfolgen"
   },
-  "revision": 3,
+  "revision": 4,
   "based_on_commit": "c797df0",
-  "updated_at": "2026-10-19T06:59:00Z",
+  "updated_at": "2026-10-19T07:11:00Z",
   "log": [
     {
       "at": "2026-10-19T06:30:00Z",
