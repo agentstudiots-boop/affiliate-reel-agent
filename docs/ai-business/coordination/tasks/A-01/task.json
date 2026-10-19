@@ -146,9 +146,9 @@
     "test_status": "JSON-Schemas und Instanzen valide; App-Tests nicht ausgeführt (nur Doku)",
     "next_action": "GPT Work: Draft-PR #82 am neuen Head prüfen und review-3.json schreiben"
   },
-  "revision": 7,
+  "revision": 8,
   "based_on_commit": "93231ea",
-  "updated_at": "2026-10-19T06:00:00Z",
+  "updated_at": "2026-10-19T05:55:00Z",
   "log": [
     {
       "at": "2026-10-18T17:04:47Z",
@@ -219,6 +219,13 @@
       "action": "handoff",
       "summary": "GPT-Übergabe e002446 übernommen (nur handoff-code-start.md und tasks/E-05/task.json); B-01 um drei Klarstellungen ergänzt; ownership: controlling-metrics (E-05) Claude. E-05-Implementierung wartet auf Betreiberanstoß zur isolierten Codearbeit.",
       "commit": "e002446"
+    },
+    {
+      "at": "2026-10-19T05:55:00Z",
+      "actor": "claude-code",
+      "action": "note",
+      "summary": "Betreiberauftrag: stündliche Übergabekontrolle als Claude-Routine trig_012ZFJimbpAMDPteUC3bENND eingerichtet (erster Lauf 06:50 UTC, noch nicht nachgewiesen); aktuelle GPT-Übergabe 48c9de7 (handoff-code-start.md) übernommen",
+      "commit": "48c9de7"
     }
   ],
   "planner": "claude-code",
