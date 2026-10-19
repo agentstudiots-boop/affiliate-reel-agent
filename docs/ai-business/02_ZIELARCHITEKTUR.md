@@ -73,8 +73,10 @@ bereitet er als Entscheidungsvorlage für den Betreiber vor.
 | **Aufgabenbuch** | Postgres, Lease mit Fencing-Zähler, Outbox, Ereignisprotokoll | nein |
 | **Eskalation** | Regeln (Fehlerquote, Frist, Budget > 80 %, `outcome_unknown`) | nein |
 
-Damit hat der Executive echte Planungs- und Entscheidungsfähigkeit, aber kein Modellfehler oder Prompt-Injection kann Rechte erweitern,
-Geld ausgeben oder etwas veröffentlichen.
+Damit hat der Executive echte Planungs- und Entscheidungsfähigkeit. **Designziel** (noch nicht nachgewiesen, GPT-R2-05): Modellfehler oder
+Prompt-Injection erzeugen keine **unautorisierten** Wirkungen – keine Rechteerweiterung, keine Veröffentlichung, keine Ausgabe über das
+reservierte Budget. Budgetierte Modellaufrufe (L1) **verursachen ausdrücklich Kosten** in der freigegebenen Höhe. Der Nachweis entsteht erst
+mit Implementierung (B-01, B-05) und adversarialen Tests.
 
 ### 3.3 Plan-Vertrag (Skizze, Baustein B-01)
 

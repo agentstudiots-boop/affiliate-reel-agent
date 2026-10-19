@@ -35,8 +35,8 @@
   "acceptance_criteria": [
     {
       "id": "AC-1",
-      "criterion": "registry.ts exportiert ein eingefrorenes Register der Abteilungen executive, controlling, opportunity, affiliate (nur lesend), engineering (extern, keine Laufzeitaktionen) mit erlaubten taskKinds und maxLevel; keine DB-Tabelle.",
-      "verification": "Unit-Test: Register unveränderlich (Object.isFrozen), unbekannte Abteilung → undefined",
+      "criterion": "registry.ts exportiert ein eingefrorenes Register der Abteilungen executive, controlling, opportunity, affiliate (nur lesend), engineering (extern, keine Laufzeitaktionen) mit maxLevel je Abteilung und je erlaubter taskKind **genau einer** ActionKind und genau einer handlerId (verbindliche Zuordnung taskKind → ActionKind → Handler); keine DB-Tabelle.",
+      "verification": "Unit-Test: Register unveränderlich (Object.isFrozen, auch verschachtelt), jede taskKind hat genau eine action/handlerId, unbekannte Abteilung → undefined",
       "met": null
     },
     {
@@ -53,14 +53,14 @@
     },
     {
       "id": "AC-4",
-      "criterion": "Eine vom Modell mitgelieferte Stufe/Berechtigung wird ignoriert; die Stufe stammt nur aus policy.ts. Schritte mit L3b/L4 landen in decisionRequests, nie in executable.",
-      "verification": "Test: Plan mit gefälschtem level:'L0' für publish → decisionRequests",
+      "criterion": "Die Stufe eines Schritts wird ausschließlich aus der im Register zur (department, taskKind) hinterlegten ActionKind abgeleitet. Eine vom Modell mitgelieferte Stufe wird ignoriert; eine mitgelieferte action, die nicht der Register-Aktion entspricht, ist ein Verstoß (keine harmlose Aktion für einen anders wirkenden Handler). Schritte mit L3b/L4 landen in decisionRequests, nie in executable. Schritte mit L0–L2 oberhalb von department.maxLevel sind Verstöße.",
+      "verification": "Tests: gefälschtes level:'L0' für eine publish-Aufgabe → decisionRequests; action:'read' für eine taskKind mit Register-Aktion publish → Verstoß; L2-Schritt bei Abteilung mit maxLevel L1 → Verstoß",
       "met": null
     },
     {
       "id": "AC-5",
-      "criterion": "Abgelehnt werden: unbekannte Abteilung/Aufgabenart, Aufgabenart nicht erlaubt für Abteilung, Zyklus oder unbekannte Referenz in dependsOn, mehr als limits.maxSteps Schritte, Tiefe > limits.maxDepth, Summe maxCostCents > costCapCents oder > limits.budgetCents, negative/nicht ganzzahlige Beträge, expectedValue ohne Spanne (low > high).",
-      "verification": "je ein negativer Test",
+      "criterion": "Abgelehnt werden: doppelte Schritt-IDs, unbekannte Abteilung/Aufgabenart, Aufgabenart nicht erlaubt für Abteilung, Zyklus oder unbekannte Referenz in dependsOn, mehr als limits.maxSteps Schritte, Tiefe > limits.maxDepth, Summe maxCostCents > costCapCents oder > limits.budgetCents, negative/nicht ganzzahlige Beträge, expectedValue mit low > high.",
+      "verification": "je ein negativer Test, darunter doppelte Schritt-ID",
       "met": null
     },
     {
@@ -80,6 +80,18 @@
       "criterion": "Keine DB, keine Route, kein Cron, kein Schalter, keine Netzaufrufe, keine Modellaufrufe.",
       "verification": "Review des Diffs",
       "met": null
+    },
+    {
+      "id": "AC-9",
+      "criterion": "Nachfolger freigabepflichtiger Schritte werden transitiv gesperrt: Hängt ein Schritt direkt oder indirekt von einem Schritt in decisionRequests ab, steht er weder in executable noch in decisionRequests, sondern in blocked (mit Verweis auf den sperrenden Schritt).",
+      "verification": "Test mit gemischtem Plan: L0 → L3b → L0 → L1; nur der erste L0-Schritt ist executable, L3b in decisionRequests, die beiden Nachfolger in blocked",
+      "met": null
+    },
+    {
+      "id": "AC-10",
+      "criterion": "Ist der Gesamtplan ungültig (ok=false, mindestens ein Verstoß), sind executable, decisionRequests und blocked leer; violations nennt alle gefundenen Verstöße.",
+      "verification": "Test: Plan mit einem gültigen L0-Schritt und einem Verstoß → executable=[]",
+      "met": null
     }
   ],
   "test_requirements": [
@@ -87,7 +99,8 @@
     "npm run lint (nur die 2 bekannten Warnungen)",
     "npm test (inkl. neuer tests/enterprise-kernel.test.cjs)",
     "npm run build",
-    "Prompt-Injection-Fall: Plan-Text fordert 'Budget erhöhen' / 'veröffentlichen' → wird L4/L3b-Entscheidungsvorlage, nicht ausführbar"
+    "Prompt-Injection-Fall: Plan-Text fordert 'Budget erhöhen' / 'veröffentlichen' → wird L4/L3b-Entscheidungsvorlage, nicht ausführbar",
+    "Gemischte Pläne (gültig/ungültig, L0–L4, Abhängigkeitsketten) als Tabellentest"
   ],
   "budget": {
     "paid_runtime_calls_allowed": false,
@@ -100,7 +113,7 @@
   "waiting": {
     "reason": "operator",
     "since": "2026-10-18T21:30:00Z",
-    "resume_condition": "Gate G0: Betreiber gibt ADR-01, ADR-13 … ADR-16 frei (BF-16). Danach Status ready; Codex nimmt den Lease per Fast-Forward-Commit auf architecture/ai-business-roadmap.",
+    "resume_condition": "Gate G0 vollständig erfüllt laut 04_ROADMAP.md §1 (alle vier Bedingungen, u. a. BF-16 mit ADR-01, ADR-13 … ADR-16 und Merge von PR #81/#82). Danach Status ready; Codex nimmt den Lease nach dem kooperativen Lease-Protokoll (05 §6).",
     "wake_mechanism": "manual_start"
   },
   "changed_files": [],
@@ -136,15 +149,15 @@
     "latest_review_file": null
   },
   "next_steps": [
-    "Nach G0: Codex setzt lease (holder gpt-work, generation 1) und status in_progress per Fast-Forward-Commit",
+    "Nach G0 (04 §1): Codex setzt lease (holder gpt-work, generation 1) und status in_progress per Fast-Forward-Commit nach 05 §6",
     "Codex implementiert auf gpt/B-01-executive-kernel, PR gegen main, Status waiting_review",
     "Claude prüft gegen AC-1 … AC-8 und schreibt tasks/B-01/review-1.json"
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-18T21:30:00Z",
+    "last_checkpoint_at": "2026-10-19T06:00:00Z",
     "checkpoint_reason": "work_package_done",
-    "last_commit": "698f4e1",
+    "last_commit": "93231ea",
     "active_branch": "claude/nice-ptolemy-k4p1c3",
     "state_summary": "Technische Planung von B-01 durch Claude (Planer). Implementierung durch Codex nach Gate G0.",
     "decisions_made": [
@@ -154,9 +167,9 @@
     "test_status": "keine Tests (Planung)",
     "next_action": "Codex: nach G0 Lease nehmen und AC-1 … AC-8 umsetzen"
   },
-  "revision": 1,
-  "based_on_commit": "698f4e1",
-  "updated_at": "2026-10-18T21:30:00Z",
+  "revision": 2,
+  "based_on_commit": "93231ea",
+  "updated_at": "2026-10-19T06:00:00Z",
   "log": [
     {
       "at": "2026-10-18T21:30:00Z",
@@ -171,6 +184,13 @@
       "action": "waiting",
       "summary": "wartet auf Gate G0 (BF-16)",
       "commit": "698f4e1"
+    },
+    {
+      "at": "2026-10-19T06:00:00Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "Planung nach GPT-R2-01/-02/-03: kanonische G0-Bedingung, verbindliche Zuordnung taskKind→ActionKind→Handler, maxLevel, eindeutige IDs, transitive Sperre (AC-9), leere Ergebnisse bei ungültigem Plan (AC-10)",
+      "commit": "93231ea"
     }
   ]
 }

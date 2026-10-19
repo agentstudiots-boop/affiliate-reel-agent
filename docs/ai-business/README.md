@@ -58,7 +58,7 @@ Nächster Schritt: GPT-Gegenprüfung dieser Runde und Betreiberentscheidung BF-1
 
 ## Bitte um Entscheidung
 
-- **BF-16 (= Gate G0):** ADR-01 (Hybrid-Executive), ADR-13 (Lease per Fast-Forward-Commit), ADR-14 (Review-Übergangsregel bei gemeinsamem
+- **BF-16 (Teil von Gate G0, Definition in 04 §1):** ADR-01 (Hybrid-Executive), ADR-13 (Lease per Fast-Forward-Commit), ADR-14 (Review-Übergangsregel bei gemeinsamem
   Konto), ADR-15 (ein Engineering-System mit Rollen), ADR-16 (erster Baustein B-01 ∥ E-05).
 - **BF-14** Hosting-Tarif (Vercel Hobby ist laut Doku nichtkommerziell). **BF-15** eigene GitHub-Identität. **BF-05** Repo öffentlich/privat.
 

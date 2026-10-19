@@ -70,7 +70,7 @@ Keine neue Struktur, nur Ergänzungen dieser Dateien (Begründung: `../07_OFFENE
   `waiting_operator`), `lease` mit `generation`, `waiting`, `acceptance_criteria`, `test_requirements`, `budget`, `claims.foreign_paths`,
   `responses_to_review`; Teilnehmer `chatgpt-chat`.
 - Neu `decision.schema.json`. Eine von einem Modell eingetragene Entscheidung gilt nur mit nachprüfbarer Quelle.
-- **Zustands-Commits (ADR-13):** Lease, Status, Checkpoint und eigene review-/decision-Dateien dürfen als kleiner Fast-Forward-Commit
+- **Zustands-Commits (ADR-13, kooperatives Lease-Protokoll laut `05` §6 – nicht technisch erzwungen):** Lease, Status, Checkpoint und eigene review-/decision-Dateien dürfen als kleiner Fast-Forward-Commit
   direkt auf `architecture/ai-business-roadmap` geschrieben werden (Connector: `expected_sha`). Abgelehnter Push = neu lesen. Inhaltliche
   Änderungen (Architektur, Schemas, Regeln) weiter per PR mit Review des anderen Systems.
 - Prüfen lokal z. B. mit `python3` + `jsonschema` (Draft 2020-12). Ein CI-Validator folgt erst bei nachgewiesenem Bedarf.

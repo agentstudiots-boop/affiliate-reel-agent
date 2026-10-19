@@ -45,12 +45,10 @@ A-03, A-04, A-05, A-07 laufen parallel zu A-02.
 
 ## Definition of Done Phase A (= Gate G0)
 
-1. GPT Work hat A-01 Runde 2 geprüft (`tasks/A-01/review-2.json`); offene `blocker` = 0.
-2. Claude hat A-02 geprüft (`tasks/A-02/review-1.json`) – erledigt.
-3. Betreiber hat ADR-01, ADR-13 … ADR-16 entschieden (BF-16); übrige ADRs dürfen vertagt sein.
-4. `resources.json` und `ownership.json` enthalten nur belegte Werte oder `null`.
-5. Betreiber merged PR #81 und danach den Draft-PR dieser Runde in den Architektur-Branch (nur Doku). Ein Verweis in `docs/PROJECT_STATUS.md`
-   folgt als eigener kleiner PR.
+Maßgeblich ist allein die Definition von **G0 in `04_ROADMAP.md` §1** (GPT-R2-01). Kurzfassung ohne eigene Abweichung: jüngstes GPT-Review
+von A-01 ohne offene blocker/major, A-02 geprüft (erledigt), BF-16 entschieden (ADR-01, ADR-13 … ADR-16), PR #81 und #82 gemergt.
+Zusätzlich gilt: `resources.json` und `ownership.json` enthalten nur belegte Werte oder `null`. Ein Verweis in `docs/PROJECT_STATUS.md`
+folgt als eigener kleiner PR.
 
 ## Was in Phase A ausdrücklich nicht passiert
 

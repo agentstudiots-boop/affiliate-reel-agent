@@ -100,9 +100,17 @@ Befunde werden klassifiziert: `blocker` (muss vor Merge behoben sein) · `major`
   über `claims.foreign_paths` mit Link auf die Zustimmung des Besitzers.
 - **Hot Files** (`ownership.json`): nur mit Abstimmung, nie parallel; vorher `origin/main` und offene PRs prüfen.
 - **Migrationsnummern:** Reservierung in `ownership.json` → `migration_reservations` per Zustands-Commit; zuletzt auf `main`: **038**.
-- **Atomare Übernahme (ADR-13):** Lease und Statuswechsel werden als kleiner Commit auf den **Koordinationsbranch**
-  `architecture/ai-business-roadmap` geschrieben – per Fast-Forward-Push bzw. Connector mit `expected_sha`. Git prüft den Ref atomar: wer zuerst
-  schreibt, hält den Lease; ein abgelehnter Push heißt „neu lesen“, nie Force-Push. `generation` steigt bei jeder Übernahme (Fencing).
+- **Übernahme per kooperativem Lease-Protokoll (ADR-13, korrigiert nach GPT-R2-04):** Lease und Statuswechsel werden als kleiner Commit auf
+  den **Koordinationsbranch** `architecture/ai-business-roadmap` geschrieben – per Fast-Forward-Push bzw. Connector mit `expected_sha`.
+  Vor **jedem** Zustandswrite (nicht nur bei der Übernahme):
+  1. Ref `R` lesen und `task.json` **an genau diesem Ref** auswerten.
+  2. Nur schreiben, wenn `lease.holder` = eigenes System, `lease.generation` = die eigene Generation und `lease.expires_at` > jetzt.
+     Übernahme nur, wenn kein gültiger fremder Lease besteht; dann `generation` + 1.
+  3. Commit exakt auf `R` aufbauen; Push nur als Fast-Forward bzw. mit `expected_sha = R`, nie Force-Push.
+  4. Push abgelehnt ⇒ neu lesen und Schritt 2 **erneut** prüfen; ist der Lease verloren, Arbeit anhalten und Checkpoint nur im eigenen Branch.
+  **Grenze:** Git verhindert nur konkurrierende Ref-Updates, nicht dass ein System ohne gültigen Lease schreibt. Das Protokoll ist eine
+  kooperative Regel aller Beteiligten, **keine technisch erzwungene Sperre**; `generation` ist ein kooperativer Fencing-Zähler. Ein Rennen
+  zweier Systeme wurde noch nicht getestet. Technisch erzwingen ließe sich das erst mit einem prüfenden CI-Check oder eigenen Identitäten (D-07).
 - **Schreibrechte je Datei:** `task.json` (Planer bis Lease, danach Implementierer), `review-<n>.json` (Prüfer), `decision.json` (Betreiber;
   ein Modell trägt nur mit nachprüfbarer Quelle ein). `resources.json`: jedes System nur seinen Abschnitt.
 - Merge-Konflikte in Koordinationsdateien werden nie automatisch zugunsten einer Seite aufgelöst.

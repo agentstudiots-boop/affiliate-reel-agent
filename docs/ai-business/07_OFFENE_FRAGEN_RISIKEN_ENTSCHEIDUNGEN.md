@@ -42,7 +42,7 @@ zum Hauptprojekt wird.
 | ADR-10 | Kein Auto-Merge für Code; optional für Doku/Koordination nach Phase D | **annehmen** | Auto-Merge mit Review-Bot (Merge = Production-Deploy) |
 | ADR-11 | Immobilien-Abteilung erst nach Machbarkeits- und Rechtsprüfung | **annehmen** | sofortiger Aufbau |
 | ADR-12 | Gate G4 trennt Messreife, Verlust-/Erkundungsbudget und Ausbauentscheidung; kleiner Recherche-Pilot schon vorher erlaubt (geändert, GPT-Review D.6) | **annehmen** | starres Go/No-Go |
-| ADR-13 | Lease/Statuswechsel als Fast-Forward-Commit auf den Koordinationsbranch (atomarer Git-Ref, `generation` als Fencing); inhaltliche Änderungen weiter per PR | **annehmen** | zentraler Lease-Dienst/DB (neue Infrastruktur); Read-then-write ohne Ref-Prüfung (nicht atomar) |
+| ADR-13 | Lease/Statuswechsel als Fast-Forward-Commit auf den Koordinationsbranch nach **kooperativem Lease-Protokoll** (05 §6): vor jedem Zustandswrite holder/generation/expires_at am selben gelesenen Ref prüfen, Commit exakt darauf, nach Konflikt neu prüfen. Git verhindert nur konkurrierende Ref-Updates, **keine** Lease-Inhaberschaft; technisch nicht erzwungen, Rennen ungetestet (korrigiert nach GPT-R2-04) | **annehmen** | zentraler Lease-Dienst/DB (neue Infrastruktur); Read-then-write ohne Ref-Prüfung |
 | ADR-14 | Übergang bis zur eigenen Reviewer-Identität: Review = `review-<n>.json` + PR-Kommentar mit geprüfter SHA; Betreiber-Merge ist Vertrauensanker; keine technische Merge-Sperre behaupten | **annehmen** | sofort Machine User/App (Einrichtungsaufwand, BF-15) |
 | ADR-15 | **Ein** Engineering-System mit je Aufgabe vergebenen Rollen (Planer, Implementierer, Prüfer), Modelle austauschbar; Neubewertung nach ca. 5 Paketen anhand der Messgrößen in 05 §2 (Prüfpunkt aus Betreiberbeschluss `aa6ce5a`) | **annehmen** | zwei eigenständige Engineering-Systeme (doppelte Infrastruktur) |
 | ADR-16 | Erster Code-Baustein: **B-01** (Claude plant, Codex implementiert, Claude prüft) parallel zu **E-05** (Codex plant, Claude implementiert, Codex prüft); Validator C-02 zurückgestellt | **annehmen** | C-02 zuerst (GPT-Vorschlag, 09 §K) |
@@ -115,4 +115,4 @@ zum Hauptprojekt wird.
 | BF-13 | Aufbau einer weiteren Geschäftseinheit (Immobilien) | I |
 | BF-14 | Hosting-Tarif angesichts der Vercel-Hobby-Bedingungen (betrifft schon das Affiliate-Studio) | sofort |
 | BF-15 | Eigene GitHub-Identität (Machine User oder App) für mindestens ein System | D |
-| BF-16 | Freigabe ADR-01, ADR-13 … ADR-16 und Start von B-01/E-05 (= Gate G0) | jetzt |
+| BF-16 | Freigabe ADR-01, ADR-13 … ADR-16; zusammen mit den übrigen Bedingungen von G0 (04 §1) Start von B-01/E-05 | jetzt |

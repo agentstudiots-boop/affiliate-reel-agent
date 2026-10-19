@@ -545,7 +545,7 @@
         "expires_at",
         "coordination_sha"
       ],
-      "description": "Exklusive Übernahme. Gültig nur, wenn per Fast-Forward-Push (bzw. Connector mit expected_sha) auf den Koordinationsbranch geschrieben; abgelehnter Push = Lease nicht erhalten.",
+      "description": "Exklusive Übernahme nach kooperativem Lease-Protokoll (05 §6): vor jedem Zustandswrite holder/generation/expires_at am selben gelesenen Ref prüfen, Commit per Fast-Forward bzw. expected_sha. Git verhindert nur konkurrierende Ref-Updates, nicht das Schreiben ohne gültigen Lease – keine technisch erzwungene Sperre.",
       "properties": {
         "holder": {
           "$ref": "#/$defs/system"
@@ -563,7 +563,7 @@
         "generation": {
           "type": "integer",
           "minimum": 1,
-          "description": "Monotoner Fencing-Zähler; ein abgelaufener Halter darf mit älterer Generation nichts mehr schreiben"
+          "description": "Monotoner, kooperativer Fencing-Zähler; nur wirksam, wenn jeder Schreiber ihn vor dem Schreiben prüft"
         }
       }
     },

@@ -31,7 +31,7 @@ Betriebsübersicht; das Planetarium konsumiert ihn nur.
 
 | Gate | Bedeutung | Erfüllt, wenn |
 |---|---|---|
-| **G0 Architektur** | gemeinsame Architektur freigegeben | A-01 Runde 2 vom GPT geprüft, A-02 von Claude geprüft, Betreiber hat ADR-01, ADR-13, ADR-14 entschieden |
+| **G0 Architektur** | gemeinsame Architektur freigegeben – **kanonische Definition**, auf die 06, 07, README und alle Task-Dateien verweisen | (1) jüngstes GPT-Review von A-01 ohne offene `blocker`/`major`-Befunde; (2) A-02 von Claude geprüft; (3) Betreiber hat ADR-01, ADR-13, ADR-14, ADR-15 und ADR-16 entschieden (BF-16); (4) PR #81 und PR #82 vom Betreiber in den Architektur-Branch gemergt |
 | **G1 Erster Baustein** | Kooperation praktisch nachgewiesen | B-01 und E-05 je mit getrenntem Planer/Implementierer/Prüfer gemergt, CI grün |
 | **G2 Kern** | Aufgabenbuch + Budgetwächter | B-02…B-05 gemergt, alles hinter Schaltern aus, Tests für Lease-Ablauf, `outcome_unknown`, Budget erschöpft |
 | **G3 Controlling sichtbar** | echte Messwerte oder „unbekannt“ | E-07 in der 2D-Übersicht, keine Zahl ohne Quelle |
