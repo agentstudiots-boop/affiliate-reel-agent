@@ -23,6 +23,7 @@
     "lib/enterprise/registry.ts",
     "lib/enterprise/policy.ts",
     "lib/enterprise/plan.ts",
+    "lib/enterprise/contract.ts",
     "lib/product-resolver.ts",
     "lib/daily/product-lock.ts",
     "lib/daily/slots.ts",
