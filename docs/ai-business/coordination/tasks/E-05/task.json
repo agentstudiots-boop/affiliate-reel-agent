@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "task_id": "E-05",
+  "title": "Reine Kennzahlenfunktionen: Deckungsbeitrag, einfacher ROI und Amortisation",
+  "module": "controlling",
+  "phase": "E",
+  "status": "planned",
+  "planner": "gpt-work",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "gpt-work",
+  "base_commit": null,
+  "branch": null,
+  "depends_on": [],
+  "claims": {
+    "paths": [
+      "lib/enterprise/controlling/metrics.ts",
+      "tests/enterprise-controlling-metrics.test.cjs"
+    ],
+    "hot_files": [
+      "tsconfig.test.json"
+    ],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Nur reine Funktionen in metrics.ts, ohne DB, Netzwerk, Modellaufruf, Uhrzeit oder Änderungen an Eingaben. Exportierte Typen MetricResult<T> = {status:'known',value:T} | {status:'unknown',reason:string} und MoneyInput = {amountCents:number|null,currency:string,kind:'measured'|'estimated'|'forecast'}.",
+      "verification": "Tests prüfen unveränderte Eingaben und deterministische Ergebnisse; Diff auf Imports und Seiteneffekte prüfen.",
+      "met": null
+    },
+    {
+      "id": "AC-2",
+      "criterion": "contributionMargin(revenue, directCosts): Beträge nichtnegative sichere Integer-Cents; Erlös muss measured sein. Kosten einzeln measured oder estimated. Ergebnis enthält measuredRevenueCents, measuredDirectCostsCents, estimatedDirectCostsCents, contributionCents und includesEstimates; Beitrag = Erlös minus beide Kostensummen, darf negativ sein. forecast führt zu unknown, nicht stillschweigend zu Null.",
+      "verification": "10000 Erlös, 2000 measured + 1000 estimated Kosten ergibt 7000 Beitrag mit includesEstimates=true; reine Messwerte ebenfalls testen.",
+      "met": null
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Fehlende Beträge, NaN/Infinity, Bruchteile von Cents, negative Eingabebeträge, Summen außerhalb safe integer und leere/abweichende Währungen liefern unknown mit verständlichem Grund. Leere Kostenliste bedeutet bestätigte Nullkosten; fehlende Kostenliste bedeutet unknown. Keine Währungsumrechnung.",
+      "verification": "Tabellentests für jeden Fehlerfall; 0 wird von null unterschieden, gemischte Währungen abgelehnt.",
+      "met": null
+    },
+    {
+      "id": "AC-4",
+      "criterion": "simpleRoi(netReturn, investment): explizit einfacher Perioden-ROI = netReturn/investment*100; netReturn ist Nettogewinn nach den zugehörigen Kosten, darf negativ sein. Beide Inputs measured, gleiche Währung, investment >0; sonst unknown. Kein annualisierter ROI und keine doppelte Subtraktion des Investments.",
+      "verification": "netReturn 2000, investment 10000 ergibt 20; -2000 ergibt -20; Nullinvestment und nicht gemessene Werte unknown. Dokumentiert gleiche Bezugsperiode als Aufruferpflicht.",
+      "met": null
+    },
+    {
+      "id": "AC-5",
+      "criterion": "simplePayback(investment, monthlyNetInflow): einfache statische Amortisation in Monaten = investment/monthlyNetInflow, beide measured, investment >=0, monthlyNetInflow >0, gleiche Währung. Bei <=0 Monatszufluss unknown, auch bei investment=0; sonst investment=0 ergibt 0 Monate. Kein Zinseszins, keine Renditeprognose.",
+      "verification": "120000/10000 ergibt 12 Monate; Null/negative Zuflüsse unknown; Grenzfall Nullinvestment prüfen.",
+      "met": null
+    },
+    {
+      "id": "AC-6",
+      "criterion": "ROI/Amortisation liefern ungerundete endliche number-Werte; Anzeige-Rundung ist nicht Teil dieses Moduls. Geld-Cents bleiben sichere Integer. Kein Resultat wird als umfassender Unternehmensgewinn dargestellt; Deckungsbeitrag enthält nur übergebene direkte Kosten.",
+      "verification": "Bruchwerte mit Toleranz testen; overflow und nichtendliche Resultate unknown.",
+      "met": null
+    },
+    {
+      "id": "AC-7",
+      "criterion": "Nur metrics.ts und Testdatei sowie genau der eigene Include-Eintrag lib/enterprise/controlling/metrics.ts in tsconfig.test.json. Kein Import in App/Produktionspfade. Nicht B-01-Dateien bearbeiten. Wenn lib/enterprise/**/*.ts bereits enthalten ist, keinen redundanten Include hinzufügen.",
+      "verification": "Diff und vorhandene parallele PRs prüfen; Include mit B-01 abgleichen.",
+      "met": null
+    },
+    {
+      "id": "AC-8",
+      "criterion": "Tests laden die echte kompilierte Implementierung; keine nachgebauten Formeln im Test statt Funktionsaufruf. Keine echten Anbieteraufrufe. Draft-PR, kein Merge und keine Aktivierung.",
+      "verification": "Gezielte Tests, dann Projektprüfungen vor PR; GPT prüft den Commit unabhängig.",
+      "met": null
+    }
+  ],
+  "test_requirements": [
+    "Gezielte Tests für reale metrics.ts-Funktionen und alle AC-Grenzfälle",
+    "Vor Code-PR: npm run typecheck, npm run lint, npm test, npm run build gemäß Projektregeln"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": null,
+    "target_changed_lines": 300,
+    "notes": "Nur bestehende Abo-Kontingente; keine zusätzlichen Credits."
+  },
+  "lease": null,
+  "changed_files": [],
+  "implemented": [],
+  "tests": [
+    {
+      "command": "Planungsdatei; keine Implementierung vorhanden",
+      "result": "not_run",
+      "commit": null,
+      "at": "2026-10-19T05:40:52.550Z"
+    }
+  ],
+  "known_issues": [
+    "Aktuellen main-SHA vor Implementierung eintragen; Architektur-Branch nicht als Codebasis verwenden.",
+    "Abweichung vom bisherigen G0: isolierte Codevorbereitung ohne Merge ist separat vom Architektur-/Produktions-Go zu behandeln; keine pauschale ADR-Zustimmung behaupten.",
+    "tsconfig.test.json wird auch von B-01 berührt: Claude besitzt diese Datei; E-05 fügt nur den exakten metrics.ts-Include hinzu, B-01 prüft vor eigener Änderung erneut.",
+    "Allgemeines Ownership-Register nennt controlling anders; für diese abgegrenzte Aufgabe gelten die Rollen aus Roadmap 04 und diesem Task, keine Übernahme anderer Controlling-Dateien."
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": null,
+    "state": "none",
+    "merge_commit": null,
+    "ci": "unknown"
+  },
+  "approval": {
+    "reviewer": "pending",
+    "operator": "pending",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Claude liest tasks/A-01/handoff-code-start.md und prüft E-05 kurz auf umsetzbare Widersprüche.",
+    "Nach Betreiberauftrag zum isolierten Programmierstart: aktuelles main lesen, eigenen Codebranch anlegen, Zuständigkeit dokumentieren und E-05 implementieren.",
+    "Draft-PR mit Tests und SHA an GPT übergeben; kein Merge, keine Produktion."
+  ],
+  "session": {
+    "system": "gpt-work",
+    "last_checkpoint_at": "2026-10-19T05:40:52.550Z",
+    "last_commit": "93231eaa000ecd28c04136ba78fbe513b666b26b",
+    "active_branch": "gpt/A-01-review-2",
+    "state_summary": "E-05 technisch spezifiziert; keine Implementierung, keine Freigabe vorgetäuscht.",
+    "decisions_made": [
+      "Claude implementiert E-05, GPT prüft; B-01 umgekehrte Rollen",
+      "Reine Formeln, keine Laufzeitintegration"
+    ],
+    "test_status": "Planungsdatei; Schemafelder manuell geprüft",
+    "next_action": "Claude übernimmt den abgegrenzten Programmierauftrag nach Betreiberanstoß."
+  },
+  "revision": 1,
+  "updated_at": "2026-10-19T05:40:52.550Z",
+  "log": [
+    {
+      "at": "2026-10-19T05:40:52.550Z",
+      "actor": "gpt-work",
+      "action": "created",
+      "summary": "E-05 als konkreten Programmierauftrag mit Schnittstellen und Grenzfalltests geplant."
+    }
+  ]
+}

@@ -28,7 +28,7 @@
       {
         "path": "tsconfig.test.json",
         "owner": "claude-code",
-        "agreement": "Planer erlaubt hiermit genau eine Zeile: \"lib/enterprise/**/*.ts\" in include (nötig, damit die Tests die kompilierten Module laden)."
+        "agreement": "Nur exakte Include-Einträge für lib/enterprise/registry.ts, lib/enterprise/policy.ts und lib/enterprise/plan.ts ergänzen (kein Glob), vorher Stand prüfen; E-05 ergänzt unabhängig davon nur lib/enterprise/controlling/metrics.ts (tasks/A-01/handoff-code-start.md)."
       }
     ]
   },
@@ -47,14 +47,14 @@
     },
     {
       "id": "AC-3",
-      "criterion": "plan.ts definiert ExecutivePlan (02 §3.3) als Zod-Schema und validatePlan(raw, registry, limits) mit Ergebnis { ok, plan, executable, decisionRequests, violations }.",
+      "criterion": "plan.ts definiert ExecutivePlan (02 §3.3) als Zod-Schema und validatePlan(raw, registry, limits) mit Ergebnis { ok, plan, executable, decisionRequests, blocked, violations } (blocked gemäß AC-9, leere Listen gemäß AC-10).",
       "verification": "Typecheck + Tests",
       "met": null
     },
     {
       "id": "AC-4",
-      "criterion": "Die Stufe eines Schritts wird ausschließlich aus der im Register zur (department, taskKind) hinterlegten ActionKind abgeleitet. Eine vom Modell mitgelieferte Stufe wird ignoriert; eine mitgelieferte action, die nicht der Register-Aktion entspricht, ist ein Verstoß (keine harmlose Aktion für einen anders wirkenden Handler). Schritte mit L3b/L4 landen in decisionRequests, nie in executable. Schritte mit L0–L2 oberhalb von department.maxLevel sind Verstöße.",
-      "verification": "Tests: gefälschtes level:'L0' für eine publish-Aufgabe → decisionRequests; action:'read' für eine taskKind mit Register-Aktion publish → Verstoß; L2-Schritt bei Abteilung mit maxLevel L1 → Verstoß",
+      "criterion": "Die Stufe eines Schritts wird ausschließlich aus der im Register zur (department, taskKind) hinterlegten ActionKind abgeleitet. Eine vom Modell mitgelieferte Stufe wird ignoriert; eine mitgelieferte action, die nicht der Register-Aktion entspricht, ist ein Verstoß (keine harmlose Aktion für einen anders wirkenden Handler). Schritte mit L3b/L4 landen in decisionRequests, nie in executable. Schritte mit L0–L2 oberhalb von department.maxLevel sind Verstöße. L3a (vorab autorisierte Mitteilung) ist in v0 ebenfalls nie ausführbar, sondern Entscheidungsvorlage; ihre Nachfolger werden wie bei L3b/L4 gesperrt. B-01 enthält keine Nachrichten- oder sonstige Handler-Ausführung.",
+      "verification": "Tests: gefälschtes level:'L0' für eine publish-Aufgabe → decisionRequests; action:'read' für eine taskKind mit Register-Aktion publish → Verstoß; L2-Schritt bei Abteilung mit maxLevel L1 → Verstoß; L3a-Schritt → decisionRequests, Nachfolger → blocked",
       "met": null
     },
     {
@@ -71,8 +71,8 @@
     },
     {
       "id": "AC-7",
-      "criterion": "Keine Imports aus anderen lib-Bereichen außer zod; lib/enterprise wird von keinem Code außerhalb lib/enterprise und tests importiert (keine Laufzeitwirkung).",
-      "verification": "Test liest Quelltexte (wie Importisolationstests) + grep app/ lib/",
+      "criterion": "Keine Imports aus anderen lib-Bereichen außer zod; lib/enterprise wird von keinem Code außerhalb lib/enterprise und tests importiert (keine Laufzeitwirkung). Der Validator wertet nur strukturierte Felder (department, taskKind, action, dependsOn, Beträge) aus; Freitext im Plan löst nie eine Aktion aus und wird nicht semantisch interpretiert.",
+      "verification": "Test liest Quelltexte (wie Importisolationstests) + grep app/ lib/; Test: Freitext 'veröffentliche jetzt' in goal/evidence ändert executable/decisionRequests nicht",
       "met": null
     },
     {
@@ -113,7 +113,7 @@
   "waiting": {
     "reason": "operator",
     "since": "2026-10-18T21:30:00Z",
-    "resume_condition": "Gate G0 vollständig erfüllt laut 04_ROADMAP.md §1 (alle vier Bedingungen, u. a. BF-16 mit ADR-01, ADR-13 … ADR-16 und Merge von PR #81/#82). Danach Status ready; Codex nimmt den Lease nach dem kooperativen Lease-Protokoll (05 §6).",
+    "resume_condition": "Betreiberanstoß zur isolierten Codearbeit auf Arbeitsbranches (ohne Merge/Produktion, tasks/A-01/handoff-code-start.md); Merge erst nach G0 laut 04_ROADMAP.md §1.",
     "wake_mechanism": "manual_start"
   },
   "changed_files": [],
@@ -150,8 +150,8 @@
   },
   "next_steps": [
     "Nach G0 (04 §1): Codex setzt lease (holder gpt-work, generation 1) und status in_progress per Fast-Forward-Commit nach 05 §6",
-    "Codex implementiert auf gpt/B-01-executive-kernel, PR gegen main, Status waiting_review",
-    "Claude prüft gegen AC-1 … AC-8 und schreibt tasks/B-01/review-1.json"
+    "Codex implementiert auf gpt/B-01-executive-kernel gegen AC-1 … AC-10, PR gegen main, Status waiting_review",
+    "Claude prüft gegen AC-1 … AC-10 und schreibt tasks/B-01/review-1.json"
   ],
   "session": {
     "system": "claude-code",
@@ -165,10 +165,10 @@
       "Unbekannte Aktion → L4 (fail closed)"
     ],
     "test_status": "keine Tests (Planung)",
-    "next_action": "Codex: nach G0 Lease nehmen und AC-1 … AC-8 umsetzen"
+    "next_action": "Codex: nach Betreiberanstoß zur isolierten Codearbeit Lease nehmen und AC-1 … AC-10 umsetzen"
   },
-  "revision": 2,
-  "based_on_commit": "93231ea",
+  "revision": 3,
+  "based_on_commit": "e002446",
   "updated_at": "2026-10-19T06:00:00Z",
   "log": [
     {
@@ -191,6 +191,13 @@
       "action": "fixed",
       "summary": "Planung nach GPT-R2-01/-02/-03: kanonische G0-Bedingung, verbindliche Zuordnung taskKind→ActionKind→Handler, maxLevel, eindeutige IDs, transitive Sperre (AC-9), leere Ergebnisse bei ungültigem Plan (AC-10)",
       "commit": "93231ea"
+    },
+    {
+      "at": "2026-10-19T06:00:00Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "Drei Klarstellungen aus handoff-code-start.md: blocked im Rückgabeobjekt (AC-3), L3a nie ausführbar + Nachfolger gesperrt (AC-4), nur strukturierte Felder, Freitext ohne Wirkung (AC-7); exakte tsconfig-Includes; Verweise AC-1 … AC-10",
+      "commit": "e002446"
     }
   ]
 }

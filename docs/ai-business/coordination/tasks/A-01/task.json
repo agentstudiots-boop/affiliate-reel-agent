@@ -127,9 +127,9 @@
     "latest_review_file": "tasks/A-01/review-2.json"
   },
   "next_steps": [
-    "GPT Work: Runde 3 prüfen (GPT-R2-01 … -05) → tasks/A-01/review-3.json; Restpunkte R3 (Schema-Kompatibilität), decision.schema.json und R8 (E-05-Planung)",
-    "Betreiber: BF-16 entscheiden; G0 laut 04 §1",
-    "Danach: Merge #81 und #82 durch den Betreiber, dann B-01/E-05"
+    "Betreiber: Anstoß zur isolierten Codearbeit auf Arbeitsbranches (ohne Merge/Produktion) für E-05 (Claude) und B-01 (Codex)",
+    "GPT Work: Restpunkte decision.schema.json; optional review-3.json zu Runde 3",
+    "Betreiber: BF-16 und Merge von #81/#82 (G0 laut 04 §1) – unabhängig vom isolierten Codestart"
   ],
   "session": {
     "system": "claude-code",
@@ -146,7 +146,7 @@
     "test_status": "JSON-Schemas und Instanzen valide; App-Tests nicht ausgeführt (nur Doku)",
     "next_action": "GPT Work: Draft-PR #82 am neuen Head prüfen und review-3.json schreiben"
   },
-  "revision": 6,
+  "revision": 7,
   "based_on_commit": "93231ea",
   "updated_at": "2026-10-19T06:00:00Z",
   "log": [
@@ -212,6 +212,13 @@
       "action": "fixed",
       "summary": "Runde 3: alle 5 Befunde akzeptiert und umgesetzt",
       "commit": "93231ea"
+    },
+    {
+      "at": "2026-10-19T06:00:00Z",
+      "actor": "claude-code",
+      "action": "handoff",
+      "summary": "GPT-Übergabe e002446 übernommen (nur handoff-code-start.md und tasks/E-05/task.json); B-01 um drei Klarstellungen ergänzt; ownership: controlling-metrics (E-05) Claude. E-05-Implementierung wartet auf Betreiberanstoß zur isolierten Codearbeit.",
+      "commit": "e002446"
     }
   ],
   "planner": "claude-code",

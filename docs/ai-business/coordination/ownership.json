@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "note": "Modulbesitz und Konfliktregeln (ADR-09, korrigiert nach GPT-04/GPT-08). Datei-genaue Zuständigkeit statt Baum-Claims. Keine Geschäftsdaten – öffentliches Repository.",
-  "revision": 3,
+  "revision": 4,
   "updated_at": "2026-10-19T06:00:00Z",
   "coordination_branch": {
     "name": "architecture/ai-business-roadmap",
@@ -77,7 +77,20 @@
       "reviewer": "claude-code",
       "planner": "claude-code",
       "status": "planned",
-      "task": "B-01"
+      "task": "B-01",
+      "note": "tsconfig.test.json: nur exakte Includes je Datei (E-05 und B-01 getrennt)"
+    },
+    {
+      "id": "controlling-metrics",
+      "paths": [
+        "lib/enterprise/controlling/metrics.ts",
+        "tests/enterprise-controlling-metrics.test.cjs"
+      ],
+      "owner": "claude-code",
+      "reviewer": "gpt-work",
+      "planner": "gpt-work",
+      "status": "planned",
+      "task": "E-05"
     },
     {
       "id": "enterprise-ledger",
