@@ -45,6 +45,12 @@ test('a throwing or misbehaving department never succeeds; module ids must match
   const greedy=await enqueue(db,'affiliate','affiliate.status_report');
   await runExecutiveCycle(db,options(db,{affiliate:{...affiliateDepartment,handle:async()=>({status:'succeeded',output:{},usedCostCents:1,usedModelCalls:0,evidence:[]})}}));
   assert.deepEqual(await status(db,greedy),{status:'failed',failure_class:'budget_exhausted'},'a status report has a zero budget');
+  const hanging=await enqueue(db,'affiliate','affiliate.status_report');
+  const started=Date.now();
+  const slow=await runExecutiveCycle(db,options(db,{affiliate:{...affiliateDepartment,handle:()=>new Promise(()=>{})}},{handlerTimeoutMs:50}));
+  assert.ok(Date.now()-started<5000,'a hanging department does not block the cycle');
+  assert.deepEqual(slow.ran.map(r=>r.taskId),[hanging]);
+  assert.deepEqual(await status(db,hanging),{status:'failed',failure_class:'internal'},'timed out ⇒ usage unknown ⇒ never succeeded');
   await db.close();
 });
 

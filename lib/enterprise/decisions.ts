@@ -2,16 +2,19 @@
 //
 // A plan step at a decision level (L3a, L3b, L4) never runs; it becomes a decision request for the operator. The request
 // is bound to subject, version and a fingerprint of everything shown to the operator; any change creates a new version
-// and supersedes the open one. A decision counts only if it comes from the operator over WhatsApp (the single active
-// approval authority, lib/publishing/authority.ts), answers exactly the request message and matches the fingerprint.
-// An executive agent can never decide its own requests, even if it were ever added to the active authorities.
+// and supersedes the open one. A decision counts only like an approval in lib/publishing/approval-gate.ts: the operator
+// (the single active approval authority) answers over WhatsApp from the trusted number, replying to exactly the request
+// message, with the literal approval or rejection word (classifyWhatsAppReply). Decision and sender are taken from that
+// evidence, never from the caller; any other text records nothing. An executive agent can never decide its own requests,
+// even if it were ever added to the active authorities.
 //
 // This module only records requests and decisions. An approved request executes nothing; sending the WhatsApp message
 // and acting on an approval are separate, later steps behind their own decisions. All times come from the database clock.
 
 import { createHash, randomUUID } from "node:crypto";
 import type { Database } from "../memory/db";
-import { isActiveAuthority } from "../publishing/authority";
+import { isActiveAuthority, type DecisionEvidence } from "../publishing/authority";
+import { classifyWhatsAppReply } from "../whatsapp/intent";
 import type { ClassifiedStep } from "./plan";
 import { requiresDecision } from "./policy";
 
@@ -28,9 +31,13 @@ export type DecisionRequestInput = {
   ttlHours?: number;
 };
 export type DecisionRequest = { id: string; subjectKey: string; version: number; fingerprint: string; level: string };
+// What the WhatsApp webhook received. trustedWaId is the operator's configured number, never taken from the message.
+// expected (optional): the request the caller believes is answered; a different request or fingerprint is refused.
 export type DecisionReply = {
-  id: string; fingerprint: string; decision: "approved" | "rejected"; authority: string;
-  requestMessageId: string; decidedMessageId: string;
+  authority: string;
+  evidence: DecisionEvidence;
+  trustedWaId: string;
+  expected?: { id: string; fingerprint: string };
 };
 
 export class DecisionError extends Error {}
@@ -47,8 +54,8 @@ function canonical(value: unknown): string {
 }
 
 // Fingerprint over everything the operator decides on.
-export function decisionFingerprint(content: { level: string; department: string; taskKind: string; subject: string; options: DecisionOption[];
-  recommendation: unknown; evidence: unknown; maxCostCents: number }): string {
+export function decisionFingerprint(content: { level: string; department: string; taskKind: string; handlerId: string; subject: string;
+  options: DecisionOption[]; recommendation: unknown; evidence: unknown; maxCostCents: number; maxModelCalls: number; taskId: string | null }): string {
   return createHash("sha256").update(canonical(content)).digest("hex");
 }
 
@@ -64,10 +71,13 @@ export async function requestDecision(db: Database, input: DecisionRequestInput)
   if (evidence.some(item => item.kind === "fact" && !item.source?.trim())) throw new DecisionError("Fakt ohne Quelle");
   const ttl = input.ttlHours ?? DEFAULT_TTL_HOURS;
   if (!Number.isFinite(ttl) || ttl <= 0 || ttl > MAX_TTL_HOURS) throw new DecisionError("Gültigkeit ungültig");
-  const fingerprint = decisionFingerprint({ level: step.level, department: step.department, taskKind: step.taskKind, subject: input.subject,
-    options: input.options, recommendation: input.recommendation ?? null, evidence, maxCostCents: step.maxCostCents });
+  const fingerprint = decisionFingerprint({ level: step.level, department: step.department, taskKind: step.taskKind, handlerId: step.handlerId,
+    subject: input.subject, options: input.options, recommendation: input.recommendation ?? null, evidence, maxCostCents: step.maxCostCents,
+    maxModelCalls: step.maxModelCalls, taskId: input.taskId ?? null });
   return db.transaction(async sql => {
     await sql.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`enterprise-decision:${input.subjectKey}`]);
+    // An open request past its validity is never reused: it expires, and the same content gets a new version.
+    await sql.query("UPDATE enterprise_decisions SET status='expired' WHERE subject_key=$1 AND status='pending' AND expires_at <= now()", [input.subjectKey]);
     const open = (await sql.query("SELECT id, version, fingerprint FROM enterprise_decisions WHERE subject_key=$1 AND status='pending'", [input.subjectKey])).rows[0];
     // The same content again: the open request stays valid.
     if (open && open.fingerprint === fingerprint)
@@ -92,22 +102,30 @@ export async function attachRequestMessage(db: Database, id: string, requestMess
   return updated.rows.length === 1;
 }
 
-export type RecordResult = { ok: true; status: "approved" | "rejected" } | { ok: false; reason: "not_operator" | "unknown_or_closed" | "wrong_message" | "fingerprint_mismatch" | "expired" };
+export type RecordResult = { ok: true; id: string; status: "approved" | "rejected" }
+  | { ok: false; reason: "not_operator" | "evidence_incomplete" | "untrusted_sender" | "unclear_reply" | "unknown_or_closed" | "wrong_message" | "fingerprint_mismatch" | "expired" };
 
 // Records the operator's decision. Nothing is executed here.
 export async function recordDecision(db: Database, reply: DecisionReply): Promise<RecordResult> {
   if (reply.authority !== "whatsapp_operator" || !isActiveAuthority(reply.authority)) return { ok: false, reason: "not_operator" };
-  if (reply.decision !== "approved" && reply.decision !== "rejected") return { ok: false, reason: "unknown_or_closed" };
+  const { evidence } = reply;
+  if (!evidence || evidence.channel !== "whatsapp" || !evidence.messageId?.trim() || !evidence.replyToMessageId?.trim()) return { ok: false, reason: "evidence_incomplete" };
+  const trusted = String(reply.trustedWaId ?? "").replace(/\D/g, "");
+  if (!trusted || String(evidence.senderWaId ?? "").replace(/\D/g, "") !== trusted) return { ok: false, reason: "untrusted_sender" };
+  const intent = classifyWhatsAppReply(String(evidence.body ?? "")).intent;
+  if (intent !== "approve" && intent !== "reject") return { ok: false, reason: "unclear_reply" };
+  const decision = intent === "approve" ? "approved" as const : "rejected" as const;
   return db.transaction(async sql => {
-    const row = (await sql.query(`SELECT status, fingerprint, request_message_id, expires_at > now() AS valid FROM enterprise_decisions WHERE id=$1 FOR UPDATE`,
-      [reply.id])).rows[0];
-    if (!row || row.status !== "pending") return { ok: false as const, reason: "unknown_or_closed" as const };
+    const row = (await sql.query(`SELECT id, status, fingerprint, expires_at > now() AS valid FROM enterprise_decisions WHERE request_message_id=$1 FOR UPDATE`,
+      [evidence.replyToMessageId])).rows[0];
+    if (!row) return { ok: false as const, reason: (reply.expected ? "wrong_message" : "unknown_or_closed") as "wrong_message" | "unknown_or_closed" };
+    if (reply.expected && reply.expected.id !== String(row.id)) return { ok: false as const, reason: "wrong_message" as const };
+    if (reply.expected && reply.expected.fingerprint !== row.fingerprint) return { ok: false as const, reason: "fingerprint_mismatch" as const };
+    if (row.status !== "pending") return { ok: false as const, reason: "unknown_or_closed" as const };
     if (!row.valid) return { ok: false as const, reason: "expired" as const };
-    if (!row.request_message_id || row.request_message_id !== reply.requestMessageId) return { ok: false as const, reason: "wrong_message" as const };
-    if (row.fingerprint !== reply.fingerprint) return { ok: false as const, reason: "fingerprint_mismatch" as const };
-    await sql.query(`UPDATE enterprise_decisions SET status=$2, authority='whatsapp_operator', decided_message_id=$3, decided_at=now() WHERE id=$1`,
-      [reply.id, reply.decision, reply.decidedMessageId]);
-    return { ok: true as const, status: reply.decision };
+    await sql.query(`UPDATE enterprise_decisions SET status=$2, authority='whatsapp_operator', decided_message_id=$3, decided_at=now() WHERE id=$1 AND status='pending'`,
+      [row.id, decision, evidence.messageId]);
+    return { ok: true as const, id: String(row.id), status: decision };
   });
 }
 
