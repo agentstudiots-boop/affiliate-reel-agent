@@ -4,7 +4,7 @@
   "title": "ControllingSnapshot (lesender Datenvertrag) und Anzeige in der 2D-Betriebsübersicht",
   "module": "controlling-snapshot",
   "phase": "E",
-  "status": "waiting_review",
+  "status": "approved_by_reviewer",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -136,7 +136,7 @@
     "ci": "pending"
   },
   "approval": {
-    "reviewer": "pending",
+    "reviewer": "approved",
     "operator": "pending",
     "latest_review_file": null
   },
@@ -145,20 +145,20 @@
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T17:08:15Z",
+    "last_checkpoint_at": "2026-10-19T18:45:08Z",
     "checkpoint_reason": "other",
-    "last_commit": "098f427",
+    "last_commit": "43873e3",
     "active_branch": "claude/E-07-controlling-snapshot",
-    "state_summary": "an Mikro-Beträge angepasst (Summen einmal auf Cent, nur EUR), Test folgt Registerzuordnung executive_planner",
+    "state_summary": "Review approve; minor unassigned.revenue umgesetzt",
     "decisions_made": [
       "Keine erfundene Null: null/unbekannt/mind./nicht verfügbar"
     ],
     "test_status": "voll 715/715",
     "next_action": "Review abwarten"
   },
-  "revision": 3,
+  "revision": 4,
   "based_on_commit": "77c26e8",
-  "updated_at": "2026-10-19T17:08:15Z",
+  "updated_at": "2026-10-19T18:45:08Z",
   "log": [
     {
       "at": "2026-10-19T12:19:00Z",
@@ -180,6 +180,13 @@
       "action": "pushed",
       "summary": "an Mikro-Beträge angepasst (Summen einmal auf Cent, nur EUR), Test folgt Registerzuordnung executive_planner",
       "commit": "098f427"
+    },
+    {
+      "at": "2026-10-19T18:45:08Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "Review approve; minor unassigned.revenue umgesetzt",
+      "commit": "43873e3"
     }
   ]
 }

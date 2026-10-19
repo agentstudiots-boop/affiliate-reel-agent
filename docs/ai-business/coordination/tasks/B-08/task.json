@@ -4,7 +4,7 @@
   "title": "KI-Planer im Schattenbetrieb (nur Vorschlag, nichts eingebunden)",
   "module": "enterprise-planner",
   "phase": "B",
-  "status": "waiting_review",
+  "status": "approved_by_reviewer",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -113,7 +113,7 @@
     "ci": "pending"
   },
   "approval": {
-    "reviewer": "pending",
+    "reviewer": "approved",
     "operator": "pending",
     "latest_review_file": null
   },
@@ -123,20 +123,20 @@
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T12:32:52Z",
+    "last_checkpoint_at": "2026-10-19T18:45:08Z",
     "checkpoint_reason": "other",
-    "last_commit": "18f838e",
+    "last_commit": "ad3c487",
     "active_branch": "claude/B-08-shadow-planner",
-    "state_summary": "Draft-PR #99 offen, voll geprüft",
+    "state_summary": "Review approve (nits)",
     "decisions_made": [
       "Betreiberauftrag 19.10.: in Abwesenheit durchgehend weiterarbeiten; Wirkung bleibt hinter Schaltern/Entscheidungen"
     ],
     "test_status": "voll 752/752",
     "next_action": "Review zweite Sitzung abwarten"
   },
-  "revision": 2,
+  "revision": 3,
   "based_on_commit": "d9e9d1e",
-  "updated_at": "2026-10-19T12:32:52Z",
+  "updated_at": "2026-10-19T18:45:08Z",
   "log": [
     {
       "at": "2026-10-19T12:11:00Z",
@@ -151,6 +151,13 @@
       "action": "pr_opened",
       "summary": "Draft-PR #99 geöffnet nach voller Prüfung (752/752)",
       "commit": "18f838e"
+    },
+    {
+      "at": "2026-10-19T18:45:08Z",
+      "actor": "claude-code",
+      "action": "approved",
+      "summary": "Review approve (nits)",
+      "commit": "ad3c487"
     }
   ]
 }

@@ -99,15 +99,16 @@ Kein PR ist eingebunden oder aktiviert: keine Schalter gesetzt, nichts in `verce
 | 4 | #87 | G-01 Affiliate-Adapter (nur lesend) | #86 | approve (nach Nachprüfung) |
 | 4 | #89 | B-02 **Migration 039** Aufgabenbuch | – | approve · **Merge = Migration in Production** |
 | 5 | #90 | B-03 Repository Aufgabenbuch | #86, #89 | approve (nach Nachprüfung) |
-| 6 | #91 | B-05 Budgetwächter | #90 | changes_requested (2 major) → behoben `6fd5837`, Nachprüfung offen |
-| 5 | #92 | E-01 **Migration 040** Kosten-/Erlösbuch | #89 | approve mit Hinweisen → umgesetzt `3736fd2` (Mikro-Beträge) · **Merge = Migration in Production** |
-| 6 | #93 | E-03 Importer `model_calls` → `cost_entries` | #92 | changes_requested (1 major) → behoben `0a45a63`, Nachprüfung offen |
-| 6 | #96 | B-06 **Migration 041** Entscheidungsvorlagen (nur Vorlage) | #92, #84 | Review offen · **Merge = Migration in Production** |
-| 7 | #98 | B-07 Executive-Zyklus + Cron-Route (`EXECUTIVE_ENABLED` aus, nicht geplant) | #91, #96, #87 | Review offen · **neue öffentliche Route (OD-B07-1)** |
-| 8 | #99 | B-08 KI-Planer im Schattenbetrieb (nichts eingebunden) | #98, #88 | Review offen |
-| 7 | #100 | E-07 ControllingSnapshot + 2D-Anzeige (nur lesend) | #93, #88 | Review offen |
+| 6 | #91 | B-05 Budgetwächter | #90 | approve (nach Nachprüfung) |
+| 5 | #92 | E-01 **Migration 040** Kosten-/Erlösbuch | #89 | approve (nach Nachprüfung, Mikro-Beträge) · **Merge = Migration in Production** |
+| 6 | #93 | E-03 Importer `model_calls` → `cost_entries` | #92 | approve (nach Nachprüfung; minor behoben) |
+| 6 | #96 | B-06 **Migration 041** Entscheidungsvorlagen (nur Vorlage) | #92, #84 | changes_requested (1 major) → behoben `070dff7`, Nachprüfung offen · **Merge = Migration in Production** |
+| 7 | #98 | B-07 Executive-Zyklus + Cron-Route (`EXECUTIVE_ENABLED` aus, nicht geplant) | #91, #96, #87 | approve (minor umgesetzt) · **neue öffentliche Route (OD-B07-1)** |
+| 8 | #99 | B-08 KI-Planer im Schattenbetrieb (nichts eingebunden) | #98, #88 | approve |
+| 7 | #100 | E-07 ControllingSnapshot + 2D-Anzeige (nur lesend) | #93, #88 | approve (minor umgesetzt) |
 | 9 | #102 | H-01 Unternehmensebene als lesender Datenvertrag (`/api/architecture` → `enterprise`) | #99, #100 | Review offen |
 | 8 | #104 | B-09 Monatsgrenze nur aus freigegebenem Budget (L4) | #98 | Review offen |
+| 9 | #105 | J-01 Ende-zu-Ende-Szenarien (nur Tests) | #104 | Review offen |
 | 10 | #103 | H-04/H-05 Ansicht „Unternehmen“ (2D, Detailpanel je Abteilung) | #102 | Review offen · visuelle Abnahme Betreiber |
 | 1 | #101 | C-04 PR-Vorlage (zweite Sitzung) | – | approve (2 optionale Hinweise; nach #95 mergen) |
 

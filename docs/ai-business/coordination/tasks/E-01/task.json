@@ -4,7 +4,7 @@
   "title": "Migration 040: Preis-, Kosten-, Erlös- und Budgetbuch (additiv, ungenutzt)",
   "module": "controlling-ledger",
   "phase": "E",
-  "status": "waiting_review",
+  "status": "approved_by_reviewer",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -158,7 +158,7 @@
     "ci": "pending"
   },
   "approval": {
-    "reviewer": "pending",
+    "reviewer": "approved",
     "operator": "pending",
     "latest_review_file": null
   },
@@ -167,20 +167,20 @@
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T17:08:15Z",
+    "last_checkpoint_at": "2026-10-19T18:45:08Z",
     "checkpoint_reason": "other",
     "last_commit": "3736fd2",
     "active_branch": "claude/E-01-cost-ledger-migration",
-    "state_summary": "Review #92 umgesetzt: amount_micros statt amount_cents, item, Währung nur mit Betrag, Quelle↔Werteart; Migration 040 weiterhin Betreiberfreigabe",
+    "state_summary": "Nachprüfung zweite Sitzung: approve (Mikro-Beträge)",
     "decisions_made": [
       "Auf B-02 gestapelt statt parallel zu main (gleiche Registrierungszeilen, Nummernfolge)"
     ],
     "test_status": "40/40 gezielt",
     "next_action": "Volle Prüfungen, Draft-PR"
   },
-  "revision": 4,
+  "revision": 5,
   "based_on_commit": "315306d",
-  "updated_at": "2026-10-19T17:08:15Z",
+  "updated_at": "2026-10-19T18:45:08Z",
   "log": [
     {
       "at": "2026-10-19T07:40:00Z",
@@ -208,6 +208,13 @@
       "actor": "claude-code",
       "action": "fixed",
       "summary": "Review #92 umgesetzt: amount_micros statt amount_cents, item, Währung nur mit Betrag, Quelle↔Werteart; Migration 040 weiterhin Betreiberfreigabe",
+      "commit": "3736fd2"
+    },
+    {
+      "at": "2026-10-19T18:45:08Z",
+      "actor": "claude-code",
+      "action": "approved",
+      "summary": "Nachprüfung zweite Sitzung: approve (Mikro-Beträge)",
       "commit": "3736fd2"
     }
   ]

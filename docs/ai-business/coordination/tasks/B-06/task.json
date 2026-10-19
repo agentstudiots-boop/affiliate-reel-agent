@@ -134,7 +134,7 @@
     "ci": "pending"
   },
   "approval": {
-    "reviewer": "pending",
+    "reviewer": "changes_requested",
     "operator": "pending",
     "latest_review_file": null
   },
@@ -144,20 +144,20 @@
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T12:11:00Z",
+    "last_checkpoint_at": "2026-10-19T18:45:08Z",
     "checkpoint_reason": "other",
-    "last_commit": "4561ecb",
+    "last_commit": "070dff7",
     "active_branch": "claude/B-06-decision-requests",
-    "state_summary": "Draft-PR #96 offen",
+    "state_summary": "Review #96: major (recordDecision vertraute Aufrufer) behoben – WhatsApp-Beweis wie Freigabe-Gate; minor umgesetzt; Nachprüfung offen",
     "decisions_made": [
       "Betreiberauftrag 19.10.: in Abwesenheit durchgehend weiterarbeiten; Wirkung bleibt hinter Schaltern/Entscheidungen"
     ],
     "test_status": "alle vier Exit 0, 705/705",
     "next_action": "Review abwarten"
   },
-  "revision": 1,
+  "revision": 2,
   "based_on_commit": "d9e9d1e",
-  "updated_at": "2026-10-19T12:11:00Z",
+  "updated_at": "2026-10-19T18:45:08Z",
   "log": [
     {
       "at": "2026-10-19T12:11:00Z",
@@ -165,6 +165,13 @@
       "action": "created",
       "summary": "B-06 geplant und implementiert (Solo-Betrieb), Commit 4561ecb",
       "commit": "4561ecb"
+    },
+    {
+      "at": "2026-10-19T18:45:08Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "Review #96: major (recordDecision vertraute Aufrufer) behoben – WhatsApp-Beweis wie Freigabe-Gate; minor umgesetzt; Nachprüfung offen",
+      "commit": "070dff7"
     }
   ]
 }

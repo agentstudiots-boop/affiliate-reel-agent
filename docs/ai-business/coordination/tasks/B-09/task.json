@@ -98,20 +98,20 @@
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T17:57:55Z",
+    "last_checkpoint_at": "2026-10-19T18:45:08Z",
     "checkpoint_reason": "other",
-    "last_commit": "883a259",
+    "last_commit": "12d829e",
     "active_branch": "claude/B-09-budget-limits",
-    "state_summary": "Draft-PR #104 offen, voll geprüft",
+    "state_summary": "Testhilfe an neue Entscheidungsschnittstelle angepasst",
     "decisions_made": [
       "Betrag ist Teil des Entscheidungsbetreffs (budget:<abteilung>:<monat>:<cent>)"
     ],
     "test_status": "744/744",
     "next_action": "Review"
   },
-  "revision": 1,
+  "revision": 2,
   "based_on_commit": "1df310c",
-  "updated_at": "2026-10-19T17:57:55Z",
+  "updated_at": "2026-10-19T18:45:08Z",
   "log": [
     {
       "at": "2026-10-19T17:57:55Z",
@@ -119,6 +119,13 @@
       "action": "pr_opened",
       "summary": "B-09 implementiert, Draft-PR #104 (744/744)",
       "commit": "883a259"
+    },
+    {
+      "at": "2026-10-19T18:45:08Z",
+      "actor": "claude-code",
+      "action": "pushed",
+      "summary": "Testhilfe an neue Entscheidungsschnittstelle angepasst",
+      "commit": "12d829e"
     }
   ]
 }

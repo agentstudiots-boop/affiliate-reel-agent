@@ -4,7 +4,7 @@
   "title": "Importer model_calls → cost_entries (gemessen, Preis nur aus dem Katalog)",
   "module": "controlling-ledger",
   "phase": "E",
-  "status": "waiting_review",
+  "status": "approved_by_reviewer",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -124,7 +124,7 @@
     "ci": "pending"
   },
   "approval": {
-    "reviewer": "changes_requested",
+    "reviewer": "approved",
     "operator": "pending",
     "latest_review_file": null
   },
@@ -133,20 +133,20 @@
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T17:08:15Z",
+    "last_checkpoint_at": "2026-10-19T18:45:08Z",
     "checkpoint_reason": "other",
-    "last_commit": "0a45a63",
+    "last_commit": "44ec71f",
     "active_branch": "claude/E-03-model-call-importer",
-    "state_summary": "Review #93 behoben: Mikro-Beträge je Zeile, repriceModelCallEntries, Minutenabstand beim Cursor; Nachprüfung offen",
+    "state_summary": "Nachprüfung approve; minor (Nachbepreisung hängt an Altzeilen) behoben",
     "decisions_made": [
       "Abteilung als Funktion hereingereicht"
     ],
     "test_status": "19/19 gezielt",
     "next_action": "Volle Prüfung, Draft-PR"
   },
-  "revision": 3,
+  "revision": 4,
   "based_on_commit": "e8149a7",
-  "updated_at": "2026-10-19T17:08:15Z",
+  "updated_at": "2026-10-19T18:45:08Z",
   "log": [
     {
       "at": "2026-10-19T11:34:00Z",
@@ -168,6 +168,13 @@
       "action": "fixed",
       "summary": "Review #93 behoben: Mikro-Beträge je Zeile, repriceModelCallEntries, Minutenabstand beim Cursor; Nachprüfung offen",
       "commit": "0a45a63"
+    },
+    {
+      "at": "2026-10-19T18:45:08Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "Nachprüfung approve; minor (Nachbepreisung hängt an Altzeilen) behoben",
+      "commit": "44ec71f"
     }
   ]
 }
