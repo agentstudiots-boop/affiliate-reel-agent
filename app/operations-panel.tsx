@@ -14,9 +14,18 @@ type Snapshot = {
   latestReport: null | { weekStart: string; status: string; text: string };
   modelUsage?: null | Array<{ agent: string; model: string; calls: number; failures: number; failureRate: number; avgLatencyMs: number; p95LatencyMs: number;
     inputTokens: number | null; outputTokens: number | null; predictTimeS: number | null; lastCallAt: string | null }>;
+  controlling?: null | {
+    period: string; parts: { modelUsage: string; costs: string; revenue: string };
+    departments: Array<{ department: string; modelUsage: null | { calls: number; usageComplete: boolean };
+      costs: null | Record<"measured" | "estimated" | "forecast", Money>; revenue: null | Record<"measured" | "estimated" | "forecast", Money> }>;
+  };
 };
+type Money = { amountCents: number | null; entries: number; unknownAmountEntries: number; complete: boolean };
 
 const euro = (cents: number) => new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(cents / 100);
+// No invented zero: no entries ⇒ "keine Daten", no known amount ⇒ "unbekannt", incomplete sum ⇒ lower bound.
+const ledgerAmount = (money: Money | undefined, part: string | undefined) => part !== "ok" || !money ? "nicht verfügbar"
+  : money.entries === 0 ? "keine Daten" : money.amountCents === null ? "unbekannt" : `${money.complete ? "" : "mind. "}${euro(money.amountCents)}`;
 const dailyLabels: Record<string,string> = {
   claimed: "Recherche gestartet", planning: "Entwurf in Arbeit", awaiting_approval: "Planfreigabe offen",
   content_approved: "Plan freigegeben", needs_input: "Klärung nötig", failed: "Fehlgeschlagen",
@@ -83,6 +92,15 @@ export function OperationsPanel() {
             <td>{row.inputTokens ?? "–"} / {row.outputTokens ?? "–"}</td><td>{row.predictTimeS === null ? "–" : `${row.predictTimeS} s`}</td></tr>)}
         </tbody></table></div> : <p>Keine Modellaufrufe protokolliert.</p>}
       <p className="muted">Kosten: Anbieterkennzahlen (Tokens, Rechenzeit) statt geschätzter Euro-Beträge; Preise je Modell beim Anbieter prüfen.</p>
+      <h4>Controlling{data.controlling ? ` (${data.controlling.period})` : ""}</h4>
+      {!data.controlling ? <p>Nicht verfügbar – Kostenbuch noch nicht eingerichtet.</p>
+        : <div style={{overflowX:"auto"}}><table><thead><tr><th>Abteilung</th><th>Modellaufrufe</th><th>Kosten gemessen</th><th>Kosten geschätzt</th><th>Erlös gemessen</th></tr></thead><tbody>
+          {data.controlling.departments.map(row => <tr key={row.department}><td>{row.department}</td>
+            <td>{row.modelUsage ? `${row.modelUsage.calls}${row.modelUsage.usageComplete ? "" : " (Messwerte unvollständig)"}` : "nicht verfügbar"}</td>
+            <td>{ledgerAmount(row.costs?.measured, data.controlling?.parts.costs)}</td><td>{ledgerAmount(row.costs?.estimated, data.controlling?.parts.costs)}</td>
+            <td>{ledgerAmount(row.revenue?.measured, data.controlling?.parts.revenue)}</td></tr>)}
+        </tbody></table></div>}
+      <p className="muted">Controlling: nur erfasste Einträge mit Quelle. „unbekannt“ = Einträge ohne bekannten Betrag; „mind.“ = Summe ohne die unbekannten Beträge.</p>
       {data.latestReport && <details><summary>Letzte Wochenbilanz · {data.latestReport.weekStart} · {data.latestReport.status}</summary><pre style={{whiteSpace:"pre-wrap"}}>{data.latestReport.text || "Bericht noch nicht erstellt."}</pre></details>}
       <p className="muted">Klicks, Verkäufe und Provisionen stammen aus erfassten Messständen. Zum Eintragen: „Gespeicherten Verlauf laden“, den Job wählen und dessen Leistungsformular öffnen. Ohne PartnerNet-Daten sind diese Werte unbekannt. Die Werte einer Beitragszeile sind der letzte Messstand dieses Beitrags, keine Tageswerte.</p>
     </>}
