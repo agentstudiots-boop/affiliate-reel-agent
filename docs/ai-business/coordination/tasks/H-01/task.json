@@ -1,0 +1,186 @@
+{
+  "schema_version": 1,
+  "task_id": "H-01",
+  "title": "Command Center: Unternehmensebene als lesender Datenvertrag (Feld enterprise in /api/architecture)",
+  "module": "command-center",
+  "phase": "H",
+  "status": "waiting_review",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "operator",
+  "base_commit": "18f838e",
+  "branch": "claude/H-01-enterprise-model",
+  "depends_on": [
+    "B-08",
+    "E-07",
+    "G-01",
+    "B-06"
+  ],
+  "claims": {
+    "paths": [
+      "lib/architecture/enterprise.ts",
+      "lib/architecture/enterprise-snapshot.ts",
+      "tests/architecture-enterprise.test.cjs"
+    ],
+    "hot_files": [
+      "app/api/architecture/route.ts",
+      "CLAUDE.md",
+      "tests/controlling-snapshot.test.cjs",
+      "tests/enterprise-affiliate-adapter.test.cjs",
+      "tests/enterprise-agent-departments.test.cjs",
+      "tests/enterprise-contract.test.cjs",
+      "tests/enterprise-decisions.test.cjs",
+      "tests/enterprise-kernel.test.cjs",
+      "tests/enterprise-task-ledger-migration.test.cjs"
+    ],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Ohne Nachweise: alle Register-Abteilungen gelistet, jeder Teil null, nichts erfunden",
+      "verification": "Test",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Zählungen je Abteilung aus dem Aufgabenbuch; unbekannte Abteilungen getrennt, nie umgebucht",
+      "verification": "Test",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Angeschlossene Abteilung mit unlesbarem Bericht: kein Health statt Vermutung",
+      "verification": "Test",
+      "met": true
+    },
+    {
+      "id": "AC-4",
+      "criterion": "Preview/Entwicklung: Runtime-Guard sperrt, Ansicht sagt es",
+      "verification": "Test",
+      "met": true
+    },
+    {
+      "id": "AC-5",
+      "criterion": "Migrierte DB: echte Zählungen, Health vom Adapter (ohne Nachweis unknown), Controlling-Zeile, abgelaufene Vorlagen nicht offen",
+      "verification": "PGlite-Test",
+      "met": true
+    },
+    {
+      "id": "AC-6",
+      "criterion": "Nur SET TRANSACTION READ ONLY / SELECT / WITH, auch im Adapter",
+      "verification": "Test mit Statement-Protokoll",
+      "met": true
+    },
+    {
+      "id": "AC-7",
+      "criterion": "Fehlende Tabellen ⇒ Teil unavailable statt 0",
+      "verification": "Test",
+      "met": true
+    },
+    {
+      "id": "AC-8",
+      "criterion": "API angemeldet, Feld enterprise, kein Secret; keine Schreib-/Ausführungsaufrufe im Code",
+      "verification": "Route-Test + Quelltextprüfung",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 300,
+    "notes": "Solo-Betrieb, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "lib/architecture/enterprise.ts",
+    "lib/architecture/enterprise-snapshot.ts",
+    "app/api/architecture/route.ts",
+    "tests/architecture-enterprise.test.cjs",
+    "CLAUDE.md",
+    "7 Isolationstests (Allowlist um lesende Nutzung ergänzt)"
+  ],
+  "implemented": [
+    "buildEnterpriseView (rein)",
+    "readEnterpriseView (nur lesend)",
+    "GET /api/architecture: Feld enterprise"
+  ],
+  "tests": [
+    {
+      "command": "node --test tests/architecture-enterprise.test.cjs",
+      "result": "passed",
+      "detail": "8/8; Gegentests (abgelaufene Vorlagen gezählt, erfundene Null) ⇒ rot",
+      "commit": "e9e4407",
+      "at": "2026-10-19T16:33:11Z"
+    },
+    {
+      "command": "npm run lint && npm test && npm run build && npm run typecheck (Stapelspitze H-01)",
+      "result": "passed",
+      "detail": "775/775, enthält diesen Stand per Merge",
+      "commit": "7b92194",
+      "at": "2026-10-19T17:08:15Z"
+    }
+  ],
+  "known_issues": [
+    "Gestapelt auf B-08 (#99) und E-07 (#100); Merge erst nach dem gesamten Stapel",
+    "Noch keine Anzeige: Szene/Panels sind H-03/H-04",
+    "Isolationstests der Kernmodule tragen H-01 als einzigen lesenden Nutzer ein"
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/102",
+    "state": "draft",
+    "merge_commit": null,
+    "ci": "pending"
+  },
+  "approval": {
+    "reviewer": "pending",
+    "operator": "pending",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Review",
+    "Merge durch Betreiber nach dem gesamten Stapel"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-19T17:08:15Z",
+    "checkpoint_reason": "other",
+    "last_commit": "7b92194",
+    "active_branch": "claude/H-01-enterprise-model",
+    "state_summary": "Draft-PR #102 nach voller Prüfung (775/775), Stapel inkl. Review-Korrekturen",
+    "decisions_made": [
+      "H-01 und H-02 (API-Feld) zusammen, da die API der erste und einzige Nutzer ist"
+    ],
+    "test_status": "8/8 gezielt",
+    "next_action": "volle Prüfung abwarten, Draft-PR"
+  },
+  "revision": 2,
+  "based_on_commit": "1df310c",
+  "updated_at": "2026-10-19T17:08:15Z",
+  "log": [
+    {
+      "at": "2026-10-19T16:33:11Z",
+      "actor": "claude-code",
+      "action": "created",
+      "summary": "H-01 geplant und implementiert (Solo-Betrieb), Commit e9e4407",
+      "commit": "e9e4407"
+    },
+    {
+      "at": "2026-10-19T17:08:15Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Draft-PR #102 nach voller Prüfung (775/775), Stapel inkl. Review-Korrekturen",
+      "commit": "7b92194"
+    }
+  ]
+}

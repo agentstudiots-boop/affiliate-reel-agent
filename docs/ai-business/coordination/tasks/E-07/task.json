@@ -107,6 +107,20 @@
       "detail": "volle Prüfung im Hauptcheckout, 715/715; erster Typecheck rot nur wegen veralteter .next/types (B-07-Build), nach Build grün",
       "commit": "c339877",
       "at": "2026-10-19T16:13:02Z"
+    },
+    {
+      "command": "node --test tests/controlling-snapshot.test.cjs",
+      "result": "passed",
+      "detail": "6/6",
+      "commit": "098f427",
+      "at": "2026-10-19T17:08:15Z"
+    },
+    {
+      "command": "npm run lint && npm test && npm run build && npm run typecheck (Stapelspitze H-01)",
+      "result": "passed",
+      "detail": "775/775, enthält diesen Stand per Merge",
+      "commit": "7b92194",
+      "at": "2026-10-19T17:08:15Z"
     }
   ],
   "known_issues": [
@@ -131,20 +145,20 @@
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T16:13:02Z",
+    "last_checkpoint_at": "2026-10-19T17:08:15Z",
     "checkpoint_reason": "other",
-    "last_commit": "c339877",
+    "last_commit": "098f427",
     "active_branch": "claude/E-07-controlling-snapshot",
-    "state_summary": "Draft-PR #100 offen, voll geprüft",
+    "state_summary": "an Mikro-Beträge angepasst (Summen einmal auf Cent, nur EUR), Test folgt Registerzuordnung executive_planner",
     "decisions_made": [
       "Keine erfundene Null: null/unbekannt/mind./nicht verfügbar"
     ],
     "test_status": "voll 715/715",
     "next_action": "Review abwarten"
   },
-  "revision": 2,
+  "revision": 3,
   "based_on_commit": "77c26e8",
-  "updated_at": "2026-10-19T16:13:02Z",
+  "updated_at": "2026-10-19T17:08:15Z",
   "log": [
     {
       "at": "2026-10-19T12:19:00Z",
@@ -159,6 +173,13 @@
       "action": "pr_opened",
       "summary": "Draft-PR #100 nach voller Prüfung (715/715)",
       "commit": "c339877"
+    },
+    {
+      "at": "2026-10-19T17:08:15Z",
+      "actor": "claude-code",
+      "action": "pushed",
+      "summary": "an Mikro-Beträge angepasst (Summen einmal auf Cent, nur EUR), Test folgt Registerzuordnung executive_planner",
+      "commit": "098f427"
     }
   ]
 }

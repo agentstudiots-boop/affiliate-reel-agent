@@ -95,6 +95,20 @@
       "detail": "alle vier Exit 0, 693/693",
       "commit": "a398e5a",
       "at": "2026-10-19T11:50:00Z"
+    },
+    {
+      "command": "node --test tests/controlling-model-call-import.test.cjs",
+      "result": "passed",
+      "detail": "14/14 mit Ledger; Gegentests rot",
+      "commit": "0a45a63",
+      "at": "2026-10-19T17:08:15Z"
+    },
+    {
+      "command": "npm run lint && npm test && npm run build && npm run typecheck (Stapelspitze H-01)",
+      "result": "passed",
+      "detail": "775/775, enthält diesen Stand per Merge",
+      "commit": "7b92194",
+      "at": "2026-10-19T17:08:15Z"
     }
   ],
   "known_issues": [
@@ -110,7 +124,7 @@
     "ci": "pending"
   },
   "approval": {
-    "reviewer": "pending",
+    "reviewer": "changes_requested",
     "operator": "pending",
     "latest_review_file": null
   },
@@ -119,20 +133,20 @@
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T11:34:00Z",
+    "last_checkpoint_at": "2026-10-19T17:08:15Z",
     "checkpoint_reason": "other",
-    "last_commit": "a398e5a",
+    "last_commit": "0a45a63",
     "active_branch": "claude/E-03-model-call-importer",
-    "state_summary": "E-03 implementiert, gezielte Tests grün",
+    "state_summary": "Review #93 behoben: Mikro-Beträge je Zeile, repriceModelCallEntries, Minutenabstand beim Cursor; Nachprüfung offen",
     "decisions_made": [
       "Abteilung als Funktion hereingereicht"
     ],
     "test_status": "19/19 gezielt",
     "next_action": "Volle Prüfung, Draft-PR"
   },
-  "revision": 2,
+  "revision": 3,
   "based_on_commit": "e8149a7",
-  "updated_at": "2026-10-19T11:50:00Z",
+  "updated_at": "2026-10-19T17:08:15Z",
   "log": [
     {
       "at": "2026-10-19T11:34:00Z",
@@ -147,6 +161,13 @@
       "action": "pr_opened",
       "summary": "Volle Prüfung grün, Draft-PR #93",
       "commit": "a398e5a"
+    },
+    {
+      "at": "2026-10-19T17:08:15Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "Review #93 behoben: Mikro-Beträge je Zeile, repriceModelCallEntries, Minutenabstand beim Cursor; Nachprüfung offen",
+      "commit": "0a45a63"
     }
   ]
 }

@@ -4,7 +4,7 @@
   "title": "Wirtschaftlichkeitsrechnung: F-01-Bewertung mit E-05-Kennzahlen verbinden (reine Funktionen)",
   "module": "opportunity",
   "phase": "F",
-  "status": "changes_requested",
+  "status": "approved_by_reviewer",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -118,6 +118,20 @@
       "result": "passed",
       "commit": "8e1f61f",
       "at": "2026-10-19T12:25:00Z"
+    },
+    {
+      "command": "npm test (zweite Sitzung)",
+      "result": "passed",
+      "detail": "707/707, Build grün",
+      "commit": "22a68a2",
+      "at": "2026-10-19T17:08:15Z"
+    },
+    {
+      "command": "npm run lint && npm test && npm run build && npm run typecheck (Stapelspitze H-01)",
+      "result": "passed",
+      "detail": "775/775, enthält diesen Stand per Merge",
+      "commit": "7b92194",
+      "at": "2026-10-19T17:08:15Z"
     }
   ],
   "known_issues": [
@@ -140,7 +154,7 @@
     "ci": "pending"
   },
   "approval": {
-    "reviewer": "changes_requested",
+    "reviewer": "approved",
     "operator": "pending",
     "latest_review_file": null
   },
@@ -151,20 +165,20 @@
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T12:25:00Z",
+    "last_checkpoint_at": "2026-10-19T17:08:15Z",
     "checkpoint_reason": "work_package_done",
-    "last_commit": "8e1f61f",
+    "last_commit": "22a68a2",
     "active_branch": "claude/F-04-opportunity-economics",
-    "state_summary": "Draft-PR #97 offen, alle Prüfungen grün",
+    "state_summary": "major aus Review #97 behoben (zweite Sitzung, 707/707, Build grün); Nachprüfung erste Sitzung: approve",
     "decisions_made": [
       "Messung schlägt Prognose; Prognose nach ungünstigem Ende beurteilt",
       "Amortisation gemessen = Investition*Monate/Deckungsbeitrag (keine Rundung des Monatszuflusses)"
     ],
-    "test_status": "705/705",
+    "test_status": "707/707",
     "next_action": "Reviews #87, #91, #92, #93"
   },
-  "revision": 2,
-  "updated_at": "2026-10-19T16:13:02Z",
+  "revision": 3,
+  "updated_at": "2026-10-19T17:08:15Z",
   "log": [
     {
       "at": "2026-10-19T12:25:00Z",
@@ -179,6 +193,13 @@
       "action": "review_received",
       "summary": "Review erste Sitzung: changes_requested (1 major, 2 minor); eingetragen von der ersten Sitzung",
       "commit": "8e1f61f"
+    },
+    {
+      "at": "2026-10-19T17:08:15Z",
+      "actor": "claude-code",
+      "action": "approved",
+      "summary": "major aus Review #97 behoben (zweite Sitzung, 707/707, Build grün); Nachprüfung erste Sitzung: approve",
+      "commit": "22a68a2"
     }
   ]
 }

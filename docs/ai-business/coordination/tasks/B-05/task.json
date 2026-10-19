@@ -117,6 +117,20 @@
       "detail": "alle vier Exit 0, 714/714",
       "commit": "2f0e572",
       "at": "2026-10-19T11:50:00Z"
+    },
+    {
+      "command": "node --test tests/enterprise-*.test.cjs",
+      "result": "passed",
+      "detail": "39/39; Gegentests rot",
+      "commit": "6fd5837",
+      "at": "2026-10-19T17:08:15Z"
+    },
+    {
+      "command": "npm run lint && npm test && npm run build && npm run typecheck (Stapelspitze H-01)",
+      "result": "passed",
+      "detail": "775/775, enthält diesen Stand per Merge",
+      "commit": "7b92194",
+      "at": "2026-10-19T17:08:15Z"
     }
   ],
   "known_issues": [
@@ -133,7 +147,7 @@
     "ci": "pending"
   },
   "approval": {
-    "reviewer": "pending",
+    "reviewer": "changes_requested",
     "operator": "pending",
     "latest_review_file": null
   },
@@ -143,11 +157,11 @@
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T11:34:00Z",
+    "last_checkpoint_at": "2026-10-19T17:08:15Z",
     "checkpoint_reason": "other",
-    "last_commit": "2f0e572",
+    "last_commit": "6fd5837",
     "active_branch": "claude/B-05-budget-guard",
-    "state_summary": "Draft-PR #91 offen",
+    "state_summary": "Review #91 (2 major) behoben: Reservierung an Lease (Halter+Fencing) gebunden, Monat aus DB-Uhr; Nachprüfung offen",
     "decisions_made": [
       "Abrechnung im Repository in derselben Transaktion wie das Ergebnis",
       "Verlorene Worker ⇒ disputed"
@@ -155,9 +169,9 @@
     "test_status": "39/39 gezielt",
     "next_action": "Review abwarten"
   },
-  "revision": 4,
+  "revision": 5,
   "based_on_commit": "7502b48",
-  "updated_at": "2026-10-19T11:50:00Z",
+  "updated_at": "2026-10-19T17:08:15Z",
   "log": [
     {
       "at": "2026-10-19T07:31:00Z",
@@ -179,6 +193,13 @@
       "action": "fixed",
       "summary": "B-03-Fixes per Merge; budget.ts auf DB-Uhr, Reservierung nur bei gültiger Lease",
       "commit": "2f0e572"
+    },
+    {
+      "at": "2026-10-19T17:08:15Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "Review #91 (2 major) behoben: Reservierung an Lease (Halter+Fencing) gebunden, Monat aus DB-Uhr; Nachprüfung offen",
+      "commit": "6fd5837"
     }
   ]
 }

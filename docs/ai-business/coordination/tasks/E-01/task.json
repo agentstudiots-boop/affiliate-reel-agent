@@ -122,6 +122,20 @@
       "detail": "alle vier Exit 0, 693/693",
       "commit": "570e410",
       "at": "2026-10-19T11:50:00Z"
+    },
+    {
+      "command": "node --test tests/controlling-ledger-migration.test.cjs tests/migration-upgrade.test.cjs",
+      "result": "passed",
+      "detail": "8/8",
+      "commit": "3736fd2",
+      "at": "2026-10-19T17:08:15Z"
+    },
+    {
+      "command": "npm run lint && npm test && npm run build && npm run typecheck (Stapelspitze H-01)",
+      "result": "passed",
+      "detail": "775/775, enthält diesen Stand per Merge",
+      "commit": "7b92194",
+      "at": "2026-10-19T17:08:15Z"
     }
   ],
   "known_issues": [
@@ -153,20 +167,20 @@
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T07:40:00Z",
+    "last_checkpoint_at": "2026-10-19T17:08:15Z",
     "checkpoint_reason": "other",
-    "last_commit": "570e410",
+    "last_commit": "3736fd2",
     "active_branch": "claude/E-01-cost-ledger-migration",
-    "state_summary": "E-01 implementiert, gezielte Tests grün",
+    "state_summary": "Review #92 umgesetzt: amount_micros statt amount_cents, item, Währung nur mit Betrag, Quelle↔Werteart; Migration 040 weiterhin Betreiberfreigabe",
     "decisions_made": [
       "Auf B-02 gestapelt statt parallel zu main (gleiche Registrierungszeilen, Nummernfolge)"
     ],
     "test_status": "40/40 gezielt",
     "next_action": "Volle Prüfungen, Draft-PR"
   },
-  "revision": 3,
+  "revision": 4,
   "based_on_commit": "315306d",
-  "updated_at": "2026-10-19T11:50:00Z",
+  "updated_at": "2026-10-19T17:08:15Z",
   "log": [
     {
       "at": "2026-10-19T07:40:00Z",
@@ -188,6 +202,13 @@
       "action": "pr_opened",
       "summary": "Draft-PR #92",
       "commit": "570e410"
+    },
+    {
+      "at": "2026-10-19T17:08:15Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "Review #92 umgesetzt: amount_micros statt amount_cents, item, Währung nur mit Betrag, Quelle↔Werteart; Migration 040 weiterhin Betreiberfreigabe",
+      "commit": "3736fd2"
     }
   ]
 }
