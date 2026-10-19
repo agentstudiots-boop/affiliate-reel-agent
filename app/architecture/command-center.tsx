@@ -5,6 +5,7 @@ import { Component, useEffect, useMemo, useState, type KeyboardEvent as ReactKey
 import type { ClusterId } from "@/lib/architecture/model";
 import type { SceneProps } from "@/app/architecture/scene";
 import { ClusterPanel, GroupedView, NodePanel, OverviewPanel, ProcessRibbon, ProfilesView } from "@/app/architecture/panels";
+import { EnterprisePanel } from "@/app/architecture/enterprise-panel";
 import type { Hover, Payload, Selection } from "@/app/architecture/types";
 import { webglAvailable } from "@/lib/architecture/webgl";
 
@@ -27,7 +28,7 @@ export function CommandCenter({ standalone = false }: { standalone?: boolean } =
   const [loading, setLoading] = useState(false);
   const [selection, setSelection] = useState<Selection>(null);
   const [query, setQuery] = useState("");
-  const [mode, setMode] = useState<"architecture" | "process" | "profiles">(standalone ? "profiles" : "architecture");
+  const [mode, setMode] = useState<"architecture" | "process" | "profiles" | "enterprise">(standalone ? "profiles" : "architecture");
   const [resetToken, setResetToken] = useState(0);
   const [use3d, setUse3d] = useState(true);
   const [webglSupported, setWebglSupported] = useState(false);
@@ -129,7 +130,7 @@ export function CommandCenter({ standalone = false }: { standalone?: boolean } =
   };
   const background = () => setSelection(current => current?.type === "node" && data
     ? (() => { const node = data.nodes.find(item => item.id === current.id); return node && node.cluster !== "core" ? { type: "cluster" as const, id: node.cluster } : null; })() : null);
-  const sceneProps: SceneProps | null = data ? { data, selection, expanded, mode: mode === "process" ? "process" : "architecture", highlightIds: highlight, reducedMotion: reduced, active: open && use3d && !sceneError && mode !== "profiles", resetToken,
+  const sceneProps: SceneProps | null = data ? { data, selection, expanded, mode: mode === "process" ? "process" : "architecture", highlightIds: highlight, reducedMotion: reduced, active: open && use3d && !sceneError && mode !== "profiles" && mode !== "enterprise", resetToken,
     onSelect: select, onBackground: background, onHover: setHover } : null;
   const showScene = use3d && !sceneError;
   const announce = data ? selectedNode ? `${selectedNode.label}: ${data.labels.operation[data.runtime.nodes[selectedNode.id]?.status ?? "unknown"].label}`
@@ -154,17 +155,19 @@ export function CommandCenter({ standalone = false }: { standalone?: boolean } =
           <button type="button" className={mode === "architecture" ? "primary" : "ghost"} aria-pressed={mode === "architecture"} onClick={() => setMode("architecture")}>Architektur</button>
           <button type="button" className={mode === "process" ? "primary" : "ghost"} aria-pressed={mode === "process"} onClick={() => { setMode("process"); setSelection(null); }}>Ablauf</button>
           <button type="button" className={mode === "profiles" ? "primary" : "ghost"} aria-pressed={mode === "profiles"} onClick={() => { setMode("profiles"); setSelection(null); }}>Steckbriefe</button>
+          <button type="button" className={mode === "enterprise" ? "primary" : "ghost"} aria-pressed={mode === "enterprise"} onClick={() => { setMode("enterprise"); setSelection(null); }}>Unternehmen</button>
         </div>
         <button type="button" className="ghost" onClick={() => { setSelection(null); setQuery(""); setResetToken(token => token + 1); }}>Gesamtansicht</button>
         {use3d && !sceneError && <button type="button" className="ghost" onClick={() => setUse3d(false)}>2D-Ansicht</button>}
         {!use3d && webglSupported && <button type="button" className="ghost" onClick={() => { setSceneError(""); setUse3d(true); setSceneMounted(true); }}>3D-Ansicht</button>}
         <button type="button" className="ghost" onClick={() => void load()} title="Status neu vom Server laden">Aktualisieren</button>
       </div>
-      <nav className="ccChips" aria-label="Hauptbereiche">{clusters.map(id => <button key={id} type="button" aria-pressed={expanded === id} className={`ccChip ${expanded === id ? "ccChipOn" : ""}`}
-        style={{ borderColor: data.labels.clusters[id].color }} onClick={() => select({ type: "cluster", id })}>{data.labels.clusters[id].label}</button>)}</nav>
+      {mode !== "enterprise" && <nav className="ccChips" aria-label="Hauptbereiche">{clusters.map(id => <button key={id} type="button" aria-pressed={expanded === id} className={`ccChip ${expanded === id ? "ccChipOn" : ""}`}
+        style={{ borderColor: data.labels.clusters[id].color }} onClick={() => select({ type: "cluster", id })}>{data.labels.clusters[id].label}</button>)}</nav>}
       {mode === "process" && <ProcessRibbon data={data} onSelect={select} />}
+      {mode === "enterprise" && <EnterprisePanel view={data.enterprise} />}
       {mode === "profiles" && <ProfilesView data={data} query={query} onSelect={next => { setMode("architecture"); select(next); }} />}
-      <div className="ccBody" hidden={mode === "profiles"}>
+      <div className="ccBody" hidden={mode === "profiles" || mode === "enterprise"}>
         <div className="ccStage" data-testid="cc-stage" tabIndex={showScene ? 0 : -1} onKeyDown={showScene ? onStageKey : undefined}
           aria-label={showScene ? "3D-Ansicht. Pfeiltasten wechseln Bereiche und Komponenten, Enter öffnet, Pfeil hoch oder Escape geht zurück, Pos1 zeigt alles." : undefined}>
           {sceneMounted && !sceneError && sceneProps && <div style={{ height: "100%", display: showScene ? "block" : "none" }}><SceneBoundary onFail={setSceneError}><Scene {...sceneProps} onContextLost={() => setSceneError("WebGL-Kontext vom Browser beendet")} /></SceneBoundary></div>}

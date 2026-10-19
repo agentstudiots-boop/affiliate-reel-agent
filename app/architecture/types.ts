@@ -1,5 +1,6 @@
 import type { ArchEdge, ArchNode, ClusterId, ComponentKind, DeploymentStatus, EdgeKind, ImplementationStatus, OperationalStatus } from "@/lib/architecture/model";
 import type { RuntimeState } from "@/lib/architecture/runtime";
+import type { EnterpriseView } from "@/lib/architecture/enterprise";
 
 // Shape of GET /api/architecture as the browser receives it (types only; no server code is bundled).
 export type ClientNode = Omit<ArchNode, "operation"> & { implementation: ImplementationStatus; deployment: DeploymentStatus };
@@ -10,6 +11,8 @@ export type Payload = {
   edges: ArchEdge[];
   process: ProcessStep[];
   runtime: RuntimeState;
+  // Enterprise level (H-01); optional so an older server response still renders.
+  enterprise?: EnterpriseView;
   missing: { id: string; label: string; state: string; missing: string[] }[];
   labels: {
     implementation: Record<ImplementationStatus, { label: string; description: string }>;

@@ -120,3 +120,59 @@ test('API: operator-protected, carries the enterprise level, no secret value; on
     assert.doesNotMatch(source,/\b(INSERT|UPDATE|DELETE|ALTER|CREATE|DROP|TRUNCATE)\b|process\.env|fetch\(|\.handle\(|enqueueTask|recordDecision|requestDecision/,file);
   }
 });
+
+// ---------- H-04/H-05: 2D view of the enterprise level ----------
+const React=require('react');
+const {renderToStaticMarkup}=require('react-dom/server');
+const {EnterprisePanel,moneyText}=require('../.test-build/app/architecture/enterprise-panel');
+const html=(view,initial)=>renderToStaticMarkup(React.createElement(EnterprisePanel,{view,initial}));
+
+test('2D view: every department as a keyboard-reachable card; without evidence it says "keine Daten" (AC-9)',()=>{
+  const empty=buildEnterpriseView({now:NOW,health:null,tasks:null,decisions:null,controlling:null,unavailableReason:'Preview/Entwicklung: Datenbankzugriff durch den Runtime-Guard gesperrt'});
+  const out=html(empty);
+  for(const d of empty.departments)assert.ok(out.includes(`<b>${d.label}</b>`),d.label);
+  assert.equal((out.match(/<button type="button" class="ccCard"/g)||[]).length,empty.departments.length);
+  assert.match(out,/Runtime-Guard gesperrt/);
+  assert.match(out,/Aufgaben: keine Daten/);
+  assert.match(out,/nicht angeschlossen/);
+  assert.doesNotMatch(out,/In Ordnung|0,00/,'nothing invented');
+  assert.match(html(undefined),/noch nicht geliefert/);
+});
+
+test('2D detail panel: health with sources, task counts, open decisions, costs as lower bound, agents (AC-10)',()=>{
+  const controlling={contractVersion:1,currency:'EUR',period:'2026-11',generatedAt:NOW.toISOString(),parts:{modelUsage:'ok',costs:'ok',revenue:'ok'},
+    departments:DEPARTMENT_IDS.map(department=>({department,modelUsage:{calls:department==='affiliate'?7:0,failures:0,inputTokens:0,outputTokens:0,predictTimeS:0,usageComplete:true,models:[]},
+      costs:{measured:{amountCents:department==='affiliate'?120:null,entries:department==='affiliate'?3:0,unknownAmountEntries:department==='affiliate'?1:0,complete:department!=='affiliate'},
+        estimated:{amountCents:null,entries:0,unknownAmountEntries:0,complete:true},forecast:{amountCents:null,entries:0,unknownAmountEntries:0,complete:true}},
+      revenue:{measured:{amountCents:null,entries:0,unknownAmountEntries:0,complete:true},estimated:{amountCents:null,entries:0,unknownAmountEntries:0,complete:true},forecast:{amountCents:null,entries:0,unknownAmountEntries:0,complete:true}}})),
+    unassigned:{modelUsage:null,costs:null},sources:[]};
+  const view=buildEnterpriseView({now:NOW,health:{affiliate:{...health('affiliate','degraded'),reason:'letzte Freigabeanfrage nicht beim Betreiber angekommen'}},
+    tasks:[{department:'affiliate',status:'succeeded',count:2,lastAt:NOW.toISOString()},{department:'affiliate',status:'queued',count:1,lastAt:NOW.toISOString()}],
+    decisions:[{department:'affiliate',pending:1,nextExpiry:'2026-11-16T08:00:00.000Z'}],controlling});
+  const out=html(view,'affiliate');
+  assert.match(out,/data-testid="cc-enterprise-detail"/);
+  assert.match(out,/Eingeschränkt/);
+  assert.match(out,/letzte Freigabeanfrage nicht beim Betreiber angekommen/);
+  assert.match(out,/x: <b>1<\/b> <small class="muted">· Quelle: daily_slot_runs<\/small>/,'every evidence value names its source');
+  assert.match(out,/erledigt: <b>2<\/b>/);
+  assert.match(out,/wartend: <b>1<\/b>/);
+  assert.match(out,/offen: <b>1<\/b>/);
+  assert.match(out,/Kosten gemessen: <b>mind\.\s1,20\s€<\/b>/);
+  assert.match(out,/Modellaufrufe: <b>7<\/b>/);
+  assert.match(out,/<code>content_text<\/code>/);
+  assert.equal(moneyText({amountCents:null,entries:2,unknownAmountEntries:2,complete:false}),'unbekannt');
+  assert.equal(moneyText(null),'keine Daten');
+  const engineering=html(view,'engineering');
+  assert.match(engineering,/arbeitet außerhalb der App/);
+});
+
+test('Command Center offers the enterprise view without WebGL and reads nothing itself (AC-11)',()=>{
+  const center=fs.readFileSync('app/architecture/command-center.tsx','utf8');
+  assert.match(center,/setMode\("enterprise"\)[^]*>Unternehmen<\/button>/);
+  assert.match(center,/mode === "enterprise" && <EnterprisePanel view=\{data\.enterprise\} \/>/);
+  assert.match(center,/mode !== "profiles" && mode !== "enterprise", resetToken/,'the 3D scene pauses in the enterprise view');
+  const panel=fs.readFileSync('app/architecture/enterprise-panel.tsx','utf8');
+  assert.doesNotMatch(panel,/fetch\(|process\.env|memory\/db/);
+  assert.doesNotMatch(panel,/^import \{[^}]*\} from "@\/lib\//m,'no value import from lib/: no server code in the client bundle');
+  assert.match(panel,/^import type \{ DepartmentView, EnterpriseView \} from "@\/lib\/architecture\/enterprise";$/m);
+});

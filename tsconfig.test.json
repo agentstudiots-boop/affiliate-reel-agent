@@ -57,6 +57,7 @@
     "lib/enterprise/controlling/snapshot.ts",
     "lib/trendsetter/**/*.ts",
     "lib/architecture/**/*.ts",
+    "app/architecture/enterprise-panel.tsx",
     "lib/tavily.ts"
   ]
 }
