@@ -12,6 +12,8 @@ import { levelFor, levelRank, requiresDecision, type PermissionLevel } from "./p
 import { REGISTRY, department, taskDefinition, type Registry } from "./registry";
 
 const cents = z.number().int().nonnegative().refine(Number.isSafeInteger, "außerhalb des sicheren Zahlenbereichs");
+// Absolute cap independent of the caller's limits, so an oversized model output is rejected before any per-step work.
+export const MAX_PLAN_STEPS = 200;
 
 const stepSchema = z.object({
   id: z.string().min(1).max(64),
@@ -30,7 +32,7 @@ export const executivePlanSchema = z.object({
   goal: z.string().min(1),
   evidence: z.array(z.object({ claim: z.string().min(1), kind: z.enum(["fact", "assumption", "forecast"]), source: z.string().min(1).optional() })).default([]),
   alternatives: z.array(z.object({ title: z.string().min(1), why_not: z.string().optional() })).default([]),
-  steps: z.array(stepSchema).min(1),
+  steps: z.array(stepSchema).min(1).max(MAX_PLAN_STEPS),
   expectedValue: z.object({ low: z.number(), high: z.number(), unit: z.string().min(1), kind: z.literal("forecast") }).nullable(),
   costCapCents: cents,
   abortCriteria: z.array(z.string()).default([]),
@@ -83,16 +85,24 @@ function chainDepth(steps: readonly PlanStep[]): number | null {
   return longest;
 }
 
+const validLimit = (value: unknown) => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+
 export function validatePlan(raw: unknown, limits: PlanLimits, registry: Registry = REGISTRY): PlanValidation {
+  // Invalid limits (NaN, missing, negative, e.g. from a misread setting) reject the plan; they never switch a check off.
+  const limitValues: Record<string, unknown> = limits && typeof limits === "object" ? limits : {};
+  const badLimits = (["maxSteps", "maxDepth", "budgetCents"] as const).filter(key => !validLimit(limitValues[key]));
+  if (badLimits.length) return rejected([`Grenzwerte ungültig: ${badLimits.join(", ")}`]);
   const parsed = executivePlanSchema.safeParse(raw);
   if (!parsed.success) return rejected(parsed.error.issues.map(issue => `Schema: ${issue.path.join(".") || "(Plan)"}: ${issue.message}`));
   const plan = parsed.data;
   const violations: string[] = [];
   const classified = new Map<string, ClassifiedStep>();
 
-  const ids = plan.steps.map(step => step.id);
-  for (const id of new Set(ids.filter((id, index) => ids.indexOf(id) !== index))) violations.push(`Schritt-ID doppelt: ${id}`);
-  if (plan.steps.length > limits.maxSteps) violations.push(`zu viele Schritte: ${plan.steps.length} > ${limits.maxSteps}`);
+  if (plan.steps.length > limits.maxSteps) return rejected([`zu viele Schritte: ${plan.steps.length} > ${limits.maxSteps}`], plan);
+  const ids = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const step of plan.steps) (ids.has(step.id) ? duplicates : ids).add(step.id);
+  for (const id of duplicates) violations.push(`Schritt-ID doppelt: ${id}`);
 
   for (const step of plan.steps) {
     const owner = department(step.department, registry);
@@ -104,7 +114,7 @@ export function validatePlan(raw: unknown, limits: PlanLimits, registry: Registr
     const level = levelFor(definition.action);
     if (!requiresDecision(level) && levelRank(level) > levelRank(owner.maxLevel))
       violations.push(`${step.id}: Stufe ${level} über der Obergrenze ${owner.maxLevel} von ${owner.id}`);
-    for (const dependency of step.dependsOn) if (!ids.includes(dependency)) violations.push(`${step.id}: unbekannte Abhängigkeit ${dependency}`);
+    for (const dependency of step.dependsOn) if (!ids.has(dependency)) violations.push(`${step.id}: unbekannte Abhängigkeit ${dependency}`);
     // The derived level replaces any model-supplied one.
     classified.set(step.id, { ...step, action: definition.action, level, handlerId: definition.handlerId });
   }
@@ -122,7 +132,7 @@ export function validatePlan(raw: unknown, limits: PlanLimits, registry: Registr
   }
   if (plan.costCapCents > limits.budgetCents) violations.push(`Kostendeckel ${plan.costCapCents} > Budget ${limits.budgetCents}`);
 
-  plan.evidence.forEach((item, index) => { if (item.kind === "fact" && !item.source) violations.push(`Beleg ${index + 1}: Fakt ohne Quelle`); });
+  plan.evidence.forEach((item, index) => { if (item.kind === "fact" && !item.source?.trim()) violations.push(`Beleg ${index + 1}: Fakt ohne Quelle`); });
   if (plan.expectedValue && plan.expectedValue.low > plan.expectedValue.high) violations.push("Erwarteter Nutzen: low > high");
 
   if (violations.length) return rejected(violations, plan);
