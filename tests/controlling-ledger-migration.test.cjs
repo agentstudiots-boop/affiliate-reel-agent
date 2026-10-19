@@ -46,13 +46,17 @@ test('costs: amounts from usage need a price, unknown amounts stay NULL, imports
   const db=await pgliteDatabase();
   const p=price();await insert(db,'price_catalog',p);
   await insert(db,'cost_entries',cost());                                         // usage without amount: allowed, amount unknown
-  await insert(db,'cost_entries',cost({amount_cents:1,price_catalog_id:p.id}));   // amount computed from a catalogue price
-  await rejects(insert(db,'cost_entries',cost({amount_cents:1})),'amount from usage without price');
-  await insert(db,'cost_entries',cost({source:'invoice',source_ref:'invoice:2026-10-vercel',category:'infra',amount_cents:2000,quantity:1,unit:'month',value_kind:'measured'}));
-  await insert(db,'cost_entries',cost({source:'manual',source_ref:'manual:abo-chatgpt-2026-10',category:'subscription',amount_cents:2300,quantity:1,unit:'month'}));
+  await insert(db,'cost_entries',cost({amount_micros:2400,currency:'EUR',price_catalog_id:p.id,item:'openai/gpt-4.1'})); // 0,24 Cent: kept, not rounded to 0
+  assert.equal(Number((await db.query("SELECT amount_micros FROM cost_entries WHERE amount_micros IS NOT NULL")).rows[0].amount_micros),2400);
+  await rejects(insert(db,'cost_entries',cost({amount_micros:1,currency:'EUR'})),'amount from usage without price');
+  await rejects(insert(db,'cost_entries',cost({amount_micros:1,price_catalog_id:p.id})),'amount without currency');
+  await rejects(insert(db,'cost_entries',cost({currency:'EUR'})),'currency without amount');
+  await rejects(insert(db,'cost_entries',cost({value_kind:'forecast'})),'imported usage is always measured');
+  await insert(db,'cost_entries',cost({source:'invoice',source_ref:'invoice:2026-10-vercel',category:'infra',amount_micros:20_000_000,currency:'USD',quantity:1,unit:'month',value_kind:'measured'}));
+  await insert(db,'cost_entries',cost({source:'manual',source_ref:'manual:abo-chatgpt-2026-10',category:'subscription',amount_micros:23_000_000,currency:'EUR',quantity:1,unit:'month',value_kind:'forecast'}));
   await insert(db,'cost_entries',cost({source_ref:'model_calls:42'}));
   await rejects(insert(db,'cost_entries',cost({source_ref:'model_calls:42'})),'same model call imported twice');
-  for(const bad of [{amount_cents:-5,source:'manual'},{quantity:-1},{category:'misc'},{value_kind:'guessed'},{source:'tavily'},{department:'Affiliate'},
+  for(const bad of [{amount_micros:-5,currency:'EUR',source:'manual'},{item:''},{quantity:-1},{category:'misc'},{value_kind:'guessed'},{source:'tavily'},{department:'Affiliate'},
     {task_id:id()}])await rejects(insert(db,'cost_entries',cost(bad)),JSON.stringify(bad));
   await db.close();
 });
