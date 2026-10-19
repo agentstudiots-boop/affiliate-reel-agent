@@ -4,7 +4,7 @@
   "title": "Executive-Kern v0: Plan-Vertrag, Richtlinien L0–L4 und Abteilungsregister (reine Funktionen)",
   "module": "enterprise-kernel",
   "phase": "B",
-  "status": "waiting_operator",
+  "status": "in_progress",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -43,7 +43,7 @@
     },
     {
       "id": "AC-3",
-      "criterion": "plan.ts definiert ExecutivePlan (02 §3.3) als Zod-Schema und validatePlan(raw, registry, limits) mit Ergebnis { ok, plan, executable, decisionRequests, blocked, violations } (blocked gemäß AC-9, leere Listen gemäß AC-10).",
+      "criterion": "plan.ts definiert ExecutivePlan (02 §3.3) als Zod-Schema und validatePlan(raw, limits, registry = REGISTRY) mit Ergebnis { ok, plan, executable, decisionRequests, blocked, violations } (blocked gemäß AC-9, leere Listen gemäß AC-10).",
       "verification": "Typecheck + Tests",
       "met": true
     },
@@ -138,6 +138,13 @@
       "detail": "685/685 Tests",
       "commit": "87e665f",
       "at": "2026-10-19T06:25:00Z"
+    },
+    {
+      "command": "node --test tests/enterprise-kernel.test.cjs",
+      "result": "passed",
+      "detail": "11/11 nach Fixes",
+      "commit": "81aa6ce",
+      "at": "2026-10-19T06:59:00Z"
     }
   ],
   "known_issues": [
@@ -159,31 +166,31 @@
     "ci": "pending"
   },
   "approval": {
-    "reviewer": "pending",
+    "reviewer": "changes_requested",
     "operator": "pending",
     "latest_review_file": null
   },
   "next_steps": [
-    "Review von #84 durch die zweite Claude-Sitzung",
-    "Betreiber: Merge nach Review/CI"
+    "Nachprüfung durch zweite Sitzung",
+    "Volle Suite über G-01-Stapel (läuft)"
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T06:25:00Z",
+    "last_checkpoint_at": "2026-10-19T06:59:00Z",
     "checkpoint_reason": "work_package_done",
-    "last_commit": "87e665f",
+    "last_commit": "81aa6ce",
     "active_branch": "claude/B-01-executive-kernel",
-    "state_summary": "B-01 implementiert, Prüfungen grün, Draft-PR #84",
+    "state_summary": "Review-Befunde behoben, Nachprüfung offen",
     "decisions_made": [
       "Reine Funktionen ohne DB als erster Baustein (ADR-16)",
       "Unbekannte Aktion → L4 (fail closed)"
     ],
     "test_status": "685/685",
-    "next_action": "Review abwarten"
+    "next_action": "Nachprüfung anfordern"
   },
-  "revision": 5,
+  "revision": 6,
   "based_on_commit": "e002446",
-  "updated_at": "2026-10-19T06:25:00Z",
+  "updated_at": "2026-10-19T06:59:00Z",
   "log": [
     {
       "at": "2026-10-18T21:30:00Z",
@@ -226,6 +233,20 @@
       "action": "pr_opened",
       "summary": "Implementierung 87e665f, Draft-PR #84, alle Prüfungen grün",
       "commit": "87e665f"
+    },
+    {
+      "at": "2026-10-19T06:59:00Z",
+      "actor": "claude-code",
+      "action": "review_received",
+      "summary": "Review zweite Sitzung (PR #84 Kommentar): changes_requested, 1 major (limits fail-open), 3 minor, 3 nit",
+      "commit": "87e665f"
+    },
+    {
+      "at": "2026-10-19T06:59:00Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "Alle Befunde behoben außer nit 6 (strip bleibt, begründet); AC-3-Signatur angeglichen",
+      "commit": "81aa6ce"
     }
   ]
 }

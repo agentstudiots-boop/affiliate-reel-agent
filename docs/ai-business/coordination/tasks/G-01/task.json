@@ -134,9 +134,9 @@
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T06:48:00Z",
+    "last_checkpoint_at": "2026-10-19T06:59:00Z",
     "checkpoint_reason": "other",
-    "last_commit": "c5c77a8",
+    "last_commit": "fd4b1f7",
     "active_branch": "claude/G-01-affiliate-adapter",
     "state_summary": "G-01 vollständig geprüft, Draft-PR #87 offen",
     "decisions_made": [
@@ -146,9 +146,9 @@
     "test_status": "volle Prüfungen grün",
     "next_action": "CI/Review #87 verfolgen"
   },
-  "revision": 2,
+  "revision": 3,
   "based_on_commit": "c797df0",
-  "updated_at": "2026-10-19T06:48:00Z",
+  "updated_at": "2026-10-19T06:59:00Z",
   "log": [
     {
       "at": "2026-10-19T06:30:00Z",
@@ -170,6 +170,13 @@
       "action": "pr_opened",
       "summary": "Volle Prüfungen grün (699/699), Draft-PR #87 (gestapelt auf #84/#86)",
       "commit": "c5c77a8"
+    },
+    {
+      "at": "2026-10-19T06:59:00Z",
+      "actor": "claude-code",
+      "action": "pushed",
+      "summary": "B-04-Review-Fixes per Merge fd4b1f7 übernommen; volle Suite läuft",
+      "commit": "fd4b1f7"
     }
   ]
 }

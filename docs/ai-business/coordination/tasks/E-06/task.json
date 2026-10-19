@@ -4,7 +4,7 @@
   "title": "Abteilungszuordnung der Modellaufrufe über das Register (ohne Schemaänderung)",
   "module": "controlling-metrics",
   "phase": "E",
-  "status": "in_progress",
+  "status": "waiting_review",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -91,10 +91,10 @@
     },
     {
       "command": "npm run typecheck / lint / test / build",
-      "result": "not_run",
-      "detail": "folgt nach G-01 im Hauptcheckout",
+      "result": "passed",
+      "detail": "alle vier Exit 0, 690/690 (auf 18561b0, vor Merge der B-01-Fixes)",
       "commit": "18561b0",
-      "at": "2026-10-19T06:44:00Z"
+      "at": "2026-10-19T06:59:00Z"
     }
   ],
   "known_issues": [
@@ -105,10 +105,10 @@
   ],
   "open_decisions": [],
   "pr": {
-    "url": null,
-    "state": "none",
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/88",
+    "state": "draft",
     "merge_commit": null,
-    "ci": "unknown"
+    "ci": "pending"
   },
   "approval": {
     "reviewer": "pending",
@@ -116,24 +116,25 @@
     "latest_review_file": null
   },
   "next_steps": [
-    "Volle Prüfungen im Hauptcheckout, Draft-PR gegen main"
+    "CI auf #88",
+    "Merge durch Betreiber erst nach #84"
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T06:44:00Z",
+    "last_checkpoint_at": "2026-10-19T06:59:00Z",
     "checkpoint_reason": "other",
-    "last_commit": "18561b0",
+    "last_commit": "61278f4",
     "active_branch": "claude/E-06-model-call-departments",
-    "state_summary": "E-06 implementiert, gezielte Tests grün",
+    "state_summary": "Draft-PR #88 offen",
     "decisions_made": [
       "Empfehlung aus 04 §E umgesetzt: Register statt Spalte department, keine Migration"
     ],
     "test_status": "5/5 gezielt",
-    "next_action": "Volle Prüfungen, Draft-PR"
+    "next_action": "CI/Review #88"
   },
-  "revision": 1,
+  "revision": 2,
   "based_on_commit": "5dcbf75",
-  "updated_at": "2026-10-19T06:44:00Z",
+  "updated_at": "2026-10-19T06:59:00Z",
   "log": [
     {
       "at": "2026-10-19T06:44:00Z",
@@ -141,6 +142,13 @@
       "action": "created",
       "summary": "E-06 geplant und implementiert (Solo-Betrieb), Commit 18561b0",
       "commit": "18561b0"
+    },
+    {
+      "at": "2026-10-19T06:59:00Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Draft-PR #88 (gestapelt auf #84), B-01-Fixes per Merge 61278f4",
+      "commit": "61278f4"
     }
   ]
 }
