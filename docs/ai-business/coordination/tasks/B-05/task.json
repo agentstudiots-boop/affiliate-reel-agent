@@ -1,0 +1,162 @@
+{
+  "schema_version": 1,
+  "task_id": "B-05",
+  "title": "Budgetwächter: Reservierung vor dem Aufruf, Abrechnung danach, unklarer Status hält die Reservierung",
+  "module": "enterprise-ledger",
+  "phase": "B",
+  "status": "in_progress",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "operator",
+  "base_commit": "a8aef79",
+  "branch": "claude/B-05-budget-guard",
+  "depends_on": [
+    "B-03"
+  ],
+  "claims": {
+    "paths": [
+      "lib/enterprise/tasks/budget.ts",
+      "tests/enterprise-budget-guard.test.cjs",
+      "lib/enterprise/tasks/repository.ts"
+    ],
+    "hot_files": [
+      "tsconfig.test.json"
+    ],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Budgetperiode = Kalendermonat Europe/Berlin",
+      "verification": "Tests an Monatsgrenzen",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Reservierung nur für laufende Aufgaben (Zeilensperre), Abteilung aus dem Aufgabenbuch, gegen Aufgaben- und Monatsbudget (Advisory-Lock); ungültige Eingaben/Grenzen ⇒ keine Reservierung",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Abgerechnet zählt der echte Betrag (Überschreitung sichtbar), freigegeben zählt nicht; nur einmal abrechenbar",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-4",
+      "criterion": "outcome_unknown ⇒ disputed; disputed zählt weiter, wird nie freigegeben, nur mit echtem Betrag aufgelöst; Freigabe bei outcome_unknown-Aufgabe gesperrt",
+      "verification": "Tests + Gegentest",
+      "met": true
+    },
+    {
+      "id": "AC-5",
+      "criterion": "completeTask rechnet offene Reservierungen in derselben Transaktion ab; reclaimExpired setzt sie auf disputed; Rollback lässt sie unverändert",
+      "verification": "Tests + Gegentest",
+      "met": true
+    },
+    {
+      "id": "AC-6",
+      "criterion": "Nicht eingebunden; keine Umgebungsvariablen/Netz",
+      "verification": "Isolationstest",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 300,
+    "notes": "Solo-Betrieb, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "lib/enterprise/tasks/budget.ts",
+    "tests/enterprise-budget-guard.test.cjs",
+    "lib/enterprise/tasks/repository.ts",
+    "tests/enterprise-task-repository.test.cjs",
+    "tsconfig.test.json"
+  ],
+  "implemented": [
+    "periodOf",
+    "reserveBudget",
+    "settleReservation",
+    "releaseReservation",
+    "disputeReservation",
+    "resolveDispute",
+    "settleTaskReservations",
+    "disputeTaskReservations",
+    "committedBudget"
+  ],
+  "tests": [
+    {
+      "command": "node --test tests/enterprise-*.test.cjs tests/migration-upgrade.test.cjs",
+      "result": "passed",
+      "detail": "39/39; zwei Gegentests bestätigt",
+      "commit": "5d55d13",
+      "at": "2026-10-19T07:31:00Z"
+    },
+    {
+      "command": "npm run typecheck / lint / test / build",
+      "result": "not_run",
+      "detail": "läuft im Hauptcheckout",
+      "commit": "5d55d13",
+      "at": "2026-10-19T07:31:00Z"
+    }
+  ],
+  "known_issues": [
+    "Gestapelt auf B-03 (#90) und damit auf #84, #86, #89",
+    "Monatsgrenzen kommen vom Aufrufer, bis E-01 (budgets) existiert; Standard muss fail-closed sein (Grenze 0)",
+    "Abrechnung je Aufgabe: Gesamtverbrauch auf die älteste offene Reservierung, weitere mit 0",
+    "Nach einem Lease-Ablauf und Neuversuch zählen die Reservierungen des verlorenen Versuchs als disputed weiter (bewusst konservativ)"
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": null,
+    "state": "none",
+    "merge_commit": null,
+    "ci": "unknown"
+  },
+  "approval": {
+    "reviewer": "pending",
+    "operator": "pending",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Volle Prüfungen, Draft-PR gegen main"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-19T07:31:00Z",
+    "checkpoint_reason": "other",
+    "last_commit": "5d55d13",
+    "active_branch": "claude/B-05-budget-guard",
+    "state_summary": "B-05 implementiert, gezielte Tests grün",
+    "decisions_made": [
+      "Abrechnung im Repository in derselben Transaktion wie das Ergebnis",
+      "Verlorene Worker ⇒ disputed"
+    ],
+    "test_status": "39/39 gezielt",
+    "next_action": "Volle Prüfungen, Draft-PR"
+  },
+  "revision": 1,
+  "based_on_commit": "7502b48",
+  "updated_at": "2026-10-19T07:31:00Z",
+  "log": [
+    {
+      "at": "2026-10-19T07:31:00Z",
+      "actor": "claude-code",
+      "action": "created",
+      "summary": "B-05 geplant und implementiert (Solo-Betrieb), Commit 5d55d13",
+      "commit": "5d55d13"
+    }
+  ]
+}
