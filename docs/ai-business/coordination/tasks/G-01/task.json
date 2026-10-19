@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "task_id": "G-01",
+  "title": "Affiliate-Adapter: Content Studio als erste Abteilung hinter dem Vertrag (nur lesend)",
+  "module": "affiliate-adapter",
+  "phase": "G",
+  "status": "in_progress",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "operator",
+  "base_commit": "cb74eb9",
+  "branch": "claude/G-01-affiliate-adapter",
+  "depends_on": [
+    "B-01",
+    "B-04"
+  ],
+  "claims": {
+    "paths": [
+      "lib/enterprise/departments/affiliate.ts",
+      "tests/enterprise-affiliate-adapter.test.cjs"
+    ],
+    "hot_files": [
+      "tsconfig.test.json"
+    ],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Ohne protokollierten Cron-Aufruf des Tagesentwurfs (7 Tage) ist health() unknown, nie ok",
+      "verification": "PGlite-Test",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Entwurf zur Freigabe (Outcome awaiting_approval) innerhalb von zwei Tagen ⇒ ok mit Nachweisen aus daily_slot_runs, content_approval_requests, publication_requests, instagram_image_posts (7-Tage-Fenster)",
+      "verification": "PGlite-Test mit echten Migrationen",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Letztes echtes Slot-Ergebnis error/failed (Leeraufrufe outside_berlin_slot/already_claimed ignoriert) oder seit zwei Tagen kein Entwurf zur Freigabe ⇒ degraded",
+      "verification": "PGlite-Tests; Drift-Test gegen app/api/cron/daily-draft/route.ts und lib/daily/draft.ts",
+      "met": true
+    },
+    {
+      "id": "AC-4",
+      "criterion": "Nicht lesbare Datenbank ⇒ health unknown ohne Nachweise; Aufgabe failed provider_error, keine Ausnahme",
+      "verification": "Test mit defekter DB",
+      "met": true
+    },
+    {
+      "id": "AC-5",
+      "criterion": "Jede Lesesicht läuft als SELECT in einer READ-ONLY-Transaktion, gebundene Parameter",
+      "verification": "Test mit protokollierender Fake-DB",
+      "met": true
+    },
+    {
+      "id": "AC-6",
+      "criterion": "Nur affiliate.status_report wird ausgeführt (Kosten 0, keine Modellaufrufe); affiliate.publication_request (L3b) wird von checkEnvelope und vom Adapter abgelehnt",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-7",
+      "criterion": "Keine Schreib-, Netz-, Env- oder Nachrichtenaufrufe; nur Typ-Import aus lib/memory/db; nicht in app/ oder lib/ außerhalb lib/enterprise eingebunden",
+      "verification": "Isolationstest",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 250,
+    "notes": "Solo-Betrieb, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "lib/enterprise/departments/affiliate.ts",
+    "tests/enterprise-affiliate-adapter.test.cjs",
+    "tsconfig.test.json"
+  ],
+  "implemented": [
+    "affiliateReadViews (daily_runs, open_approvals, published)",
+    "affiliateContext",
+    "affiliateDepartment.health/handle"
+  ],
+  "tests": [
+    {
+      "command": "node --test tests/enterprise-affiliate-adapter.test.cjs",
+      "result": "passed",
+      "detail": "8/8",
+      "commit": "c5c77a8",
+      "at": "2026-10-19T06:55:00Z"
+    },
+    {
+      "command": "npm run typecheck / lint / test / build",
+      "result": "not_run",
+      "detail": "läuft",
+      "commit": "a307bd3",
+      "at": "2026-10-19T06:45:00Z"
+    }
+  ],
+  "known_issues": [
+    "Gestapelt auf B-04 (#86) und B-01 (#84); Merge erst danach",
+    "Outcome-Werte stehen als DAILY_OUTCOMES im Adapter; ein Test prüft, dass sie im Studio-Code vorkommen. Neue Fehler-Outcomes im Studio müssen dort ergänzt werden",
+    "Liest nur; Studio (Jarvis), Gates und Tabellen unverändert",
+    "needs_input über zwei Tage (z. B. Qualitäts-Gate ohne Kandidat) gilt bewusst als degraded: technisch kein Fehler, aber kein Entwurf beim Betreiber"
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": null,
+    "state": "none",
+    "merge_commit": null,
+    "ci": "unknown"
+  },
+  "approval": {
+    "reviewer": "pending",
+    "operator": "pending",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Volle Prüfungen abschließen, Draft-PR gegen main"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-19T06:45:00Z",
+    "checkpoint_reason": "other",
+    "last_commit": "c5c77a8",
+    "active_branch": "claude/G-01-affiliate-adapter",
+    "state_summary": "G-01 implementiert, gezielte Tests grün",
+    "decisions_made": [
+      "Solo-Betrieb: Planung, Implementierung und Kriterien durch Claude",
+      "Nur lesende Sichten statt DB-Handle (B-04)"
+    ],
+    "test_status": "7/7 gezielt",
+    "next_action": "Draft-PR öffnen"
+  },
+  "revision": 1,
+  "based_on_commit": "c797df0",
+  "updated_at": "2026-10-19T06:45:00Z",
+  "log": [
+    {
+      "at": "2026-10-19T06:45:00Z",
+      "actor": "claude-code",
+      "action": "created",
+      "summary": "G-01 geplant und implementiert (Solo-Betrieb), Commit a307bd3",
+      "commit": "a307bd3"
+    },
+    {
+      "at": "2026-10-19T06:55:00Z",
+      "actor": "claude-code",
+      "action": "updated",
+      "summary": "Selbstprüfung: erfundener Outcome drafted im Test, failed zählte als Erfolg, Leeraufrufe verdeckten Fehler – korrigiert, Drift-Test ergänzt",
+      "commit": "c5c77a8"
+    }
+  ]
+}
