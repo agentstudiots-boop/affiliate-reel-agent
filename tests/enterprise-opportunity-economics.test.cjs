@@ -88,6 +88,29 @@ test('verdict needs the operator limit; measured wins over forecast, forecast is
   assert.deepEqual([byMeasurement.verdict.status,byMeasurement.verdict.basis],['outside_limit','measured']);
 });
 
+test('a test phase decides alone: measured loss is outside, unusable measurements are insufficient (review #97)',()=>{
+  // Grid forecast 2–10 months is within 12 months – it must not overrule a measured test phase.
+  const loss=run({}, {measured:{periodMonths:2,revenue:eur(10000),directCosts:[eur(30000)],investment:eur(50000)},limits:LIMITS});
+  assert.deepEqual([loss.verdict.status,loss.verdict.basis,loss.testRecommended],['outside_limit','measured',false]);
+  assert.match(loss.verdict.reasons[0],/Deckungsbeitrag ≤ 0/);
+  const lossWithoutLimit=run({}, {measured:{periodMonths:2,revenue:eur(10000),directCosts:[eur(10000)],investment:eur(50000)}});
+  assert.deepEqual([lossWithoutLimit.verdict.status,lossWithoutLimit.testRecommended],['outside_limit',false]); // zero margin, no limit needed
+  const estimated=run({}, {measured:{periodMonths:2,revenue:eur(10000),directCosts:[eur(3000,'estimated')],investment:eur(50000)},limits:LIMITS});
+  assert.deepEqual([estimated.verdict.status,estimated.verdict.basis,estimated.testRecommended],['insufficient_data','measured',false]);
+  assert.match(estimated.verdict.reasons[0],/geschätzte Kosten/);
+  const missing=run({}, {measured:{periodMonths:2,revenue:eur(null),directCosts:[],investment:eur(50000)},limits:LIMITS});
+  assert.deepEqual([missing.verdict.status,missing.testRecommended],['insufficient_data',false]);
+});
+
+test('malformed assessment values yield unknown instead of throwing (review #97)',()=>{
+  const evaluation=evaluateOpportunity(grid(),CONFIG);
+  const broken=grid().map(a=>a.criterion==='investmentNeed'||a.criterion==='revenueProfitPotential'?{...a,value:null}:a);
+  const result=assessEconomics({evaluation,assessments:broken,limits:LIMITS});
+  assert.match(result.forecast.investment.reason,/Wert fehlt/);
+  assert.match(result.forecast.monthlyProfit.reason,/nur als Spanne/);
+  assert.equal(result.testRecommended,false);
+});
+
 test('test recommended only if the grid recommends a test and the verdict is within the limit (AC-6)',()=>{
   assert.equal(run({}, {limits:LIMITS}).testRecommended,true);
   assert.equal(run({}, {limits:{...LIMITS,maxPaybackMonths:9}}).testRecommended,false);

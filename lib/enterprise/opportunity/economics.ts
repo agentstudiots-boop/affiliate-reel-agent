@@ -3,10 +3,13 @@
 // Joins an F-01 grid evaluation with the E-05 key figures. Three kinds of numbers stay strictly apart:
 // * measured – from a real test phase (revenue, direct costs, investment): contribution margin, simple ROI and simple
 //   payback via E-05; anything estimated in it is reported, never mixed into ROI or payback;
-// * forecast – from the grid (investment need, revenue/profit range): a payback range, always a range with its formula;
+// * forecast – from the grid (investment need, revenue/profit range): a payback range, always a range with its formula.
+//   The range of "Umsatz-/Gewinnpotenzial" is read as monthly profit after direct costs; a revenue figure there would make
+//   the payback look too short, so the assessor must enter profit;
 // * scoring – the F-01 recommendation as it is.
 // Missing or inconsistent inputs yield "unknown" with a reason – nothing is estimated here. The verdict compares a payback
-// with the operator's maximum (a decision of the operator, Q-07); without that limit there is no verdict. A verdict or a
+// with the operator's maximum (a decision of the operator, Q-07); without that limit there is no verdict. Once a test phase
+// has measured figures, they alone decide: a measured loss is outside every limit, unusable measurements are insufficient. A verdict or a
 // "test recommended" is never an approval. No database, network, model calls or clock; inputs are not changed.
 
 import { contributionMargin, simplePayback, simpleRoi, type ContributionMargin, type MetricResult, type MoneyInput } from "../controlling/metrics";
@@ -51,7 +54,7 @@ export type EconomicsAssessment = {
   testRecommended: boolean;
 };
 
-export const FORECAST_FORMULA = "Amortisation (Monate) = Investition / monatlicher Gewinn; Spanne: niedrigste Investition / höchster Gewinn bis höchste Investition / niedrigster Gewinn";
+export const FORECAST_FORMULA = "Amortisation (Monate) = Investition / monatlicher Gewinn nach direkten Kosten; Spanne: niedrigste Investition / höchster Gewinn bis höchste Investition / niedrigster Gewinn";
 
 const unknown = (reason: string): { status: "unknown"; reason: string } => ({ status: "unknown", reason });
 const known = <T>(value: T): { status: "known"; value: T } => ({ status: "known", value });
@@ -75,7 +78,8 @@ function assessed(evaluation: OpportunityEvaluation, assessments: readonly Crite
 // Investment need as a cent range: a number is a range of one point; the unit must be the currency code itself.
 function investmentRange(entry: CriterionAssessment): MetricResult<MoneyRange> {
   const value = entry.value;
-  const unit = "unit" in value ? value.unit.trim() : "";
+  if (!value || typeof value !== "object") return unknown("Investitionsbedarf: Wert fehlt");
+  const unit = "unit" in value && typeof value.unit === "string" ? value.unit.trim() : "";
   if (!CURRENCY.test(unit)) return unknown(`Investitionsbedarf: Einheit muss ein Währungscode sein (z. B. EUR), erhalten: ${unit || "keine"}`);
   const [low, high] = value.type === "number" ? [value.amount, value.amount] : value.type === "range" ? [value.low, value.high] : [NaN, NaN];
   const lowCents = toCents(low), highCents = toCents(high);
@@ -87,8 +91,8 @@ function investmentRange(entry: CriterionAssessment): MetricResult<MoneyRange> {
 // Monthly profit range; the unit must be "<currency>/Monat". A forecast is always a range (enforced by F-01).
 function profitRange(entry: CriterionAssessment): MetricResult<MoneyRange> {
   const value = entry.value;
-  if (value.type !== "range") return unknown("Umsatz-/Gewinnpotenzial: nur als Spanne zulässig");
-  const match = /^([A-Z]{3})\/Monat$/.exec(value.unit.trim());
+  if (!value || typeof value !== "object" || value.type !== "range") return unknown("Umsatz-/Gewinnpotenzial: nur als Spanne zulässig");
+  const match = typeof value.unit === "string" ? /^([A-Z]{3})\/Monat$/.exec(value.unit.trim()) : null;
   if (!match) return unknown(`Umsatz-/Gewinnpotenzial: Einheit muss <Währung>/Monat sein, erhalten: ${value.unit}`);
   const lowCents = toCents(value.low), highCents = toCents(value.high);
   if (lowCents === null || highCents === null) return unknown("Umsatz-/Gewinnpotenzial: Betrag nicht in Cent darstellbar");
@@ -136,25 +140,29 @@ function measuredEconomics(input: MeasuredInput): MeasuredEconomics {
 }
 
 function verdictFor(measured: MeasuredEconomics | null, forecast: ForecastEconomics, limits: EconomicsLimits | null | undefined): Verdict {
-  // Measured figures win over the forecast; the forecast is judged by its unfavourable end.
-  const measuredPayback = measured?.paybackMonths.status === "known" ? measured.paybackMonths.value : null;
-  const forecastPaybackRange = forecast.paybackMonths.status === "known" ? forecast.paybackMonths.value : null;
-  const basis = measuredPayback !== null ? "measured" : forecastPaybackRange ? "forecast" : null;
-  if (!basis) {
-    const reasons = [measured ? `gemessen: ${(measured.paybackMonths as { reason: string }).reason}` : "keine Messwerte aus einer Testphase",
-      `Prognose: ${(forecast.paybackMonths as { reason: string }).reason ?? "unbekannt"}`];
-    return { status: "insufficient_data", basis: null, limitsVersion: null, reasons };
-  }
   const max = limits?.maxPaybackMonths;
   const version = typeof limits?.version === "string" && limits.version.trim() ? limits.version.trim() : null;
-  if (!version || typeof max !== "number" || !Number.isFinite(max) || max <= 0)
-    return { status: "no_operator_limit", basis, limitsVersion: version, reasons: ["maximale Amortisationsdauer nicht festgelegt (Betreiberentscheidung Q-07)"] };
-  const months = basis === "measured" ? measuredPayback : forecastPaybackRange!.highMonths;
-  if (months === null) return { status: "outside_limit", basis, limitsVersion: version, reasons: ["im ungünstigen Fall keine Amortisation (niedrigster Gewinn ≤ 0)"] };
-  const label = basis === "measured" ? "gemessene" : "prognostizierte (ungünstiger Fall)";
-  return months <= max
-    ? { status: "within_limit", basis, limitsVersion: version, reasons: [] }
-    : { status: "outside_limit", basis, limitsVersion: version, reasons: [`${label} Amortisation über ${max} Monaten`] };
+  const hasLimit = !!version && typeof max === "number" && Number.isFinite(max) && max > 0;
+  const noLimit = (basis: Verdict["basis"]): Verdict =>
+    ({ status: "no_operator_limit", basis, limitsVersion: version, reasons: ["maximale Amortisationsdauer nicht festgelegt (Betreiberentscheidung Q-07)"] });
+  const compare = (basis: "measured" | "forecast", months: number | null, label: string): Verdict => {
+    if (months === null) return { status: "outside_limit", basis, limitsVersion: version, reasons: ["im ungünstigen Fall keine Amortisation (niedrigster Gewinn ≤ 0)"] };
+    if (!hasLimit) return noLimit(basis);
+    return months <= (max as number) ? { status: "within_limit", basis, limitsVersion: version, reasons: [] }
+      : { status: "outside_limit", basis, limitsVersion: version, reasons: [`${label} Amortisation über ${max} Monaten`] };
+  };
+  // A test phase decides on its own: once measured figures exist, the forecast is never used for the verdict.
+  if (measured) {
+    if (measured.paybackMonths.status === "known") return compare("measured", measured.paybackMonths.value, "gemessene");
+    const contribution = measured.contribution;
+    if (contribution.status === "known" && !contribution.value.includesEstimates && contribution.value.contributionCents <= 0)
+      return { status: "outside_limit", basis: "measured", limitsVersion: version, reasons: ["gemessener Deckungsbeitrag ≤ 0: keine Amortisation"] };
+    return { status: "insufficient_data", basis: "measured", limitsVersion: version, reasons: [`gemessen: ${measured.paybackMonths.reason}`] };
+  }
+  // Without a test phase the forecast is judged by its unfavourable end.
+  if (forecast.paybackMonths.status === "known") return compare("forecast", forecast.paybackMonths.value.highMonths, "prognostizierte (ungünstiger Fall)");
+  return { status: "insufficient_data", basis: null, limitsVersion: version,
+    reasons: ["keine Messwerte aus einer Testphase", `Prognose: ${forecast.paybackMonths.reason}`] };
 }
 
 export function assessEconomics(input: {
