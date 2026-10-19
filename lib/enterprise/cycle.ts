@@ -4,7 +4,9 @@
 // Nothing here decides or approves anything: tasks are L0–L2 by construction (B-01/B-03), decision requests stay requests
 // (B-06), and a department result goes through the repository's checks (lease, fencing, budget, outcome_unknown). A
 // department that throws has an unknown usage, so its result is recorded as unreadable – the repository fails the task
-// and disputes its budget reservations. The cron route calls this only with EXECUTIVE_ENABLED=true in production.
+// and disputes its budget reservations. A department that does not answer within handlerTimeoutMs is treated the same way
+// (its usage is unknown), so one hanging task cannot use up the route's time budget for the others.
+// The cron route calls this only with EXECUTIVE_ENABLED=true in production.
 
 import type { Database } from "../memory/db";
 import type { DepartmentContext, DepartmentModule } from "./contract";
@@ -18,6 +20,8 @@ export type CycleOptions = {
   maxTasks: number;
   departments: Partial<Record<DepartmentId, DepartmentModule>>;
   contextFor: (department: DepartmentId) => DepartmentContext;
+  // Time per department call; default 15 s, capped by the lease.
+  handlerTimeoutMs?: number;
 };
 export type CycleReport = {
   reclaimed: { requeued: number; dead: number; unknown: number; expired: number };
@@ -26,9 +30,19 @@ export type CycleReport = {
 };
 
 const MAX_TASKS = 10;
+const DEFAULT_HANDLER_TIMEOUT_MS = 15_000;
+const TIMED_OUT = Symbol("timed_out");
+
+async function withTimeout<T>(work: Promise<T>, ms: number): Promise<T | typeof TIMED_OUT> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try { return await Promise.race([work, new Promise<typeof TIMED_OUT>(resolve => { timer = setTimeout(() => resolve(TIMED_OUT), ms); })]); }
+  finally { clearTimeout(timer); }
+}
 
 export async function runExecutiveCycle(db: Database, options: CycleOptions): Promise<CycleReport> {
   const maxTasks = Math.min(Math.max(Number.isSafeInteger(options.maxTasks) ? options.maxTasks : 1, 0), MAX_TASKS);
+  const requested = Number.isFinite(options.handlerTimeoutMs) && (options.handlerTimeoutMs ?? 0) > 0 ? options.handlerTimeoutMs! : DEFAULT_HANDLER_TIMEOUT_MS;
+  const handlerTimeoutMs = Math.min(requested, options.leaseMs);
   const reclaimed = await reclaimExpired(db);
   const expiredDecisions = await expireDecisions(db);
   const report: CycleReport = {
@@ -49,8 +63,10 @@ export async function runExecutiveCycle(db: Database, options: CycleOptions): Pr
       outcome = "stale_lease";
     } else {
       let result: unknown;
-      try { result = await handler.handle(lease.envelope, options.contextFor(department)); }
-      catch { result = { status: "unreadable" }; }
+      try {
+        const answer = await withTimeout(Promise.resolve().then(() => handler.handle(lease.envelope, options.contextFor(department))), handlerTimeoutMs);
+        result = answer === TIMED_OUT ? { status: "unreadable", reason: "Zeitlimit überschritten" } : answer;
+      } catch { result = { status: "unreadable" }; }
       const done = await completeTask(db, lease, result);
       outcome = done.ok ? done.outcome : done.reason;
     }
