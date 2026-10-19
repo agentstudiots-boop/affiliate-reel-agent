@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "task_id": "H-04",
+  "title": "Command Center: Ansicht „Unternehmen“ in 2D mit Detailpanel je Abteilung (H-04/H-05)",
+  "module": "command-center",
+  "phase": "H",
+  "status": "waiting_review",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "operator",
+  "base_commit": "7b92194",
+  "branch": "claude/H-04-enterprise-panel",
+  "depends_on": [
+    "H-01"
+  ],
+  "claims": {
+    "paths": [
+      "app/architecture/enterprise-panel.tsx"
+    ],
+    "hot_files": [
+      "app/architecture/command-center.tsx",
+      "app/architecture/types.ts",
+      "tests/architecture-enterprise.test.cjs",
+      "tsconfig.test.json"
+    ],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-9",
+      "criterion": "Jede Register-Abteilung als per Tastatur erreichbare Karte; ohne Nachweis „keine Daten“, nichts erfunden",
+      "verification": "Render-Test (react-dom/server)",
+      "met": true
+    },
+    {
+      "id": "AC-10",
+      "criterion": "Detailpanel: Zustand mit Begründung, Nachweise je Quelle, Aufgaben je Status, offene Vorlagen, Kosten als Untergrenze, Agenten",
+      "verification": "Render-Test",
+      "met": true
+    },
+    {
+      "id": "AC-11",
+      "criterion": "Ansicht ohne WebGL, 3D pausiert, keine eigenen Datenzugriffe, nur Typ-Importe aus lib/",
+      "verification": "Quelltextprüfung + Screenshots Desktop/Handy ohne horizontales Scrollen",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 300,
+    "notes": "Solo-Betrieb, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "app/architecture/enterprise-panel.tsx",
+    "app/architecture/command-center.tsx",
+    "app/architecture/types.ts",
+    "tests/architecture-enterprise.test.cjs",
+    "tsconfig.test.json"
+  ],
+  "implemented": [
+    "EnterprisePanel (Karten + Detailpanel)",
+    "Modus „Unternehmen“ im Command Center"
+  ],
+  "tests": [
+    {
+      "command": "node --test tests/architecture-enterprise.test.cjs tests/architecture.test.cjs",
+      "result": "passed",
+      "detail": "37/37",
+      "commit": "9be3d44",
+      "at": "2026-10-19T17:12:49Z"
+    },
+    {
+      "command": "npm test && npm run build && npm run typecheck",
+      "result": "passed",
+      "detail": "778/778 (erster Lauf 9be3d44: Isolationstest rot wegen Typ-Import aus registry, behoben)",
+      "commit": "8559c06",
+      "at": "2026-10-19T17:35:36Z"
+    }
+  ],
+  "known_issues": [
+    "Gestapelt auf H-01 (#102)",
+    "3D-Planetenebene (H-03) folgt separat",
+    "Auf dem Handy steht das Detailpanel unter den Karten"
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/103",
+    "state": "draft",
+    "merge_commit": null,
+    "ci": "pending"
+  },
+  "approval": {
+    "reviewer": "pending",
+    "operator": "pending",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "volle Prüfung",
+    "Draft-PR",
+    "Review; visuelle Abnahme durch den Betreiber"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-19T17:35:36Z",
+    "checkpoint_reason": "other",
+    "last_commit": "8559c06",
+    "active_branch": "claude/H-04-enterprise-panel",
+    "state_summary": "Draft-PR #103 offen, voll geprüft",
+    "decisions_made": [
+      "2D zuerst (H-04/H-05), 3D-Planetenebene (H-03) danach"
+    ],
+    "test_status": "778/778",
+    "next_action": "Review; visuelle Abnahme Betreiber"
+  },
+  "revision": 2,
+  "based_on_commit": "1df310c",
+  "updated_at": "2026-10-19T17:35:36Z",
+  "log": [
+    {
+      "at": "2026-10-19T17:12:49Z",
+      "actor": "claude-code",
+      "action": "created",
+      "summary": "H-04/H-05 implementiert (Solo-Betrieb), Commit 9be3d44",
+      "commit": "9be3d44"
+    },
+    {
+      "at": "2026-10-19T17:35:36Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Draft-PR #103 nach voller Prüfung (778/778)",
+      "commit": "8559c06"
+    }
+  ]
+}

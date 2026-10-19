@@ -107,6 +107,7 @@ Kein PR ist eingebunden oder aktiviert: keine Schalter gesetzt, nichts in `verce
 | 8 | #99 | B-08 KI-Planer im Schattenbetrieb (nichts eingebunden) | #98, #88 | Review offen |
 | 7 | #100 | E-07 ControllingSnapshot + 2D-Anzeige (nur lesend) | #93, #88 | Review offen |
 | 9 | #102 | H-01 Unternehmensebene als lesender Datenvertrag (`/api/architecture` → `enterprise`) | #99, #100 | Review offen |
+| 10 | #103 | H-04/H-05 Ansicht „Unternehmen“ (2D, Detailpanel je Abteilung) | #102 | Review offen · visuelle Abnahme Betreiber |
 | 1 | #101 | C-04 PR-Vorlage (zweite Sitzung) | – | approve (2 optionale Hinweise; nach #95 mergen) |
 
 Gestapelte PRs enthalten die Commits ihrer Basis; nach deren Merge zeigt der Diff nur den eigenen Zuwachs. Bekannte triviale Konflikte:
