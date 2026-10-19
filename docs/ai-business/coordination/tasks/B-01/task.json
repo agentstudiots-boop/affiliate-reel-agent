@@ -4,13 +4,13 @@
   "title": "Executive-Kern v0: Plan-Vertrag, Richtlinien L0–L4 und Abteilungsregister (reine Funktionen)",
   "module": "enterprise-kernel",
   "phase": "B",
-  "status": "ready",
+  "status": "waiting_operator",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
   "reviewer": "operator",
   "base_commit": "c56711e",
-  "branch": null,
+  "branch": "claude/B-01-executive-kernel",
   "depends_on": [
     "A-01",
     "A-02"
@@ -33,61 +33,61 @@
       "id": "AC-1",
       "criterion": "registry.ts exportiert ein eingefrorenes Register der Abteilungen executive, controlling, opportunity, affiliate (nur lesend), engineering (extern, keine Laufzeitaktionen) mit maxLevel je Abteilung und je erlaubter taskKind **genau einer** ActionKind und genau einer handlerId (verbindliche Zuordnung taskKind → ActionKind → Handler); keine DB-Tabelle.",
       "verification": "Unit-Test: Register unveränderlich (Object.isFrozen, auch verschachtelt), jede taskKind hat genau eine action/handlerId, unbekannte Abteilung → undefined",
-      "met": null
+      "met": true
     },
     {
       "id": "AC-2",
       "criterion": "policy.ts bildet jede ActionKind deterministisch auf L0, L1, L2, L3a, L3b oder L4 ab (02 §3.5); unbekannte Aktion → L4 (fail closed).",
       "verification": "Tabellentest über alle ActionKinds + unbekannte Aktion",
-      "met": null
+      "met": true
     },
     {
       "id": "AC-3",
       "criterion": "plan.ts definiert ExecutivePlan (02 §3.3) als Zod-Schema und validatePlan(raw, registry, limits) mit Ergebnis { ok, plan, executable, decisionRequests, blocked, violations } (blocked gemäß AC-9, leere Listen gemäß AC-10).",
       "verification": "Typecheck + Tests",
-      "met": null
+      "met": true
     },
     {
       "id": "AC-4",
       "criterion": "Die Stufe eines Schritts wird ausschließlich aus der im Register zur (department, taskKind) hinterlegten ActionKind abgeleitet. Eine vom Modell mitgelieferte Stufe wird ignoriert; eine mitgelieferte action, die nicht der Register-Aktion entspricht, ist ein Verstoß (keine harmlose Aktion für einen anders wirkenden Handler). Schritte mit L3b/L4 landen in decisionRequests, nie in executable. Schritte mit L0–L2 oberhalb von department.maxLevel sind Verstöße. L3a (vorab autorisierte Mitteilung) ist in v0 ebenfalls nie ausführbar, sondern Entscheidungsvorlage; ihre Nachfolger werden wie bei L3b/L4 gesperrt. B-01 enthält keine Nachrichten- oder sonstige Handler-Ausführung.",
       "verification": "Tests: gefälschtes level:'L0' für eine publish-Aufgabe → decisionRequests; action:'read' für eine taskKind mit Register-Aktion publish → Verstoß; L2-Schritt bei Abteilung mit maxLevel L1 → Verstoß; L3a-Schritt → decisionRequests, Nachfolger → blocked",
-      "met": null
+      "met": true
     },
     {
       "id": "AC-5",
       "criterion": "Abgelehnt werden: doppelte Schritt-IDs, unbekannte Abteilung/Aufgabenart, Aufgabenart nicht erlaubt für Abteilung, Zyklus oder unbekannte Referenz in dependsOn, mehr als limits.maxSteps Schritte, Tiefe > limits.maxDepth, Summe maxCostCents > costCapCents oder > limits.budgetCents, negative/nicht ganzzahlige Beträge, expectedValue mit low > high.",
       "verification": "je ein negativer Test, darunter doppelte Schritt-ID",
-      "met": null
+      "met": true
     },
     {
       "id": "AC-6",
       "criterion": "Evidenz mit kind 'fact' ohne source wird als Verstoß gemeldet (Fakten nur mit Quelle).",
       "verification": "Test",
-      "met": null
+      "met": true
     },
     {
       "id": "AC-7",
       "criterion": "Keine Imports aus anderen lib-Bereichen außer zod; lib/enterprise wird von keinem Code außerhalb lib/enterprise und tests importiert (keine Laufzeitwirkung). Der Validator wertet nur strukturierte Felder (department, taskKind, action, dependsOn, Beträge) aus; Freitext im Plan löst nie eine Aktion aus und wird nicht semantisch interpretiert.",
       "verification": "Test liest Quelltexte (wie Importisolationstests) + grep app/ lib/; Test: Freitext 'veröffentliche jetzt' in goal/evidence ändert executable/decisionRequests nicht",
-      "met": null
+      "met": true
     },
     {
       "id": "AC-8",
       "criterion": "Keine DB, keine Route, kein Cron, kein Schalter, keine Netzaufrufe, keine Modellaufrufe.",
       "verification": "Review des Diffs",
-      "met": null
+      "met": true
     },
     {
       "id": "AC-9",
       "criterion": "Nachfolger freigabepflichtiger Schritte werden transitiv gesperrt: Hängt ein Schritt direkt oder indirekt von einem Schritt in decisionRequests ab, steht er weder in executable noch in decisionRequests, sondern in blocked (mit Verweis auf den sperrenden Schritt).",
       "verification": "Test mit gemischtem Plan: L0 → L3b → L0 → L1; nur der erste L0-Schritt ist executable, L3b in decisionRequests, die beiden Nachfolger in blocked",
-      "met": null
+      "met": true
     },
     {
       "id": "AC-10",
       "criterion": "Ist der Gesamtplan ungültig (ok=false, mindestens ein Verstoß), sind executable, decisionRequests und blocked leer; violations nennt alle gefundenen Verstöße.",
       "verification": "Test: Plan mit einem gültigen L0-Schritt und einem Verstoß → executable=[]",
-      "met": null
+      "met": true
     }
   ],
   "test_requirements": [
@@ -106,15 +106,38 @@
     "notes": "Abo-Kontingente unbekannt; bei Erschöpfung waiting_capacity + Checkpoint"
   },
   "lease": null,
-  "waiting": null,
-  "changed_files": [],
-  "implemented": [],
+  "waiting": {
+    "reason": "operator",
+    "since": "2026-10-19T06:25:00Z",
+    "resume_condition": "Review (zweite Claude-Sitzung geplant) und Merge durch den Betreiber",
+    "wake_mechanism": "manual_start"
+  },
+  "changed_files": [
+    "lib/enterprise/policy.ts",
+    "lib/enterprise/registry.ts",
+    "lib/enterprise/plan.ts",
+    "tests/enterprise-kernel.test.cjs",
+    "tsconfig.test.json"
+  ],
+  "implemented": [
+    "policy.ts: Aktionsart → Stufe L0–L4, unbekannt = L4",
+    "registry.ts: eingefrorenes Register, je Aufgabenart genau eine Aktion + Handler, maxLevel",
+    "plan.ts: ExecutivePlan + validatePlan (Stufe aus Register, Entscheidungsvorlagen, transitive Sperre, leere Listen bei ungültigem Plan)"
+  ],
   "tests": [
     {
-      "command": "keine – Planungsdatei",
-      "result": "not_run",
-      "commit": null,
-      "at": "2026-10-18T21:30:00Z"
+      "command": "node --test tests/enterprise-kernel.test.cjs",
+      "result": "passed",
+      "detail": "9/9",
+      "commit": "87e665f",
+      "at": "2026-10-19T06:25:00Z"
+    },
+    {
+      "command": "npm run typecheck / lint / test / build",
+      "result": "passed",
+      "detail": "685/685 Tests",
+      "commit": "87e665f",
+      "at": "2026-10-19T06:25:00Z"
     }
   ],
   "known_issues": [
@@ -130,10 +153,10 @@
     }
   ],
   "pr": {
-    "url": null,
-    "state": "none",
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/84",
+    "state": "draft",
     "merge_commit": null,
-    "ci": "unknown"
+    "ci": "pending"
   },
   "approval": {
     "reviewer": "pending",
@@ -141,26 +164,26 @@
     "latest_review_file": null
   },
   "next_steps": [
-    "Claude implementiert B-01 gegen AC-1 … AC-10 auf claude/B-01-executive-kernel",
-    "Draft-PR gegen main, Projektprüfungen grün, kein Merge"
+    "Review von #84 durch die zweite Claude-Sitzung",
+    "Betreiber: Merge nach Review/CI"
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T06:15:00Z",
+    "last_checkpoint_at": "2026-10-19T06:25:00Z",
     "checkpoint_reason": "work_package_done",
-    "last_commit": "93231ea",
+    "last_commit": "87e665f",
     "active_branch": "claude/B-01-executive-kernel",
-    "state_summary": "B-01 im Solo-Betrieb von Claude übernommen (Betreiberbeschluss 19.10.2026); GPT hatte keinen Code veröffentlicht.",
+    "state_summary": "B-01 implementiert, Prüfungen grün, Draft-PR #84",
     "decisions_made": [
       "Reine Funktionen ohne DB als erster Baustein (ADR-16)",
       "Unbekannte Aktion → L4 (fail closed)"
     ],
-    "test_status": "keine Tests (Planung)",
-    "next_action": "B-01 implementieren"
+    "test_status": "685/685",
+    "next_action": "Review abwarten"
   },
-  "revision": 4,
+  "revision": 5,
   "based_on_commit": "e002446",
-  "updated_at": "2026-10-19T06:15:00Z",
+  "updated_at": "2026-10-19T06:25:00Z",
   "log": [
     {
       "at": "2026-10-18T21:30:00Z",
@@ -196,6 +219,13 @@
       "action": "handoff",
       "summary": "Solo-Betrieb (Betreiberbeschluss 19.10.2026): B-01 von GPT an Claude übergeben; Prüfer = Betreiber-Merge + CI, GPT optional",
       "commit": null
+    },
+    {
+      "at": "2026-10-19T06:25:00Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Implementierung 87e665f, Draft-PR #84, alle Prüfungen grün",
+      "commit": "87e665f"
     }
   ]
 }

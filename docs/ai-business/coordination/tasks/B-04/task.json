@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "task_id": "B-04",
+  "title": "Abteilungsvertrag: Task-Envelope, Ergebnis, Health, begrenzte Lesefähigkeiten (reine Funktionen)",
+  "module": "enterprise-kernel",
+  "phase": "B",
+  "status": "in_progress",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "operator",
+  "base_commit": "87e665f",
+  "branch": "claude/B-04-department-contract",
+  "depends_on": [
+    "B-01"
+  ],
+  "claims": {
+    "paths": [
+      "lib/enterprise/contract.ts",
+      "tests/enterprise-contract.test.cjs"
+    ],
+    "hot_files": [
+      "tsconfig.test.json"
+    ],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "envelopeFromStep erzeugt Task-Envelopes nur aus ausführbaren Schritten (L0–L2); Stufe und Handler stammen aus dem Register; Entscheidungsvorlagen und veränderte Schritte werden abgelehnt",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "checkEnvelope prüft empfangene Envelopes erneut: Schema, Register-Bindung, Handler, Stufe, maxLevel, Laufzeitabteilung",
+      "verification": "Negativtests je Fall",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "checkResult: Ergebnis-Schema (succeeded/failed inkl. outcome_unknown), Budget für Kosten und Modellaufrufe, Fakten nur mit Quelle",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-4",
+      "criterion": "checkHealth: richtige Abteilung, Status ok nur mit Nachweis",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-5",
+      "criterion": "Abteilungen erhalten nur benannte Lesesichten (createReadCapability), keinen DB-Handle; unbekannte Sichten werden abgelehnt",
+      "verification": "Tests inkl. toString/__proto__",
+      "met": true
+    },
+    {
+      "id": "AC-6",
+      "criterion": "Nur zod und Kernmodule importiert, kein Import in App-Code, keine DB/Route/Cron/Modellaufrufe",
+      "verification": "Isolationstest",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 350,
+    "notes": "Solo-Betrieb, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "lib/enterprise/contract.ts",
+    "tests/enterprise-contract.test.cjs",
+    "tsconfig.test.json"
+  ],
+  "implemented": [
+    "Zod-Verträge Task-Envelope/Ergebnis/Health",
+    "envelopeFromStep, checkEnvelope, checkResult, checkHealth",
+    "createReadCapability (benannte Lesesichten statt DB-Handle)"
+  ],
+  "tests": [
+    {
+      "command": "node --test tests/enterprise-contract.test.cjs tests/enterprise-kernel.test.cjs",
+      "result": "passed",
+      "detail": "15/15",
+      "commit": "cb74eb9",
+      "at": "2026-10-19T06:25:00Z"
+    },
+    {
+      "command": "npm run typecheck / lint / test / build",
+      "result": "not_run",
+      "detail": "läuft",
+      "commit": "cb74eb9",
+      "at": "2026-10-19T06:25:00Z"
+    }
+  ],
+  "known_issues": [
+    "Baut auf B-01 (#84) auf; PR enthält dessen Commit, Merge erst nach #84",
+    "tsconfig.test.json: Include direkt vor lib/product-resolver.ts – F-01 (zweite Sitzung) fügt direkt danach ein, trivialer Konflikt möglich"
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": null,
+    "state": "none",
+    "merge_commit": null,
+    "ci": "unknown"
+  },
+  "approval": {
+    "reviewer": "pending",
+    "operator": "pending",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Projektprüfungen abschließen, Draft-PR gegen main"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-19T06:25:00Z",
+    "checkpoint_reason": "other",
+    "last_commit": "cb74eb9",
+    "active_branch": "claude/B-04-department-contract",
+    "state_summary": "B-04 implementiert, gezielte Tests grün, volle Prüfungen laufen",
+    "decisions_made": [
+      "Planung, Implementierung und Kriterien im Solo-Betrieb durch Claude"
+    ],
+    "test_status": "15/15 gezielt",
+    "next_action": "Draft-PR öffnen"
+  },
+  "revision": 1,
+  "based_on_commit": "af7f39b",
+  "updated_at": "2026-10-19T06:25:00Z",
+  "log": [
+    {
+      "at": "2026-10-19T06:25:00Z",
+      "actor": "claude-code",
+      "action": "created",
+      "summary": "B-04 geplant und implementiert (Solo-Betrieb), Commit cb74eb9",
+      "commit": "cb74eb9"
+    }
+  ]
+}
