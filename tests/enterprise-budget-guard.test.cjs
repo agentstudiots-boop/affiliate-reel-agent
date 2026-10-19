@@ -28,7 +28,9 @@ async function decide(db,subjectKey,decision='approved'){
   const r=await D.requestDecision(db,{step:budgetStep(),subjectKey,subject:`Budget ${subjectKey}`,options:OPTIONS});
   const requestMessageId=`wamid.req.${crypto.randomUUID()}`;
   assert.equal(await D.attachRequestMessage(db,r.id,requestMessageId),true);
-  if(decision)assert.equal((await D.recordDecision(db,{id:r.id,fingerprint:r.fingerprint,decision,authority:'whatsapp_operator',requestMessageId,decidedMessageId:`wamid.reply.${crypto.randomUUID()}`})).ok,true);
+  if(decision)assert.equal((await D.recordDecision(db,{authority:'whatsapp_operator',trustedWaId:'491701234567',expected:{id:r.id,fingerprint:r.fingerprint},
+    evidence:{channel:'whatsapp',messageId:`wamid.reply.${crypto.randomUUID()}`,replyToMessageId:requestMessageId,senderWaId:'491701234567',
+      body:decision==='approved'?'Freigeben':'Ablehnen'}})).ok,true);
   return r.id;
 }
 async function approveBudget(db,limitCents,{department='opportunity',kind='hard',decision='approved',subjectAmount=limitCents,subjectDepartment=department}={}){
