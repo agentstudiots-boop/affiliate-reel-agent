@@ -4,7 +4,7 @@
   "title": "Abteilungsvertrag: Task-Envelope, Ergebnis, Health, begrenzte Lesefähigkeiten (reine Funktionen)",
   "module": "enterprise-kernel",
   "phase": "B",
-  "status": "review",
+  "status": "waiting_review",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -100,7 +100,7 @@
       "result": "passed",
       "detail": "alle vier Exit 0 im Hauptcheckout",
       "commit": "cb74eb9",
-      "at": "2026-10-19T06:40:00Z"
+      "at": "2026-10-19T06:33:00Z"
     }
   ],
   "known_issues": [
@@ -125,7 +125,7 @@
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T06:40:00Z",
+    "last_checkpoint_at": "2026-10-19T06:33:00Z",
     "checkpoint_reason": "other",
     "last_commit": "cb74eb9",
     "active_branch": "claude/B-04-department-contract",
@@ -138,7 +138,7 @@
   },
   "revision": 2,
   "based_on_commit": "af7f39b",
-  "updated_at": "2026-10-19T06:40:00Z",
+  "updated_at": "2026-10-19T06:33:00Z",
   "log": [
     {
       "at": "2026-10-19T06:25:00Z",
@@ -148,7 +148,7 @@
       "commit": "cb74eb9"
     },
     {
-      "at": "2026-10-19T06:40:00Z",
+      "at": "2026-10-19T06:33:00Z",
       "actor": "claude-code",
       "action": "pr_opened",
       "summary": "Volle Prüfungen grün, Draft-PR #86 (gestapelt auf #84)",

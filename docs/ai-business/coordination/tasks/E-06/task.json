@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "task_id": "E-06",
+  "title": "Abteilungszuordnung der Modellaufrufe über das Register (ohne Schemaänderung)",
+  "module": "controlling-metrics",
+  "phase": "E",
+  "status": "in_progress",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "operator",
+  "base_commit": "87e665f",
+  "branch": "claude/E-06-model-call-departments",
+  "depends_on": [
+    "B-01"
+  ],
+  "claims": {
+    "paths": [
+      "lib/enterprise/controlling/agent-departments.ts",
+      "tests/enterprise-agent-departments.test.cjs"
+    ],
+    "hot_files": [
+      "tsconfig.test.json"
+    ],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Nur exakte Agentennamen werden zugeordnet (eigene Eigenschaften, kein Präfix-Raten); unbekannte Namen und toString/__proto__ ⇒ null",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Jeder Agentenname, den der Code in model_calls aufzeichnet, ist zugeordnet; keine verwaisten Einträge",
+      "verification": "Drift-Test über app/ und lib/ inkl. Gegentest (Eintrag entfernt ⇒ Test rot)",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "allocateModelUsage summiert je Abteilung, zeigt jede Abteilung (auch mit 0) und listet nicht zugeordnete Agenten namentlich",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-4",
+      "criterion": "Fehlende Token-/Rechenzeitwerte ⇒ usageComplete=false (Summen sind Untergrenzen), keine erfundenen Werte; Rundung erst am Ende",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-5",
+      "criterion": "Reines Modul: nur Register importiert, keine DB/Env/Netz, nicht in App-Code eingebunden",
+      "verification": "Isolationstest",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 200,
+    "notes": "Solo-Betrieb, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "lib/enterprise/controlling/agent-departments.ts",
+    "tests/enterprise-agent-departments.test.cjs",
+    "tsconfig.test.json"
+  ],
+  "implemented": [
+    "MODEL_AGENT_DEPARTMENTS (13 Agenten → affiliate)",
+    "departmentForAgent",
+    "allocateModelUsage"
+  ],
+  "tests": [
+    {
+      "command": "node --test tests/enterprise-agent-departments.test.cjs",
+      "result": "passed",
+      "detail": "5/5",
+      "commit": "18561b0",
+      "at": "2026-10-19T06:44:00Z"
+    },
+    {
+      "command": "npm run typecheck / lint / test / build",
+      "result": "not_run",
+      "detail": "folgt nach G-01 im Hauptcheckout",
+      "commit": "18561b0",
+      "at": "2026-10-19T06:44:00Z"
+    }
+  ],
+  "known_issues": [
+    "Baut auf B-01 (#84) auf; PR enthält dessen Commit, Merge erst nach #84",
+    "Alle heutigen Agenten gehören zum Affiliate-Studio, auch der WhatsApp-Router; künftige Executive-Agenten zeichnen eigene Namen auf (B-08/B-09)",
+    "Der Drift-Test kennt die Aufzeichnungsstellen namentlich; eine neue Stelle mit recordModelCall lässt ihn bewusst fehlschlagen, bis Zuordnung und Liste ergänzt sind",
+    "Gleiches Verzeichnis lib/enterprise/controlling/ wie E-05 (#83), aber andere Datei; tsconfig-Include an anderer Stelle"
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": null,
+    "state": "none",
+    "merge_commit": null,
+    "ci": "unknown"
+  },
+  "approval": {
+    "reviewer": "pending",
+    "operator": "pending",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Volle Prüfungen im Hauptcheckout, Draft-PR gegen main"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-19T06:44:00Z",
+    "checkpoint_reason": "other",
+    "last_commit": "18561b0",
+    "active_branch": "claude/E-06-model-call-departments",
+    "state_summary": "E-06 implementiert, gezielte Tests grün",
+    "decisions_made": [
+      "Empfehlung aus 04 §E umgesetzt: Register statt Spalte department, keine Migration"
+    ],
+    "test_status": "5/5 gezielt",
+    "next_action": "Volle Prüfungen, Draft-PR"
+  },
+  "revision": 1,
+  "based_on_commit": "5dcbf75",
+  "updated_at": "2026-10-19T06:44:00Z",
+  "log": [
+    {
+      "at": "2026-10-19T06:44:00Z",
+      "actor": "claude-code",
+      "action": "created",
+      "summary": "E-06 geplant und implementiert (Solo-Betrieb), Commit 18561b0",
+      "commit": "18561b0"
+    }
+  ]
+}

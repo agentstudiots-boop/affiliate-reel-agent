@@ -100,14 +100,14 @@
       "result": "passed",
       "detail": "8/8",
       "commit": "c5c77a8",
-      "at": "2026-10-19T06:55:00Z"
+      "at": "2026-10-19T06:35:00Z"
     },
     {
       "command": "npm run typecheck / lint / test / build",
       "result": "not_run",
       "detail": "läuft",
       "commit": "a307bd3",
-      "at": "2026-10-19T06:45:00Z"
+      "at": "2026-10-19T06:30:00Z"
     }
   ],
   "known_issues": [
@@ -133,7 +133,7 @@
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T06:45:00Z",
+    "last_checkpoint_at": "2026-10-19T06:30:00Z",
     "checkpoint_reason": "other",
     "last_commit": "c5c77a8",
     "active_branch": "claude/G-01-affiliate-adapter",
@@ -147,19 +147,19 @@
   },
   "revision": 1,
   "based_on_commit": "c797df0",
-  "updated_at": "2026-10-19T06:45:00Z",
+  "updated_at": "2026-10-19T06:30:00Z",
   "log": [
     {
-      "at": "2026-10-19T06:45:00Z",
+      "at": "2026-10-19T06:30:00Z",
       "actor": "claude-code",
       "action": "created",
       "summary": "G-01 geplant und implementiert (Solo-Betrieb), Commit a307bd3",
       "commit": "a307bd3"
     },
     {
-      "at": "2026-10-19T06:55:00Z",
+      "at": "2026-10-19T06:35:00Z",
       "actor": "claude-code",
-      "action": "updated",
+      "action": "fixed",
       "summary": "Selbstprüfung: erfundener Outcome drafted im Test, failed zählte als Erfolg, Leeraufrufe verdeckten Fehler – korrigiert, Drift-Test ergänzt",
       "commit": "c5c77a8"
     }

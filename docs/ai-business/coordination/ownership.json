@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "note": "Modulbesitz und Konfliktregeln (ADR-09, korrigiert nach GPT-04/GPT-08). Datei-genaue Zuständigkeit statt Baum-Claims. Keine Geschäftsdaten – öffentliches Repository.",
-  "revision": 4,
+  "revision": 5,
   "updated_at": "2026-10-19T06:00:00Z",
   "coordination_branch": {
     "name": "architecture/ai-business-roadmap",
@@ -84,13 +84,16 @@
       "id": "controlling-metrics",
       "paths": [
         "lib/enterprise/controlling/metrics.ts",
-        "tests/enterprise-controlling-metrics.test.cjs"
+        "tests/enterprise-controlling-metrics.test.cjs",
+        "lib/enterprise/controlling/agent-departments.ts",
+        "tests/enterprise-agent-departments.test.cjs"
       ],
       "owner": "claude-code",
       "reviewer": "gpt-work",
       "planner": "gpt-work",
       "status": "planned",
-      "task": "E-05"
+      "task": "E-05",
+      "note": "E-05 Kennzahlen, E-06 Abteilungszuordnung (Solo-Betrieb: Claude implementiert, Betreiber prüft)"
     },
     {
       "id": "enterprise-ledger",
