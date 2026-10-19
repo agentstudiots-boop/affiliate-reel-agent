@@ -46,6 +46,7 @@ zum Hauptprojekt wird.
 | ADR-14 | Übergang bis zur eigenen Reviewer-Identität: Review = `review-<n>.json` + PR-Kommentar mit geprüfter SHA; Betreiber-Merge ist Vertrauensanker; keine technische Merge-Sperre behaupten | **annehmen** | sofort Machine User/App (Einrichtungsaufwand, BF-15) |
 | ADR-15 | **Ein** Engineering-System mit je Aufgabe vergebenen Rollen (Planer, Implementierer, Prüfer), Modelle austauschbar; Neubewertung nach ca. 5 Paketen anhand der Messgrößen in 05 §2 (Prüfpunkt aus Betreiberbeschluss `aa6ce5a`) | **annehmen** | zwei eigenständige Engineering-Systeme (doppelte Infrastruktur) |
 | ADR-16 | Erster Code-Baustein: **B-01** (Claude plant, Codex implementiert, Claude prüft) parallel zu **E-05** (Codex plant, Claude implementiert, Codex prüft); Validator C-02 zurückgestellt | **annehmen** | C-02 zuerst (GPT-Vorschlag, 09 §K) |
+| ADR-17 | **Solo-Betrieb** (Betreiberbeschluss 19.10.2026): Claude Code plant, implementiert und testet allein; GPT Work optional als Nachprüfer; Leases/Routinen entfallen. Ersetzt für die laufende Arbeit ADR-13, ADR-15 und die Rollenverteilung in ADR-16 | **beschlossen** (Betreiber) | Zwei-System-Kooperation (zu aufwendig, GPT ohne Kontingent) |
 
 ## 2. Offene Fragen
 
@@ -88,6 +89,7 @@ zum Hauptprojekt wird.
 | R-16 | Externe Wirkung mit unklarem Ausgang wird doppelt ausgelöst | mittel | hoch | Outbox, `outcome_unknown`, keine automatische Wiederholung |
 | R-17 | Koordination wird zum Hauptprojekt | mittel | hoch | ADR-16, Validator zurückgestellt, Automatisierung nur bei gemessenem Engpass |
 | R-18 | Ein System ist längere Zeit am Abo-Limit (keine Zusatz-Credits, `e7692d0`); Reviews stauen sich, und das verfügbare System könnte versucht sein, eigene Arbeit selbst freizugeben | hoch (aktuell GPT Work) | mittel | `waiting_capacity` + Checkpoint; nur andere Aufgaben übernehmen; keine Selbstfreigabe, kein Merge nur wegen grüner CI |
+| R-19 | Solo-Betrieb: kein unabhängiges Zweitmodell-Review; eigene Fehler werden seltener gefunden | mittel | mittel | kleine PRs, strenge ACs und Negativtests, volle CI, Betreiber-Merge; GPT-Nachprüfung wenn verfügbar |
 
 ## 4. Ungeklärte Abhängigkeiten
 

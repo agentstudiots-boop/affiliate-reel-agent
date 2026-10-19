@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "note": "Ressourcen der Entwicklung. null = unbekannt/offener Konfigurationsparameter. Kein Wert ohne Quelle eintragen. Nachweisstatus explizit: verfügbar ist nicht eingerichtet oder Ende-zu-Ende getestet. Unbekannte Limits bleiben null. Jedes System pflegt nur seinen eigenen Abschnitt unter systems.<id>; gemeinsame Abschnitte per PR.",
-  "revision": 7,
-  "updated_at": "2026-10-19T05:55:00Z",
+  "revision": 8,
+  "updated_at": "2026-10-19T06:15:00Z",
   "systems": {
     "claude-code": {
       "plan_or_tier": null,
@@ -29,9 +29,8 @@
       },
       "can_schedule_followups": {
         "value": true,
-        "status": "configured_not_yet_run",
-        "source": "Routine trig_012ZFJimbpAMDPteUC3bENND „Claude-GPT-Übergaben prüfen (stündlich)“, eingerichtet 19.10.2026 05:50 UTC auf Betreiberauftrag; feuert stündlich zu Minute 50 in diese Sitzung (session_013ML6yNNmrkumEGMyMCCbPr), erster Lauf geplant 06:50 UTC, noch nicht nachgewiesen. Läuft im bestehenden Abo; kein zusätzlicher Credit.",
-        "limits": "Startet keine neue Sitzung, sondern setzt diese fort; endet, wenn die Sitzung archiviert wird. Kein Ereignis-Trigger, keine Sofortreaktion."
+        "status": "available_not_configured_for_project",
+        "source": "Stündliche Routine trig_012ZFJimbpAMDPteUC3bENND am 19.10.2026 vor dem ersten Lauf wieder gelöscht (Solo-Betrieb). Kein Lauf nachgewiesen."
       },
       "triggerable_from_github_comment": {
         "value": false,
@@ -120,6 +119,10 @@
         "source": "Betreiberbeschluss e7692d0: Work-Guthaben aufgebraucht; Reset-Zeitpunkt unbekannt",
         "checked_at": "2026-10-18T20:15:00Z"
       }
+    },
+    "collaboration_mode": {
+      "value": "solo_claude",
+      "source": "Betreiberbeschluss 19.10.2026 (coordination/README.md): Claude arbeitet allein, GPT Work optional"
     }
   },
   "checkpoint_thresholds": {

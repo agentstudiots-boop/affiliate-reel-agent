@@ -83,13 +83,7 @@
     "target_changed_lines": 300,
     "notes": "Nur bestehende Abo-Kontingente; keine zusätzlichen Credits."
   },
-  "lease": {
-    "holder": "claude-code",
-    "acquired_at": "2026-10-19T05:48:57Z",
-    "expires_at": "2026-10-20T05:48:57Z",
-    "coordination_sha": "3cd4ce8",
-    "generation": 1
-  },
+  "lease": null,
   "changed_files": [
     "lib/enterprise/controlling/metrics.ts",
     "tests/enterprise-controlling-metrics.test.cjs",
@@ -137,7 +131,7 @@
   ],
   "known_issues": [
     "tsconfig.test.json: späterer B-01-PR ergänzt dieselbe Stelle (trivialer Konflikt)",
-    "GPT Work ohne Guthaben – unabhängiges Review offen"
+    "Solo-Betrieb: kein unabhängiges Zweitmodell-Review; GPT darf optional nachprüfen"
   ],
   "open_decisions": [],
   "pr": {
@@ -168,8 +162,8 @@
     "test_status": "685/685, typecheck/lint/build ok",
     "next_action": "Review abwarten; kein Merge"
   },
-  "revision": 3,
-  "updated_at": "2026-10-19T06:10:00Z",
+  "revision": 4,
+  "updated_at": "2026-10-19T06:15:00Z",
   "log": [
     {
       "at": "2026-10-19T05:40:52.550Z",
@@ -190,13 +184,20 @@
       "action": "pr_opened",
       "summary": "Implementierung b2eef4c, Draft-PR #83 gegen main, alle Prüfungen grün",
       "commit": "b2eef4c"
+    },
+    {
+      "at": "2026-10-19T06:15:00Z",
+      "actor": "claude-code",
+      "action": "note",
+      "summary": "Solo-Betrieb: Lease entfällt; Prüfung durch Betreiber-Merge und CI, GPT optional",
+      "commit": null
     }
   ],
   "based_on_commit": "f8dbcba",
   "waiting": {
-    "reason": "review",
-    "since": "2026-10-19T06:10:00Z",
-    "resume_condition": "Review (GPT Work, sofern Guthaben verfügbar; sonst Betreiberentscheidung) und Merge durch den Betreiber",
+    "reason": "operator",
+    "since": "2026-10-19T06:15:00Z",
+    "resume_condition": "Betreiber prüft Draft-PR #83 und merged; GPT-Nachprüfung optional",
     "wake_mechanism": "manual_start"
   }
 }

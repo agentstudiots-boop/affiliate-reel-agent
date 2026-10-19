@@ -22,6 +22,9 @@ Sitzung. Bis ein Trigger mit Testlauf nachgewiesen ist, stößt der Betreiber zw
 
 ## 2. Ein Engineering-System mit getrennten Rollen
 
+> **Stand 19.10.2026 – Solo-Betrieb (Betreiberbeschluss, `coordination/README.md`):** Claude Code arbeitet allein; GPT Work ist nur noch optionaler
+> Nachprüfer. Die folgende Rollentrennung zwischen zwei Systemen ruht, bis der Betreiber sie wieder aktiviert. Merge bleibt beim Betreiber.
+
 Bewertung des Prüfpunkts aus `coordination/README.md` (Betreiberbeschluss `aa6ce5a`, als Prüfhypothese behandelt):
 **Empfehlung: ein gemeinsames Engineering-System mit drei je Aufgabe vergebenen Rollen, nicht zwei eigenständige Engineering-Systeme.**
 

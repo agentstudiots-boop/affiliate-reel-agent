@@ -4,11 +4,11 @@
   "title": "Executive-Kern v0: Plan-Vertrag, Richtlinien L0–L4 und Abteilungsregister (reine Funktionen)",
   "module": "enterprise-kernel",
   "phase": "B",
-  "status": "waiting_operator",
+  "status": "ready",
   "planner": "claude-code",
-  "responsible": "gpt-work",
-  "implementer": "gpt-work",
-  "reviewer": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "operator",
   "base_commit": "c56711e",
   "branch": null,
   "depends_on": [
@@ -22,15 +22,11 @@
       "lib/enterprise/plan.ts",
       "tests/enterprise-kernel.test.cjs"
     ],
-    "hot_files": [],
+    "hot_files": [
+      "tsconfig.test.json"
+    ],
     "migration_numbers": [],
-    "foreign_paths": [
-      {
-        "path": "tsconfig.test.json",
-        "owner": "claude-code",
-        "agreement": "Nur exakte Include-Einträge für lib/enterprise/registry.ts, lib/enterprise/policy.ts und lib/enterprise/plan.ts ergänzen (kein Glob), vorher Stand prüfen; E-05 ergänzt unabhängig davon nur lib/enterprise/controlling/metrics.ts (tasks/A-01/handoff-code-start.md)."
-      }
-    ]
+    "foreign_paths": []
   },
   "acceptance_criteria": [
     {
@@ -110,12 +106,7 @@
     "notes": "Abo-Kontingente unbekannt; bei Erschöpfung waiting_capacity + Checkpoint"
   },
   "lease": null,
-  "waiting": {
-    "reason": "operator",
-    "since": "2026-10-18T21:30:00Z",
-    "resume_condition": "Betreiberanstoß zur isolierten Codearbeit auf Arbeitsbranches (ohne Merge/Produktion, tasks/A-01/handoff-code-start.md); Merge erst nach G0 laut 04_ROADMAP.md §1.",
-    "wake_mechanism": "manual_start"
-  },
+  "waiting": null,
   "changed_files": [],
   "implemented": [],
   "tests": [
@@ -127,8 +118,9 @@
     }
   ],
   "known_issues": [
-    "lib/enterprise existiert noch nicht; Code-Branch von aktuellem main (nicht vom Architektur-Branch) abzweigen: gpt/B-01-executive-kernel",
-    "PR gegen main; Merge erst nach Review Claude + Betreiber"
+    "Solo-Betrieb: Prüfung durch Betreiber-Merge und CI, kein unabhängiges Zweitmodell-Review; GPT darf optional nachprüfen",
+    "Code-Branch claude/B-01-executive-kernel von aktuellem main; PR gegen main; Merge nur durch den Betreiber",
+    "tsconfig.test.json: exakte Includes je Datei, Stelle wie E-05 (#83) – trivialer Konflikt beim zweiten Merge"
   ],
   "open_decisions": [
     {
@@ -149,27 +141,26 @@
     "latest_review_file": null
   },
   "next_steps": [
-    "Nach G0 (04 §1): Codex setzt lease (holder gpt-work, generation 1) und status in_progress per Fast-Forward-Commit nach 05 §6",
-    "Codex implementiert auf gpt/B-01-executive-kernel gegen AC-1 … AC-10, PR gegen main, Status waiting_review",
-    "Claude prüft gegen AC-1 … AC-10 und schreibt tasks/B-01/review-1.json"
+    "Claude implementiert B-01 gegen AC-1 … AC-10 auf claude/B-01-executive-kernel",
+    "Draft-PR gegen main, Projektprüfungen grün, kein Merge"
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T06:00:00Z",
+    "last_checkpoint_at": "2026-10-19T06:15:00Z",
     "checkpoint_reason": "work_package_done",
     "last_commit": "93231ea",
-    "active_branch": "claude/nice-ptolemy-k4p1c3",
-    "state_summary": "Technische Planung von B-01 durch Claude (Planer). Implementierung durch Codex nach Gate G0.",
+    "active_branch": "claude/B-01-executive-kernel",
+    "state_summary": "B-01 im Solo-Betrieb von Claude übernommen (Betreiberbeschluss 19.10.2026); GPT hatte keinen Code veröffentlicht.",
     "decisions_made": [
       "Reine Funktionen ohne DB als erster Baustein (ADR-16)",
       "Unbekannte Aktion → L4 (fail closed)"
     ],
     "test_status": "keine Tests (Planung)",
-    "next_action": "Codex: nach Betreiberanstoß zur isolierten Codearbeit Lease nehmen und AC-1 … AC-10 umsetzen"
+    "next_action": "B-01 implementieren"
   },
-  "revision": 3,
+  "revision": 4,
   "based_on_commit": "e002446",
-  "updated_at": "2026-10-19T06:00:00Z",
+  "updated_at": "2026-10-19T06:15:00Z",
   "log": [
     {
       "at": "2026-10-18T21:30:00Z",
@@ -198,6 +189,13 @@
       "action": "fixed",
       "summary": "Drei Klarstellungen aus handoff-code-start.md: blocked im Rückgabeobjekt (AC-3), L3a nie ausführbar + Nachfolger gesperrt (AC-4), nur strukturierte Felder, Freitext ohne Wirkung (AC-7); exakte tsconfig-Includes; Verweise AC-1 … AC-10",
       "commit": "e002446"
+    },
+    {
+      "at": "2026-10-19T06:15:00Z",
+      "actor": "claude-code",
+      "action": "handoff",
+      "summary": "Solo-Betrieb (Betreiberbeschluss 19.10.2026): B-01 von GPT an Claude übergeben; Prüfer = Betreiber-Merge + CI, GPT optional",
+      "commit": null
     }
   ]
 }

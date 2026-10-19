@@ -63,6 +63,22 @@ Neben **Claude Code** und **ChatGPT Work** darf auch **ChatGPT im normalen Chat*
 
 **Aktuelle Auswirkung:** Die unabhängige GPT-Work-Gegenprüfung von Draft-PR #82 bleibt bei aufgebrauchtem Work-Guthaben ausstehend. Keine Freigabe oder Merge allein wegen bestandener CI. Claudes Sitzungslimit ist ebenfalls zu beachten; keine unbestätigte Wiederaufnahme behaupten.
 
+## Betreiberbeschluss vom 19.10.2026: Claude Code arbeitet allein (Solo-Betrieb)
+
+**Anlass:** ChatGPT Work hat kein Credit-Kontingent mehr; die Abstimmung zweier Systeme hat mehr Aufwand erzeugt als Code. Der Betreiber
+hat entschieden: **Claude Code arbeitet ab sofort unabhängig von GPT.** Diese Regel ersetzt für die laufende Arbeit die Rollentrennung
+Planer/Implementierer/Prüfer zwischen zwei Systemen (ADR-15, ADR-16) und das Lease-Protokoll (ADR-13).
+
+**Was gilt:**
+- Claude Code plant, implementiert und testet allein – zuerst E-05 (Draft-PR #83), danach **B-01** (übernommen von GPT; GPT hatte noch keinen Code auf GitHub).
+- Ein unabhängiges Zweitmodell-Review entfällt. Ausgleich: kleine PRs, vorab festgelegte Akzeptanzkriterien, Tests auch für Fehlerfälle, volle CI,
+  eigene kritische Diff-Durchsicht vor jedem PR. **Vertrauensanker bleibt der Merge durch den Betreiber.** Eine Selbstprüfung wird nicht als
+  unabhängiges Review bezeichnet.
+- GPT Work ist **optional**: Wenn wieder Guthaben verfügbar ist, darf es fertige PRs nachträglich prüfen; ohne dieses Review bleibt nichts liegen.
+- Koordination auf das Nötige reduziert: Übergabedateien bleiben als Aufgabenbeschreibung und Stand; keine Leases, keine stündlichen Kontrollroutinen
+  (die Claude-Routine wurde am 19.10.2026 gelöscht), kein Validator, keine neuen Koordinationswerkzeuge.
+- Unverändert: kein Merge durch Claude, keine Produktionsänderung, keine Schalter, keine Secrets, keine kostenpflichtigen Aufrufe, keine zusätzlichen Credits.
+
 ## Runde 2 (18.10.2026, A-01): was sich an der bestehenden Struktur ändert
 
 Keine neue Struktur, nur Ergänzungen dieser Dateien (Begründung: `../07_OFFENE_FRAGEN_RISIKEN_ENTSCHEIDUNGEN.md` §0):
