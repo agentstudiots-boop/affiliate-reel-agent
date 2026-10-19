@@ -4,6 +4,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const crypto=require('node:crypto');
 const pgliteDatabase=require('./helpers/pglite-db.cjs');
+const {departmentForAgent}=require('../.test-build/lib/enterprise/controlling/agent-departments');
 const {readControllingSnapshot,berlinMonth,controllingSnapshotSchema}=require('../.test-build/lib/enterprise/controlling/snapshot');
 
 const NOW=new Date('2026-11-15T12:00:00Z');
@@ -50,9 +51,11 @@ test('sums per department and kind; unknown amounts make a sum a lower bound (AC
   const snap=await readControllingSnapshot(db,NOW);
   const a=dept(snap,'affiliate');
   assert.deepEqual([a.modelUsage.calls,a.modelUsage.failures,a.modelUsage.usageComplete],[3,1,false]);
-  // executive_planner is mapped only with B-08; on this branch it is listed as unassigned, never guessed.
-  assert.equal(dept(snap,'executive').modelUsage.calls,0);
-  assert.deepEqual(snap.unassigned.modelUsage.agents.sort(),['executive_planner','mystery']);
+  // executive_planner is mapped to executive only with B-08 (E-06 register); without that mapping it is listed as unassigned.
+  // Never guessed either way – the expectation follows the reviewed register, so the test holds before and after B-08.
+  const planner=departmentForAgent('executive_planner');
+  assert.equal(dept(snap,'executive').modelUsage.calls,planner==='executive'?1:0);
+  assert.deepEqual(snap.unassigned.modelUsage.agents.sort(),planner?['mystery']:['executive_planner','mystery']);
   assert.deepEqual(a.costs.measured,{amountCents:200,entries:2,unknownAmountEntries:1,complete:false});
   assert.deepEqual(a.costs.forecast,{amountCents:500,entries:1,unknownAmountEntries:0,complete:true});
   assert.deepEqual(snap.unassigned.costs.measured.amountCents,70);
