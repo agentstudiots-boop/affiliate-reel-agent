@@ -72,7 +72,7 @@ test('missing tables make their part unavailable instead of zero; reads are read
   assert.ok(statements.slice(1).every(s=>s==='SELECT'),statements.join(','));
 });
 
-test('pure read module, not wired into app code yet (AC-5)',()=>{
+test('pure read module; only the read-only operations overview uses it (AC-5)',()=>{
   const source=fs.readFileSync('lib/enterprise/controlling/snapshot.ts','utf8');
   assert.match(source,/SET TRANSACTION READ ONLY/);
   assert.doesNotMatch(source,/\b(INSERT|UPDATE|DELETE)\b|process\.env|fetch\(|getDatabase/);
