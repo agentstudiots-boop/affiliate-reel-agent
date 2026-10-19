@@ -110,6 +110,13 @@
       "detail": "alle vier Exit 0, 713/713",
       "commit": "5d55d13",
       "at": "2026-10-19T07:44:00Z"
+    },
+    {
+      "command": "npm run typecheck / lint / test / build (nach B-03-Fixes)",
+      "result": "passed",
+      "detail": "alle vier Exit 0, 714/714",
+      "commit": "2f0e572",
+      "at": "2026-10-19T11:50:00Z"
     }
   ],
   "known_issues": [
@@ -148,9 +155,9 @@
     "test_status": "39/39 gezielt",
     "next_action": "Review abwarten"
   },
-  "revision": 3,
+  "revision": 4,
   "based_on_commit": "7502b48",
-  "updated_at": "2026-10-19T11:34:00Z",
+  "updated_at": "2026-10-19T11:50:00Z",
   "log": [
     {
       "at": "2026-10-19T07:31:00Z",

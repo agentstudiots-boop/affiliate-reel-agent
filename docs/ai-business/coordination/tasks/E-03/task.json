@@ -4,7 +4,7 @@
   "title": "Importer model_calls → cost_entries (gemessen, Preis nur aus dem Katalog)",
   "module": "controlling-ledger",
   "phase": "E",
-  "status": "in_progress",
+  "status": "waiting_review",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -91,10 +91,10 @@
     },
     {
       "command": "npm run typecheck / lint / test / build",
-      "result": "not_run",
-      "detail": "läuft im Hauptcheckout",
+      "result": "passed",
+      "detail": "alle vier Exit 0, 693/693",
       "commit": "a398e5a",
-      "at": "2026-10-19T11:34:00Z"
+      "at": "2026-10-19T11:50:00Z"
     }
   ],
   "known_issues": [
@@ -104,10 +104,10 @@
   ],
   "open_decisions": [],
   "pr": {
-    "url": null,
-    "state": "none",
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/93",
+    "state": "draft",
     "merge_commit": null,
-    "ci": "unknown"
+    "ci": "pending"
   },
   "approval": {
     "reviewer": "pending",
@@ -130,15 +130,22 @@
     "test_status": "19/19 gezielt",
     "next_action": "Volle Prüfung, Draft-PR"
   },
-  "revision": 1,
+  "revision": 2,
   "based_on_commit": "e8149a7",
-  "updated_at": "2026-10-19T11:34:00Z",
+  "updated_at": "2026-10-19T11:50:00Z",
   "log": [
     {
       "at": "2026-10-19T11:34:00Z",
       "actor": "claude-code",
       "action": "created",
       "summary": "E-03 geplant und implementiert (Solo-Betrieb), Commits d9ffab5, a398e5a",
+      "commit": "a398e5a"
+    },
+    {
+      "at": "2026-10-19T11:50:00Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Volle Prüfung grün, Draft-PR #93",
       "commit": "a398e5a"
     }
   ]

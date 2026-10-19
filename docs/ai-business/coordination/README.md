@@ -85,19 +85,20 @@ Zweite Claude-Code-Sitzung (`session_01Srrz6J98VFXDsVBnE82VPC`) prüft PRs als *
 unabhängiges Zweitmodell-Review. Alle Code-PRs: nicht eingebunden, keine Schalter, keine Routen, keine kostenpflichtigen Aufrufe.
 Einzelheiten je Aufgabe in `tasks/<ID>/task.json`.
 
-| Reihenfolge | PR | Aufgabe | gestapelt auf | Stand |
+| Reihenfolge | PR | Aufgabe | gestapelt auf | Stand (19.10., mittags) |
 |---|---|---|---|---|
 | 0 | #81, #82 | Architektur/Roadmap (Doku) | – | Gate G0, Betreiber |
-| 1 | #83 | E-05 Kennzahlen-Formeln | – | geprüft (approve) |
-| 2 | #84 | B-01 Plan-Vertrag, Richtlinien, Register | – | Review changes_requested → behoben, Nachprüfung offen |
-| 3 | #86 | B-04 Abteilungsvertrag | #84 | Review approve, Minor behoben |
-| 4 | #87 | G-01 Affiliate-Adapter (nur lesend) | #86 | Review offen |
-| 4 | #88 | E-06 Abteilungszuordnung `model_calls` | #84 | Review offen |
+| 1 | #83 | E-05 Kennzahlen-Formeln | – | approve |
+| 2 | #84 | B-01 Plan-Vertrag, Richtlinien, Register | – | approve (nach Nachprüfung) |
+| 3 | #86 | B-04 Abteilungsvertrag | #84 | approve (nach Nachprüfung) |
+| 4 | #87 | G-01 Affiliate-Adapter (nur lesend) | #86 | changes_requested → behoben, Nachprüfung offen |
+| 4 | #88 | E-06 Abteilungszuordnung  | #84 | approve (Minor behoben) |
 | 4 | #85 | F-01 Bewertungsraster (zweite Sitzung) | – | Review offen |
-| 5 | #89 | B-02 **Migration 039** Aufgabenbuch | – | Review offen · **Merge = Migration in Production** |
-| 6 | #90 | B-03 Repository Aufgabenbuch | #86, #89 | Review offen |
-| 7 | #91 | B-05 Budgetwächter | #90 | Review offen |
-| 8 | folgt | E-01 **Migration 040** Kosten-/Erlösbuch | #89 | volle Prüfung läuft · **Merge = Migration in Production** |
+| 5 | #89 | B-02 **Migration 039** Aufgabenbuch | – | changes_requested → behoben, Nachprüfung offen · **Merge = Migration in Production** |
+| 6 | #90 | B-03 Repository Aufgabenbuch | #86, #89 | changes_requested (3 major) → behoben, Nachprüfung offen |
+| 7 | #91 | B-05 Budgetwächter | #90 | Review offen (Betreiberfreigabe für die Prüfung) |
+| 6 | #92 | E-01 **Migration 040** Kosten-/Erlösbuch | #89 | Review offen · **Merge = Migration in Production** |
+| 7 | #93 | E-03 Importer  →  | #92 | Review offen |
 
 Gestapelte PRs enthalten die Commits ihrer Basis; nach deren Merge zeigt der Diff nur den eigenen Zuwachs. Bekannter trivialer Konflikt:
 `tsconfig.test.json`-Includes von #84 und #85 stehen benachbart (beide Einträge behalten).

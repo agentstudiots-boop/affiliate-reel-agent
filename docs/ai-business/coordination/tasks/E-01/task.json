@@ -4,7 +4,7 @@
   "title": "Migration 040: Preis-, Kosten-, Erlös- und Budgetbuch (additiv, ungenutzt)",
   "module": "controlling-ledger",
   "phase": "E",
-  "status": "in_progress",
+  "status": "waiting_review",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -115,6 +115,13 @@
       "detail": "alle vier Exit 0, 688/688 (auf dccea46)",
       "commit": "dccea46",
       "at": "2026-10-19T11:34:00Z"
+    },
+    {
+      "command": "npm run typecheck / lint / test / build (auf E-03-Stapel a398e5a)",
+      "result": "passed",
+      "detail": "alle vier Exit 0, 693/693",
+      "commit": "570e410",
+      "at": "2026-10-19T11:50:00Z"
     }
   ],
   "known_issues": [
@@ -131,10 +138,10 @@
     }
   ],
   "pr": {
-    "url": null,
-    "state": "none",
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/92",
+    "state": "draft",
     "merge_commit": null,
-    "ci": "unknown"
+    "ci": "pending"
   },
   "approval": {
     "reviewer": "pending",
@@ -157,9 +164,9 @@
     "test_status": "40/40 gezielt",
     "next_action": "Volle Prüfungen, Draft-PR"
   },
-  "revision": 2,
+  "revision": 3,
   "based_on_commit": "315306d",
-  "updated_at": "2026-10-19T11:34:00Z",
+  "updated_at": "2026-10-19T11:50:00Z",
   "log": [
     {
       "at": "2026-10-19T07:40:00Z",
@@ -173,6 +180,13 @@
       "actor": "claude-code",
       "action": "fixed",
       "summary": "B-02-Fixes per Merge 5fc6855; Isolationstest lässt Kernmodule in lib/enterprise zu",
+      "commit": "570e410"
+    },
+    {
+      "at": "2026-10-19T11:50:00Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Draft-PR #92",
       "commit": "570e410"
     }
   ]
