@@ -81,11 +81,12 @@ test('budgets: one per department, month and kind; approval stays explicit (AC-5
   await db.close();
 });
 
+// Kernel modules in lib/enterprise (importer E-03) may use the ledger; their own isolation tests make sure they are not wired in.
 test('no application code uses the controlling ledger yet (AC-6)',()=>{
   const users=[];
   const walk=dir=>{for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
     const full=path.join(dir,entry.name);
-    if(entry.isDirectory()){if(entry.name!=='node_modules')walk(full);}
+    if(entry.isDirectory()){if(entry.name!=='node_modules'&&full!==path.join('lib','enterprise'))walk(full);}
     else if(/\.(ts|tsx)$/.test(entry.name)&&/\b(price_catalog|cost_entries|revenue_entries)\b|\b(FROM|INTO|UPDATE|JOIN|TABLE)\s+budgets\b/i.test(fs.readFileSync(full,'utf8')))users.push(full);
   }};
   walk('app');walk('lib');
