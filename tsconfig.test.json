@@ -21,6 +21,7 @@
   "include": [
     "lib/content/**/*.ts",
     "lib/product-resolver.ts",
+    "lib/enterprise/opportunity/scoring.ts",
     "lib/daily/product-lock.ts",
     "lib/daily/slots.ts",
     "lib/daily/evidence.ts",
