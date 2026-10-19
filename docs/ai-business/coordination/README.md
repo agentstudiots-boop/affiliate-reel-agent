@@ -79,6 +79,36 @@ Planer/Implementierer/Prüfer zwischen zwei Systemen (ADR-15, ADR-16) und das Le
   (die Claude-Routine wurde am 19.10.2026 gelöscht), kein Validator, keine neuen Koordinationswerkzeuge.
 - Unverändert: kein Merge durch Claude, keine Produktionsänderung, keine Schalter, keine Secrets, keine kostenpflichtigen Aufrufe, keine zusätzlichen Credits.
 
+## Stand 19.10.2026, vormittags: offene Draft-PRs und Merge-Reihenfolge
+
+Zweite Claude-Code-Sitzung (`session_01Srrz6J98VFXDsVBnE82VPC`) prüft PRs als **Zweitsitzung desselben Modells** – hilfreich, aber kein
+unabhängiges Zweitmodell-Review. Alle Code-PRs: nicht eingebunden, keine Schalter, keine Routen, keine kostenpflichtigen Aufrufe.
+Einzelheiten je Aufgabe in `tasks/<ID>/task.json`.
+
+| Reihenfolge | PR | Aufgabe | gestapelt auf | Stand |
+|---|---|---|---|---|
+| 0 | #81, #82 | Architektur/Roadmap (Doku) | – | Gate G0, Betreiber |
+| 1 | #83 | E-05 Kennzahlen-Formeln | – | geprüft (approve) |
+| 2 | #84 | B-01 Plan-Vertrag, Richtlinien, Register | – | Review changes_requested → behoben, Nachprüfung offen |
+| 3 | #86 | B-04 Abteilungsvertrag | #84 | Review approve, Minor behoben |
+| 4 | #87 | G-01 Affiliate-Adapter (nur lesend) | #86 | Review offen |
+| 4 | #88 | E-06 Abteilungszuordnung `model_calls` | #84 | Review offen |
+| 4 | #85 | F-01 Bewertungsraster (zweite Sitzung) | – | Review offen |
+| 5 | #89 | B-02 **Migration 039** Aufgabenbuch | – | Review offen · **Merge = Migration in Production** |
+| 6 | #90 | B-03 Repository Aufgabenbuch | #86, #89 | Review offen |
+| 7 | #91 | B-05 Budgetwächter | #90 | Review offen |
+| 8 | folgt | E-01 **Migration 040** Kosten-/Erlösbuch | #89 | volle Prüfung läuft · **Merge = Migration in Production** |
+
+Gestapelte PRs enthalten die Commits ihrer Basis; nach deren Merge zeigt der Diff nur den eigenen Zuwachs. Bekannter trivialer Konflikt:
+`tsconfig.test.json`-Includes von #84 und #85 stehen benachbart (beide Einträge behalten).
+
+**Offene Betreiberentscheidungen:** BF-16 (ADR-01, ADR-13…17), Merge #81/#82 (G0), Freigabe der Migrationen 039 und 040 (je eigener Merge),
+BF-14 Hosting-Tarif, BF-15 eigene GitHub-Identität, BF-05 Sichtbarkeit des Repos.
+
+**Bewusst angehalten** (brauchen eine Betreiberentscheidung, bevor Code entsteht): B-06 Entscheidungsvorlagen (WhatsApp-Freigabe-Hot-Files,
+weitere Migration), B-07 Cron `executive-cycle` (Änderung an `vercel.json` = Produktiv-Cron), B-08 KI-Planer (Modellaufrufe), F-03 Recherche-Pilot (Kosten).
+Weiter ohne Entscheidung möglich: E-03 Importer `model_calls` → `cost_entries` (gestapelt auf E-01).
+
 ## Runde 2 (18.10.2026, A-01): was sich an der bestehenden Struktur ändert
 
 Keine neue Struktur, nur Ergänzungen dieser Dateien (Begründung: `../07_OFFENE_FRAGEN_RISIKEN_ENTSCHEIDUNGEN.md` §0):
