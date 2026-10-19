@@ -91,12 +91,22 @@ test('a price entered later fills only unknown amounts; known amounts never chan
   await call(db,{input_tokens:1000,output_tokens:100,predict_time_s:null});
   await importModelCalls(db);
   assert.deepEqual((await lines(db)).map(l=>[l.unit,l.amount_micros]),[['input_token',2000],['output_token',null]]);
-  assert.deepEqual(await repriceModelCallEntries(db),{checked:1,repriced:0},'still no output price');
+  assert.deepEqual(await repriceModelCallEntries(db),{checked:0,repriced:0},'still no output price: nothing to do');
   const outputPrice=await price(db,{unit:'output_token',price_micros:8});
   await db.query("UPDATE price_catalog SET price_micros=999 WHERE id=$1",[inputPrice]); // a changed catalogue must not rewrite booked lines
   assert.deepEqual(await repriceModelCallEntries(db),{checked:1,repriced:1});
   assert.deepEqual((await lines(db)).map(l=>[l.unit,l.amount_micros,l.currency,l.price_catalog_id]),[['input_token',2000,'EUR',inputPrice],['output_token',800,'EUR',outputPrice]]);
   assert.deepEqual(await repriceModelCallEntries(db),{checked:0,repriced:0});
+  await db.close();
+});
+
+test('lines that can never be priced do not block repricing of later lines (review #93)',async()=>{
+  const db=await pgliteDatabase();
+  for(let i=0;i<3;i++)await call(db,{model:'unknown/model',input_tokens:10,output_tokens:null,predict_time_s:null,created_at:'2026-10-19T07:00:00Z'});
+  await call(db,{input_tokens:1000,output_tokens:null,predict_time_s:null,created_at:'2026-10-19T08:00:00Z'});
+  await importModelCalls(db);
+  await price(db,{price_micros:2});
+  assert.deepEqual(await repriceModelCallEntries(db,{limit:1}),{checked:1,repriced:1},'the old unpriceable lines are skipped');
   await db.close();
 });
 

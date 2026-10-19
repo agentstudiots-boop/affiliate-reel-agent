@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     const db = getDatabase();
     await ensureAutomationSchema(db);
     const report = await runExecutiveCycle(db, {
-      holder: `cron-${randomUUID()}`, leaseMs: 5 * 60 * 1000, maxTasks: 3,
+      holder: `cron-${randomUUID()}`, leaseMs: 5 * 60 * 1000, maxTasks: 3, handlerTimeoutMs: 15_000, // 3 × 15 s within maxDuration 60 s
       departments: { affiliate: affiliateDepartment },
       contextFor: department => {
         if (department !== "affiliate") throw new Error("Abteilung ohne Kontext");
