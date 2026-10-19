@@ -26,6 +26,7 @@
     "lib/enterprise/contract.ts",
     "lib/enterprise/tasks/repository.ts",
     "lib/enterprise/tasks/budget.ts",
+    "lib/enterprise/decisions.ts",
     "lib/product-resolver.ts",
     "lib/daily/product-lock.ts",
     "lib/daily/slots.ts",
