@@ -3,8 +3,10 @@
 // A paid call may only start after its amount is reserved against the department's monthly limit; afterwards the
 // reservation is settled with the real amount. An unclear outcome (outcome_unknown, lost response) disputes the
 // reservation: it keeps counting against the budget and is never released automatically. Reservations of one department
-// and month are serialised by an advisory lock, as in lib/visual/runway-budget.ts. Limits come from the caller (the
-// budgets table follows with E-01); an invalid limit refuses every reservation. No provider calls while the lock is held.
+// and month are serialised by an advisory lock, as in lib/visual/runway-budget.ts. The monthly limit comes only from a
+// hard budget (migration 040) whose approved_decision_id names an operator decision (migration 041) that was approved for
+// exactly this department, month and amount (budgetSubjectKey) – never from the caller. Without such a budget the limit is
+// 0 and every reservation is refused (task B-09). No provider calls while the lock is held.
 // All times come from the database clock, like in the repository (B-03) – including the budget month, which the caller
 // cannot choose. Reserving, settling and releasing are bound to the worker's lease (holder + fencing token) of a running
 // task: a worker that lost its lease can neither reserve nor free budget. Disputing only makes the guard stricter and
@@ -16,7 +18,7 @@ import type { Database, Sql } from "../../memory/db";
 export type Reservation = { id: string; taskId: string; department: string; period: string; amountCents: number };
 export type ReserveResult =
   | { ok: true; reservation: Reservation; committedCents: number; limitCents: number }
-  | { ok: false; reason: "budget_exhausted" | "invalid_request" | "task_not_running"; detail: string; committedCents?: number; limitCents?: number };
+  | { ok: false; reason: "budget_exhausted" | "no_approved_budget" | "invalid_request" | "task_not_running"; detail: string; committedCents?: number; limitCents?: number };
 
 // Same shape as Lease in ./repository (not imported: the repository imports this module).
 export type LeaseRef = { id: string; holder: string; fencingToken: number };
@@ -33,6 +35,22 @@ export function periodOf(date: Date): string {
 // at their real amount (which may exceed the reservation). Released reservations no longer count.
 const BERLIN_PERIOD = "to_char(now() AT TIME ZONE 'Europe/Berlin', 'YYYY-MM')";
 
+// Subject of the L4 decision (executive.budget_change) that makes a hard budget binding. The amount is part of the key, so
+// a changed limit needs a new decision.
+export function budgetSubjectKey(department: string, period: string, limitCents: number): string {
+  return `budget:${department}:${period}:${limitCents}`;
+}
+
+// The binding monthly limit, or null without an approved hard budget (tables of migration 040/041 missing ⇒ null as well).
+async function approvedLimit(sql: Sql, department: string, period: string): Promise<number | null> {
+  const tables = (await sql.query("SELECT to_regclass('public.budgets') IS NOT NULL AND to_regclass('public.enterprise_decisions') IS NOT NULL AS ok")).rows[0];
+  if (tables?.ok !== true) return null;
+  const row = (await sql.query(`SELECT b.limit_cents FROM budgets b JOIN enterprise_decisions d ON d.id::text = b.approved_decision_id
+    WHERE b.department=$1 AND b.period=$2 AND b.kind='hard' AND d.status='approved' AND d.level='L4' AND d.task_kind='executive.budget_change'
+      AND d.subject_key = 'budget:' || b.department || ':' || b.period || ':' || b.limit_cents::text`, [department, period])).rows[0];
+  return row ? Number(row.limit_cents) : null;
+}
+
 // The running task of exactly this lease, locked; null for a stale, expired or foreign lease.
 async function lockRunning(sql: Sql, lease: LeaseRef) {
   return (await sql.query(`SELECT department,max_cost_cents FROM enterprise_tasks WHERE id=$1 AND lease_holder=$2 AND fencing_token=$3
@@ -46,9 +64,8 @@ async function committed(sql: Sql, department: string, period: string) {
   return Number(row?.cents ?? 0);
 }
 
-export async function reserveBudget(db: Database, lease: LeaseRef, request: { amountCents: number; limitCents: number }): Promise<ReserveResult> {
+export async function reserveBudget(db: Database, lease: LeaseRef, request: { amountCents: number }): Promise<ReserveResult> {
   if (!cents(request.amountCents) || request.amountCents === 0) return { ok: false, reason: "invalid_request", detail: "Betrag muss eine positive ganze Zahl in Cent sein" };
-  if (!cents(request.limitCents)) return { ok: false, reason: "invalid_request", detail: "Budgetgrenze ungültig" };
   return db.transaction(async sql => {
     // Only the current lease of a started task may reserve; its department is taken from the ledger, not the caller.
     const task = await lockRunning(sql, lease);
@@ -59,14 +76,17 @@ export async function reserveBudget(db: Database, lease: LeaseRef, request: { am
       return { ok: false as const, reason: "budget_exhausted" as const, detail: `Aufgabenbudget ${task.max_cost_cents} Cent überschritten` };
     const period = String((await sql.query(`SELECT ${BERLIN_PERIOD} AS period`)).rows[0]?.period);
     await sql.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`enterprise-budget:${department}:${period}`]);
+    const limitCents = await approvedLimit(sql, department, period);
+    if (limitCents === null)
+      return { ok: false as const, reason: "no_approved_budget" as const, detail: `kein vom Betreiber freigegebenes Monatsbudget ${department} ${period}`, limitCents: 0 };
     const used = await committed(sql, department, period);
-    if (used + request.amountCents > request.limitCents)
-      return { ok: false as const, reason: "budget_exhausted" as const, detail: `Monatsbudget ${department} ${period} erschöpft`, committedCents: used, limitCents: request.limitCents };
+    if (used + request.amountCents > limitCents)
+      return { ok: false as const, reason: "budget_exhausted" as const, detail: `Monatsbudget ${department} ${period} erschöpft`, committedCents: used, limitCents };
     const id = randomUUID();
     await sql.query(`INSERT INTO budget_reservations(id,task_id,department,period,amount_cents) VALUES($1,$2,$3,$4,$5)`,
       [id, lease.id, department, period, request.amountCents]);
     return { ok: true as const, reservation: { id, taskId: lease.id, department, period, amountCents: request.amountCents },
-      committedCents: used + request.amountCents, limitCents: request.limitCents };
+      committedCents: used + request.amountCents, limitCents };
   });
 }
 
