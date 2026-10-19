@@ -145,7 +145,7 @@ test('2D detail panel: health with sources, task counts, open decisions, costs a
       costs:{measured:{amountCents:department==='affiliate'?120:null,entries:department==='affiliate'?3:0,unknownAmountEntries:department==='affiliate'?1:0,complete:department!=='affiliate'},
         estimated:{amountCents:null,entries:0,unknownAmountEntries:0,complete:true},forecast:{amountCents:null,entries:0,unknownAmountEntries:0,complete:true}},
       revenue:{measured:{amountCents:null,entries:0,unknownAmountEntries:0,complete:true},estimated:{amountCents:null,entries:0,unknownAmountEntries:0,complete:true},forecast:{amountCents:null,entries:0,unknownAmountEntries:0,complete:true}}})),
-    unassigned:{modelUsage:null,costs:null},sources:[]};
+    unassigned:{modelUsage:null,costs:null,revenue:null},sources:[]};
   const view=buildEnterpriseView({now:NOW,health:{affiliate:{...health('affiliate','degraded'),reason:'letzte Freigabeanfrage nicht beim Betreiber angekommen'}},
     tasks:[{department:'affiliate',status:'succeeded',count:2,lastAt:NOW.toISOString()},{department:'affiliate',status:'queued',count:1,lastAt:NOW.toISOString()}],
     decisions:[{department:'affiliate',pending:1,nextExpiry:'2026-11-16T08:00:00.000Z'}],controlling});
