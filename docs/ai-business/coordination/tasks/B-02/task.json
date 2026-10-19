@@ -125,7 +125,11 @@
     "Hot Files: migrations.ts, ensure-automation-schema.ts, migration-upgrade-Test, architecture/model.ts, CLAUDE.md, PROJECT_STATUS.md"
   ],
   "open_decisions": [
-    "Betreiber: Merge = Migration in Production (additiv, ungenutzt) freigeben?"
+    {
+      "id": "OD-B02-1",
+      "question": "Merge = Migration 039 wird in Production angewendet (additiv, ungenutzt). Freigeben?",
+      "owner": "operator"
+    }
   ],
   "pr": {
     "url": null,
