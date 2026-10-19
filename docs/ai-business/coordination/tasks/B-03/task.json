@@ -4,7 +4,7 @@
   "title": "Repository Aufgabenbuch: Lease mit Fencing, SKIP LOCKED, Idempotenz, Outbox, outcome_unknown, Dead-Letter",
   "module": "enterprise-ledger",
   "phase": "B",
-  "status": "in_progress",
+  "status": "waiting_review",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -107,11 +107,11 @@
       "at": "2026-10-19T07:08:00Z"
     },
     {
-      "command": "npm run typecheck / lint / test / build",
-      "result": "not_run",
-      "detail": "folgt im Hauptcheckout",
+      "command": "npm run typecheck / lint / test / build (auf B-03-Stapel a8aef79, enthält B-02 3bb3362)",
+      "result": "passed",
+      "detail": "alle vier Exit 0, 707/707",
       "commit": "a8aef79",
-      "at": "2026-10-19T07:08:00Z"
+      "at": "2026-10-19T07:24:00Z"
     }
   ],
   "known_issues": [
@@ -123,10 +123,10 @@
   ],
   "open_decisions": [],
   "pr": {
-    "url": null,
-    "state": "none",
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/90",
+    "state": "draft",
     "merge_commit": null,
-    "ci": "unknown"
+    "ci": "pending"
   },
   "approval": {
     "reviewer": "pending",
@@ -134,31 +134,39 @@
     "latest_review_file": null
   },
   "next_steps": [
-    "Volle Prüfungen im Hauptcheckout, Draft-PR gegen main"
+    "Review durch zweite Sitzung",
+    "Merge durch Betreiber nach #84, #86, #89"
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T07:08:00Z",
+    "last_checkpoint_at": "2026-10-19T07:24:00Z",
     "checkpoint_reason": "other",
     "last_commit": "a8aef79",
     "active_branch": "claude/B-03-task-repository",
-    "state_summary": "B-03 implementiert, gezielte Tests grün",
+    "state_summary": "Draft-PR #90 offen",
     "decisions_made": [
       "Erneute Registerprüfung beim Leasen",
       "Nur provider_error automatisch wiederholbar"
     ],
     "test_status": "33/33 gezielt",
-    "next_action": "Volle Prüfungen, Draft-PR"
+    "next_action": "Review abwarten"
   },
-  "revision": 1,
+  "revision": 2,
   "based_on_commit": "5f0f9e0",
-  "updated_at": "2026-10-19T07:08:00Z",
+  "updated_at": "2026-10-19T07:24:00Z",
   "log": [
     {
       "at": "2026-10-19T07:08:00Z",
       "actor": "claude-code",
       "action": "created",
       "summary": "B-03 geplant und implementiert (Solo-Betrieb), Commits 7c67d00, a8aef79",
+      "commit": "a8aef79"
+    },
+    {
+      "at": "2026-10-19T07:24:00Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Volle Prüfung grün (707/707), Draft-PR 90",
       "commit": "a8aef79"
     }
   ]

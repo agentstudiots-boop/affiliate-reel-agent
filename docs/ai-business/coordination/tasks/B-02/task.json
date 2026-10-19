@@ -4,7 +4,7 @@
   "title": "Migration 039: Aufgabenbuch, Ereignisse, Outbox, Budgetreservierungen (additiv, ungenutzt)",
   "module": "enterprise-ledger",
   "phase": "B",
-  "status": "in_progress",
+  "status": "waiting_review",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -110,11 +110,11 @@
       "at": "2026-10-19T06:52:00Z"
     },
     {
-      "command": "npm run typecheck / lint / test / build",
-      "result": "not_run",
-      "detail": "folgt im Hauptcheckout",
+      "command": "npm run typecheck / lint / test / build (auf B-03-Stapel a8aef79, enthält B-02 3bb3362)",
+      "result": "passed",
+      "detail": "alle vier Exit 0, 707/707",
       "commit": "3bb3362",
-      "at": "2026-10-19T06:52:00Z"
+      "at": "2026-10-19T07:24:00Z"
     }
   ],
   "known_issues": [
@@ -132,10 +132,10 @@
     }
   ],
   "pr": {
-    "url": null,
-    "state": "none",
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/89",
+    "state": "draft",
     "merge_commit": null,
-    "ci": "unknown"
+    "ci": "pending"
   },
   "approval": {
     "reviewer": "pending",
@@ -143,25 +143,26 @@
     "latest_review_file": null
   },
   "next_steps": [
-    "Volle Prüfungen im Hauptcheckout, Draft-PR gegen main"
+    "Review durch zweite Sitzung",
+    "Merge durch Betreiber (Migration in Production!)"
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T06:52:00Z",
+    "last_checkpoint_at": "2026-10-19T07:24:00Z",
     "checkpoint_reason": "other",
     "last_commit": "3bb3362",
     "active_branch": "claude/B-02-task-ledger-migration",
-    "state_summary": "B-02 implementiert, gezielte Tests grün",
+    "state_summary": "Draft-PR #89 offen",
     "decisions_made": [
       "Direkt von main, unabhängig von B-01-Code (Migration zuerst allein)",
       "Fehlerklassen an B-04 angeglichen"
     ],
     "test_status": "34/34 gezielt",
-    "next_action": "Volle Prüfungen, Draft-PR"
+    "next_action": "Review abwarten"
   },
-  "revision": 2,
+  "revision": 3,
   "based_on_commit": "d19edb1",
-  "updated_at": "2026-10-19T07:08:00Z",
+  "updated_at": "2026-10-19T07:24:00Z",
   "log": [
     {
       "at": "2026-10-19T06:52:00Z",
@@ -175,6 +176,13 @@
       "actor": "claude-code",
       "action": "fixed",
       "summary": "Isolationstest lässt Kernmodule in lib/enterprise zu (B-03-Repository)",
+      "commit": "3bb3362"
+    },
+    {
+      "at": "2026-10-19T07:24:00Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Volle Prüfung grün (707/707), Draft-PR 89",
       "commit": "3bb3362"
     }
   ]
