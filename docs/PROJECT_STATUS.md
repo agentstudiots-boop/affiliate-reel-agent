@@ -15,7 +15,7 @@ Ausführlicher Abschluss mit Soll-Ist-Matrix: [`docs/PRODUCTION_AUDIT_FINAL_2026
 | Production-Deployment | je Merge automatisch; letzter geprüfter: `dpl_3eE5ETatCsdENnhUtGeHYZ1hTTNA` READY (`77f0489`, 12 Cron-Einträge angenommen) |
 | Tests | 676 Tests grün (`npm test`), Typecheck, Lint, Build; CI (`check`) grün je PR |
 | Offene PRs (alt) | #61 (verletzt Importregel), #65 (überholt), #10 (Migrationskonflikt) – schließen oder neu aufsetzen |
-| Migrationen | 001–040, nur additiv (038: Zustellstatus Themenvorschläge, Themenvideo-Felder, `topic_video_days`; 039: Executive-Aufgabenbuch `enterprise_*`/`budget_reservations`; 040: Kosten-/Erlösbuch `price_catalog`, `cost_entries`, `revenue_entries`, `budgets`; beide noch von keinem Code genutzt) |
+| Migrationen | 001–041, nur additiv (038: Zustellstatus Themenvorschläge, Themenvideo-Felder, `topic_video_days`; 039: Executive-Aufgabenbuch `enterprise_*`/`budget_reservations`; 040: Kosten-/Erlösbuch `price_catalog`, `cost_entries`, `revenue_entries`, `budgets`; 041: Entscheidungsvorlagen `enterprise_decisions`; 039–041 noch von keinem Code genutzt) |
 | Production-Env (nur Namen) | vorhanden: `CONTENT_STUDIO_PASSWORD`, `CRON_SECRET`, DB/Blob, WhatsApp (`WHATTSAPP_*`), Meta-System-User, Replicate, Tavily, Runway (+Budget), Faceless, YouTube (3 OAuth), `HEYGEN_API_KEY`, `WHATSAPP_DAILY_TEMPLATE_*` (`ENABLED=false`). **Fehlend:** `TOPIC_PIPELINE_ENABLED`, `TOPIC_DAILY_VIDEO`, `TOPIC_COPY_MODE`, `TOPIC_STANDARD_VIDEO_PROVIDER`, `TOPIC_RUNWAY_MONTHLY_VIDEO_LIMIT`, `HEYGEN_AVATAR_ID`, `HEYGEN_VOICE_ID`, `HEYGEN_MONTHLY_VIDEO_LIMIT`, `HEYGEN_ENABLED`, `META_PAGE_ID`, `META_INSTAGRAM_USER_ID`, Pinterest/TikTok/X, `ADMIN_SESSION_SECRET` (optional) |
 
 ## 2. Gemergte PRs dieser Sitzung
