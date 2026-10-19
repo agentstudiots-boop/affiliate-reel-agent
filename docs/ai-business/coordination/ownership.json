@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "note": "Modulbesitz und Konfliktregeln (ADR-09, korrigiert nach GPT-04/GPT-08). Datei-genaue Zuständigkeit statt Baum-Claims. Keine Geschäftsdaten – öffentliches Repository.",
-  "revision": 6,
+  "revision": 7,
   "updated_at": "2026-10-19T06:00:00Z",
   "coordination_branch": {
     "name": "architecture/ai-business-roadmap",
@@ -153,6 +153,17 @@
       "reviewer": "claude-code",
       "status": "deferred",
       "note": "erst wenn Koordinationsfehler als Engpass nachgewiesen sind (Betreiberauftrag: gezielt automatisieren)"
+    },
+    {
+      "id": "controlling-ledger",
+      "paths": [
+        "db/migrations/040_controlling_cost_ledger.sql",
+        "tests/controlling-ledger-migration.test.cjs"
+      ],
+      "owner": "claude-code",
+      "reviewer": "operator",
+      "status": "in_progress",
+      "task": "E-01"
     }
   ],
   "hot_files": [
@@ -201,6 +212,14 @@
         "reserved_by": "claude-code",
         "at": "2026-10-19T06:48:00Z",
         "note": "Vor dem PR erneut gegen origin/main prüfen; parallele Studio-Arbeit kann 039 belegen ⇒ dann umnummerieren"
+      },
+      {
+        "number": "040",
+        "task": "E-01",
+        "name": "040_controlling_cost_ledger.sql",
+        "reserved_by": "claude-code",
+        "at": "2026-10-19T07:35:00Z",
+        "note": "Unabhängig von 039 (B-02) auf main; wird 039 zuerst gemergt, bleibt 040; wird E-01 zuerst gemergt, Lücke 039 ist für den Lader unkritisch, aber vorher prüfen"
       }
     ],
     "rule": "Vor Beginn einer Aufgabe mit Migration die nächste freie Nummer per Zustands-Commit hier und in claims.migration_numbers reservieren; vor dem PR erneut gegen origin/main prüfen."
