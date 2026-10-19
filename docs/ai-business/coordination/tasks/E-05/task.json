@@ -4,7 +4,7 @@
   "title": "Reine Kennzahlenfunktionen: Deckungsbeitrag, einfacher ROI und Amortisation",
   "module": "controlling",
   "phase": "E",
-  "status": "in_progress",
+  "status": "waiting_review",
   "planner": "gpt-work",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -27,49 +27,49 @@
       "id": "AC-1",
       "criterion": "Nur reine Funktionen in metrics.ts, ohne DB, Netzwerk, Modellaufruf, Uhrzeit oder Änderungen an Eingaben. Exportierte Typen MetricResult<T> = {status:'known',value:T} | {status:'unknown',reason:string} und MoneyInput = {amountCents:number|null,currency:string,kind:'measured'|'estimated'|'forecast'}.",
       "verification": "Tests prüfen unveränderte Eingaben und deterministische Ergebnisse; Diff auf Imports und Seiteneffekte prüfen.",
-      "met": null
+      "met": true
     },
     {
       "id": "AC-2",
       "criterion": "contributionMargin(revenue, directCosts): Beträge nichtnegative sichere Integer-Cents; Erlös muss measured sein. Kosten einzeln measured oder estimated. Ergebnis enthält measuredRevenueCents, measuredDirectCostsCents, estimatedDirectCostsCents, contributionCents und includesEstimates; Beitrag = Erlös minus beide Kostensummen, darf negativ sein. forecast führt zu unknown, nicht stillschweigend zu Null.",
       "verification": "10000 Erlös, 2000 measured + 1000 estimated Kosten ergibt 7000 Beitrag mit includesEstimates=true; reine Messwerte ebenfalls testen.",
-      "met": null
+      "met": true
     },
     {
       "id": "AC-3",
       "criterion": "Fehlende Beträge, NaN/Infinity, Bruchteile von Cents, negative Eingabebeträge, Summen außerhalb safe integer und leere/abweichende Währungen liefern unknown mit verständlichem Grund. Leere Kostenliste bedeutet bestätigte Nullkosten; fehlende Kostenliste bedeutet unknown. Keine Währungsumrechnung.",
       "verification": "Tabellentests für jeden Fehlerfall; 0 wird von null unterschieden, gemischte Währungen abgelehnt.",
-      "met": null
+      "met": true
     },
     {
       "id": "AC-4",
       "criterion": "simpleRoi(netReturn, investment): explizit einfacher Perioden-ROI = netReturn/investment*100; netReturn ist Nettogewinn nach den zugehörigen Kosten, darf negativ sein. Beide Inputs measured, gleiche Währung, investment >0; sonst unknown. Kein annualisierter ROI und keine doppelte Subtraktion des Investments.",
       "verification": "netReturn 2000, investment 10000 ergibt 20; -2000 ergibt -20; Nullinvestment und nicht gemessene Werte unknown. Dokumentiert gleiche Bezugsperiode als Aufruferpflicht.",
-      "met": null
+      "met": true
     },
     {
       "id": "AC-5",
       "criterion": "simplePayback(investment, monthlyNetInflow): einfache statische Amortisation in Monaten = investment/monthlyNetInflow, beide measured, investment >=0, monthlyNetInflow >0, gleiche Währung. Bei <=0 Monatszufluss unknown, auch bei investment=0; sonst investment=0 ergibt 0 Monate. Kein Zinseszins, keine Renditeprognose.",
       "verification": "120000/10000 ergibt 12 Monate; Null/negative Zuflüsse unknown; Grenzfall Nullinvestment prüfen.",
-      "met": null
+      "met": true
     },
     {
       "id": "AC-6",
       "criterion": "ROI/Amortisation liefern ungerundete endliche number-Werte; Anzeige-Rundung ist nicht Teil dieses Moduls. Geld-Cents bleiben sichere Integer. Kein Resultat wird als umfassender Unternehmensgewinn dargestellt; Deckungsbeitrag enthält nur übergebene direkte Kosten.",
       "verification": "Bruchwerte mit Toleranz testen; overflow und nichtendliche Resultate unknown.",
-      "met": null
+      "met": true
     },
     {
       "id": "AC-7",
       "criterion": "Nur metrics.ts und Testdatei sowie genau der eigene Include-Eintrag lib/enterprise/controlling/metrics.ts in tsconfig.test.json. Kein Import in App/Produktionspfade. Nicht B-01-Dateien bearbeiten. Wenn lib/enterprise/**/*.ts bereits enthalten ist, keinen redundanten Include hinzufügen.",
       "verification": "Diff und vorhandene parallele PRs prüfen; Include mit B-01 abgleichen.",
-      "met": null
+      "met": true
     },
     {
       "id": "AC-8",
       "criterion": "Tests laden die echte kompilierte Implementierung; keine nachgebauten Formeln im Test statt Funktionsaufruf. Keine echten Anbieteraufrufe. Draft-PR, kein Merge und keine Aktivierung.",
       "verification": "Gezielte Tests, dann Projektprüfungen vor PR; GPT prüft den Commit unabhängig.",
-      "met": null
+      "met": true
     }
   ],
   "test_requirements": [
@@ -90,28 +90,61 @@
     "coordination_sha": "3cd4ce8",
     "generation": 1
   },
-  "changed_files": [],
-  "implemented": [],
+  "changed_files": [
+    "lib/enterprise/controlling/metrics.ts",
+    "tests/enterprise-controlling-metrics.test.cjs",
+    "tsconfig.test.json"
+  ],
+  "implemented": [
+    "contributionMargin: Deckungsbeitrag mit getrennt ausgewiesenen gemessenen/geschätzten direkten Kosten",
+    "simpleRoi: einfacher Perioden-ROI in Prozent",
+    "simplePayback: statische Amortisation in Monaten",
+    "MetricResult known/unknown mit Grund; Validierung von Betrag, Währung, Werteart, sicherem Zahlenbereich"
+  ],
   "tests": [
     {
-      "command": "Planungsdatei; keine Implementierung vorhanden",
-      "result": "not_run",
-      "commit": null,
-      "at": "2026-10-19T05:40:52.550Z"
+      "command": "node --test tests/enterprise-controlling-metrics.test.cjs",
+      "result": "passed",
+      "detail": "9/9",
+      "commit": "b2eef4c",
+      "at": "2026-10-19T06:10:00Z"
+    },
+    {
+      "command": "npm run typecheck",
+      "result": "passed",
+      "commit": "b2eef4c",
+      "at": "2026-10-19T06:10:00Z"
+    },
+    {
+      "command": "npm run lint",
+      "result": "passed",
+      "commit": "b2eef4c",
+      "at": "2026-10-19T06:10:00Z"
+    },
+    {
+      "command": "npm test",
+      "result": "passed",
+      "detail": "685/685",
+      "commit": "b2eef4c",
+      "at": "2026-10-19T06:10:00Z"
+    },
+    {
+      "command": "npm run build",
+      "result": "passed",
+      "commit": "b2eef4c",
+      "at": "2026-10-19T06:10:00Z"
     }
   ],
   "known_issues": [
-    "Aktuellen main-SHA vor Implementierung eintragen; Architektur-Branch nicht als Codebasis verwenden.",
-    "Abweichung vom bisherigen G0: isolierte Codevorbereitung ohne Merge ist separat vom Architektur-/Produktions-Go zu behandeln; keine pauschale ADR-Zustimmung behaupten.",
-    "tsconfig.test.json wird auch von B-01 berührt: Claude besitzt diese Datei; E-05 fügt nur den exakten metrics.ts-Include hinzu, B-01 prüft vor eigener Änderung erneut.",
-    "Allgemeines Ownership-Register nennt controlling anders; für diese abgegrenzte Aufgabe gelten die Rollen aus Roadmap 04 und diesem Task, keine Übernahme anderer Controlling-Dateien."
+    "tsconfig.test.json: späterer B-01-PR ergänzt dieselbe Stelle (trivialer Konflikt)",
+    "GPT Work ohne Guthaben – unabhängiges Review offen"
   ],
   "open_decisions": [],
   "pr": {
-    "url": null,
-    "state": "none",
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/83",
+    "state": "draft",
     "merge_commit": null,
-    "ci": "unknown"
+    "ci": "pending"
   },
   "approval": {
     "reviewer": "pending",
@@ -119,25 +152,24 @@
     "latest_review_file": null
   },
   "next_steps": [
-    "Claude liest tasks/A-01/handoff-code-start.md und prüft E-05 kurz auf umsetzbare Widersprüche.",
-    "Nach Betreiberauftrag zum isolierten Programmierstart: aktuelles main lesen, eigenen Codebranch anlegen, Zuständigkeit dokumentieren und E-05 implementieren.",
-    "Draft-PR mit Tests und SHA an GPT übergeben; kein Merge, keine Produktion."
+    "Review des Draft-PR #83",
+    "Betreiber: Merge nach Review/CI"
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T05:48:57Z",
-    "checkpoint_reason": "other",
-    "last_commit": "c56711e",
+    "last_checkpoint_at": "2026-10-19T06:10:00Z",
+    "checkpoint_reason": "work_package_done",
+    "last_commit": "b2eef4c",
     "active_branch": "claude/E-05-controlling-metrics",
-    "state_summary": "Lease übernommen nach Betreiberfreigabe zur isolierten Codearbeit (19.10.2026). Implementierung auf eigenem Branch von main c56711e.",
+    "state_summary": "E-05 implementiert, alle Projektprüfungen grün, Draft-PR #83 offen.",
     "decisions_made": [
-      "Betreiberfreigabe: nur Programmieren und Testen, Draft-PR, kein Merge, keine Produktivänderung"
+      "MoneyInput erlaubt negative Beträge; Domänenprüfung je Funktion"
     ],
-    "test_status": "läuft",
-    "next_action": "Projektprüfungen abschließen, Draft-PR gegen main öffnen"
+    "test_status": "685/685, typecheck/lint/build ok",
+    "next_action": "Review abwarten; kein Merge"
   },
-  "revision": 2,
-  "updated_at": "2026-10-19T05:48:57Z",
+  "revision": 3,
+  "updated_at": "2026-10-19T06:10:00Z",
   "log": [
     {
       "at": "2026-10-19T05:40:52.550Z",
@@ -151,7 +183,20 @@
       "action": "lease_acquired",
       "summary": "Lease generation 1 (kooperatives Protokoll 05 §6) nach ausdrücklicher Betreiberfreigabe zur isolierten Programmierarbeit an E-05",
       "commit": "3cd4ce8"
+    },
+    {
+      "at": "2026-10-19T06:10:00Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Implementierung b2eef4c, Draft-PR #83 gegen main, alle Prüfungen grün",
+      "commit": "b2eef4c"
     }
   ],
-  "based_on_commit": "3cd4ce8"
+  "based_on_commit": "f8dbcba",
+  "waiting": {
+    "reason": "review",
+    "since": "2026-10-19T06:10:00Z",
+    "resume_condition": "Review (GPT Work, sofern Guthaben verfügbar; sonst Betreiberentscheidung) und Merge durch den Betreiber",
+    "wake_mechanism": "manual_start"
+  }
 }
