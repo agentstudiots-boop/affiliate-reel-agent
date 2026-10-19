@@ -4,7 +4,7 @@
   "title": "Affiliate-Adapter: Content Studio als erste Abteilung hinter dem Vertrag (nur lesend)",
   "module": "affiliate-adapter",
   "phase": "G",
-  "status": "in_progress",
+  "status": "waiting_review",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -104,10 +104,10 @@
     },
     {
       "command": "npm run typecheck / lint / test / build",
-      "result": "not_run",
-      "detail": "läuft",
-      "commit": "a307bd3",
-      "at": "2026-10-19T06:30:00Z"
+      "result": "passed",
+      "detail": "alle vier Exit 0 im Hauptcheckout, 699/699 Tests",
+      "commit": "c5c77a8",
+      "at": "2026-10-19T06:48:00Z"
     }
   ],
   "known_issues": [
@@ -118,10 +118,10 @@
   ],
   "open_decisions": [],
   "pr": {
-    "url": null,
-    "state": "none",
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/87",
+    "state": "draft",
     "merge_commit": null,
-    "ci": "unknown"
+    "ci": "pending"
   },
   "approval": {
     "reviewer": "pending",
@@ -129,25 +129,26 @@
     "latest_review_file": null
   },
   "next_steps": [
-    "Volle Prüfungen abschließen, Draft-PR gegen main"
+    "CI auf #87 abwarten",
+    "Merge durch Betreiber erst nach #84 und #86"
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T06:30:00Z",
+    "last_checkpoint_at": "2026-10-19T06:48:00Z",
     "checkpoint_reason": "other",
     "last_commit": "c5c77a8",
     "active_branch": "claude/G-01-affiliate-adapter",
-    "state_summary": "G-01 implementiert, gezielte Tests grün",
+    "state_summary": "G-01 vollständig geprüft, Draft-PR #87 offen",
     "decisions_made": [
       "Solo-Betrieb: Planung, Implementierung und Kriterien durch Claude",
       "Nur lesende Sichten statt DB-Handle (B-04)"
     ],
-    "test_status": "7/7 gezielt",
-    "next_action": "Draft-PR öffnen"
+    "test_status": "volle Prüfungen grün",
+    "next_action": "CI/Review #87 verfolgen"
   },
-  "revision": 1,
+  "revision": 2,
   "based_on_commit": "c797df0",
-  "updated_at": "2026-10-19T06:30:00Z",
+  "updated_at": "2026-10-19T06:48:00Z",
   "log": [
     {
       "at": "2026-10-19T06:30:00Z",
@@ -161,6 +162,13 @@
       "actor": "claude-code",
       "action": "fixed",
       "summary": "Selbstprüfung: erfundener Outcome drafted im Test, failed zählte als Erfolg, Leeraufrufe verdeckten Fehler – korrigiert, Drift-Test ergänzt",
+      "commit": "c5c77a8"
+    },
+    {
+      "at": "2026-10-19T06:48:00Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Volle Prüfungen grün (699/699), Draft-PR #87 (gestapelt auf #84/#86)",
       "commit": "c5c77a8"
     }
   ]

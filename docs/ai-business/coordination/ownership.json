@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "note": "Modulbesitz und Konfliktregeln (ADR-09, korrigiert nach GPT-04/GPT-08). Datei-genaue Zuständigkeit statt Baum-Claims. Keine Geschäftsdaten – öffentliches Repository.",
-  "revision": 5,
+  "revision": 6,
   "updated_at": "2026-10-19T06:00:00Z",
   "coordination_branch": {
     "name": "architecture/ai-business-roadmap",
@@ -98,12 +98,15 @@
     {
       "id": "enterprise-ledger",
       "paths": [
+        "app/api/cron/executive-cycle/**",
+        "db/migrations/039_enterprise_task_ledger.sql",
         "lib/enterprise/tasks/**",
-        "app/api/cron/executive-cycle/**"
+        "tests/enterprise-task-ledger-migration.test.cjs"
       ],
       "owner": "claude-code",
       "reviewer": "gpt-work",
-      "status": "planned"
+      "status": "planned",
+      "task": "B-02"
     },
     {
       "id": "controlling",
@@ -190,7 +193,16 @@
   "migration_reservations": {
     "last_on_main": "038",
     "source": "origin/main c56711e: db/migrations/038_topic_delivery_and_video.sql (PR #79)",
-    "reserved": [],
+    "reserved": [
+      {
+        "number": "039",
+        "task": "B-02",
+        "name": "039_enterprise_task_ledger.sql",
+        "reserved_by": "claude-code",
+        "at": "2026-10-19T06:48:00Z",
+        "note": "Vor dem PR erneut gegen origin/main prüfen; parallele Studio-Arbeit kann 039 belegen ⇒ dann umnummerieren"
+      }
+    ],
     "rule": "Vor Beginn einer Aufgabe mit Migration die nächste freie Nummer per Zustands-Commit hier und in claims.migration_numbers reservieren; vor dem PR erneut gegen origin/main prüfen."
   },
   "parallel_sessions": [
