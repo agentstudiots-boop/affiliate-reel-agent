@@ -99,11 +99,12 @@ test('events are numbered per task; outbox and budget states are consistent (AC-
   await db.close();
 });
 
+// The kernel's own modules in lib/enterprise (repository B-03) may use the ledger; their isolation tests make sure they are not wired in.
 test('no application code uses the ledger yet (AC-6)',()=>{
   const users=[];
   const walk=dir=>{for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
     const full=path.join(dir,entry.name);
-    if(entry.isDirectory()){if(entry.name!=='node_modules')walk(full);}
+    if(entry.isDirectory()){if(entry.name!=='node_modules'&&full!==path.join('lib','enterprise'))walk(full);}
     else if(/\.(ts|tsx)$/.test(entry.name)&&/\b(enterprise_tasks|enterprise_task_events|enterprise_outbox|budget_reservations)\b/.test(fs.readFileSync(full,'utf8')))users.push(full);
   }};
   walk('app');walk('lib');
