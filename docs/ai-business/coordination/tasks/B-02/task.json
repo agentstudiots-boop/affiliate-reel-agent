@@ -113,7 +113,7 @@
       "command": "npm run typecheck / lint / test / build",
       "result": "not_run",
       "detail": "folgt im Hauptcheckout",
-      "commit": "a3d1a88",
+      "commit": "3bb3362",
       "at": "2026-10-19T06:52:00Z"
     }
   ],
@@ -149,7 +149,7 @@
     "system": "claude-code",
     "last_checkpoint_at": "2026-10-19T06:52:00Z",
     "checkpoint_reason": "other",
-    "last_commit": "a3d1a88",
+    "last_commit": "3bb3362",
     "active_branch": "claude/B-02-task-ledger-migration",
     "state_summary": "B-02 implementiert, gezielte Tests grün",
     "decisions_made": [
@@ -159,9 +159,9 @@
     "test_status": "34/34 gezielt",
     "next_action": "Volle Prüfungen, Draft-PR"
   },
-  "revision": 1,
+  "revision": 2,
   "based_on_commit": "d19edb1",
-  "updated_at": "2026-10-19T06:52:00Z",
+  "updated_at": "2026-10-19T07:08:00Z",
   "log": [
     {
       "at": "2026-10-19T06:52:00Z",
@@ -169,6 +169,13 @@
       "action": "created",
       "summary": "B-02 geplant und implementiert (Solo-Betrieb), Commit a3d1a88",
       "commit": "a3d1a88"
+    },
+    {
+      "at": "2026-10-19T07:08:00Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "Isolationstest lässt Kernmodule in lib/enterprise zu (B-03-Repository)",
+      "commit": "3bb3362"
     }
   ]
 }
