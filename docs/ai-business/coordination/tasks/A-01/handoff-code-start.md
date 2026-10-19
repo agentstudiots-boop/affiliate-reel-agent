@@ -37,3 +37,15 @@ Der Review-Branch basiert auf einem älteren Stand als Claudes jüngste Korrektu
 
 ## Prüfnachweis dieser Übergabe
 Task-Felder und Pflichtfelder gegen das gelesene task.schema.json manuell abgeglichen. Keine automatische Schema-Validierung und keine Code-Tests behauptet; dies ist Planung, keine Implementierung.
+
+## Nachtrag 19.10.2026: parallele Arbeit und gegenseitige Übergabekontrolle
+Betreiberauftrag aus dem laufenden Gespräch: GPT soll seinen B-01-Arbeitsauftrag in der Übergabe dokumentieren; gewünscht ist außerdem eine Prüfung, ob beide Systeme die Übergabedateien autonom etwa alle zehn Minuten kontrollieren können.
+
+- GPT ist für B-01 (isolierter Executive-Steuerungsbaustein) verantwortlich; Claude für E-05. Jeweils eigenes Modell als unabhängiger Prüfer der anderen Implementierung.
+- Tatsächlicher GPT-Stand bei diesem Eintrag: Programmierauftrag und Übergabe vorbereitet; noch kein B-01-Anwendungscode geschrieben und noch kein Code-PR erstellt. Frühere Gesprächsformulierungen zum „Start“ sind keine Implementierungsnachweise.
+- Der Betreiber berichtet, Claude habe die ausdrückliche Freigabe zur isolierten E-05-Codearbeit erhalten. Das ist eine berichtete Freigabe, keine eigenständig geprüfte Fertigstellung.
+- Während einer aktiven Arbeitssitzung: vor Aufgabenübernahme, vor Änderungen gemeinsamer Dateien, beim Abschluss eines Arbeitspakets und vor dem Review den aktuellen Remote-Stand der betroffenen Task-/Review-Dateien lesen. Nur neue Revisionen/Commits bearbeiten; keine Doppelarbeit und keine Selbstfreigabe.
+- Gewünschter Zehn-Minuten-Hintergrundtakt: mit der in dieser GPT-Sitzung verfügbaren Automationsfunktion nicht unterstützt; höchste planbare Frequenz einmal pro Stunde. Deshalb keine Zehn-Minuten-Aufgabe angelegt und auch nicht stillschweigend auf stündlich geändert.
+- Eine GitHub-Übergabe startet Claude nicht automatisch. Claudes wiederkehrender Start muss in dessen eigener Umgebung geprüft und eingerichtet werden; hierfür liegt kein Nachweis vor. Keine kostenpflichtige API-/Action-Umgehung einrichten.
+- Alternative zur Abstimmung: stündliche GPT-Kontrolle; ggf. später ereignisgesteuerte Kontrolle bei relevanter PR-Aktualisierung. Beides ist hier nur eine Option, nicht aktiviert oder Ende-zu-Ende getestet.
+- Unverändert: kein Merge, keine Produktion, keine neuen Credits. Die Prüfung einer Automatisierung soll den Bau von B-01/E-05 nicht durch ein neues Koordinationsprojekt ersetzen.
