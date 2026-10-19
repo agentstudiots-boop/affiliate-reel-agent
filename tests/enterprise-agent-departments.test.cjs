@@ -28,14 +28,22 @@ test('every agent name the code records in model_calls is mapped (AC-2)',()=>{
   // New recording sites must be added here and to MODEL_AGENT_DEPARTMENTS; dynamic names are resolved below.
   assert.deepEqual(recorders.sort(),['lib/content/model.ts','lib/whatsapp/chat.ts','lib/whatsapp/instruction.ts','lib/whatsapp/route-llm.ts','lib/whatsapp/transcribe.ts'].map(p=>path.join(...p.split('/'))).sort());
   const names=new Set();
-  // lib/content/model.ts records `content_${agent}` for each generate("<agent>", ...) call.
+  // lib/content/model.ts records `content_${agent}` for each generate("<agent>", ...) call – also from the topic pipeline
+  // (lib/topic-pipeline), which is part of the Content Studio and therefore counts as affiliate. Searched everywhere.
   assert.match(read('lib/content/model.ts'),/agent:`content_\$\{agent\}`/);
-  for(const file of files.filter(f=>f.startsWith(path.join('lib','content'))))for(const m of read(file).matchAll(/\bgenerate\(\s*"([a-z_]+)"/g))names.add(`content_${m[1]}`);
+  for(const file of files.filter(f=>!f.startsWith(path.join('lib','enterprise')))){
+    const source=read(file);
+    for(const m of source.matchAll(/\bgenerate\(\s*"([a-z_]+)"/g))names.add(`content_${m[1]}`);
+  }
   // routerModelCall records options.agent, default "whatsapp_router".
   const router=read('lib/whatsapp/route-llm.ts');
   const fallback=router.match(/options\.agent \?\? "([a-z_]+)"/);
   assert.ok(fallback,'Standard-Agent von routerModelCall nicht gefunden');names.add(fallback[1]);
-  for(const file of files)for(const line of read(file).split('\n').filter(l=>/\brouterModelCall\(/.test(l)))for(const m of line.matchAll(/agent: ?"([a-z_]+)"/g))names.add(m[1]);
+  // Whole calls, also across lines; an agent given as a variable could not be checked.
+  for(const file of files)for(const call of read(file).matchAll(/\brouterModelCall\(([\s\S]*?)\);/g)){
+    for(const m of call[1].matchAll(/\bagent:\s*"([a-z_]+)"/g))names.add(m[1]);
+    assert.doesNotMatch(call[1].replace(/\bagent:\s*"[a-z_]+"/g,''),/\bagent\b/,`${file}: routerModelCall mit nicht-literalem Agentennamen`);
+  }
   // The other recording sites pass literal agent names.
   for(const file of recorders.filter(f=>!/model\.ts$|route-llm\.ts$/.test(f)))for(const m of read(file).matchAll(/agent: ?"([a-z_]+)"/g))names.add(m[1]);
   assert.ok(names.size>=10,[...names].join(','));
@@ -58,6 +66,9 @@ test('missing metrics mark sums as incomplete instead of inventing values (AC-4)
   assert.equal(totals.usageComplete,false);
   assert.deepEqual([totals.calls,totals.inputTokens,totals.outputTokens,totals.predictTimeS],[2,10,5,1.3]);
   assert.equal(allocateModelUsage([]).unassigned.usageComplete,true);
+  // Review #88 nit: invalid call counts are not silently treated as complete.
+  assert.equal(allocateModelUsage([row('content_text',{calls:NaN})]).byDepartment.affiliate.usageComplete,false);
+  assert.equal(allocateModelUsage([row('content_text',{failures:-1})]).byDepartment.affiliate.usageComplete,false);
 });
 
 test('pure module: only the registry is imported, not wired into app code (AC-5)',()=>{

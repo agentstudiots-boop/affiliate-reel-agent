@@ -8,7 +8,8 @@
 import { DEPARTMENT_IDS, type DepartmentId } from "../registry";
 
 export const MODEL_AGENT_DEPARTMENTS: Readonly<Record<string, DepartmentId>> = Object.freeze({
-  // lib/content/model.ts records `content_${agent}` for the editorial agents of the studio.
+  // lib/content/model.ts records `content_${agent}` for the editorial agents of the studio, including the topic pipeline
+  // (lib/topic-pipeline: content_text, content_video), which is part of the Content Studio.
   content_orchestrator: "affiliate",
   content_trend: "affiliate",
   content_creative: "affiliate",
@@ -35,7 +36,7 @@ export type ModelUsageRow = { agent: string; model: string; calls: number; failu
   inputTokens: number | null; outputTokens: number | null; predictTimeS: number | null };
 
 export type UsageTotals = { calls: number; failures: number; inputTokens: number; outputTokens: number; predictTimeS: number;
-  /** false if at least one row lacks token or compute metrics: the sums are then lower bounds. */
+  /** false if at least one row lacks token or compute metrics or has invalid counts: the sums are then lower bounds. */
   usageComplete: boolean; models: string[] };
 
 export type ModelUsageAllocation = { byDepartment: Record<DepartmentId, UsageTotals>; unassigned: UsageTotals & { agents: string[] } };
@@ -44,8 +45,10 @@ const empty = (): UsageTotals => ({ calls: 0, failures: 0, inputTokens: 0, outpu
 const count = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
 
 function add(totals: UsageTotals, row: ModelUsageRow) {
-  totals.calls += count(row.calls) ?? 0;
-  totals.failures += count(row.failures) ?? 0;
+  const calls = count(row.calls), failures = count(row.failures);
+  if (calls === null || failures === null) totals.usageComplete = false;
+  totals.calls += calls ?? 0;
+  totals.failures += failures ?? 0;
   const usage = [count(row.inputTokens), count(row.outputTokens), count(row.predictTimeS)];
   if (usage.includes(null)) totals.usageComplete = false;
   totals.inputTokens += usage[0] ?? 0;
