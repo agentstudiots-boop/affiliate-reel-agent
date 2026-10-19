@@ -44,6 +44,7 @@
     "lib/security/**/*.ts",
     "lib/trendsetter/**/*.ts",
     "lib/architecture/**/*.ts",
-    "lib/tavily.ts"
+    "lib/tavily.ts",
+    "lib/enterprise/controlling/metrics.ts"
   ]
 }
