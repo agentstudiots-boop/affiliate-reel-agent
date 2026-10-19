@@ -92,13 +92,13 @@ Einzelheiten je Aufgabe in `tasks/<ID>/task.json`.
 | 2 | #84 | B-01 Plan-Vertrag, Richtlinien, Register | – | approve (nach Nachprüfung) |
 | 3 | #86 | B-04 Abteilungsvertrag | #84 | approve (nach Nachprüfung) |
 | 4 | #87 | G-01 Affiliate-Adapter (nur lesend) | #86 | changes_requested → behoben, Nachprüfung offen |
-| 4 | #88 | E-06 Abteilungszuordnung  | #84 | approve (Minor behoben) |
+| 4 | #88 | E-06 Abteilungszuordnung `model_calls` | #84 | approve (Minor behoben) |
 | 4 | #85 | F-01 Bewertungsraster (zweite Sitzung) | – | Review offen |
 | 5 | #89 | B-02 **Migration 039** Aufgabenbuch | – | changes_requested → behoben, Nachprüfung offen · **Merge = Migration in Production** |
 | 6 | #90 | B-03 Repository Aufgabenbuch | #86, #89 | changes_requested (3 major) → behoben, Nachprüfung offen |
 | 7 | #91 | B-05 Budgetwächter | #90 | Review offen (Betreiberfreigabe für die Prüfung) |
 | 6 | #92 | E-01 **Migration 040** Kosten-/Erlösbuch | #89 | Review offen · **Merge = Migration in Production** |
-| 7 | #93 | E-03 Importer  →  | #92 | Review offen |
+| 7 | #93 | E-03 Importer `model_calls` → `cost_entries` | #92 | Review offen |
 
 Gestapelte PRs enthalten die Commits ihrer Basis; nach deren Merge zeigt der Diff nur den eigenen Zuwachs. Bekannter trivialer Konflikt:
 `tsconfig.test.json`-Includes von #84 und #85 stehen benachbart (beide Einträge behalten).
@@ -108,7 +108,7 @@ BF-14 Hosting-Tarif, BF-15 eigene GitHub-Identität, BF-05 Sichtbarkeit des Repo
 
 **Bewusst angehalten** (brauchen eine Betreiberentscheidung, bevor Code entsteht): B-06 Entscheidungsvorlagen (WhatsApp-Freigabe-Hot-Files,
 weitere Migration), B-07 Cron `executive-cycle` (Änderung an `vercel.json` = Produktiv-Cron), B-08 KI-Planer (Modellaufrufe), F-03 Recherche-Pilot (Kosten).
-Weiter ohne Entscheidung möglich: E-03 Importer `model_calls` → `cost_entries` (gestapelt auf E-01).
+Weiter ohne Entscheidung möglich: nur noch Review-Befunde. Vorgeschlagen als eigene Aufgabe: `recordModelCall` in `lib/whatsapp/video-revision.ts` (Bestandscode, Befund aus dem Review von #88).
 
 ## Runde 2 (18.10.2026, A-01): was sich an der bestehenden Struktur ändert
 
