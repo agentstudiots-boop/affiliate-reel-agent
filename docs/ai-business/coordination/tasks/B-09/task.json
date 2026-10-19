@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "task_id": "B-09",
+  "title": "Budgetwächter: Monatsgrenze nur aus freigegebenem hartem Budget (L4-Entscheidung), nie vom Aufrufer",
+  "module": "enterprise-ledger",
+  "phase": "B",
+  "status": "waiting_review",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "operator",
+  "base_commit": "f26e7ac",
+  "branch": "claude/B-09-budget-limits",
+  "depends_on": [
+    "B-05",
+    "B-06",
+    "E-01"
+  ],
+  "claims": {
+    "paths": [
+      "lib/enterprise/tasks/budget.ts",
+      "tests/enterprise-budget-guard.test.cjs"
+    ],
+    "hot_files": [],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "reserveBudget nimmt keine Grenze vom Aufrufer; Grenze nur aus hartem Budget mit angenommener L4-Entscheidung executive.budget_change",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Betreff bindet Abteilung, Monat und Betrag; erhöhter Betrag, offene/abgelehnte Vorlage, fremde Abteilung, weiches Budget binden nicht",
+      "verification": "Tabellentest + Gegentests",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Ohne freigegebenes Budget (auch ohne Tabellen) Grenze 0, Ergebnis no_approved_budget",
+      "verification": "Test",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 300,
+    "notes": "Solo-Betrieb, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "lib/enterprise/tasks/budget.ts",
+    "tests/enterprise-budget-guard.test.cjs"
+  ],
+  "implemented": [
+    "budgetSubjectKey",
+    "approvedLimit in reserveBudget"
+  ],
+  "tests": [
+    {
+      "command": "npm run lint && npm test && npm run build && npm run typecheck",
+      "result": "passed",
+      "detail": "744/744; Gegentests rot",
+      "commit": "883a259",
+      "at": "2026-10-19T17:57:55Z"
+    }
+  ],
+  "known_issues": [
+    "Gestapelt auf B-07 (#98)",
+    "Anlegen/Versand von Budgetvorlagen und Handler executive.budgetChangeRequest folgen separat"
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/104",
+    "state": "draft",
+    "merge_commit": null,
+    "ci": "pending"
+  },
+  "approval": {
+    "reviewer": "pending",
+    "operator": "pending",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Review",
+    "Merge durch Betreiber nach #98"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-19T17:57:55Z",
+    "checkpoint_reason": "other",
+    "last_commit": "883a259",
+    "active_branch": "claude/B-09-budget-limits",
+    "state_summary": "Draft-PR #104 offen, voll geprüft",
+    "decisions_made": [
+      "Betrag ist Teil des Entscheidungsbetreffs (budget:<abteilung>:<monat>:<cent>)"
+    ],
+    "test_status": "744/744",
+    "next_action": "Review"
+  },
+  "revision": 1,
+  "based_on_commit": "1df310c",
+  "updated_at": "2026-10-19T17:57:55Z",
+  "log": [
+    {
+      "at": "2026-10-19T17:57:55Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "B-09 implementiert, Draft-PR #104 (744/744)",
+      "commit": "883a259"
+    }
+  ]
+}
