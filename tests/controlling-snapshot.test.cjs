@@ -52,6 +52,7 @@ test('sums per department and kind; unknown amounts make a sum a lower bound (AC
   await cost(db,{amount_micros:9_990_000,occurred_at:'2026-10-20T08:00:00Z'}); // previous month
   await revenue(db,{});await revenue(db,{amount_cents:-300});await revenue(db,{amount_cents:null,value_kind:'estimated'});
   await revenue(db,{period_start:'2026-10-01',period_end:'2026-10-31'});
+  await revenue(db,{department:'immobilien',amount_cents:900});          // department outside the register
   const snap=await readControllingSnapshot(db,NOW);
   const a=dept(snap,'affiliate');
   assert.deepEqual([a.modelUsage.calls,a.modelUsage.failures,a.modelUsage.usageComplete],[3,1,false]);
@@ -62,6 +63,7 @@ test('sums per department and kind; unknown amounts make a sum a lower bound (AC
   assert.deepEqual(snap.unassigned.modelUsage.agents.sort(),planner?['mystery']:['executive_planner','mystery']);
   assert.deepEqual(a.costs.measured,{amountCents:200,entries:13,unknownAmountEntries:2,complete:false},'1 996 000 µ + 10 × 400 µ = 200 ct; no price and USD unknown');
   assert.equal(snap.currency,'EUR');
+  assert.deepEqual(snap.unassigned.revenue.measured,{amountCents:900,entries:1,unknownAmountEntries:0,complete:true},'revenue of unknown departments is not dropped');
   assert.deepEqual(a.costs.forecast,{amountCents:500,entries:1,unknownAmountEntries:0,complete:true});
   assert.deepEqual(snap.unassigned.costs.measured.amountCents,70);
   assert.deepEqual(a.revenue.measured,{amountCents:1200,entries:2,unknownAmountEntries:0,complete:true});
