@@ -42,6 +42,7 @@
     "lib/publishing/**/*.ts",
     "lib/capabilities/**/*.ts",
     "lib/security/**/*.ts",
+    "lib/enterprise/controlling/import-model-calls.ts",
     "lib/trendsetter/**/*.ts",
     "lib/architecture/**/*.ts",
     "lib/tavily.ts"
