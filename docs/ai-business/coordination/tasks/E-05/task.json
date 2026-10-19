@@ -4,13 +4,13 @@
   "title": "Reine Kennzahlenfunktionen: Deckungsbeitrag, einfacher ROI und Amortisation",
   "module": "controlling",
   "phase": "E",
-  "status": "planned",
+  "status": "in_progress",
   "planner": "gpt-work",
   "responsible": "claude-code",
   "implementer": "claude-code",
   "reviewer": "gpt-work",
-  "base_commit": null,
-  "branch": null,
+  "base_commit": "c56711e",
+  "branch": "claude/E-05-controlling-metrics",
   "depends_on": [],
   "claims": {
     "paths": [
@@ -83,7 +83,13 @@
     "target_changed_lines": 300,
     "notes": "Nur bestehende Abo-Kontingente; keine zusätzlichen Credits."
   },
-  "lease": null,
+  "lease": {
+    "holder": "claude-code",
+    "acquired_at": "2026-10-19T05:48:57Z",
+    "expires_at": "2026-10-20T05:48:57Z",
+    "coordination_sha": "3cd4ce8",
+    "generation": 1
+  },
   "changed_files": [],
   "implemented": [],
   "tests": [
@@ -118,26 +124,34 @@
     "Draft-PR mit Tests und SHA an GPT übergeben; kein Merge, keine Produktion."
   ],
   "session": {
-    "system": "gpt-work",
-    "last_checkpoint_at": "2026-10-19T05:40:52.550Z",
-    "last_commit": "93231eaa000ecd28c04136ba78fbe513b666b26b",
-    "active_branch": "gpt/A-01-review-2",
-    "state_summary": "E-05 technisch spezifiziert; keine Implementierung, keine Freigabe vorgetäuscht.",
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-19T05:48:57Z",
+    "checkpoint_reason": "other",
+    "last_commit": "c56711e",
+    "active_branch": "claude/E-05-controlling-metrics",
+    "state_summary": "Lease übernommen nach Betreiberfreigabe zur isolierten Codearbeit (19.10.2026). Implementierung auf eigenem Branch von main c56711e.",
     "decisions_made": [
-      "Claude implementiert E-05, GPT prüft; B-01 umgekehrte Rollen",
-      "Reine Formeln, keine Laufzeitintegration"
+      "Betreiberfreigabe: nur Programmieren und Testen, Draft-PR, kein Merge, keine Produktivänderung"
     ],
-    "test_status": "Planungsdatei; Schemafelder manuell geprüft",
-    "next_action": "Claude übernimmt den abgegrenzten Programmierauftrag nach Betreiberanstoß."
+    "test_status": "läuft",
+    "next_action": "Projektprüfungen abschließen, Draft-PR gegen main öffnen"
   },
-  "revision": 1,
-  "updated_at": "2026-10-19T05:40:52.550Z",
+  "revision": 2,
+  "updated_at": "2026-10-19T05:48:57Z",
   "log": [
     {
       "at": "2026-10-19T05:40:52.550Z",
       "actor": "gpt-work",
       "action": "created",
       "summary": "E-05 als konkreten Programmierauftrag mit Schnittstellen und Grenzfalltests geplant."
+    },
+    {
+      "at": "2026-10-19T05:48:57Z",
+      "actor": "claude-code",
+      "action": "lease_acquired",
+      "summary": "Lease generation 1 (kooperatives Protokoll 05 §6) nach ausdrücklicher Betreiberfreigabe zur isolierten Programmierarbeit an E-05",
+      "commit": "3cd4ce8"
     }
-  ]
+  ],
+  "based_on_commit": "3cd4ce8"
 }
