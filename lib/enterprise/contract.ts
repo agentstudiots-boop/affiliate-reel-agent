@@ -14,6 +14,7 @@ export const TASK_SOURCES = ["operator", "executive", "cron"] as const;
 export type TaskSource = (typeof TASK_SOURCES)[number];
 
 const isoTime = z.string().datetime({ offset: true });
+const source = z.string().refine(value => value.trim().length > 0, "Quelle leer");
 
 export const taskEnvelopeSchema = z.object({
   schemaVersion: z.literal(1),
@@ -41,7 +42,7 @@ export const taskResultSchema = z.discriminatedUnion("status", [
     output: z.record(z.string(), z.unknown()),
     usedCostCents: z.number().int().nonnegative(),
     usedModelCalls: z.number().int().nonnegative(),
-    evidence: z.array(z.object({ claim: z.string().min(1), kind: z.enum(["fact", "assumption", "forecast"]), source: z.string().min(1).optional() })).default([]),
+    evidence: z.array(z.object({ claim: z.string().min(1), kind: z.enum(["fact", "assumption", "forecast"]), source: source.optional() })).default([]),
   }),
   z.object({
     status: z.literal("failed"),
@@ -57,7 +58,7 @@ export const healthReportSchema = z.object({
   department: z.enum(DEPARTMENT_IDS),
   status: z.enum(["ok", "degraded", "error", "not_configured", "unknown"]),
   checkedAt: isoTime,
-  evidence: z.array(z.object({ label: z.string().min(1), value: z.union([z.string(), z.number(), z.boolean(), z.null()]), source: z.string().min(1) })),
+  evidence: z.array(z.object({ label: z.string().min(1), value: z.union([z.string(), z.number(), z.boolean(), z.null()]), source })),
   reason: z.string().optional(),
 });
 export type HealthReport = z.infer<typeof healthReportSchema>;
@@ -82,7 +83,7 @@ export class CapabilityError extends Error {}
 // Builds the read capability: unknown views are refused, and the department never sees the underlying connection.
 export function createReadCapability(departmentId: DepartmentId, views: Readonly<Record<string, ReadView>>): DepartmentContext["read"] {
   return async (view, params = {}) => {
-    if (!Object.prototype.hasOwnProperty.call(views, view)) throw new CapabilityError(`${departmentId}: Sicht ${view} nicht freigegeben`);
+    if (!Object.prototype.hasOwnProperty.call(views, view) || typeof views[view] !== "function") throw new CapabilityError(`${departmentId}: Sicht ${view} nicht freigegeben`);
     return views[view](params);
   };
 }
@@ -92,7 +93,8 @@ export type EnvelopeMeta = {
   idempotencyKey: string; payload?: Record<string, unknown>; createdAt: string; deadline?: string | null;
 };
 
-// Only an executable (L0–L2) step that still matches the registry becomes a task envelope.
+// Only an executable (L0–L2) step that still matches the registry becomes a task envelope. The finished envelope goes through
+// checkEnvelope as well, so building and receiving use one and the same check (maxLevel, runtime, deadline).
 export function envelopeFromStep(step: ClassifiedStep, meta: EnvelopeMeta, registry: Registry = REGISTRY): { ok: true; envelope: TaskEnvelope } | { ok: false; reason: string } {
   const definition = taskDefinition(step.department, step.taskKind, registry);
   if (!definition) return { ok: false, reason: `Aufgabenart ${step.taskKind} für ${step.department} nicht erlaubt` };
@@ -105,7 +107,8 @@ export function envelopeFromStep(step: ClassifiedStep, meta: EnvelopeMeta, regis
     permissionLevel: level, budget: { maxModelCalls: step.maxModelCalls, maxCostCents: step.maxCostCents, deadline: meta.deadline ?? step.deadline ?? null },
     idempotencyKey: meta.idempotencyKey, payload: meta.payload ?? {}, createdAt: meta.createdAt,
   });
-  return parsed.success ? { ok: true, envelope: parsed.data } : { ok: false, reason: parsed.error.issues.map(issue => `${issue.path.join(".")}: ${issue.message}`).join("; ") };
+  if (!parsed.success) return { ok: false, reason: parsed.error.issues.map(issue => `${issue.path.join(".")}: ${issue.message}`).join("; ") };
+  return checkEnvelope(parsed.data, registry);
 }
 
 // Kernel-side check of an envelope received from anywhere (queue, test, future API): schema, registry binding and level.
@@ -122,19 +125,25 @@ export function checkEnvelope(raw: unknown, registry: Registry = REGISTRY): { ok
   if (requiresDecision(level)) return { ok: false, reason: `Stufe ${level} ist nie als Aufgabe ausführbar` };
   if (levelRank(level) > levelRank(owner.maxLevel)) return { ok: false, reason: `Stufe ${level} über der Obergrenze ${owner.maxLevel} von ${owner.id}` };
   if (!owner.runtime) return { ok: false, reason: `${owner.id} hat keine Laufzeitaufgaben` };
+  if (envelope.budget.deadline && Date.parse(envelope.budget.deadline) <= Date.parse(envelope.createdAt))
+    return { ok: false, reason: "Frist liegt nicht nach der Erstellung" };
   return { ok: true, envelope };
 }
 
-// A result is accepted only if it parses and stays within the task's budget; overspending is reported, never hidden.
-export function checkResult(raw: unknown, envelope: TaskEnvelope): { ok: true; result: TaskResult } | { ok: false; reason: string } {
+export type Usage = { usedCostCents: number; usedModelCalls: number };
+
+// A result is accepted only if it parses and stays within the task's budget; overspending is reported, never hidden:
+// a parsed result that is rejected still returns its actual usage for the cost ledger.
+export function checkResult(raw: unknown, envelope: TaskEnvelope): { ok: true; result: TaskResult } | { ok: false; reason: string; usage?: Usage } {
   const parsed = taskResultSchema.safeParse(raw);
   if (!parsed.success) return { ok: false, reason: parsed.error.issues.map(issue => `${issue.path.join(".")}: ${issue.message}`).join("; ") };
   const result = parsed.data;
-  if (result.usedCostCents > envelope.budget.maxCostCents) return { ok: false, reason: `Kosten ${result.usedCostCents} > Budget ${envelope.budget.maxCostCents}` };
-  if (result.usedModelCalls > envelope.budget.maxModelCalls) return { ok: false, reason: `Modellaufrufe ${result.usedModelCalls} > Budget ${envelope.budget.maxModelCalls}` };
+  const usage = { usedCostCents: result.usedCostCents, usedModelCalls: result.usedModelCalls };
+  if (result.usedCostCents > envelope.budget.maxCostCents) return { ok: false, reason: `Kosten ${result.usedCostCents} > Budget ${envelope.budget.maxCostCents}`, usage };
+  if (result.usedModelCalls > envelope.budget.maxModelCalls) return { ok: false, reason: `Modellaufrufe ${result.usedModelCalls} > Budget ${envelope.budget.maxModelCalls}`, usage };
   if (result.status === "succeeded") {
     const index = result.evidence.findIndex(item => item.kind === "fact" && !item.source);
-    if (index >= 0) return { ok: false, reason: `Beleg ${index + 1}: Fakt ohne Quelle` };
+    if (index >= 0) return { ok: false, reason: `Beleg ${index + 1}: Fakt ohne Quelle`, usage };
   }
   return { ok: true, result };
 }
