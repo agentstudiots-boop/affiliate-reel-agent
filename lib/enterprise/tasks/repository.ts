@@ -9,6 +9,7 @@
 import { randomUUID } from "node:crypto";
 import type { Database, Sql } from "../../memory/db";
 import { checkEnvelope, checkResult, type TaskEnvelope } from "../contract";
+import { disputeTaskReservations, settleTaskReservations } from "./budget";
 
 export type TaskCreator = "operator" | "executive" | "cron" | "department";
 export type Lease = { id: string; holder: string; fencingToken: number };
@@ -136,11 +137,16 @@ export async function completeTask(db: Database, lease: Lease, rawResult: unknow
     if (!checked.ok) {
       // Over budget or malformed: never accepted as success; the actual usage is kept for the cost ledger.
       const failureClass = checked.usage && /Budget/.test(checked.reason) ? "budget_exhausted" : "internal";
+      if (checked.usage) await settleTaskReservations(sql, lease.id, checked.usage.usedCostCents, now);
+      else await disputeTaskReservations(sql, lease.id);
       await finish("failed", failureClass, { rejected: checked.reason, usage: checked.usage ?? null }, "failed", { reason: checked.reason, failureClass });
       return { ok: true as const, outcome: "failed" as const };
     }
     const result = checked.result;
     const usage = { usedCostCents: result.usedCostCents, usedModelCalls: result.usedModelCalls };
+    // Reservations follow the result in the same transaction (B-05): known usage settles, an unclear outcome disputes.
+    if (result.status === "failed" && result.failureClass === "outcome_unknown") await disputeTaskReservations(sql, lease.id);
+    else await settleTaskReservations(sql, lease.id, result.usedCostCents, now);
     if (result.status === "succeeded") {
       await finish("succeeded", null, { output: result.output, evidence: result.evidence, ...usage }, "succeeded", usage);
       for (const draft of outbox)
@@ -175,6 +181,8 @@ export async function reclaimExpired(db: Database, now: Date): Promise<{ requeue
       const updated = (await sql.query(`UPDATE enterprise_tasks SET status=$2,failure_class=$3,lease_holder=NULL,lease_until=NULL,fencing_token=fencing_token+1,
           updated_at=$4::timestamptz WHERE id=$1 RETURNING fencing_token`, [row.id, again ? "queued" : "dead", again ? null : "internal", at])).rows[0];
       await event(sql, String(row.id), again ? "lease_expired" : "dead", "kernel", now, Number(updated.fencing_token), { previousHolder: String(row.lease_holder) });
+      // The worker vanished: whether its paid call happened is unknown, so its open reservations keep counting.
+      await disputeTaskReservations(sql, String(row.id));
       (again ? requeued : dead).push(String(row.id));
     }
     const late = (await sql.query(`SELECT id FROM enterprise_tasks WHERE status='queued' AND deadline IS NOT NULL AND deadline <= $1::timestamptz

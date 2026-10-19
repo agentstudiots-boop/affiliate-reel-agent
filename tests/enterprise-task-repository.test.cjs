@@ -142,7 +142,7 @@ test('registry changes, deadlines and cancellation stop queued tasks (AC-6)',asy
 
 test('repository is not wired into app code and imports only the contract and the db type (AC-7)',()=>{
   const source=fs.readFileSync('lib/enterprise/tasks/repository.ts','utf8');
-  assert.deepEqual([...source.matchAll(/from\s+"([^"]+)"/g)].map(m=>m[1]).sort(),['../../memory/db','../contract','node:crypto']);
+  assert.deepEqual([...source.matchAll(/from\s+"([^"]+)"/g)].map(m=>m[1]).sort(),['../../memory/db','../contract','./budget','node:crypto']);
   assert.match(source,/import type \{ Database, Sql \} from "\.\.\/\.\.\/memory\/db"/);
   assert.doesNotMatch(source,/process\.env|fetch\(|getDatabase|now\(\)|new Date\(\)/);
   const users=[];
