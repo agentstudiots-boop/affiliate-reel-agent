@@ -1,0 +1,184 @@
+{
+  "schema_version": 1,
+  "task_id": "F-04",
+  "title": "Wirtschaftlichkeitsrechnung: F-01-Bewertung mit E-05-Kennzahlen verbinden (reine Funktionen)",
+  "module": "opportunity",
+  "phase": "F",
+  "status": "changes_requested",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "operator",
+  "base_commit": "d421f2b",
+  "based_on_commit": "c56711e",
+  "branch": "claude/F-04-opportunity-economics",
+  "depends_on": [
+    "F-01",
+    "E-05"
+  ],
+  "claims": {
+    "paths": [
+      "lib/enterprise/opportunity/economics.ts",
+      "tests/enterprise-opportunity-economics.test.cjs"
+    ],
+    "hot_files": [
+      "tsconfig.test.json"
+    ],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Reine Funktion assessEconomics, deterministisch, Eingaben unverändert; gemessene Kennzahlen nur über E-05 (contributionMargin, simpleRoi, simplePayback)",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Prognose der Amortisation immer als Spanne aus Investitionsbedarf und Gewinnspanne mit offengelegter Formel; niedrigster Gewinn <= 0 => highMonths null; höchster Gewinn <= 0 => unknown",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Fehlende/ungültige Rasterkriterien, falsche Einheiten (Währungscode bzw. <Währung>/Monat), Währungsmix, Bruchteile von Cent => unknown mit Grund, nie geschätzt",
+      "verification": "Tabellentests",
+      "met": true
+    },
+    {
+      "id": "AC-4",
+      "criterion": "Schätzungen nie in ROI/Amortisation, Prognosen nie in gemessene Werte",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-5",
+      "criterion": "Urteil nur gegen versionierte Betreibergrenze maxPaybackMonths (Q-07); ohne Grenze no_operator_limit; Messung vor Prognose; Prognose nach ungünstigem Ende",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-6",
+      "criterion": "testRecommended nur wenn F-01 recommend_test und Urteil within_limit; nie eine Freigabe",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-7",
+      "criterion": "Nur ../controlling/metrics und ./scoring importiert, keine Uhr/Env/Netz/DB, nicht in App-Code eingebunden",
+      "verification": "Isolationstest",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 350,
+    "notes": "Solo-Betrieb, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "lib/enterprise/opportunity/economics.ts",
+    "tests/enterprise-opportunity-economics.test.cjs",
+    "tsconfig.test.json"
+  ],
+  "implemented": [
+    "assessEconomics: getrennte Spalten gemessen/prognostiziert/Bewertung, Urteil gegen Betreibergrenze, testRecommended"
+  ],
+  "tests": [
+    {
+      "command": "npm test",
+      "result": "passed",
+      "detail": "705/705",
+      "commit": "8e1f61f",
+      "at": "2026-10-19T12:25:00Z"
+    },
+    {
+      "command": "npm run typecheck",
+      "result": "passed",
+      "commit": "8e1f61f",
+      "at": "2026-10-19T12:25:00Z"
+    },
+    {
+      "command": "npm run lint",
+      "result": "passed",
+      "commit": "8e1f61f",
+      "at": "2026-10-19T12:25:00Z"
+    },
+    {
+      "command": "npm run build",
+      "result": "passed",
+      "commit": "8e1f61f",
+      "at": "2026-10-19T12:25:00Z"
+    }
+  ],
+  "known_issues": [
+    "Gestapelt auf #85 (F-01) und #83 (E-05); Merge erst danach",
+    "runningCosts gehen nicht in die Prognose ein (Gewinnspanne laut 02 §6 bereits Gewinn)",
+    "Ohne Q-07-Werte immer no_operator_limit / testRecommended=false",
+    "Review erste Sitzung (Kommentar #97): major – verdictFor fällt bei gemessenem Verlust/geschätzten Kosten auf die Prognose zurück ⇒ testRecommended true; 2 minor"
+  ],
+  "open_decisions": [
+    {
+      "id": "Q-07",
+      "question": "Maximale Amortisationsdauer, Gewichte und Schwellen des Bewertungsrasters festlegen",
+      "owner": "operator"
+    }
+  ],
+  "pr": {
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/97",
+    "state": "draft",
+    "merge_commit": null,
+    "ci": "pending"
+  },
+  "approval": {
+    "reviewer": "changes_requested",
+    "operator": "pending",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Befund aus Review #97 beheben (zweite Sitzung)",
+    "Nachprüfung",
+    "Merge durch Betreiber nach #85 und #83"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-19T12:25:00Z",
+    "checkpoint_reason": "work_package_done",
+    "last_commit": "8e1f61f",
+    "active_branch": "claude/F-04-opportunity-economics",
+    "state_summary": "Draft-PR #97 offen, alle Prüfungen grün",
+    "decisions_made": [
+      "Messung schlägt Prognose; Prognose nach ungünstigem Ende beurteilt",
+      "Amortisation gemessen = Investition*Monate/Deckungsbeitrag (keine Rundung des Monatszuflusses)"
+    ],
+    "test_status": "705/705",
+    "next_action": "Reviews #87, #91, #92, #93"
+  },
+  "revision": 2,
+  "updated_at": "2026-10-19T16:13:02Z",
+  "log": [
+    {
+      "at": "2026-10-19T12:25:00Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "F-04 implementiert, Draft-PR #97",
+      "commit": "8e1f61f"
+    },
+    {
+      "at": "2026-10-19T16:13:02Z",
+      "actor": "claude-code",
+      "action": "review_received",
+      "summary": "Review erste Sitzung: changes_requested (1 major, 2 minor); eingetragen von der ersten Sitzung",
+      "commit": "8e1f61f"
+    }
+  ]
+}

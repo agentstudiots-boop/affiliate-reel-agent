@@ -89,14 +89,14 @@ Kein PR ist eingebunden oder aktiviert: keine Schalter gesetzt, nichts in `verce
 |---|---|---|---|---|
 | 0 | #81, #82 | Architektur/Roadmap (Doku) | – | Gate G0, Betreiber |
 | 1 | #83 | E-05 Kennzahlen-Formeln | – | approve |
-| 1 | #85 | F-01 Bewertungsraster (zweite Sitzung) | – | Review offen |
+| 1 | #85 | F-01 Bewertungsraster (zweite Sitzung) | – | approve (2 optionale Hinweise) |
 | 1 | #95 | D-05 Release-Checkliste (zweite Sitzung, Doku) | – | approve |
 | 2 | #84 | B-01 Plan-Vertrag, Richtlinien, Register | – | approve (nach Nachprüfung) |
-| 2 | #97 | F-04 Wirtschaftlichkeitsrechnung (zweite Sitzung) | #83, #85 | Review offen (erste Sitzung) |
+| 2 | #97 | F-04 Wirtschaftlichkeitsrechnung (zweite Sitzung) | #83, #85 | changes_requested (1 major: gemessener Verlust wird von der Prognose überstimmt) |
 | 3 | #86 | B-04 Abteilungsvertrag | #84 | approve (nach Nachprüfung) |
 | 3 | #88 | E-06 Abteilungszuordnung `model_calls` | #84 | approve |
 | 3 | #94 | Videoänderung: `recordModelCall` (zweite Sitzung) | – | approve · wer von #88/#94 zuletzt gemergt wird, bekommt den Eintrag `whatsapp_video_revision` |
-| 4 | #87 | G-01 Affiliate-Adapter (nur lesend) | #86 | behoben, Nachprüfung offen |
+| 4 | #87 | G-01 Affiliate-Adapter (nur lesend) | #86 | approve (nach Nachprüfung) |
 | 4 | #89 | B-02 **Migration 039** Aufgabenbuch | – | approve · **Merge = Migration in Production** |
 | 5 | #90 | B-03 Repository Aufgabenbuch | #86, #89 | approve (nach Nachprüfung) |
 | 6 | #91 | B-05 Budgetwächter | #90 | Review offen |
@@ -105,7 +105,7 @@ Kein PR ist eingebunden oder aktiviert: keine Schalter gesetzt, nichts in `verce
 | 6 | #96 | B-06 **Migration 041** Entscheidungsvorlagen (nur Vorlage) | #92, #84 | Review offen · **Merge = Migration in Production** |
 | 7 | #98 | B-07 Executive-Zyklus + Cron-Route (`EXECUTIVE_ENABLED` aus, nicht geplant) | #91, #96, #87 | Review offen · **neue öffentliche Route (OD-B07-1)** |
 | 8 | #99 | B-08 KI-Planer im Schattenbetrieb (nichts eingebunden) | #98, #88 | Review offen |
-| 7 | folgt | E-07 ControllingSnapshot + 2D-Anzeige (nur lesend) | #93, #88 | volle Prüfung läuft |
+| 7 | #100 | E-07 ControllingSnapshot + 2D-Anzeige (nur lesend) | #93, #88 | Review offen |
 
 Gestapelte PRs enthalten die Commits ihrer Basis; nach deren Merge zeigt der Diff nur den eigenen Zuwachs. Bekannte triviale Konflikte:
 `tsconfig.test.json`-Includes benachbarter PRs (beide Einträge behalten); ich löse sie per Merge-Commit, sobald die Basis gemergt ist.

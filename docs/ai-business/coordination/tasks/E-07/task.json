@@ -4,7 +4,7 @@
   "title": "ControllingSnapshot (lesender Datenvertrag) und Anzeige in der 2D-Betriebsübersicht",
   "module": "controlling-snapshot",
   "phase": "E",
-  "status": "in_progress",
+  "status": "waiting_review",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -100,6 +100,13 @@
       "detail": "42/42 gezielt",
       "commit": "e37d656",
       "at": "2026-10-19T12:19:00Z"
+    },
+    {
+      "command": "npm run typecheck && npm run lint && npm test && npm run build",
+      "result": "passed",
+      "detail": "volle Prüfung im Hauptcheckout, 715/715; erster Typecheck rot nur wegen veralteter .next/types (B-07-Build), nach Build grün",
+      "commit": "c339877",
+      "at": "2026-10-19T16:13:02Z"
     }
   ],
   "known_issues": [
@@ -109,10 +116,10 @@
   ],
   "open_decisions": [],
   "pr": {
-    "url": null,
-    "state": "none",
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/100",
+    "state": "draft",
     "merge_commit": null,
-    "ci": "unknown"
+    "ci": "pending"
   },
   "approval": {
     "reviewer": "pending",
@@ -124,20 +131,20 @@
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T12:19:00Z",
+    "last_checkpoint_at": "2026-10-19T16:13:02Z",
     "checkpoint_reason": "other",
-    "last_commit": "e37d656",
+    "last_commit": "c339877",
     "active_branch": "claude/E-07-controlling-snapshot",
-    "state_summary": "E-07 implementiert",
+    "state_summary": "Draft-PR #100 offen, voll geprüft",
     "decisions_made": [
       "Keine erfundene Null: null/unbekannt/mind./nicht verfügbar"
     ],
-    "test_status": "42/42 gezielt",
-    "next_action": "Volle Prüfung, Draft-PR"
+    "test_status": "voll 715/715",
+    "next_action": "Review abwarten"
   },
-  "revision": 1,
+  "revision": 2,
   "based_on_commit": "77c26e8",
-  "updated_at": "2026-10-19T12:19:00Z",
+  "updated_at": "2026-10-19T16:13:02Z",
   "log": [
     {
       "at": "2026-10-19T12:19:00Z",
@@ -145,6 +152,13 @@
       "action": "created",
       "summary": "E-07 geplant und implementiert, Commits 8910edb, e37d656",
       "commit": "e37d656"
+    },
+    {
+      "at": "2026-10-19T16:13:02Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Draft-PR #100 nach voller Prüfung (715/715)",
+      "commit": "c339877"
     }
   ]
 }
