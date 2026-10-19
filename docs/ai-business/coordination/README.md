@@ -79,36 +79,44 @@ Planer/Implementierer/Prüfer zwischen zwei Systemen (ADR-15, ADR-16) und das Le
   (die Claude-Routine wurde am 19.10.2026 gelöscht), kein Validator, keine neuen Koordinationswerkzeuge.
 - Unverändert: kein Merge durch Claude, keine Produktionsänderung, keine Schalter, keine Secrets, keine kostenpflichtigen Aufrufe, keine zusätzlichen Credits.
 
-## Stand 19.10.2026, vormittags: offene Draft-PRs und Merge-Reihenfolge
+## Stand 19.10.2026, nachmittags: offene Draft-PRs und Merge-Reihenfolge
 
 Zweite Claude-Code-Sitzung (`session_01Srrz6J98VFXDsVBnE82VPC`) prüft PRs als **Zweitsitzung desselben Modells** – hilfreich, aber kein
-unabhängiges Zweitmodell-Review. Alle Code-PRs: nicht eingebunden, keine Schalter, keine Routen, keine kostenpflichtigen Aufrufe.
-Einzelheiten je Aufgabe in `tasks/<ID>/task.json`.
+unabhängiges Zweitmodell-Review – und setzt eigene Aufgaben um (F-01, F-04, D-05, Videoänderung). Einzelheiten je Aufgabe in `tasks/<ID>/task.json`.
+Kein PR ist eingebunden oder aktiviert: keine Schalter gesetzt, nichts in `vercel.json`, keine kostenpflichtigen Aufrufe. Merge nur durch den Betreiber.
 
-| Reihenfolge | PR | Aufgabe | gestapelt auf | Stand (19.10., mittags) |
+| Reihenfolge | PR | Aufgabe | gestapelt auf | Stand |
 |---|---|---|---|---|
 | 0 | #81, #82 | Architektur/Roadmap (Doku) | – | Gate G0, Betreiber |
 | 1 | #83 | E-05 Kennzahlen-Formeln | – | approve |
+| 1 | #85 | F-01 Bewertungsraster (zweite Sitzung) | – | Review offen |
+| 1 | #95 | D-05 Release-Checkliste (zweite Sitzung, Doku) | – | approve |
 | 2 | #84 | B-01 Plan-Vertrag, Richtlinien, Register | – | approve (nach Nachprüfung) |
+| 2 | #97 | F-04 Wirtschaftlichkeitsrechnung (zweite Sitzung) | #83, #85 | Review offen (erste Sitzung) |
 | 3 | #86 | B-04 Abteilungsvertrag | #84 | approve (nach Nachprüfung) |
-| 4 | #87 | G-01 Affiliate-Adapter (nur lesend) | #86 | changes_requested → behoben, Nachprüfung offen |
-| 4 | #88 | E-06 Abteilungszuordnung `model_calls` | #84 | approve (Minor behoben) |
-| 4 | #85 | F-01 Bewertungsraster (zweite Sitzung) | – | Review offen |
-| 5 | #89 | B-02 **Migration 039** Aufgabenbuch | – | changes_requested → behoben, Nachprüfung offen · **Merge = Migration in Production** |
-| 6 | #90 | B-03 Repository Aufgabenbuch | #86, #89 | changes_requested (3 major) → behoben, Nachprüfung offen |
-| 7 | #91 | B-05 Budgetwächter | #90 | Review offen (Betreiberfreigabe für die Prüfung) |
-| 6 | #92 | E-01 **Migration 040** Kosten-/Erlösbuch | #89 | Review offen · **Merge = Migration in Production** |
-| 7 | #93 | E-03 Importer `model_calls` → `cost_entries` | #92 | Review offen |
+| 3 | #88 | E-06 Abteilungszuordnung `model_calls` | #84 | approve |
+| 3 | #94 | Videoänderung: `recordModelCall` (zweite Sitzung) | – | approve · wer von #88/#94 zuletzt gemergt wird, bekommt den Eintrag `whatsapp_video_revision` |
+| 4 | #87 | G-01 Affiliate-Adapter (nur lesend) | #86 | behoben, Nachprüfung offen |
+| 4 | #89 | B-02 **Migration 039** Aufgabenbuch | – | approve · **Merge = Migration in Production** |
+| 5 | #90 | B-03 Repository Aufgabenbuch | #86, #89 | approve (nach Nachprüfung) |
+| 6 | #91 | B-05 Budgetwächter | #90 | Review offen |
+| 5 | #92 | E-01 **Migration 040** Kosten-/Erlösbuch | #89 | Review offen · **Merge = Migration in Production** |
+| 6 | #93 | E-03 Importer `model_calls` → `cost_entries` | #92 | Review offen |
+| 6 | #96 | B-06 **Migration 041** Entscheidungsvorlagen (nur Vorlage) | #92, #84 | Review offen · **Merge = Migration in Production** |
+| 7 | #98 | B-07 Executive-Zyklus + Cron-Route (`EXECUTIVE_ENABLED` aus, nicht geplant) | #91, #96, #87 | Review offen · **neue öffentliche Route (OD-B07-1)** |
+| 8 | #99 | B-08 KI-Planer im Schattenbetrieb (nichts eingebunden) | #98, #88 | Review offen |
+| 7 | folgt | E-07 ControllingSnapshot + 2D-Anzeige (nur lesend) | #93, #88 | volle Prüfung läuft |
 
-Gestapelte PRs enthalten die Commits ihrer Basis; nach deren Merge zeigt der Diff nur den eigenen Zuwachs. Bekannter trivialer Konflikt:
-`tsconfig.test.json`-Includes von #84 und #85 stehen benachbart (beide Einträge behalten).
+Gestapelte PRs enthalten die Commits ihrer Basis; nach deren Merge zeigt der Diff nur den eigenen Zuwachs. Bekannte triviale Konflikte:
+`tsconfig.test.json`-Includes benachbarter PRs (beide Einträge behalten); ich löse sie per Merge-Commit, sobald die Basis gemergt ist.
 
-**Offene Betreiberentscheidungen:** BF-16 (ADR-01, ADR-13…17), Merge #81/#82 (G0), Freigabe der Migrationen 039 und 040 (je eigener Merge),
-BF-14 Hosting-Tarif, BF-15 eigene GitHub-Identität, BF-05 Sichtbarkeit des Repos.
+**B-06/B-07/B-08 wurden nach dem Betreiberauftrag vom 19.10. („ohne weitere Aufforderung weiterarbeiten“) als Code umgesetzt, aber ohne Wirkung:**
+die vorher genannten Entscheidungen bleiben vollständig beim Betreiber und fallen erst beim Merge bzw. bei der Aktivierung an –
+Migration 041 (Merge von #96), öffentliche Route `/api/cron/executive-cycle` (Merge von #98), Eintrag in `vercel.json` und
+`EXECUTIVE_ENABLED=true` (eigene spätere Änderung), Einbindung und Modellbudget des Planers (eigene spätere Änderung). F-03 (Kosten) bleibt angehalten.
 
-**Bewusst angehalten** (brauchen eine Betreiberentscheidung, bevor Code entsteht): B-06 Entscheidungsvorlagen (WhatsApp-Freigabe-Hot-Files,
-weitere Migration), B-07 Cron `executive-cycle` (Änderung an `vercel.json` = Produktiv-Cron), B-08 KI-Planer (Modellaufrufe), F-03 Recherche-Pilot (Kosten).
-Weiter ohne Entscheidung möglich: nur noch Review-Befunde. Vorgeschlagen als eigene Aufgabe: `recordModelCall` in `lib/whatsapp/video-revision.ts` (Bestandscode, Befund aus dem Review von #88).
+**Offene Betreiberentscheidungen:** BF-16 (ADR-01, ADR-13…17), Merge #81/#82 (G0), Freigabe der Migrationen 039, 040, 041 (je eigener Merge),
+OD-B07-1 öffentliche Cron-Route, BF-14 Hosting-Tarif, BF-15 eigene GitHub-Identität, BF-05 Sichtbarkeit des Repos.
 
 ## Runde 2 (18.10.2026, A-01): was sich an der bestehenden Struktur ändert
 

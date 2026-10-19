@@ -4,7 +4,7 @@
   "title": "Executive-Zyklus und Cron-Route (Schalter EXECUTIVE_ENABLED aus, nicht geplant)",
   "module": "enterprise-ledger",
   "phase": "B",
-  "status": "in_progress",
+  "status": "waiting_review",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -96,6 +96,13 @@
       "detail": "83/83 gezielt",
       "commit": "c74a0a7",
       "at": "2026-10-19T12:11:00Z"
+    },
+    {
+      "command": "npm run typecheck && npm run lint && npm test && npm run build",
+      "result": "passed",
+      "detail": "volle Prüfung im Hauptcheckout, 742/742",
+      "commit": "c74a0a7",
+      "at": "2026-10-19T12:32:52Z"
     }
   ],
   "known_issues": [
@@ -111,10 +118,10 @@
     }
   ],
   "pr": {
-    "url": null,
-    "state": "none",
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/98",
+    "state": "draft",
     "merge_commit": null,
-    "ci": "unknown"
+    "ci": "pending"
   },
   "approval": {
     "reviewer": "pending",
@@ -127,26 +134,33 @@
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T12:11:00Z",
+    "last_checkpoint_at": "2026-10-19T12:32:52Z",
     "checkpoint_reason": "other",
     "last_commit": "c74a0a7",
     "active_branch": "claude/B-07-executive-cycle",
-    "state_summary": "implementiert, volle Prüfung auf B-08-Stapel läuft",
+    "state_summary": "Draft-PR #98 offen, voll geprüft",
     "decisions_made": [
       "Betreiberauftrag 19.10.: in Abwesenheit durchgehend weiterarbeiten; Wirkung bleibt hinter Schaltern/Entscheidungen"
     ],
-    "test_status": "83/83 gezielt",
-    "next_action": "Review abwarten"
+    "test_status": "voll 742/742",
+    "next_action": "Review zweite Sitzung abwarten"
   },
-  "revision": 1,
+  "revision": 2,
   "based_on_commit": "d9e9d1e",
-  "updated_at": "2026-10-19T12:11:00Z",
+  "updated_at": "2026-10-19T12:32:52Z",
   "log": [
     {
       "at": "2026-10-19T12:11:00Z",
       "actor": "claude-code",
       "action": "created",
       "summary": "B-07 geplant und implementiert (Solo-Betrieb), Commit c74a0a7",
+      "commit": "c74a0a7"
+    },
+    {
+      "at": "2026-10-19T12:32:52Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Draft-PR #98 geöffnet nach voller Prüfung (742/742)",
       "commit": "c74a0a7"
     }
   ]

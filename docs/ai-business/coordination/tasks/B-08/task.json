@@ -4,7 +4,7 @@
   "title": "KI-Planer im Schattenbetrieb (nur Vorschlag, nichts eingebunden)",
   "module": "enterprise-planner",
   "phase": "B",
-  "status": "in_progress",
+  "status": "waiting_review",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -91,6 +91,13 @@
       "detail": "86/86 gezielt",
       "commit": "18f838e",
       "at": "2026-10-19T12:11:00Z"
+    },
+    {
+      "command": "npm run typecheck && npm run lint && npm test && npm run build",
+      "result": "passed",
+      "detail": "volle Prüfung im Hauptcheckout, 752/752",
+      "commit": "18f838e",
+      "at": "2026-10-19T12:32:52Z"
     }
   ],
   "known_issues": [
@@ -100,10 +107,10 @@
   ],
   "open_decisions": [],
   "pr": {
-    "url": null,
-    "state": "none",
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/99",
+    "state": "draft",
     "merge_commit": null,
-    "ci": "unknown"
+    "ci": "pending"
   },
   "approval": {
     "reviewer": "pending",
@@ -116,26 +123,33 @@
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T12:11:00Z",
+    "last_checkpoint_at": "2026-10-19T12:32:52Z",
     "checkpoint_reason": "other",
     "last_commit": "18f838e",
     "active_branch": "claude/B-08-shadow-planner",
-    "state_summary": "implementiert, volle Prüfung läuft",
+    "state_summary": "Draft-PR #99 offen, voll geprüft",
     "decisions_made": [
       "Betreiberauftrag 19.10.: in Abwesenheit durchgehend weiterarbeiten; Wirkung bleibt hinter Schaltern/Entscheidungen"
     ],
-    "test_status": "86/86 gezielt",
-    "next_action": "Review abwarten"
+    "test_status": "voll 752/752",
+    "next_action": "Review zweite Sitzung abwarten"
   },
-  "revision": 1,
+  "revision": 2,
   "based_on_commit": "d9e9d1e",
-  "updated_at": "2026-10-19T12:11:00Z",
+  "updated_at": "2026-10-19T12:32:52Z",
   "log": [
     {
       "at": "2026-10-19T12:11:00Z",
       "actor": "claude-code",
       "action": "created",
       "summary": "B-08 geplant und implementiert (Solo-Betrieb), Commit 18f838e",
+      "commit": "18f838e"
+    },
+    {
+      "at": "2026-10-19T12:32:52Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Draft-PR #99 geöffnet nach voller Prüfung (752/752)",
       "commit": "18f838e"
     }
   ]
