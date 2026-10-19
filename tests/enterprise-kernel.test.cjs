@@ -3,8 +3,8 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const {REGISTRY,department,taskDefinition}=require('../.test-build/lib/enterprise/registry');
-const {ACTION_KINDS,ACTION_LEVELS,levelFor}=require('../.test-build/lib/enterprise/policy');
-const {validatePlan}=require('../.test-build/lib/enterprise/plan');
+const {ACTION_KINDS,ACTION_LEVELS,PERMISSION_LEVELS,levelFor,isExecutableLevel,requiresDecision}=require('../.test-build/lib/enterprise/policy');
+const {validatePlan,MAX_PLAN_STEPS}=require('../.test-build/lib/enterprise/plan');
 
 const LIMITS={maxSteps:10,maxDepth:4,budgetCents:10000};
 const step=(id,department,taskKind,extra={})=>({id,department,taskKind,dependsOn:[],maxCostCents:0,maxModelCalls:0,...extra});
@@ -42,6 +42,30 @@ test('every action kind has exactly one level; unknown actions are L4 (AC-2)',()
   assert.deepEqual({...ACTION_LEVELS},expected);
   for(const [action,level] of Object.entries(expected))assert.equal(levelFor(action),level);
   for(const unknown of ['delete_everything','',null,undefined,42,'toString','__proto__'])assert.equal(levelFor(unknown),'L4');
+  // Review B-01 #4: an unknown level is never executable, also when passed directly.
+  for(const level of ['L9','',undefined,'l0'])assert.deepEqual([isExecutableLevel(level),requiresDecision(level)],[false,true],String(level));
+  assert.deepEqual(['L0','L1','L2'].map(isExecutableLevel),[true,true,true]);
+  assert.ok(Object.isFrozen(PERMISSION_LEVELS));
+});
+
+test('invalid limits reject the plan instead of switching checks off (review B-01 #1)',()=>{
+  const costly=plan(Array.from({length:30},(_,i)=>step(`s${i}`,'controlling','controlling.monthly_close',{maxCostCents:1e14})),{costCapCents:Number.MAX_SAFE_INTEGER});
+  for(const limits of [{maxSteps:NaN,maxDepth:NaN,budgetCents:NaN},{},null,undefined,{...LIMITS,budgetCents:-1},{...LIMITS,maxSteps:'10'},{...LIMITS,maxDepth:Infinity},{...LIMITS,budgetCents:1.5}])
+    invalid(validatePlan(costly,limits),/Grenzwerte ungültig/);
+  invalid(validatePlan(plan([step('a','controlling','controlling.monthly_close')]),{maxSteps:10,maxDepth:4}),/Grenzwerte ungültig: budgetCents/);
+});
+
+test('oversized plans are rejected early and in linear time (review B-01 #2)',()=>{
+  const chain=n=>plan(Array.from({length:n},(_,i)=>step(`s${i}`,'controlling','controlling.monthly_close',{dependsOn:i?[`s${i-1}`]:[]})));
+  let started=Date.now();
+  invalid(validatePlan(chain(100_000),LIMITS),/steps/);
+  invalid(validatePlan(chain(MAX_PLAN_STEPS),LIMITS),/zu viele Schritte: 200 > 10/);
+  assert.ok(Date.now()-started<5000,`zu langsam: ${Date.now()-started} ms`);
+  started=Date.now();
+  const wide=validatePlan(plan(Array.from({length:MAX_PLAN_STEPS},(_,i)=>step(`s${i}`,'controlling','controlling.monthly_close',{dependsOn:i?[`s${i-1}`]:[]}))),{maxSteps:MAX_PLAN_STEPS,maxDepth:MAX_PLAN_STEPS,budgetCents:5000});
+  assert.equal(wide.ok,true,wide.violations.join(' | '));
+  assert.equal(wide.executable.length,MAX_PLAN_STEPS);
+  assert.ok(Date.now()-started<1000,`zu langsam: ${Date.now()-started} ms`);
 });
 
 test('valid plan returns { ok, plan, executable, decisionRequests, blocked, violations } (AC-3)',()=>{
@@ -99,6 +123,7 @@ test('structural violations are rejected and leave all result lists empty (AC-5,
 
 test('facts need a source (AC-6)',()=>{
   invalid(validatePlan(plan([step('a','controlling','controlling.monthly_close')],{evidence:[{claim:'Umsatz stieg',kind:'fact'}]}),LIMITS),/Fakt ohne Quelle/);
+  invalid(validatePlan(plan([step('a','controlling','controlling.monthly_close')],{evidence:[{claim:'Umsatz stieg',kind:'fact',source:'  '}]}),LIMITS),/Fakt ohne Quelle/);
   assert.equal(validatePlan(plan([step('a','controlling','controlling.monthly_close')],{evidence:[{claim:'Umsatz stieg',kind:'fact',source:'controlling.monthly_close'},{claim:'Trend hält an',kind:'assumption'}]}),LIMITS).ok,true);
 });
 
@@ -132,14 +157,15 @@ test('kernel modules are isolated: only zod and each other, not used by app code
   for(const file of ['registry','policy','plan']){
     const source=fs.readFileSync(`lib/enterprise/${file}.ts`,'utf8');
     for(const match of source.matchAll(/from\s+"([^"]+)"/g))assert.ok(['zod','./policy','./registry'].includes(match[1]),`${file}: ${match[1]}`);
-    assert.doesNotMatch(source,/fetch\(|process\.env|getDatabase|Date\.now|new Date/,file);
+    assert.doesNotMatch(source,/fetch\(|process\.env|getDatabase|Date\.now|new Date|require\(|import\(/,file);
   }
   const users=[];
   const walk=dir=>{for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
     const full=path.join(dir,entry.name);
     if(entry.isDirectory()){if(!full.startsWith(path.join('lib','enterprise')))walk(full);}
-    else if(/\.(ts|tsx)$/.test(entry.name)&&/enterprise\/(registry|policy|plan)/.test(fs.readFileSync(full,'utf8')))users.push(full);
+    else if(/\.(ts|tsx|js|mjs|cjs)$/.test(entry.name)&&/enterprise\/(registry|policy|plan)/.test(fs.readFileSync(full,'utf8')))users.push(full);
   }};
-  walk('app');walk('lib');
+  walk('app');walk('lib');if(fs.existsSync('scripts'))walk('scripts');
+  for(const file of ['proxy.ts','instrumentation.ts','next.config.ts'])if(fs.existsSync(file)&&/enterprise\/(registry|policy|plan)/.test(fs.readFileSync(file,'utf8')))users.push(file);
   assert.deepEqual(users,[]);
 });
