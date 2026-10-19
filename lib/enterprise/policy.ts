@@ -4,7 +4,7 @@
 // treated as L4 (fail closed). L0–L2 may run inside a department's mandate; L3a, L3b and L4 are never executable in v0 and
 // become decision requests for the operator. This module executes nothing.
 
-export const PERMISSION_LEVELS = ["L0", "L1", "L2", "L3a", "L3b", "L4"] as const;
+export const PERMISSION_LEVELS = Object.freeze(["L0", "L1", "L2", "L3a", "L3b", "L4"] as const);
 export type PermissionLevel = (typeof PERMISSION_LEVELS)[number];
 
 // L0 observe · L1 internal analysis within reserved budget · L2 reversible internal writes ·
@@ -43,5 +43,6 @@ export function levelFor(action: unknown): PermissionLevel {
 }
 
 export const levelRank = (level: PermissionLevel) => PERMISSION_LEVELS.indexOf(level);
-export const isExecutableLevel = (level: PermissionLevel) => levelRank(level) <= levelRank("L2");
+// An unknown level (rank -1) is never executable: fail closed for every caller, not only via levelFor.
+export const isExecutableLevel = (level: PermissionLevel) => levelRank(level) >= 0 && levelRank(level) <= levelRank("L2");
 export const requiresDecision = (level: PermissionLevel) => !isExecutableLevel(level);
