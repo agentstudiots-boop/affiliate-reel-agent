@@ -49,3 +49,13 @@ Betreiberauftrag aus dem laufenden Gespräch: GPT soll seinen B-01-Arbeitsauftra
 - Eine GitHub-Übergabe startet Claude nicht automatisch. Claudes wiederkehrender Start muss in dessen eigener Umgebung geprüft und eingerichtet werden; hierfür liegt kein Nachweis vor. Keine kostenpflichtige API-/Action-Umgehung einrichten.
 - Alternative zur Abstimmung: stündliche GPT-Kontrolle; ggf. später ereignisgesteuerte Kontrolle bei relevanter PR-Aktualisierung. Beides ist hier nur eine Option, nicht aktiviert oder Ende-zu-Ende getestet.
 - Unverändert: kein Merge, keine Produktion, keine neuen Credits. Die Prüfung einer Automatisierung soll den Bau von B-01/E-05 nicht durch ein neues Koordinationsprojekt ersetzen.
+
+## Aktualisierung: stündliche Kontrolle beauftragt und GPT-Routine eingerichtet
+Betreiberauftrag 19.10.2026, ca. 07:48 Europe/Berlin: beide Systeme sollen stündlich die Übergaben des anderen lesen und nächste Zuständigkeiten abstimmen.
+
+**GPT-Seite:** Die Aufgabe „Claude-GPT-Übergaben prüfen“ wurde erfolgreich erstellt und ist aktiviert. Zeitplan: stündlich ab 19.10.2026, 08:48 Europe/Berlin. Der erste automatische Lauf ist noch nicht nachgewiesen. Dieser bestätigte Einrichtungsstand ersetzt die ältere Aussage „keine Automatisierung aktiviert“ oben.
+Die Routine liest aktuelle GitHub-Stände, erkennt neue Revisionen/Review-Anfragen und dokumentiert konkrete nächste Zuständigkeiten in der bestehenden Struktur. Unveränderte Stände erzeugen keine Meldung und keinen leeren Commit. Sie startet keinen zweiten konkurrierenden Implementierungsprozess und verändert keinen Anwendungscode.
+
+**Claude-Seite – Auftrag:** Eine entsprechende stündliche Übergabekontrolle in der eigenen Umgebung einrichten, sofern dort tatsächlich unterstützt und innerhalb der bestehenden Abonnements möglich. Vor Neuanlage vorhandene Routinen prüfen. Aktuelle GPT-Übergaben lesen, neue SHAs/Revisionen abgleichen, nächste Zuständigkeit dokumentieren; keine Doppelarbeit oder Selbstfreigabe. Einrichtung und ersten erfolgreichen Lauf getrennt nachweisen. Falls nicht möglich, den konkreten Grund dokumentieren; keine Hintergrundaktivität behaupten. GPT hat keine Claude-Routine eingerichtet.
+
+Kein Merge, keine Produktion, keine Aktivierung und keine zusätzlichen Credits. Automatische Kontrollen verbessern die Abstimmung, garantieren aber weder sofortige Reaktion noch fehlerfreie Kommunikation. Die bereits verteilte Programmierarbeit bleibt davon getrennt.
