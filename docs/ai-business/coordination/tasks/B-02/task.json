@@ -138,7 +138,7 @@
     "ci": "pending"
   },
   "approval": {
-    "reviewer": "pending",
+    "reviewer": "changes_requested",
     "operator": "pending",
     "latest_review_file": null
   },
@@ -148,9 +148,9 @@
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T07:24:00Z",
+    "last_checkpoint_at": "2026-10-19T11:34:00Z",
     "checkpoint_reason": "other",
-    "last_commit": "3bb3362",
+    "last_commit": "73e76c7",
     "active_branch": "claude/B-02-task-ledger-migration",
     "state_summary": "Draft-PR #89 offen",
     "decisions_made": [
@@ -158,11 +158,11 @@
       "Fehlerklassen an B-04 angeglichen"
     ],
     "test_status": "34/34 gezielt",
-    "next_action": "Review abwarten"
+    "next_action": "Nachprüfung #89"
   },
-  "revision": 3,
+  "revision": 4,
   "based_on_commit": "d19edb1",
-  "updated_at": "2026-10-19T07:24:00Z",
+  "updated_at": "2026-10-19T11:34:00Z",
   "log": [
     {
       "at": "2026-10-19T06:52:00Z",
@@ -184,6 +184,20 @@
       "action": "pr_opened",
       "summary": "Volle Prüfung grün (707/707), Draft-PR 89",
       "commit": "3bb3362"
+    },
+    {
+      "at": "2026-10-19T11:34:00Z",
+      "actor": "claude-code",
+      "action": "review_received",
+      "summary": "Review zweite Sitzung (PR #89): changes_requested; 1 major (outcome_unknown-Klasse außerhalb Status), 2 minor",
+      "commit": "3bb3362"
+    },
+    {
+      "at": "2026-10-19T11:34:00Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "CHECK Fehlerklasse nur in Fehlerzuständen, bigint, handler_id-Format, Kommentar per Konvention",
+      "commit": "73e76c7"
     }
   ]
 }

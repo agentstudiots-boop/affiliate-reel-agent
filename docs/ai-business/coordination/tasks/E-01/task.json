@@ -111,10 +111,10 @@
     },
     {
       "command": "npm run typecheck / lint / test / build",
-      "result": "not_run",
-      "detail": "folgt im Hauptcheckout",
+      "result": "passed",
+      "detail": "alle vier Exit 0, 688/688 (auf dccea46)",
       "commit": "dccea46",
-      "at": "2026-10-19T07:40:00Z"
+      "at": "2026-10-19T11:34:00Z"
     }
   ],
   "known_issues": [
@@ -148,7 +148,7 @@
     "system": "claude-code",
     "last_checkpoint_at": "2026-10-19T07:40:00Z",
     "checkpoint_reason": "other",
-    "last_commit": "dccea46",
+    "last_commit": "570e410",
     "active_branch": "claude/E-01-cost-ledger-migration",
     "state_summary": "E-01 implementiert, gezielte Tests grün",
     "decisions_made": [
@@ -157,9 +157,9 @@
     "test_status": "40/40 gezielt",
     "next_action": "Volle Prüfungen, Draft-PR"
   },
-  "revision": 1,
+  "revision": 2,
   "based_on_commit": "315306d",
-  "updated_at": "2026-10-19T07:40:00Z",
+  "updated_at": "2026-10-19T11:34:00Z",
   "log": [
     {
       "at": "2026-10-19T07:40:00Z",
@@ -167,6 +167,13 @@
       "action": "created",
       "summary": "E-01 geplant und implementiert (Solo-Betrieb), Commit dccea46",
       "commit": "dccea46"
+    },
+    {
+      "at": "2026-10-19T11:34:00Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "B-02-Fixes per Merge 5fc6855; Isolationstest lässt Kernmodule in lib/enterprise zu",
+      "commit": "570e410"
     }
   ]
 }

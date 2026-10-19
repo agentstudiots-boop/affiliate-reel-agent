@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "task_id": "E-03",
+  "title": "Importer model_calls → cost_entries (gemessen, Preis nur aus dem Katalog)",
+  "module": "controlling-ledger",
+  "phase": "E",
+  "status": "in_progress",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "operator",
+  "base_commit": "dccea46",
+  "branch": "claude/E-03-model-call-importer",
+  "depends_on": [
+    "E-01",
+    "E-06"
+  ],
+  "claims": {
+    "paths": [
+      "lib/enterprise/controlling/import-model-calls.ts",
+      "tests/controlling-model-call-import.test.cjs"
+    ],
+    "hot_files": [
+      "tsconfig.test.json"
+    ],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Betrag in Cent aus Mikropreis, ungültige Eingaben ⇒ null",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Je gemeldeter Einheit eine gemessene Zeile; Betrag nur mit zum Aufrufzeitpunkt gültigem Katalogpreis, sonst NULL",
+      "verification": "PGlite-Test + Gegentest",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Fehlende Messwerte ⇒ keine Zeile; unbekannte/ungültige Abteilung ⇒ nicht zugeordnet",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-4",
+      "criterion": "Idempotent über (source, source_ref), fortsetzbar per Cursor, höchstens 1000 Aufrufe je Lauf",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-5",
+      "criterion": "Liest model_calls unverändert, schreibt nur cost_entries; nicht eingebunden",
+      "verification": "Isolationstest",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 250,
+    "notes": "Solo-Betrieb, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "lib/enterprise/controlling/import-model-calls.ts",
+    "tests/controlling-model-call-import.test.cjs",
+    "tsconfig.test.json"
+  ],
+  "implemented": [
+    "amountCents",
+    "importModelCalls"
+  ],
+  "tests": [
+    {
+      "command": "node --test tests/controlling-*.test.cjs tests/enterprise-task-ledger-migration.test.cjs tests/migration-upgrade.test.cjs",
+      "result": "passed",
+      "detail": "19/19; Gegentest bestätigt",
+      "commit": "a398e5a",
+      "at": "2026-10-19T11:34:00Z"
+    },
+    {
+      "command": "npm run typecheck / lint / test / build",
+      "result": "not_run",
+      "detail": "läuft im Hauptcheckout",
+      "commit": "a398e5a",
+      "at": "2026-10-19T11:34:00Z"
+    }
+  ],
+  "known_issues": [
+    "Gestapelt auf E-01 (und damit B-02 #89)",
+    "Abteilung wird hereingereicht (E-06 departmentForAgent), nicht importiert – keine Stapelabhängigkeit zu #88",
+    "Nicht eingebunden: Aufruf durch Cron/Executive erst nach Betreiberentscheidung"
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": null,
+    "state": "none",
+    "merge_commit": null,
+    "ci": "unknown"
+  },
+  "approval": {
+    "reviewer": "pending",
+    "operator": "pending",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Volle Prüfung, Draft-PR"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-19T11:34:00Z",
+    "checkpoint_reason": "other",
+    "last_commit": "a398e5a",
+    "active_branch": "claude/E-03-model-call-importer",
+    "state_summary": "E-03 implementiert, gezielte Tests grün",
+    "decisions_made": [
+      "Abteilung als Funktion hereingereicht"
+    ],
+    "test_status": "19/19 gezielt",
+    "next_action": "Volle Prüfung, Draft-PR"
+  },
+  "revision": 1,
+  "based_on_commit": "e8149a7",
+  "updated_at": "2026-10-19T11:34:00Z",
+  "log": [
+    {
+      "at": "2026-10-19T11:34:00Z",
+      "actor": "claude-code",
+      "action": "created",
+      "summary": "E-03 geplant und implementiert (Solo-Betrieb), Commits d9ffab5, a398e5a",
+      "commit": "a398e5a"
+    }
+  ]
+}

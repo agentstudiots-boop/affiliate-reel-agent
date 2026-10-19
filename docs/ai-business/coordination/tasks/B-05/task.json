@@ -136,9 +136,9 @@
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-19T07:44:00Z",
+    "last_checkpoint_at": "2026-10-19T11:34:00Z",
     "checkpoint_reason": "other",
-    "last_commit": "5d55d13",
+    "last_commit": "2f0e572",
     "active_branch": "claude/B-05-budget-guard",
     "state_summary": "Draft-PR #91 offen",
     "decisions_made": [
@@ -148,9 +148,9 @@
     "test_status": "39/39 gezielt",
     "next_action": "Review abwarten"
   },
-  "revision": 2,
+  "revision": 3,
   "based_on_commit": "7502b48",
-  "updated_at": "2026-10-19T07:44:00Z",
+  "updated_at": "2026-10-19T11:34:00Z",
   "log": [
     {
       "at": "2026-10-19T07:31:00Z",
@@ -165,6 +165,13 @@
       "action": "pr_opened",
       "summary": "Volle Prüfung grün (713/713), Draft-PR #91",
       "commit": "5d55d13"
+    },
+    {
+      "at": "2026-10-19T11:34:00Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "B-03-Fixes per Merge; budget.ts auf DB-Uhr, Reservierung nur bei gültiger Lease",
+      "commit": "2f0e572"
     }
   ]
 }

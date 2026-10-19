@@ -4,7 +4,7 @@
   "title": "Abteilungsvertrag: Task-Envelope, Ergebnis, Health, begrenzte Lesefähigkeiten (reine Funktionen)",
   "module": "enterprise-kernel",
   "phase": "B",
-  "status": "waiting_review",
+  "status": "waiting_operator",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -150,9 +150,9 @@
     "test_status": "volle Prüfungen grün",
     "next_action": "Volle Suite über G-01-Stapel"
   },
-  "revision": 4,
+  "revision": 5,
   "based_on_commit": "af7f39b",
-  "updated_at": "2026-10-19T07:11:00Z",
+  "updated_at": "2026-10-19T11:34:00Z",
   "log": [
     {
       "at": "2026-10-19T06:25:00Z",
@@ -180,6 +180,13 @@
       "actor": "claude-code",
       "action": "fixed",
       "summary": "Alle Befunde behoben; B-01-Fixes per Merge 40a6b27",
+      "commit": "19890a4"
+    },
+    {
+      "at": "2026-10-19T11:34:00Z",
+      "actor": "claude-code",
+      "action": "review_received",
+      "summary": "Review zweite Sitzung (PR #86): approve nach Nachprüfung; alle Befunde geschlossen",
       "commit": "19890a4"
     }
   ]

@@ -4,7 +4,7 @@
   "title": "Executive-Kern v0: Plan-Vertrag, Richtlinien L0–L4 und Abteilungsregister (reine Funktionen)",
   "module": "enterprise-kernel",
   "phase": "B",
-  "status": "in_progress",
+  "status": "waiting_operator",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -173,7 +173,7 @@
     "ci": "pending"
   },
   "approval": {
-    "reviewer": "changes_requested",
+    "reviewer": "approved",
     "operator": "pending",
     "latest_review_file": null
   },
@@ -195,9 +195,9 @@
     "test_status": "685/685",
     "next_action": "Nachprüfung anfordern"
   },
-  "revision": 7,
+  "revision": 8,
   "based_on_commit": "e002446",
-  "updated_at": "2026-10-19T07:11:00Z",
+  "updated_at": "2026-10-19T11:34:00Z",
   "log": [
     {
       "at": "2026-10-18T21:30:00Z",
@@ -253,6 +253,13 @@
       "actor": "claude-code",
       "action": "fixed",
       "summary": "Alle Befunde behoben außer nit 6 (strip bleibt, begründet); AC-3-Signatur angeglichen",
+      "commit": "81aa6ce"
+    },
+    {
+      "at": "2026-10-19T11:34:00Z",
+      "actor": "claude-code",
+      "action": "review_received",
+      "summary": "Review zweite Sitzung (PR #84): approve nach Nachprüfung; Befunde geschlossen",
       "commit": "81aa6ce"
     }
   ]
