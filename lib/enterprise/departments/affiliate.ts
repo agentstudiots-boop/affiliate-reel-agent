@@ -7,8 +7,15 @@
 import type { Database, Sql } from "../../memory/db";
 import { createReadCapability, type DepartmentContext, type DepartmentModule, type HealthReport, type ReadView, type TaskEnvelope, type TaskResult } from "../contract";
 
-const STALE_AFTER_MS = 2 * 24 * 60 * 60 * 1000; // no successful daily slot run for two days ⇒ degraded
+const STALE_AFTER_MS = 2 * 24 * 60 * 60 * 1000; // no draft reached the operator for two days ⇒ degraded
 const WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Outcomes written to daily_slot_runs by app/api/cron/daily-draft/route.ts and lib/daily/draft.ts. A test keeps them in sync.
+export const DAILY_OUTCOMES = {
+  success: "awaiting_approval", // a draft was sent to the operator for approval
+  failures: ["error", "failed"],
+  idle: ["outside_berlin_slot", "already_claimed"], // cron hour outside the Berlin slot, or slot already handled
+} as const;
 
 const iso = (value: unknown) => value instanceof Date ? value.toISOString() : typeof value === "string" && value ? new Date(value).toISOString() : null;
 const count = (value: unknown) => value === null || value === undefined ? 0 : Number(value);
@@ -20,10 +27,12 @@ async function readOnly(db: Database, work: (sql: Sql) => Promise<Record<string,
 // Named read views of this department. Parameters are bound, never interpolated.
 export function affiliateReadViews(db: Database): Record<string, ReadView> {
   return {
-    daily_runs: params => readOnly(db, async sql => (await sql.query(`SELECT count(*)::int AS total, count(*) FILTER (WHERE outcome='error')::int AS errors,
-        max(invoked_at) FILTER (WHERE outcome NOT IN ('error','outside_berlin_slot')) AS last_ok_at, max(invoked_at) AS last_at,
-        (array_agg(outcome ORDER BY invoked_at DESC))[1] AS last_outcome
-      FROM daily_slot_runs WHERE invoked_at > $1::timestamptz`, [params.since])).rows),
+    daily_runs: params => readOnly(db, async sql => (await sql.query(`SELECT count(*)::int AS total,
+        count(*) FILTER (WHERE outcome = ANY($2::text[]))::int AS errors, count(*) FILTER (WHERE outcome = $3)::int AS drafts,
+        max(invoked_at) FILTER (WHERE outcome = $3) AS last_draft_at, max(invoked_at) AS last_at,
+        (array_agg(outcome ORDER BY invoked_at DESC) FILTER (WHERE outcome <> ALL($4::text[])))[1] AS last_outcome
+      FROM daily_slot_runs WHERE invoked_at > $1::timestamptz`,
+      [params.since, [...DAILY_OUTCOMES.failures], DAILY_OUTCOMES.success, [...DAILY_OUTCOMES.idle]])).rows),
     open_approvals: () => readOnly(db, async sql => (await sql.query(`SELECT
         (SELECT count(*)::int FROM content_approval_requests WHERE status='pending') AS content_pending,
         (SELECT count(*)::int FROM publication_requests WHERE status='pending') AS publication_pending`)).rows),
@@ -37,7 +46,7 @@ export function affiliateContext(db: Database, now: () => Date = () => new Date(
   return { departmentId: "affiliate", now, read: createReadCapability("affiliate", affiliateReadViews(db)) };
 }
 
-type Figures = { totalRuns: number; errorRuns: number; lastOkAt: string | null; lastRunAt: string | null; lastOutcome: string | null;
+type Figures = { totalRuns: number; errorRuns: number; drafts: number; lastDraftAt: string | null; lastRunAt: string | null; lastOutcome: string | null;
   contentApprovalsPending: number; publicationApprovalsPending: number; publishedFacebook: number; publishedInstagram: number };
 
 async function readFigures(context: DepartmentContext): Promise<Figures> {
@@ -46,7 +55,7 @@ async function readFigures(context: DepartmentContext): Promise<Figures> {
   const [open] = await context.read("open_approvals");
   const [published] = await context.read("published", { since });
   return {
-    totalRuns: count(runs?.total), errorRuns: count(runs?.errors), lastOkAt: iso(runs?.last_ok_at), lastRunAt: iso(runs?.last_at),
+    totalRuns: count(runs?.total), errorRuns: count(runs?.errors), drafts: count(runs?.drafts), lastDraftAt: iso(runs?.last_draft_at), lastRunAt: iso(runs?.last_at),
     lastOutcome: runs?.last_outcome ? String(runs.last_outcome) : null,
     contentApprovalsPending: count(open?.content_pending), publicationApprovalsPending: count(open?.publication_pending),
     publishedFacebook: count(published?.facebook), publishedInstagram: count(published?.instagram),
@@ -54,9 +63,9 @@ async function readFigures(context: DepartmentContext): Promise<Figures> {
 }
 
 function evaluate(figures: Figures, now: Date): Pick<HealthReport, "status" | "reason"> {
-  if (figures.totalRuns === 0) return { status: "unknown", reason: "kein Tageslauf in den letzten 7 Tagen protokolliert" };
-  if (figures.lastOutcome === "error") return { status: "degraded", reason: "letzter Tageslauf fehlgeschlagen" };
-  if (!figures.lastOkAt || now.getTime() - Date.parse(figures.lastOkAt) > STALE_AFTER_MS) return { status: "degraded", reason: "seit über zwei Tagen kein erfolgreicher Tageslauf" };
+  if (figures.totalRuns === 0) return { status: "unknown", reason: "kein Cron-Aufruf des Tagesentwurfs in den letzten 7 Tagen protokolliert" };
+  if ((DAILY_OUTCOMES.failures as readonly string[]).includes(figures.lastOutcome ?? "")) return { status: "degraded", reason: "letzter Tageslauf fehlgeschlagen" };
+  if (!figures.lastDraftAt || now.getTime() - Date.parse(figures.lastDraftAt) > STALE_AFTER_MS) return { status: "degraded", reason: "seit über zwei Tagen kein Entwurf zur Freigabe" };
   return { status: "ok" };
 }
 
@@ -69,9 +78,11 @@ export const affiliateDepartment: DepartmentModule = {
     try { figures = await readFigures(context); }
     catch { return { department: "affiliate", status: "unknown", checkedAt, evidence: [], reason: "Nachweise nicht lesbar (Datenbank oder Tabelle nicht verfügbar)" }; }
     return { department: "affiliate", checkedAt, ...evaluate(figures, context.now()), evidence: [
-      { label: "Tagesläufe (7 Tage)", value: figures.totalRuns, source: "daily_slot_runs" },
+      { label: "Cron-Aufrufe Tagesentwurf (7 Tage)", value: figures.totalRuns, source: "daily_slot_runs" },
       { label: "davon Fehler", value: figures.errorRuns, source: "daily_slot_runs" },
-      { label: "letzter erfolgreicher Tageslauf", value: figures.lastOkAt, source: "daily_slot_runs" },
+      { label: "Entwürfe zur Freigabe (7 Tage)", value: figures.drafts, source: "daily_slot_runs" },
+      { label: "letzter Entwurf zur Freigabe", value: figures.lastDraftAt, source: "daily_slot_runs" },
+      { label: "letztes Slot-Ergebnis", value: figures.lastOutcome, source: "daily_slot_runs" },
       { label: "offene Inhaltsfreigaben", value: figures.contentApprovalsPending, source: "content_approval_requests" },
       { label: "offene Veröffentlichungsfreigaben (Facebook)", value: figures.publicationApprovalsPending, source: "publication_requests" },
       { label: "veröffentlicht Facebook (7 Tage)", value: figures.publishedFacebook, source: "publication_requests" },
@@ -84,7 +95,7 @@ export const affiliateDepartment: DepartmentModule = {
     try {
       const figures = await readFigures(context);
       return { status: "succeeded", output: { ...figures, windowDays: 7 }, usedCostCents: 0, usedModelCalls: 0,
-        evidence: [{ claim: `${figures.totalRuns} Tagesläufe in 7 Tagen`, kind: "fact", source: "daily_slot_runs" }] };
+        evidence: [{ claim: `${figures.drafts} Entwürfe zur Freigabe bei ${figures.totalRuns} Cron-Aufrufen in 7 Tagen`, kind: "fact", source: "daily_slot_runs" }] };
     } catch {
       return { status: "failed", failureClass: "provider_error", reason: "Nachweise nicht lesbar", usedCostCents: 0, usedModelCalls: 0 };
     }

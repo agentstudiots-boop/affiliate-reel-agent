@@ -6,7 +6,7 @@ const crypto=require('node:crypto');
 const pgliteDatabase=require('./helpers/pglite-db.cjs');
 const {validatePlan}=require('../.test-build/lib/enterprise/plan');
 const {envelopeFromStep,checkHealth,checkResult,checkEnvelope}=require('../.test-build/lib/enterprise/contract');
-const {affiliateDepartment,affiliateContext}=require('../.test-build/lib/enterprise/departments/affiliate');
+const {affiliateDepartment,affiliateContext,DAILY_OUTCOMES}=require('../.test-build/lib/enterprise/departments/affiliate');
 
 const NOW=new Date('2026-11-01T12:00:00Z');
 const hoursAgo=h=>new Date(NOW.getTime()-h*3600*1000).toISOString();
@@ -22,39 +22,55 @@ test('no evidence yet: health is unknown, never ok (AC-1)',async()=>{
   const db=await pgliteDatabase();
   const report=await affiliateDepartment.health(affiliateContext(db,()=>NOW));
   assert.equal(report.status,'unknown');
-  assert.match(report.reason,/kein Tageslauf/);
+  assert.match(report.reason,/kein Cron-Aufruf/);
   assert.equal(checkHealth(report,'affiliate').ok,true);
   await db.close();
 });
 
-test('recent successful daily run: ok with evidence from the real tables (AC-2)',async()=>{
+test('recent draft for approval: ok with evidence from the real tables (AC-2)',async()=>{
   const db=await pgliteDatabase();
   await run(db,hoursAgo(30),'error');
-  await run(db,hoursAgo(5),'drafted');
-  await run(db,hoursAgo(200),'drafted'); // outside the 7-day window
+  await run(db,hoursAgo(5),'awaiting_approval');
+  await run(db,hoursAgo(4),'outside_berlin_slot');
+  await run(db,hoursAgo(200),'awaiting_approval'); // outside the 7-day window
   await db.query(`INSERT INTO instagram_image_posts(publication_id,status,updated_at) VALUES($1,'published',$2),($3,'failed',$2)`,[crypto.randomUUID(),hoursAgo(10),crypto.randomUUID()]);
   const report=await affiliateDepartment.health(affiliateContext(db,()=>NOW));
   assert.equal(report.status,'ok',report.reason);
   assert.equal(checkHealth(report,'affiliate').ok,true);
-  assert.equal(evidence(report,'Tagesläufe (7 Tage)'),2);
+  assert.equal(evidence(report,'Cron-Aufrufe Tagesentwurf (7 Tage)'),3);
   assert.equal(evidence(report,'davon Fehler'),1);
-  assert.equal(evidence(report,'letzter erfolgreicher Tageslauf'),hoursAgo(5));
+  assert.equal(evidence(report,'Entwürfe zur Freigabe (7 Tage)'),1);
+  assert.equal(evidence(report,'letzter Entwurf zur Freigabe'),hoursAgo(5));
+  assert.equal(evidence(report,'letztes Slot-Ergebnis'),'awaiting_approval');
   assert.equal(evidence(report,'veröffentlicht Instagram (7 Tage)'),1);
   assert.equal(evidence(report,'offene Inhaltsfreigaben'),0);
   await db.close();
 });
 
-test('failed or stale daily runs are degraded (AC-3)',async()=>{
-  const db=await pgliteDatabase();
-  await run(db,hoursAgo(20),'drafted');
-  await run(db,hoursAgo(2),'error');
-  assert.equal((await affiliateDepartment.health(affiliateContext(db,()=>NOW))).status,'degraded');
+test('failed runs are degraded even behind idle cron calls; no draft for two days is degraded (AC-3)',async()=>{
+  for(const failure of ['error','failed']){
+    const db=await pgliteDatabase();
+    await run(db,hoursAgo(20),'awaiting_approval');
+    await run(db,hoursAgo(3),failure);
+    await run(db,hoursAgo(2),'already_claimed');
+    await run(db,hoursAgo(1),'outside_berlin_slot');
+    const report=await affiliateDepartment.health(affiliateContext(db,()=>NOW));
+    assert.deepEqual([report.status,report.reason],['degraded','letzter Tageslauf fehlgeschlagen'],failure);
+    await db.close();
+  }
   const stale=await pgliteDatabase();
-  await run(stale,hoursAgo(60),'drafted');
+  await run(stale,hoursAgo(60),'awaiting_approval');
+  await run(stale,hoursAgo(5),'needs_input');
   const report=await affiliateDepartment.health(affiliateContext(stale,()=>NOW));
   assert.equal(report.status,'degraded');
-  assert.match(report.reason,/über zwei Tagen/);
-  await db.close();await stale.close();
+  assert.match(report.reason,/über zwei Tagen kein Entwurf/);
+  await stale.close();
+});
+
+test('outcome values match what the studio writes to daily_slot_runs (AC-2/AC-3)',()=>{
+  const source=['app/api/cron/daily-draft/route.ts','lib/daily/draft.ts'].map(file=>fs.readFileSync(file,'utf8')).join('\n');
+  for(const value of [DAILY_OUTCOMES.success,...DAILY_OUTCOMES.failures,...DAILY_OUTCOMES.idle])
+    assert.match(source,new RegExp(`["']${value}["']`),value);
 });
 
 test('unreadable database yields unknown, not an error or ok (AC-4)',async()=>{
@@ -80,12 +96,12 @@ test('views are read-only SELECTs inside READ ONLY transactions (AC-5)',async()=
 
 test('status report task returns figures within budget; publication requests are never handled (AC-6)',async()=>{
   const db=await pgliteDatabase();
-  await run(db,hoursAgo(3),'drafted');
+  await run(db,hoursAgo(3),'awaiting_approval');
   const envelope=envelopeFor('affiliate.status_report');
   assert.equal(checkEnvelope(envelope).ok,true);
   const result=await affiliateDepartment.handle(envelope,affiliateContext(db,()=>NOW));
   assert.equal(result.status,'succeeded');
-  assert.equal(result.output.totalRuns,1);
+  assert.deepEqual([result.output.totalRuns,result.output.drafts],[1,1]);
   assert.equal(checkResult(result,envelope).ok,true);
   const forged={...envelope,taskKind:'affiliate.publication_request',handlerId:'affiliate.publicationRequest',permissionLevel:'L3b'};
   assert.equal(checkEnvelope(forged).ok,false);
