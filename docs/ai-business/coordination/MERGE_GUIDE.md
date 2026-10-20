@@ -12,7 +12,7 @@ vollen Prüfungen (lint, `npm test`, build, typecheck). Die Zahlen unten stammen
   1. Ein Textkonflikt in `tsconfig.test.json`, zwischen #97 und #112. Die Lösung ist, beide Einträge zu behalten.
   2. Zwei Fehler, die erst im Zusammenspiel auftreten. Einzeln ist jeder PR grün.
 - **Behoben bzw. vorbereitet:**
-  - Fehler 1 ist in #112 behoben (`b280bb5`).
+  - Fehler 1 ist in #112 behoben (`3f35aaa`).
   - Fehler 2 und der Textkonflikt werden mit einem Update von #112 erledigt, sobald Stufe 1 auf `main` liegt.
 - **Endstand nach allen Stufen:** 849/849 Tests, lint (2 bekannte Warnungen), build und typecheck grün.
 
@@ -64,7 +64,7 @@ Nicht gegen `main` und nicht Teil dieses Leitfadens: #81, #82 und #111 (Roadmap-
 1. **E-02-Isolationstest gegen J-02-Kommentar.**
    - Der Test in `tests/controlling-price-catalog.test.cjs` meldet jede Datei, die `controlling/price-catalog` erwähnt.
    - Der J-02-Importer nannte diesen Pfad in einem Kommentar.
-   - Behoben in #112 `b280bb5`: Nur der Kommentar ist geändert, kein Verhalten.
+   - Behoben in #112 `3f35aaa`: Nur der Kommentar ist geändert, kein Verhalten.
 2. **E-06-Registertest gegen #94.**
    - `tests/enterprise-agent-departments.test.cjs` verlangt, dass jeder in `model_calls` protokollierte Agent einer Abteilung zugeordnet ist.
    - #94 bringt `whatsapp_video_revision`. Der Eintrag ist erst möglich, wenn beide auf `main` liegen: Ein Eintrag ohne Aufrufer wäre laut demselben Test „veraltet“.
@@ -85,10 +85,16 @@ Nicht gegen `main` und nicht Teil dieses Leitfadens: #81, #82 und #111 (Roadmap-
 | + #92 (040), merge ohne Konflikt | – | 720/720 | – | – |
 | + #96 (041), merge ohne Konflikt | ✔ | 739/739 | ✔ | ✔ |
 | Endstand (+ #112 aktualisiert, #106, #108) | ✔ | 849/849 | ✔ | ✔ |
-| #112 allein (`b280bb5`) | ✔ | 796/796 | ✔ | ✔ |
+| #112 allein (`3f35aaa`) | ✔ | 796/796 | ✔ | ✔ |
 
 Auf dem Stand nach #96 zeigt ein Probe-Merge von #112 nur den erwarteten Konflikt in `tsconfig.test.json`. Schritt 8 löst ihn auf.
 Der Endstand wurde zweimal geprüft: einmal mit allen Merges in Stapelreihenfolge, einmal in der Stufenreihenfolge oben. Beide
 Bäume unterscheiden sich nur in der Reihenfolge der `tsconfig.test.json`-Einträge und im Wortlaut eines Kommentars.
 
-Gegenprüfung: Die zweite Sitzung spielt die Reihenfolge unabhängig nach (Auftrag vom 20.10.). Ihr Ergebnis wird hier ergänzt.
+**Gegenprüfung (zweite Sitzung, 20.10. abends):** Die zweite Sitzung hat die Reihenfolge unabhängig nachgespielt, auf eigener Basis
+`c56711e`, nur lokal. Es gibt keine Abweichung: Stufe 1 708/708, #89 714/714, #92 720/720, #96 739/739, jeweils ohne Konflikt. #112 zeigt nur
+den `tsconfig.test.json`-Konflikt, die Vereinigung ergibt 44 Einträge ohne Dubletten. Ohne die Zuordnung aus Schritt 8 stehen 848/849 Tests
+grün, rot ist genau der Registertest, mit der Zuordnung 849/849. Alle offenen PR-Köpfe gegen `main` sind im Endstand enthalten.
+
+Hinweis: #112 wurde nach dem Review neu geschrieben, ohne inhaltliche Änderung. Der Commit trug eine Modellkennung im Trailer, entgegen
+CLAUDE.md §8. Neuer Kopf ist `3f35aaa`, Baum identisch mit dem geprüften Stand.
