@@ -68,6 +68,7 @@ export const CRITERIA: Readonly<Record<CriterionId, CriterionRule>> = {
   entryBarriers: { label: "Eintrittsbarrieren", values: ["scale"] },
   investmentNeed: { label: "Investitionsbedarf", values: ["number", "range"] },
   runningCosts: { label: "Laufende Kosten", values: ["number", "range"] },
+  // Profit after direct costs per period (contribution as in E-05), not revenue; F-04 computes payback from it.
   revenueProfitPotential: { label: "Umsatz-/Gewinnpotenzial", values: ["range"], kinds: ["forecast"] },
   scalability: { label: "Skalierbarkeit", values: ["scale"] },
   payback: { label: "Amortisationsdauer", values: ["number", "range"], kinds: ["assumption", "forecast"] },
@@ -83,6 +84,8 @@ const KINDS: readonly EvidenceKind[] = ["fact", "assumption", "forecast"];
 const isText = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
 const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
 const isScale = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 5;
+// Costs are amounts to pay: a negative investment or running cost would silently improve the economics.
+const NON_NEGATIVE: readonly CriterionId[] = ["investmentNeed", "runningCosts"];
 const inUnitInterval = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
 
 function invalidValue(criterion: CriterionId, value: unknown): string | null {
@@ -93,11 +96,13 @@ function invalidValue(criterion: CriterionId, value: unknown): string | null {
     case "number":
       if (typeof value.amount !== "number" || !Number.isFinite(value.amount)) return "Zahl ist nicht endlich";
       if (!isText(value.unit)) return "Einheit fehlt";
+      if (NON_NEGATIVE.includes(criterion) && value.amount < 0) return "Betrag darf nicht negativ sein";
       if (criterion === "automationLevel" && (value.unit !== "%" || value.amount < 0 || value.amount > 100)) return "Automatisierungsgrad nur in % von 0 bis 100";
       return null;
     case "range":
       if (typeof value.low !== "number" || typeof value.high !== "number" || !Number.isFinite(value.low) || !Number.isFinite(value.high)) return "Spanne ist nicht endlich";
       if (value.low > value.high) return "Spanne: Untergrenze größer als Obergrenze";
+      if (NON_NEGATIVE.includes(criterion) && value.low < 0) return "Betrag darf nicht negativ sein";
       return isText(value.unit) ? null : "Einheit fehlt";
     case "scale":
       return isScale(value.level) ? null : "Skala nur ganzzahlig 1–5";
