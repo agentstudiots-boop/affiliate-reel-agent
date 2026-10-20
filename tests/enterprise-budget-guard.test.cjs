@@ -24,8 +24,8 @@ const reserve=(db,lease,amountCents)=>B.reserveBudget(db,lease,{amountCents});
 const OPTIONS=[{id:'yes',label:'Freigeben'},{id:'no',label:'Ablehnen'}];
 const budgetStep=()=>validatePlan({goal:'x',steps:[{id:'b',department:'executive',taskKind:'executive.budget_change',dependsOn:[],maxCostCents:0,maxModelCalls:0}],
   expectedValue:null,costCapCents:0},{maxSteps:5,maxDepth:3,budgetCents:10_000}).decisionRequests[0];
-async function decide(db,subjectKey,decision='approved'){
-  const r=await D.requestDecision(db,{step:budgetStep(),subjectKey,subject:`Budget ${subjectKey}`,options:OPTIONS});
+async function decide(db,budget,decision='approved'){
+  const r=await D.requestDecision(db,{step:budgetStep(),budget,subject:'Budget',options:OPTIONS});
   const requestMessageId=`wamid.req.${crypto.randomUUID()}`;
   assert.equal(await D.attachRequestMessage(db,r.id,requestMessageId),true);
   if(decision)assert.equal((await D.recordDecision(db,{authority:'whatsapp_operator',trustedWaId:'491701234567',expected:{id:r.id,fingerprint:r.fingerprint},
@@ -35,7 +35,7 @@ async function decide(db,subjectKey,decision='approved'){
 }
 async function approveBudget(db,limitCents,{department='opportunity',kind='hard',decision='approved',subjectAmount=limitCents,subjectDepartment=department}={}){
   const period=await dbPeriod(db);
-  const decisionId=decision===null?null:await decide(db,B.budgetSubjectKey(subjectDepartment,period,subjectAmount),decision);
+  const decisionId=decision===null?null:await decide(db,{department:subjectDepartment,period,limitCents:subjectAmount},decision);
   await db.query('INSERT INTO budgets(id,department,period,limit_cents,kind,approved_decision_id) VALUES($1,$2,$3,$4,$5,$6)',
     [crypto.randomUUID(),department,period,limitCents,kind,decisionId]);
 }
@@ -134,7 +134,14 @@ test('unclear outcomes dispute the reservation; it keeps counting and is never r
   assert.deepEqual(await reservations(db),[['disputed',300,null]]);
   assert.equal(await B.releaseReservation(db,lease,r.id),false);
   assert.equal(await B.committedBudget(db,'opportunity',r.period),300);
-  assert.equal(await B.resolveDispute(db,r.id,120),true,'only a real amount resolves it');
+  // Only a real amount with its source and actor resolves it; the evidence lands in the task's event log.
+  for(const bad of [120,{settledAmountCents:120,source:' ',actor:'operator'},{settledAmountCents:120,source:'Rechnung 7',actor:''},{settledAmountCents:-1,source:'Rechnung 7',actor:'operator'}])
+    assert.equal(await B.resolveDispute(db,r.id,bad),false,JSON.stringify(bad));
+  assert.equal(await B.committedBudget(db,'opportunity',r.period),300,'still disputed');
+  assert.equal(await B.resolveDispute(db,r.id,{settledAmountCents:120,source:'Replicate-Abrechnung 2026-10',actor:'operator'}),true,'only a real amount resolves it');
+  assert.equal(await B.resolveDispute(db,r.id,{settledAmountCents:0,source:'x',actor:'operator'}),false,'resolved only once');
+  const resolved=(await db.query("SELECT actor,detail FROM enterprise_task_events WHERE task_id=$1 AND kind='dispute_resolved'",[lease.id])).rows;
+  assert.deepEqual(resolved.map(e=>[e.actor,e.detail.reservationId,e.detail.settledAmountCents,e.detail.source]),[['operator',r.id,120,'Replicate-Abrechnung 2026-10']]);
   assert.equal(await B.committedBudget(db,'opportunity',r.period),120);
 
   // A still reserved row of a task that ended in outcome_unknown can never be released.
