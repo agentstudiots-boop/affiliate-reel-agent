@@ -101,7 +101,14 @@ test('unclear outcomes dispute the reservation; it keeps counting and is never r
   assert.deepEqual(await reservations(db),[['disputed',300,null]]);
   assert.equal(await B.releaseReservation(db,lease,r.id),false);
   assert.equal(await B.committedBudget(db,'opportunity',r.period),300);
-  assert.equal(await B.resolveDispute(db,r.id,120),true,'only a real amount resolves it');
+  // Only a real amount with its source and actor resolves it; the evidence lands in the task's event log.
+  for(const bad of [120,{settledAmountCents:120,source:' ',actor:'operator'},{settledAmountCents:120,source:'Rechnung 7',actor:''},{settledAmountCents:-1,source:'Rechnung 7',actor:'operator'}])
+    assert.equal(await B.resolveDispute(db,r.id,bad),false,JSON.stringify(bad));
+  assert.equal(await B.committedBudget(db,'opportunity',r.period),300,'still disputed');
+  assert.equal(await B.resolveDispute(db,r.id,{settledAmountCents:120,source:'Replicate-Abrechnung 2026-10',actor:'operator'}),true,'only a real amount resolves it');
+  assert.equal(await B.resolveDispute(db,r.id,{settledAmountCents:0,source:'x',actor:'operator'}),false,'resolved only once');
+  const resolved=(await db.query("SELECT actor,detail FROM enterprise_task_events WHERE task_id=$1 AND kind='dispute_resolved'",[lease.id])).rows;
+  assert.deepEqual(resolved.map(e=>[e.actor,e.detail.reservationId,e.detail.settledAmountCents,e.detail.source]),[['operator',r.id,120,'Replicate-Abrechnung 2026-10']]);
   assert.equal(await B.committedBudget(db,'opportunity',r.period),120);
 
   // A still reserved row of a task that ended in outcome_unknown can never be released.
