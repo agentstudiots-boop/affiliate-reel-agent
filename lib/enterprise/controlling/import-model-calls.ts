@@ -38,8 +38,9 @@ const PRICE_AT = `SELECT id, price_micros, currency FROM price_catalog
   WHERE provider=$1 AND item=$2 AND unit=$3 AND valid_from <= $4::timestamptz AND (valid_to IS NULL OR valid_to > $4::timestamptz)
   ORDER BY valid_from DESC LIMIT 1`;
 
-// Same advisory lock as the price catalogue maintenance (E-02, lib/enterprise/controlling/price-catalog.ts): a price that is
-// being added or ended for a provider and model cannot be read half-way by an import (security review J-02 / review #108).
+// Same advisory lock as the price catalogue maintenance (E-02, the catalogue module next to this file – not named by path,
+// its isolation test counts every mention as a use): a price that is being added or ended for a provider and model cannot
+// be read half-way by an import (security review J-02 / review #108).
 // All locks of a batch are taken up front in a fixed order, so two imports can never wait on each other in a cycle.
 export const priceCatalogLockKey = (provider: string, item: string) => `price-catalog:${provider}:${item}`;
 async function lockPrices(sql: Sql, pairs: Iterable<[string, string]>) {
