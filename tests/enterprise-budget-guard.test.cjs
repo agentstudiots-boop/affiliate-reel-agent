@@ -111,9 +111,17 @@ test('settled amounts count as spent, released ones free the budget, overspend s
   assert.equal(await B.committedBudget(db,'opportunity',a.period),650);
   assert.equal((await reserve(db,lease,351)).ok,false);
   assert.equal(await B.settleReservation(db,lease,b.id,1),false,'released cannot be settled');
-  // The task budget counts the real cost of what was settled: 650 of 5000 used, so 4351 no longer fits.
-  assert.equal((await reserve(db,lease,4351,100_000)).reason,'budget_exhausted');
-  assert.equal((await reserve(db,lease,4350,100_000)).ok,true,'exactly the rest fits');
+  await db.close();
+});
+
+test('the task budget counts settled reservations at their real cost (B-05, found by J-03)',async()=>{
+  const db=await pgliteDatabase();
+  await approveBudget(db,100_000);
+  const lease=await runningTask(db,{maxCostCents:5000});
+  const a=(await reserve(db,lease,400)).reservation;
+  assert.equal(await B.settleReservation(db,lease,a.id,650),true);
+  assert.equal((await reserve(db,lease,4351)).reason,'budget_exhausted','650 of 5000 used, 4351 no longer fits');
+  assert.equal((await reserve(db,lease,4350)).ok,true,'exactly the rest fits');
   await db.close();
 });
 
