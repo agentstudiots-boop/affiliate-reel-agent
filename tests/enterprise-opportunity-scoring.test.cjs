@@ -85,6 +85,8 @@ test('invalid assessments are rejected with a reason and never scored (AC-2, AC-
     ['revenueProfitPotential',{value:{type:'range',low:300,high:0,unit:'EUR'}},/Untergrenze/],
     ['runningCosts',{value:{type:'range',low:0,high:Number.POSITIVE_INFINITY,unit:'EUR'}},/nicht endlich/],
     ['investmentNeed',{value:{type:'number',amount:500,unit:''}},/Einheit fehlt/],
+    ['investmentNeed',{value:{type:'number',amount:-500,unit:'EUR'}},/nicht negativ/],
+    ['runningCosts',{value:{type:'range',low:-20,high:30,unit:'EUR/Monat'}},/nicht negativ/],
     ['automationLevel',{value:{type:'number',amount:120,unit:'%'}},/0 bis 100/],['legalRisks',{value:{type:'list',items:['']}},/Liste/],
     ['trendDuration',{kind:'fact',sources:[{reference:'https://example.org'}]},/Art fact nicht zulässig/],['targetAudience',{value:null},/Wert fehlt/],
   ];
