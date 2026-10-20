@@ -61,11 +61,17 @@
       "detail": "Review approve, 1 minor (K.O.-Richtung)",
       "commit": "5f7888f",
       "at": "2026-10-20T13:20:00Z"
+    },
+    {
+      "command": "Doku-Review (Nachprüfung)",
+      "result": "passed",
+      "detail": "approve, K.O.-Bedingungen je Frage",
+      "commit": "a96acb0",
+      "at": "2026-10-20T13:25:00Z"
     }
   ],
   "known_issues": [
-    "Rollenabweichung: laut 04 Phase I setzt GPT Work um und Claude prüft; hier Claude-zu-Claude (Umsetzung zweite Sitzung, Prüfung Hauptsitzung). Zusätzliche GPT-Prüfung durch Betreiber möglich.",
-    "minor offen: K.O.-Regel hat bei 4.4, 5.1, 5.2, 6.1 die falsche Richtung"
+    "Rollenabweichung: laut 04 Phase I setzt GPT Work um und Claude prüft; hier Claude-zu-Claude (Umsetzung zweite Sitzung, Prüfung Hauptsitzung). Zusätzliche GPT-Prüfung durch Betreiber möglich."
   ],
   "open_decisions": [],
   "pr": {
@@ -80,24 +86,22 @@
     "latest_review_file": null
   },
   "next_steps": [
-    "Session 2: minor beheben",
-    "Nachprüfung",
     "Merge durch Betreiber in architecture/ai-business-roadmap"
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-20T13:20:00Z",
+    "last_checkpoint_at": "2026-10-20T13:25:00Z",
     "checkpoint_reason": "other",
-    "last_commit": "5f7888f",
+    "last_commit": "a96acb0",
     "active_branch": "claude/I-02-data-legal-checklist",
-    "state_summary": "Draft-PR #111, Review approve mit 1 minor",
+    "state_summary": "Draft-PR #111 approve nach Nachprüfung",
     "decisions_made": [],
     "test_status": "Doku",
-    "next_action": "minor beheben"
+    "next_action": "Merge durch Betreiber"
   },
-  "revision": 2,
+  "revision": 3,
   "based_on_commit": "e15bdbc",
-  "updated_at": "2026-10-20T13:20:00Z",
+  "updated_at": "2026-10-20T13:25:00Z",
   "log": [
     {
       "at": "2026-10-20T13:15:00Z",
@@ -112,6 +116,13 @@
       "action": "review_received",
       "summary": "Review #111: approve, 1 minor (K.O.-Richtung); Rollenabweichung vermerkt",
       "commit": "5f7888f"
+    },
+    {
+      "at": "2026-10-20T13:25:00Z",
+      "actor": "claude-code",
+      "action": "approved",
+      "summary": "Nachprüfung #111 @a96acb0: approve",
+      "commit": "a96acb0"
     }
   ]
 }
