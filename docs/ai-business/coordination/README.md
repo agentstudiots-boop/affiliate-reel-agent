@@ -79,6 +79,13 @@ Planer/Implementierer/Prüfer zwischen zwei Systemen (ADR-15, ADR-16) und das Le
   (die Claude-Routine wurde am 19.10.2026 gelöscht), kein Validator, keine neuen Koordinationswerkzeuge.
 - Unverändert: kein Merge durch Claude, keine Produktionsänderung, keine Schalter, keine Secrets, keine kostenpflichtigen Aufrufe, keine zusätzlichen Credits.
 
+## Stand 20.10.2026, abends: geprüfter Merge-Leitfaden
+
+Alle offenen Roadmap-PRs wurden lokal auf `main` zusammengeführt und in Stufen voll geprüft. **Verbindliche Reihenfolge für den Betreiber:
+[`MERGE_GUIDE.md`](MERGE_GUIDE.md).** Sie ersetzt die Spalte „Reihenfolge“ der Tabelle unten. Zwei Fehler, die erst im Zusammenspiel
+auftreten, sind dort beschrieben: E-02-Isolationstest gegen einen J-02-Kommentar (behoben in #112 `b280bb5`) und E-06-Registertest
+gegen #94 (Schritt 8). Endstand: 849/849 Tests, lint, build und typecheck grün.
+
 ## Stand 19.10.2026, nachmittags: offene Draft-PRs und Merge-Reihenfolge
 
 Zweite Claude-Code-Sitzung (`session_01Srrz6J98VFXDsVBnE82VPC`) prüft PRs als **Zweitsitzung desselben Modells** – hilfreich, aber kein
