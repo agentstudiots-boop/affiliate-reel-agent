@@ -33,8 +33,16 @@ async function healthOf(id: DepartmentId, connected: ConnectedDepartment, db: Da
   } catch { return null; }
 }
 
+// Never throws: an unexpected error leaves the whole enterprise level without values instead of breaking the Command Center.
 export async function readEnterpriseView(now = new Date(), open: () => Database = getDatabase,
   connected: Partial<Record<DepartmentId, ConnectedDepartment>> = CONNECTED_DEPARTMENTS): Promise<EnterpriseView> {
+  try { return await collect(now, open, connected); }
+  catch {
+    return buildEnterpriseView({ now, health: null, tasks: null, decisions: null, controlling: null, unavailableReason: "Unternehmensebene nicht lesbar (unerwarteter Fehler)" });
+  }
+}
+
+async function collect(now: Date, open: () => Database, connected: Partial<Record<DepartmentId, ConnectedDepartment>>): Promise<EnterpriseView> {
   let db: Database;
   try { db = open(); }
   catch (error) {
