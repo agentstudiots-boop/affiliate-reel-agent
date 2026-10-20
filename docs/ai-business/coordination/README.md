@@ -113,9 +113,9 @@ Kein PR ist eingebunden oder aktiviert: keine Schalter gesetzt, nichts in `verce
 | 10 | #103 | H-04/H-05 Ansicht „Unternehmen“ (2D, Detailpanel je Abteilung) | #102 | approve · visuelle Abnahme Betreiber |
 | 1 | #101 | C-04 PR-Vorlage (zweite Sitzung) | – | approve (2 optionale Hinweise; nach #95 mergen) |
 | 8 | #107 | E-04 manuelle Belege/Erlöse/CSV-Import (zweite Sitzung, nicht eingebunden) | #100 | approve (nach Nachprüfung `a70442d`) · **OD-E04-1** PartnerNet-Bericht/Kopfzeile |
-| 11 | #109 | H-03 Planetenebene in der 3D-Szene (nur lesend) | #103 | approve (minor+nit umgesetzt `0a9c683`, Nachprüfung offen) · visuelle Abnahme Betreiber |
+| 11 | #109 | H-03 Planetenebene in der 3D-Szene (nur lesend) | #103 | approve (nach Nachprüfung `0a9c683`) · visuelle Abnahme Betreiber |
 | 9 | #108 | E-02 Preiskatalog-Pflege (zweite Sitzung, nicht eingebunden) | #107 | approve (nach Nachprüfung `f05623f`) |
-| 12 | #110 | D-06 Entwicklungsstand aus den Übergabedateien (nur ID/Phase/Status) | #109 | approve (minor+nit umgesetzt `9f7e609`, Nachprüfung offen) · wirkt erst nach #82 |
+| 12 | #110 | D-06 Entwicklungsstand aus den Übergabedateien (nur ID/Phase/Status) | #109 | approve (nach Nachprüfung `9f7e609`) · wirkt erst nach #82 |
 
 **J-02 Sicherheitsreview (Claude-Hälfte, 20.10.):** 0 kritisch/hoch, 1 mittel, 4 niedrig – alle behoben, Details `tasks/J-02/findings-claude.md`.
 Volle Prüfung grün auf J-03 `e709752` (754/754) und H-04 `782f6bd` (784/784).
