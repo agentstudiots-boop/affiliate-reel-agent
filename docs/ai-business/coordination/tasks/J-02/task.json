@@ -99,13 +99,17 @@
     "Info-Hinweise für die spätere Einbindung in findings-claude.md"
   ],
   "open_decisions": [
-    "OD-H01-1: Unternehmensebene im Command Center ohne eigenen Schalter (nur lesend, hinter Login)"
+    {
+      "id": "OD-H01-1",
+      "question": "Unternehmensebene im Command Center ohne eigenen Schalter lassen (nur lesend, hinter Login)?",
+      "owner": "operator"
+    }
   ],
   "pr": {
     "url": null,
     "state": "none",
     "merge_commit": null,
-    "ci": "n/a"
+    "ci": "unknown"
   },
   "approval": {
     "reviewer": "pending",
@@ -134,7 +138,7 @@
     {
       "at": "2026-10-20T06:45:00Z",
       "actor": "claude-code",
-      "action": "review_done",
+      "action": "fixed",
       "summary": "Claude-Hälfte J-02: 0 kritisch/hoch, 1 mittel, 4 niedrig – alle behoben",
       "commit": "782f6bd"
     }
