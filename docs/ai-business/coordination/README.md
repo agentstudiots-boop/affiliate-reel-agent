@@ -112,6 +112,7 @@ Kein PR ist eingebunden oder aktiviert: keine Schalter gesetzt, nichts in `verce
 | 10 | #106 | J-03 Kostenobergrenzen unter Retries (nur Tests) | #105 | Review offen |
 | 10 | #103 | H-04/H-05 Ansicht „Unternehmen“ (2D, Detailpanel je Abteilung) | #102 | approve · visuelle Abnahme Betreiber |
 | 1 | #101 | C-04 PR-Vorlage (zweite Sitzung) | – | approve (2 optionale Hinweise; nach #95 mergen) |
+| 8 | #107 | E-04 manuelle Belege/Erlöse/CSV-Import (zweite Sitzung, nicht eingebunden) | #100 | approve (2 minor offen) · **OD-E04-1** PartnerNet-Bericht/Kopfzeile |
 
 **J-02 Sicherheitsreview (Claude-Hälfte, 20.10.):** 0 kritisch/hoch, 1 mittel, 4 niedrig – alle behoben, Details `tasks/J-02/findings-claude.md`.
 Volle Prüfung grün auf J-03 `e709752` (754/754) und H-04 `782f6bd` (784/784).
@@ -125,7 +126,7 @@ Migration 041 (Merge von #96), öffentliche Route `/api/cron/executive-cycle` (M
 `EXECUTIVE_ENABLED=true` (eigene spätere Änderung), Einbindung und Modellbudget des Planers (eigene spätere Änderung). F-03 (Kosten) bleibt angehalten.
 
 **Offene Betreiberentscheidungen:** BF-16 (ADR-01, ADR-13…17), Merge #81/#82 (G0), Freigabe der Migrationen 039, 040, 041 (je eigener Merge),
-OD-B07-1 öffentliche Cron-Route, OD-H01-1 Unternehmensebene im Command Center ohne eigenen Schalter (nur lesend, hinter Login), BF-14 Hosting-Tarif, BF-15 eigene GitHub-Identität, BF-05 Sichtbarkeit des Repos.
+OD-B07-1 öffentliche Cron-Route, OD-H01-1 Unternehmensebene im Command Center ohne eigenen Schalter (nur lesend, hinter Login), OD-E04-1 PartnerNet-Bericht und Schlüsselspalten, BF-14 Hosting-Tarif, BF-15 eigene GitHub-Identität, BF-05 Sichtbarkeit des Repos.
 
 ## Runde 2 (18.10.2026, A-01): was sich an der bestehenden Struktur ändert
 
