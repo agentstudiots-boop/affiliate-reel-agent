@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "task_id": "E-04",
+  "title": "Manuelle Belege und Erlöse (Kosten, Erlöse, PartnerNet-CSV) – nur Code und Tests",
+  "module": "enterprise-controlling",
+  "phase": "E",
+  "status": "in_progress",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "claude-code",
+  "base_commit": "43873e3",
+  "branch": "claude/E-04-manual-entries",
+  "depends_on": [
+    "E-01",
+    "E-07"
+  ],
+  "claims": {
+    "paths": [
+      "lib/enterprise/controlling/manual-entries.ts",
+      "tests/controlling-manual-entries.test.cjs"
+    ],
+    "hot_files": [],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "recordManualCost/recordManualRevenue schreiben idempotent (UNIQUE source, source_ref); measured nur mit Belegreferenz; Abteilung nur aus dem Register",
+      "verification": "PGlite-Tests",
+      "met": false
+    },
+    {
+      "id": "AC-2",
+      "criterion": "PartnerNet-CSV: Spaltenzuordnung über Kopfzeile, unbekannte Spalten/Formate abgelehnt, Dezimalkomma, nur EUR; Ergebnis je Zeile (übernommen/Duplikat/abgelehnt mit Grund)",
+      "verification": "Tests mit synthetischer CSV",
+      "met": false
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Nicht eingebunden: keine Route, UI, Cron, Migration; keine echten Geschäftsdaten im Repo",
+      "verification": "Isolationstest",
+      "met": false
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 400,
+    "notes": "Zweite Claude-Sitzung, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [],
+  "implemented": [],
+  "tests": [],
+  "known_issues": [
+    "Falls Migration 040 nicht reicht: melden, nicht ändern"
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": null,
+    "state": "none",
+    "merge_commit": null,
+    "ci": "unknown"
+  },
+  "approval": {
+    "reviewer": "pending",
+    "operator": "pending",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Umsetzung durch Session 2",
+    "Review durch Claude-Hauptsitzung"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-20T07:25:00Z",
+    "checkpoint_reason": "other",
+    "last_commit": "43873e3",
+    "active_branch": "claude/E-04-manual-entries",
+    "state_summary": "von Session 2 übernommen (Freigabe durch deren Betreiber)",
+    "decisions_made": [],
+    "test_status": "–",
+    "next_action": "Umsetzung"
+  },
+  "revision": 1,
+  "based_on_commit": "563e398",
+  "updated_at": "2026-10-20T07:25:00Z",
+  "log": [
+    {
+      "at": "2026-10-20T07:25:00Z",
+      "actor": "claude-code",
+      "action": "created",
+      "summary": "Aufgabe angelegt, Umsetzung durch zweite Claude-Sitzung",
+      "commit": "563e398"
+    }
+  ]
+}
