@@ -71,7 +71,10 @@ export async function reserveBudget(db: Database, lease: LeaseRef, request: { am
     const task = await lockRunning(sql, lease);
     if (!task) return { ok: false as const, reason: "task_not_running" as const, detail: "Aufgabe nicht (mehr) unter dieser Lease in Bearbeitung" };
     const department = String(task.department);
-    const already = (await sql.query("SELECT coalesce(sum(amount_cents),0)::bigint AS cents FROM budget_reservations WHERE task_id=$1 AND status<>'released'", [lease.id])).rows[0];
+    // All attempts of the task count at their real cost: settled reservations at the settled amount (which may exceed
+    // the reservation), open and disputed ones at the reserved amount.
+    const already = (await sql.query(`SELECT coalesce(sum(CASE WHEN status='settled' THEN settled_amount_cents ELSE amount_cents END),0)::bigint AS cents
+      FROM budget_reservations WHERE task_id=$1 AND status<>'released'`, [lease.id])).rows[0];
     if (Number(already?.cents ?? 0) + request.amountCents > Number(task.max_cost_cents))
       return { ok: false as const, reason: "budget_exhausted" as const, detail: `Aufgabenbudget ${task.max_cost_cents} Cent überschritten` };
     const period = String((await sql.query(`SELECT ${BERLIN_PERIOD} AS period`)).rows[0]?.period);
