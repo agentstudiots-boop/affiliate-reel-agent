@@ -63,6 +63,13 @@ test('preview/development: the runtime guard blocks the database and the view sa
   assert.match(view.reason,/Runtime-Guard/);
 });
 
+test('an unexpected error leaves the enterprise level empty instead of breaking the Command Center (review #102)',async()=>{
+  const broken={get affiliate(){throw new Error('kaputt');}};
+  const view=await readEnterpriseView(NOW,()=>({}),broken);
+  assert.deepEqual([view.available,view.parts.health,view.departments.length>0],[false,'unavailable',true]);
+  assert.match(view.reason,/unerwarteter Fehler/);
+});
+
 test('migrated database: real counts, affiliate health from the adapter, controlling line attached (AC-5)',async()=>{
   const db=await pgliteDatabase();
   const now=new Date();
