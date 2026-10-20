@@ -36,7 +36,7 @@ function DevelopmentSection({ development }: { development: DevelopmentView | un
   return <>
     <h5>Entwicklungsstand (Übergabedateien, Stand des Builds)</h5>
     {!development ? <p className="muted">{NO_DATA}</p>
-      : !development.available ? <p className="muted">{development.reason ?? NO_DATA}</p>
+      : !development.available ? <p className="muted">{development.reason ?? NO_DATA}{development.skipped > 0 ? ` · ${development.skipped} Datei(en) nicht lesbar und ausgelassen.` : ""}</p>
       : <>
         <ul>{Object.entries(development.byStatus).map(([status, count]) => <li key={status}>{DEVELOPMENT_LABEL[status] ?? status}: <b>{count}</b></li>)}</ul>
         <p className="muted">{development.tasks.map(task => `${task.id} ${DEVELOPMENT_LABEL[task.status] ?? task.status}`).join(" · ")}</p>

@@ -53,8 +53,10 @@ export function readDevelopmentView(dir = path.join(process.cwd(), "docs", "ai-b
   try {
     if (!existsSync(dir)) return buildDevelopmentView(null);
     const files: HandOverFile[] = [];
-    let skipped = 0;
-    for (const folder of readdirSync(dir).sort().slice(0, MAX_FILES)) {
+    const folders = readdirSync(dir).sort();
+    // Folders beyond the limit are not read but counted, so the view never hides that something is missing.
+    let skipped = Math.max(0, folders.length - MAX_FILES);
+    for (const folder of folders.slice(0, MAX_FILES)) {
       const file = path.join(dir, folder, "task.json");
       if (!existsSync(file) || statSync(file).size > MAX_BYTES) { skipped++; continue; }
       files.push({ folder, content: readFileSync(file, "utf8") });

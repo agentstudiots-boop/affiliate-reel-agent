@@ -39,6 +39,11 @@ test('reading the folder: missing folder, missing or oversized files, never thro
   const view=readDevelopmentView(dir);
   assert.deepEqual(view.tasks.map(t=>t.id),['B-01']);
   assert.equal(view.skipped,2,'missing and oversized file');
+  // More folders than the limit: the rest is counted as skipped, not silently dropped (review #110).
+  const many=Object.fromEntries(Array.from({length:203},(_,i)=>{const id=`B-${String(i%100).padStart(2,'0')}`;return [`${String(i).padStart(3,'0')}-${id}`,file(id,'merged').content];}));
+  const big=readDevelopmentView(tmp(many));
+  assert.equal(big.tasks.length+big.skipped,203,'every folder is either read or counted');
+  assert.ok(big.skipped>=3);
   const notADir=path.join(dir,'B-01','task.json');
   assert.equal(readDevelopmentView(notADir).available,false);
 });
@@ -61,6 +66,7 @@ test('wired read-only into /api/architecture, traced into the deployment, shown 
   assert.match(engineering,/wartet auf Review: <b>1<\/b>/);
   assert.match(engineering,/B-03 gemergt · H-03 wartet auf Review/);
   assert.match(render('engineering',buildDevelopmentView(null)),/Übergabedateien nicht im Build enthalten/);
+  assert.match(render('engineering',buildDevelopmentView([{folder:'B-01',content:'{kaputt'}])),/keine lesbare Übergabedatei · 1 Datei\(en\) nicht lesbar und ausgelassen/,'skipped files are shown even when nothing is readable');
   assert.match(render('engineering',undefined),/Entwicklungsstand[^]*keine Daten/);
   assert.doesNotMatch(render('affiliate',development),/Entwicklungsstand/);
 });
