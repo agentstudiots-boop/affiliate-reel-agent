@@ -8,17 +8,19 @@
 import { z } from "zod";
 import { levelFor, levelRank, requiresDecision, PERMISSION_LEVELS, type PermissionLevel } from "./policy";
 import { DEPARTMENT_IDS, REGISTRY, department, taskDefinition, type DepartmentId, type Registry } from "./registry";
-import type { ClassifiedStep } from "./plan";
+import { MAX_MODEL_CALLS, type ClassifiedStep } from "./plan";
 
 export const TASK_SOURCES = ["operator", "executive", "cron"] as const;
 export type TaskSource = (typeof TASK_SOURCES)[number];
 
 const isoTime = z.string().datetime({ offset: true });
 const source = z.string().refine(value => value.trim().length > 0, "Quelle leer");
-// Bounds (security review J-02): same model call limit as MAX_MODEL_CALLS in ./plan (a test keeps both equal), amounts only
-// as safe integers, at most 100 evidence items, and a task result of at most 64 KiB as JSON.
-export const MAX_MODEL_CALLS = 1000;
+// Bounds (security review J-02): the model call limit of ./plan, amounts only as safe integers, at most 100 evidence items and
+// a task result of at most 64 KiB as JSON. Limits on a result are checked after parsing, so a result that breaks them still
+// reports its usage and its reservations settle at the real amount (review #112); an over-long failure reason is shortened.
+export { MAX_MODEL_CALLS };
 export const MAX_EVIDENCE = 100;
+export const MAX_REASON_CHARS = 2000;
 export const MAX_OUTPUT_BYTES = 64 * 1024;
 const count = z.number().int().nonnegative().max(MAX_MODEL_CALLS);
 const amount = z.number().int().nonnegative().refine(Number.isSafeInteger, "außerhalb des sicheren Zahlenbereichs");
@@ -49,12 +51,12 @@ export const taskResultSchema = z.discriminatedUnion("status", [
     output: z.record(z.string(), z.unknown()),
     usedCostCents: amount,
     usedModelCalls: z.number().int().nonnegative().refine(Number.isSafeInteger, "außerhalb des sicheren Zahlenbereichs"),
-    evidence: z.array(z.object({ claim: z.string().min(1), kind: z.enum(["fact", "assumption", "forecast"]), source: source.optional() })).max(MAX_EVIDENCE).default([]),
+    evidence: z.array(z.object({ claim: z.string().min(1), kind: z.enum(["fact", "assumption", "forecast"]), source: source.optional() })).default([]),
   }),
   z.object({
     status: z.literal("failed"),
     failureClass: z.enum(FAILURE_CLASSES),
-    reason: z.string().min(1).max(2000),
+    reason: z.string().min(1).transform(text => text.length > MAX_REASON_CHARS ? `${text.slice(0, MAX_REASON_CHARS - 1)}…` : text),
     usedCostCents: amount,
     usedModelCalls: z.number().int().nonnegative().refine(Number.isSafeInteger, "außerhalb des sicheren Zahlenbereichs"),
   }),
@@ -150,6 +152,7 @@ export function checkResult(raw: unknown, envelope: TaskEnvelope): { ok: true; r
   if (result.usedModelCalls > envelope.budget.maxModelCalls) return { ok: false, reason: `Modellaufrufe ${result.usedModelCalls} > Budget ${envelope.budget.maxModelCalls}`, usage };
   if (result.status === "succeeded") {
     // A result too large for the ledger is rejected with its usage, so reservations still settle at the real amount.
+    if (result.evidence.length > MAX_EVIDENCE) return { ok: false, reason: `mehr als ${MAX_EVIDENCE} Belege`, usage };
     if (Buffer.byteLength(JSON.stringify({ output: result.output, evidence: result.evidence }), "utf8") > MAX_OUTPUT_BYTES)
       return { ok: false, reason: `Ergebnis größer als ${MAX_OUTPUT_BYTES} Byte`, usage };
     const index = result.evidence.findIndex(item => item.kind === "fact" && !item.source);
