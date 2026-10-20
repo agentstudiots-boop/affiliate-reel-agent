@@ -6,7 +6,7 @@ import type { DepartmentView, EnterpriseView } from "@/lib/architecture/enterpri
 // Enterprise level of the Command Center in 2D (tasks H-04/H-05): one card per department of the executive register and a
 // detail panel. Pure presentation of the `enterprise` contract (H-01): every value is shown with its source, and a part
 // without evidence says "keine Daten" – nothing is filled in on the client. Buttons are plain, so the view works without
-// WebGL and with the keyboard (Tab, Enter/Leertaste).
+// WebGL and with the keyboard (Tab, Enter/Leertaste). The 3D planets (H-03) reuse the summary and the detail panel.
 
 type DepartmentId = DepartmentView["id"];
 type Health = NonNullable<DepartmentView["health"]>;
@@ -46,7 +46,7 @@ function tasksText(tasks: DepartmentView["tasks"]) {
   return `${tasks.total} gesamt · ${open} offen`;
 }
 
-function DepartmentDetail({ department }: { department: DepartmentView }) {
+export function DepartmentDetail({ department }: { department: DepartmentView }) {
   const health = department.health;
   return <div data-testid="cc-enterprise-detail">
     <h4>{department.label}</h4>
@@ -82,27 +82,41 @@ function DepartmentDetail({ department }: { department: DepartmentView }) {
   </div>;
 }
 
-export function EnterprisePanel({ view, initial = null }: { view: EnterpriseView | undefined; initial?: DepartmentId | null }) {
-  const [selected, setSelected] = useState<DepartmentId | null>(initial);
-  if (!view) return <p className="muted" role="status">Unternehmensebene wird von diesem Server noch nicht geliefert.</p>;
-  const current = view.departments.find(item => item.id === selected) ?? null;
+// Header of the enterprise level: as-of time, which parts were readable, why nothing is shown, unknown departments.
+export function EnterpriseSummary({ view }: { view: EnterpriseView }) {
   const parts: [string, string][] = [["Zustand", view.parts.health], ["Aufgabenbuch", view.parts.tasks], ["Entscheidungen", view.parts.decisions], ["Controlling", view.parts.controlling]];
-  return <div data-testid="cc-enterprise">
+  return <>
     <p className="muted">Unternehmensebene, nur lesend · Stand {time(view.generatedAt)} · {parts.map(([label, state]) => `${label}: ${state === "ok" ? "lesbar" : "nicht verfügbar"}`).join(" · ")}</p>
     {!view.available && <p role="status" className="muted">{view.reason ?? "Keine Nachweise lesbar."} Alle Abteilungen werden ohne Werte gezeigt.</p>}
     {view.unknownDepartments.length > 0 && <p role="alert" className="error">Einträge für unbekannte Abteilungen: {view.unknownDepartments.map(item => `${item.department} (${item.tasks} Aufgaben, ${item.pendingDecisions} Vorlagen)`).join(", ")}</p>}
+  </>;
+}
+
+export const DETAIL_HINT = "Abteilung wählen, um Zustand, Nachweise, Aufgaben, Entscheidungen, Kosten und Agenten zu sehen.";
+
+// Selection is either kept here (initial) or controlled by the Command Center (selected/onSelect), so switching between the
+// 2D cards and the 3D planets keeps the chosen department.
+export function EnterprisePanel({ view, initial = null, selected, onSelect }: { view: EnterpriseView | undefined; initial?: DepartmentId | null;
+  selected?: DepartmentId | null; onSelect?: (id: DepartmentId | null) => void }) {
+  const [own, setOwn] = useState<DepartmentId | null>(initial);
+  const current = selected !== undefined ? selected : own;
+  const choose = (id: DepartmentId | null) => { if (onSelect) onSelect(id); else setOwn(id); };
+  if (!view) return <p className="muted" role="status">Unternehmensebene wird von diesem Server noch nicht geliefert.</p>;
+  const department = view.departments.find(item => item.id === current) ?? null;
+  return <div data-testid="cc-enterprise">
+    <EnterpriseSummary view={view} />
     <div className="ccBody">
       <div className="ccCards" role="list" aria-label="Abteilungen" style={{ alignContent: "start", padding: 0 }}>
-        {view.departments.map(department => <div role="listitem" key={department.id}>
-          <button type="button" className="ccCard" aria-pressed={selected === department.id} onClick={() => setSelected(selected === department.id ? null : department.id)}>
-            <span className="ccCardHead"><b>{department.label}</b><HealthChip department={department} /></span>
-            <small>Aufgaben: {tasksText(department.tasks)}</small>
-            <small>Offene Entscheidungen: {department.decisions ? department.decisions.pending : NO_DATA}</small>
-            <small>Kosten gemessen: {moneyText(department.controlling?.costs?.measured)}</small>
+        {view.departments.map(item => <div role="listitem" key={item.id}>
+          <button type="button" className="ccCard" aria-pressed={current === item.id} onClick={() => choose(current === item.id ? null : item.id)}>
+            <span className="ccCardHead"><b>{item.label}</b><HealthChip department={item} /></span>
+            <small>Aufgaben: {tasksText(item.tasks)}</small>
+            <small>Offene Entscheidungen: {item.decisions ? item.decisions.pending : NO_DATA}</small>
+            <small>Kosten gemessen: {moneyText(item.controlling?.costs?.measured)}</small>
           </button></div>)}
       </div>
       <aside className="ccDetail" aria-live="polite">
-        {current ? <DepartmentDetail department={current} /> : <p className="muted">Abteilung wählen, um Zustand, Nachweise, Aufgaben, Entscheidungen, Kosten und Agenten zu sehen.</p>}
+        {department ? <DepartmentDetail department={department} /> : <p className="muted">{DETAIL_HINT}</p>}
       </aside>
     </div>
   </div>;

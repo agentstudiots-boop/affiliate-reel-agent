@@ -176,10 +176,76 @@ test('2D detail panel: health with sources, task counts, open decisions, costs a
 test('Command Center offers the enterprise view without WebGL and reads nothing itself (AC-11)',()=>{
   const center=fs.readFileSync('app/architecture/command-center.tsx','utf8');
   assert.match(center,/setMode\("enterprise"\)[^]*>Unternehmen<\/button>/);
-  assert.match(center,/mode === "enterprise" && <EnterprisePanel view=\{data\.enterprise\} \/>/);
-  assert.match(center,/mode !== "profiles" && mode !== "enterprise", resetToken/,'the 3D scene pauses in the enterprise view');
+  // Without WebGL (or without enterprise data) the 2D cards are shown; with WebGL the planets use the same canvas (H-03).
+  assert.match(center,/mode === "enterprise" && !planetsShown && <EnterprisePanel view=\{data\.enterprise\} selected=\{department\} onSelect=\{setDepartment\} \/>/);
+  assert.match(center,/const planetsShown = enterprise3d && showScene;/);
+  assert.match(center,/const enterprise3d = mode === "enterprise" && !!data\?\.enterprise;/);
+  assert.match(center,/mode !== "profiles" && \(mode !== "enterprise" \|\| enterprise3d\), resetToken/,'the scene only runs in the enterprise view when there is data');
   const panel=fs.readFileSync('app/architecture/enterprise-panel.tsx','utf8');
   assert.doesNotMatch(panel,/fetch\(|process\.env|memory\/db/);
   assert.doesNotMatch(panel,/^import \{[^}]*\} from "@\/lib\//m,'no value import from lib/: no server code in the client bundle');
   assert.match(panel,/^import type \{ DepartmentView, EnterpriseView \} from "@\/lib\/architecture\/enterprise";$/m);
+});
+
+// ---------- H-03: enterprise level as planets in the 3D scene ----------
+const P=require('../.test-build/app/architecture/enterprise-planets');
+
+test('planets: Executive in the centre, the other departments on one orbit, fixed size, state in words (H-03 AC-1)',()=>{
+  const view=buildEnterpriseView({now:NOW,health:{affiliate:health('affiliate','degraded')},
+    tasks:[{department:'affiliate',status:'succeeded',count:500,lastAt:NOW.toISOString()}],decisions:[{department:'affiliate',pending:2,nextExpiry:null}],controlling:null});
+  const planets=P.planets(view);
+  assert.deepEqual(planets.map(p=>p.id),view.departments.map(d=>d.id));
+  const byId=Object.fromEntries(planets.map(p=>[p.id,p]));
+  assert.deepEqual(byId.executive.position,[0,0,0]);
+  const ring=planets.filter(p=>p.id!=='executive');
+  for(const p of ring)assert.ok(Math.abs(Math.hypot(p.position[0],p.position[2])-P.PLANET_ORBIT)<0.01,p.id);
+  assert.equal(new Set(ring.map(p=>p.position.join())).size,ring.length,'no two planets in one place');
+  assert.equal(new Set(ring.map(p=>p.radius)).size,1,'size never depends on activity (500 tasks change nothing)');
+  assert.equal(byId.affiliate.status,'Eingeschränkt');
+  assert.equal(byId.affiliate.pendingDecisions,2);
+  assert.match(byId.affiliate.sub,/Eingeschränkt · 2 Entscheidungen offen/);
+  assert.equal(byId.affiliate.wireframe,false);
+  for(const id of ['executive','controlling','opportunity','engineering']){
+    assert.equal(byId[id].wireframe,true,id);
+    assert.equal(byId[id].status,'nicht angeschlossen',id);
+  }
+  assert.match(byId.engineering.plain,/arbeitet außerhalb der App/);
+  assert.equal(byId.controlling.pendingDecisions,0);
+});
+
+test('planets: without evidence nothing is invented; unreadable report and missing ledger stay visible (H-03 AC-2)',()=>{
+  const empty=buildEnterpriseView({now:NOW,health:null,tasks:null,decisions:null,controlling:null});
+  for(const p of P.planets(empty)){
+    assert.equal(p.pendingDecisions,null,p.id);
+    assert.doesNotMatch(p.sub,/In Ordnung|offen/,p.id);
+  }
+  const unreadable=P.planets(buildEnterpriseView({now:NOW,health:{affiliate:null},tasks:null,decisions:null,controlling:null}));
+  assert.equal(unreadable.find(p=>p.id==='affiliate').status,'Bericht nicht lesbar');
+  assert.deepEqual(P.planets(undefined),[]);
+});
+
+test('planets: camera goals keep the orbit in view and look at a planet from outside (H-03 AC-3)',()=>{
+  for(const aspect of [0.5,1,1.8]){
+    const goal=P.enterpriseOverviewGoal(aspect);
+    const distance=Math.hypot(...goal.position);
+    const halfWidth=Math.tan(45*Math.PI/360)*aspect*distance;
+    assert.ok(halfWidth>=P.PLANET_ORBIT||distance>=79,`aspect ${aspect}: orbit fits`);
+  }
+  const position=[P.PLANET_ORBIT,0,0];
+  const goal=P.planetGoal(position,1.6);
+  assert.deepEqual(goal.target,position);
+  assert.ok(goal.position[0]>P.PLANET_ORBIT,'camera outside the orbit');
+});
+
+test('2D panel can be controlled by the Command Center; planets module reads nothing (H-03 AC-4)',()=>{
+  const view=buildEnterpriseView({now:NOW,health:null,tasks:null,decisions:null,controlling:null});
+  const out=renderToStaticMarkup(React.createElement(EnterprisePanel,{view,selected:'engineering',onSelect:()=>{}}));
+  assert.match(out,/data-testid="cc-enterprise-detail"/);
+  assert.match(out,/arbeitet außerhalb der App/);
+  const source=fs.readFileSync('app/architecture/enterprise-planets.ts','utf8');
+  assert.deepEqual([...source.matchAll(/^import (type )?\{[^}]*\} from "([^"]+)";$/gm)].map(m=>`${m[1]?'type ':''}${m[2]}`).sort(),
+    ['./enterprise-panel','type @/lib/architecture/enterprise']);
+  assert.doesNotMatch(source,/fetch\(|process\.env|Date\.now|new Date|Math\.random/);
+  const scene=fs.readFileSync('app/architecture/scene.tsx','utf8');
+  assert.match(scene,/if \(mode === "enterprise"\) return/);
 });

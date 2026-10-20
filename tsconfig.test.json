@@ -58,6 +58,7 @@
     "lib/trendsetter/**/*.ts",
     "lib/architecture/**/*.ts",
     "app/architecture/enterprise-panel.tsx",
+    "app/architecture/enterprise-planets.ts",
     "lib/tavily.ts"
   ]
 }

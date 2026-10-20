@@ -8,12 +8,16 @@ import { CAMERA_FOV, CLUSTERS, HUB_RADIUS, clusterGoal, hubPosition, labelSizing
 import type { ClusterId, ComponentKind, OperationalStatus } from "@/lib/architecture/model";
 import { processSegments } from "@/lib/architecture/process";
 import type { ClientNode, Hover, Payload, Selection } from "@/app/architecture/types";
+import { enterpriseOverviewGoal, planetGoal, planetLabelScale, planets, PLANET_ORBIT, type DepartmentId, type Planet } from "@/app/architecture/enterprise-planets";
 
 export type SceneProps = {
   data: Payload;
   selection: Selection;
   expanded: ClusterId | null;
-  mode: "architecture" | "process";
+  mode: "architecture" | "process" | "enterprise";
+  /** Enterprise level (H-03): the selected department and how to change it. */
+  department?: DepartmentId | null;
+  onSelectDepartment?: (id: DepartmentId | null) => void;
   highlightIds: Set<string>;
   reducedMotion: boolean;
   /** false while the dialog is closed or the 2D view is shown: the render loop stops. */
@@ -167,6 +171,47 @@ function CameraRig({ goal, goalKey, reducedMotion }: { goal: CameraGoal; goalKey
   return null;
 }
 
+// One department of the register as a planet; size and place are fixed, state is colour + words, open decisions a ring.
+function PlanetNode({ planet, selected, dim, scale, reducedMotion, onSelect, onHover }: { planet: Planet; selected: boolean; dim: boolean; scale: number; reducedMotion: boolean;
+  onSelect: (id: DepartmentId) => void; onHover: SceneProps["onHover"] }) {
+  const ref = useRef<Mesh>(null);
+  useFrame((_, delta) => { if (ref.current && !reducedMotion && selected) ref.current.rotation.y += delta * 0.5; });
+  return <group position={planet.position}>
+    <mesh ref={ref} scale={selected ? 1.18 : 1} onClick={event => { event.stopPropagation(); onSelect(planet.id); }} {...hoverHandlers(`department:${planet.id}`, planet.label, planet.plain, onHover)}>
+      <sphereGeometry args={[planet.radius, 40, 40]} />
+      <meshStandardMaterial color={planet.color} emissive={planet.color} emissiveIntensity={selected ? 0.85 : 0.35} roughness={0.45} transparent opacity={dim ? 0.3 : 0.95} wireframe={planet.wireframe} />
+    </mesh>
+    {!!planet.pendingDecisions && <mesh rotation={[Math.PI / 2.2, 0, 0]}><torusGeometry args={[planet.radius + 0.55, 0.07, 10, 64]} /><meshBasicMaterial color="#ffb020" transparent opacity={dim ? 0.25 : 0.9} /></mesh>}
+    {selected && <mesh rotation={[Math.PI / 2, 0, 0]}><ringGeometry args={[planet.radius + 0.9, planet.radius + 1.02, 64]} /><meshBasicMaterial color="#ffffff" transparent opacity={0.8} side={2} /></mesh>}
+    <Label title={planet.label} sub={planet.sub} subColor={planet.color} y={planet.radius + 0.9 + 0.6 * scale} height={0.8 * scale} dim={dim} />
+  </group>;
+}
+
+function EnterpriseLayer(props: SceneProps) {
+  const { data, department = null, reducedMotion, resetToken } = props;
+  const size = useThree(state => state.size);
+  const aspect = size.width / Math.max(1, size.height);
+  const scale = planetLabelScale(aspect, size.height);
+  const onHover: SceneProps["onHover"] = hover => props.onHover(hover ? { ...hover, x: Math.max(8, Math.min(hover.x + 14, size.width - 260)), y: Math.max(8, Math.min(hover.y + 14, size.height - 90)) } : null);
+  const items = useMemo(() => planets(data.enterprise), [data.enterprise]);
+  const centre = items.find(planet => planet.position.every(value => value === 0));
+  const chosen = items.find(planet => planet.id === department);
+  const goal = chosen && chosen !== centre ? planetGoal(chosen.position, aspect) : enterpriseOverviewGoal(aspect);
+  const goalKey = `${goal.position.join(",")}|${goal.target.join(",")}|${resetToken}`;
+  const orbit = useMemo(() => Array.from({ length: 129 }, (_, i) => { const a = (i / 128) * Math.PI * 2; return [Math.cos(a) * PLANET_ORBIT, 0, Math.sin(a) * PLANET_ORBIT] as Vec3; }), []);
+  const select = (id: DepartmentId) => props.onSelectDepartment?.(department === id ? null : id);
+  return <>
+    <Line points={orbit} color="#2a3446" lineWidth={1} transparent opacity={0.7} />
+    {/* Spokes show the register's structure (Executive coordinates), not activity. */}
+    {centre && items.filter(planet => planet !== centre).map(planet => <Line key={`spoke-${planet.id}`} points={[[0, 0, 0], planet.position]} color={planet.color} lineWidth={1.2} transparent opacity={0.25} />)}
+    <group onPointerMissed={() => props.onSelectDepartment?.(null)}>
+      {items.map(planet => <PlanetNode key={planet.id} planet={planet} selected={department === planet.id} dim={!!department && department !== planet.id} scale={scale}
+        reducedMotion={reducedMotion} onSelect={select} onHover={onHover} />)}
+    </group>
+    <CameraRig goal={goal} goalKey={goalKey} reducedMotion={reducedMotion} />
+  </>;
+}
+
 function Scene(props: SceneProps) {
   const { data, selection, expanded, mode, highlightIds, reducedMotion, resetToken, onSelect } = props;
   const size = useThree(state => state.size);
@@ -220,12 +265,21 @@ function Scene(props: SceneProps) {
   const ring = useMemo(() => Array.from({ length: 129 }, (_, i) => { const a = (i / 128) * Math.PI * 2; return [Math.cos(a) * HUB_RADIUS, 0, Math.sin(a) * HUB_RADIUS] as Vec3; }), []);
   const dimNode = (id: string) => (searching && !highlightIds.has(id)) || (!!selectedId && selectedId !== id && !data.edges.some(edge => (edge.from === selectedId && edge.to === id) || (edge.to === selectedId && edge.from === id)));
 
-  return <>
+  const backdrop = <>
     <color attach="background" args={["#05070b"]} />
     <fog attach="fog" args={["#05070b", 55, 120]} />
     <ambientLight intensity={0.6} />
     <pointLight position={[0, 10, 0]} intensity={120} color="#9ff7ff" />
     <pointLight position={[25, 12, 25]} intensity={60} color="#c7b0ff" />
+  </>;
+  if (mode === "enterprise") return <>
+    {backdrop}
+    <EnterpriseLayer {...props} />
+    <OrbitControls makeDefault enableDamping dampingFactor={0.08} minDistance={5} maxDistance={95} maxPolarAngle={Math.PI * 0.49} />
+  </>;
+
+  return <>
+    {backdrop}
     <Line points={ring} color="#2a3446" lineWidth={1} transparent opacity={0.7} />
     {CLUSTERS.map(cluster => {
       const dim = mode === "process" || (!!expanded && expanded !== cluster);
