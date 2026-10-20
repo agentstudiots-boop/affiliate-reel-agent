@@ -80,8 +80,10 @@ function budgetSubject(input: DecisionRequestInput): { subjectKey: string; subje
   if (!Number.isSafeInteger(budget.limitCents) || budget.limitCents <= 0) throw new DecisionError("Budgetänderung: Betrag muss eine positive ganze Zahl in Cent sein");
   const subjectKey = budgetSubjectKey(budget.department, budget.period, budget.limitCents);
   if (input.subjectKey !== undefined && input.subjectKey !== subjectKey) throw new DecisionError("Budgetänderung: Betreffschlüssel wird hier gebildet");
+  // The free text may not name an amount of its own: the only amount the operator sees is the binding one, and it comes first.
+  if (/[€$£]|\b(EUR|Euro|Cent|ct)\b/i.test(input.subject)) throw new DecisionError("Budgetänderung: Betrag nur aus der strukturierten Angabe, nicht im Text");
   const amount = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(budget.limitCents / 100);
-  return { subjectKey, subject: `${input.subject.trim()} – Monatsbudget ${budget.department} ${budget.period}: ${amount}` };
+  return { subjectKey, subject: `Monatsbudget ${budget.department} ${budget.period}: ${amount} – ${input.subject.trim()}` };
 }
 
 // Fingerprint over everything the operator decides on.
