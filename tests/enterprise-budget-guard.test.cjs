@@ -87,6 +87,9 @@ test('settled amounts count as spent, released ones free the budget, overspend s
   assert.equal(await B.committedBudget(db,'opportunity',a.period),650);
   assert.equal((await reserve(db,lease,351)).ok,false);
   assert.equal(await B.settleReservation(db,lease,b.id,1),false,'released cannot be settled');
+  // The task budget counts the real cost of what was settled: 650 of 5000 used, so 4351 no longer fits.
+  assert.equal((await reserve(db,lease,4351,100_000)).reason,'budget_exhausted');
+  assert.equal((await reserve(db,lease,4350,100_000)).ok,true,'exactly the rest fits');
   await db.close();
 });
 
