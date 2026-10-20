@@ -105,7 +105,7 @@ sind Prüfhinweise, keine Einordnung.
 
 | # | Prüffrage | Antwort | Status |
 |---|---|---|---|
-| 6.1 | **[K.O. wenn: ja oder unklar und 6.2–6.8 nicht vollständig `geklärt`]** Werden personenbezogene Daten verarbeitet? Zu bedenken: Eigentümer- und Mieterangaben, aber auch Adressen, Fotos oder genaue Koordinaten einzelner Objekte können Personen zuzuordnen sein. | | |
+| 6.1 | **[K.O. wenn: ja oder unklar und 6.2–6.10 nicht vollständig `geklärt`]** Werden personenbezogene Daten verarbeitet? Zu bedenken: Eigentümer- und Mieterangaben, aber auch Adressen, Fotos oder genaue Koordinaten einzelner Objekte können Personen zuzuordnen sein. | | |
 | 6.2 | Falls ja: Auf welche Rechtsgrundlage stützt sich jede Verarbeitung (Art. 6 DSGVO), und ist sie dokumentiert? | | |
 | 6.3 | Wie werden Betroffene informiert, wenn Daten nicht bei ihnen selbst erhoben werden (Art. 14 DSGVO)? | | |
 | 6.4 | Zweckbindung und Datenminimierung: Reichen aggregierte Daten (z. B. je Stadtteil) statt Einzelobjekten? | | |
