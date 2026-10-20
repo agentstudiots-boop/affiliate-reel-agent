@@ -26,7 +26,8 @@ export class RepositoryError extends Error {}
 // Failure classes that may be retried automatically while attempts remain. outcome_unknown never is.
 const RETRYABLE = new Set(["provider_error"]);
 const MAX_LEASE_MS = 15 * 60 * 1000;
-const MAX_SKIPPED = 1000;
+// Invalid queued tasks rejected per leaseNext call; the rest waits for the next call, so one call stays short (cron time budget).
+const MAX_SKIPPED = 50;
 
 const iso = (value: unknown) => value instanceof Date ? value.toISOString() : new Date(String(value)).toISOString();
 const json = (value: unknown) => JSON.stringify(value);
