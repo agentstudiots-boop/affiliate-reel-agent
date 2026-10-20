@@ -85,7 +85,7 @@ test('a hand-built step is checked against the register; budget changes only as 
   const shown=(await db.query('SELECT subject,subject_key FROM enterprise_decisions WHERE id=$1',[r.id])).rows[0];
   assert.match(shown.subject,/^Monatsbudget affiliate 2026-10: 20,00\s€ – Budget Affiliate Oktober$/,'the binding amount comes first');
   // The free text cannot show an amount of its own (review #96).
-  for(const text of ['Kleines Testbudget 50,00 €','Budget 50 EUR','Budget 5000 Cent','Budget $50','Budget 50 euro'])
+  for(const text of ['Kleines Testbudget 50,00 €','Budget 50 EUR','Budget 5000 Cent','Budget $50','Budget 50 euro','Budget 50 Euros','Budget 0,5 TEUR','Budget 50 Tsd.','Budget 50','Budget fünfzig Euro'])
     await assert.rejects(D.requestDecision(db,{step,budget,subject:text,options:OPTIONS}),D.DecisionError,text);
   assert.equal(shown.subject_key,'budget:affiliate:2026-10:2000');
   await assert.rejects(D.requestDecision(db,{step,budget,subjectKey:'budget:affiliate:2026-10:2000000',subject:'Budget',options:OPTIONS}),D.DecisionError,'foreign key');
