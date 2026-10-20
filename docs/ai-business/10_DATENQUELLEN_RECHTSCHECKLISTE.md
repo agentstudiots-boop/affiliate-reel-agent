@@ -16,8 +16,8 @@ Kritik K-05). Sie ergänzt die Bewertung als Opportunity (I-01, Raster F-01: Kri
 
 - Jede Frage bekommt einen **Status**: `offen` · `geklärt` · `nicht anwendbar` – und bei `geklärt` einen **Nachweis**
   (Dokument, Datum, wer hat geprüft). Eine Antwort ohne Nachweis bleibt `offen`.
-- Fragen mit **[K.O.]** sind Ausschlusskriterien: Solange eine davon `offen` ist oder mit „nein“ bzw. „unklar“ beantwortet wird,
-  lautet das Ergebnis in §7 **kein Go**.
+- Fragen mit **[K.O. wenn: …]** sind Ausschlusskriterien; jede nennt ihre Bedingung selbst, denn je nach Frage ist „ja“ oder „nein“
+  die unbedenkliche Antwort. Trifft die Bedingung zu oder ist die Frage noch `offen`, lautet das Ergebnis in §7 **kein Go**.
 - Annahmen und Fakten getrennt halten (Abnahme Phase I): Was nur vermutet wird, steht unter „Annahme“, nicht unter „Antwort“.
 - Keine Datenbeschaffung, kein Test-Abruf einer Quelle und keine kostenpflichtige Lizenz während des Ausfüllens ohne
   ausdrückliche Freigabe (Phase I: „keine Datenbeschaffung ohne Freigabe“; Lizenzen sind Betreiberentscheidung L4).
@@ -66,8 +66,8 @@ Je Quelle:
 
 | # | Prüffrage | Antwort | Status |
 |---|---|---|---|
-| 3.1 | **[K.O.]** Erlauben die Nutzungsbedingungen den geplanten Zugriffsweg? Insbesondere: Ist automatisiertes Auslesen (Scraping, Crawler) ausdrücklich erlaubt, verboten oder nicht geregelt? | | |
-| 3.2 | **[K.O.]** Ist die **gewerbliche** Nutzung erlaubt? | | |
+| 3.1 | **[K.O. wenn: nein oder unklar]** Erlauben die Nutzungsbedingungen den geplanten Zugriffsweg? Insbesondere: Ist automatisiertes Auslesen (Scraping, Crawler) ausdrücklich erlaubt, verboten oder nicht geregelt? | | |
+| 3.2 | **[K.O. wenn: nein oder unklar]** Ist die **gewerbliche** Nutzung erlaubt? | | |
 | 3.3 | Gibt es Vorgaben zu Abrufhäufigkeit, API-Schlüsseln, technischen Schutzmaßnahmen oder `robots.txt`, die eingehalten werden müssen? | | |
 | 3.4 | Dürfen Daten oder Auszüge **veröffentlicht** oder an Dritte weitergegeben werden, oder nur intern ausgewertet? | | |
 | 3.5 | Dürfen abgeleitete Ergebnisse (Statistiken, Karten, Texte) veröffentlicht werden, und mit welcher Quellenangabe? | | |
@@ -82,7 +82,7 @@ Je Quelle:
 | 4.1 | Unter welcher Lizenz stehen offene Daten (z. B. Datenlizenz Deutschland, Creative Commons, ODbL bei Kartendaten)? Ist die Lizenzversion festgehalten? | | |
 | 4.2 | Welche Pflichten folgen daraus (Namensnennung, Weitergabe unter gleichen Bedingungen, Kennzeichnung von Änderungen)? Wie und wo wird die Namensnennung angezeigt? | | |
 | 4.3 | Sind Lizenzen verschiedener Quellen miteinander **und** mit gewerblicher Nutzung vereinbar? | | |
-| 4.4 | **[K.O.]** Werden Fotos, Grundrisse, Exposé-Texte oder Kartenkacheln Dritter verwendet? Falls ja: Liegt dafür ein Nutzungsrecht vor? | | |
+| 4.4 | **[K.O. wenn: Material Dritter wird verwendet und das Nutzungsrecht fehlt oder ist unklar]** Werden Fotos, Grundrisse, Exposé-Texte oder Kartenkacheln Dritter verwendet? Falls ja: Liegt dafür ein Nutzungsrecht vor? | | |
 | 4.5 | Wer hält die Rechte an selbst erzeugten Inhalten (Texte, KI-Bilder), und widersprechen die Bedingungen der Modellanbieter der geplanten Nutzung? | | |
 | 4.6 | Bei kostenpflichtigen Lizenzen: Umfang (Nutzer, Abrufe, Gebiet), Laufzeit, Preis – Freigabe nur als L4-Entscheidung über das Budget (B-05/B-09). | | |
 
@@ -93,8 +93,8 @@ sind Prüfhinweise, keine Einordnung.
 
 | # | Prüffrage | Antwort | Status |
 |---|---|---|---|
-| 5.1 | **[K.O.]** Prüfen lassen: Kann das Angebot als Anlageberatung, Anlage- oder Finanzanlagenvermittlung verstanden werden (z. B. Empfehlungen zu Kauf/Verkauf, Renditeaussagen; mögliche Bezüge: KWG, § 34f GewO)? | | |
-| 5.2 | **[K.O.]** Prüfen lassen: Wird Immobilien- oder Darlehensvermittlung betrieben oder angebahnt, etwa durch Provisionen oder Weiterleitung von Interessenten (mögliche Bezüge: § 34c, § 34i GewO)? | | |
+| 5.1 | **[K.O. wenn: ja oder unklar, solange eine etwa erforderliche Erlaubnis nicht nachgewiesen ist]** Prüfen lassen: Kann das Angebot als Anlageberatung, Anlage- oder Finanzanlagenvermittlung verstanden werden (z. B. Empfehlungen zu Kauf/Verkauf, Renditeaussagen; mögliche Bezüge: KWG, § 34f GewO)? | | |
+| 5.2 | **[K.O. wenn: ja oder unklar, solange eine etwa erforderliche Erlaubnis nicht nachgewiesen ist]** Prüfen lassen: Wird Immobilien- oder Darlehensvermittlung betrieben oder angebahnt, etwa durch Provisionen oder Weiterleitung von Interessenten (mögliche Bezüge: § 34c, § 34i GewO)? | | |
 | 5.3 | Prüfen lassen: Enthalten Ausgaben Einschätzungen im Einzelfall, die als Rechts- oder Steuerberatung gelten könnten (mögliche Bezüge: RDG, StBerG)? | | |
 | 5.4 | Werden Wertangaben gemacht, die mit einem Verkehrswertgutachten verwechselt werden können (mögliche Bezüge: ImmoWertV, Sachverständigenwesen)? Wie wird das ausgeschlossen? | | |
 | 5.5 | Welche Hinweise müssen sichtbar sein (keine Beratung, keine Gewähr, Datenstand, Quelle), und wurden sie von einer zugelassenen Person geprüft? | | |
@@ -105,7 +105,7 @@ sind Prüfhinweise, keine Einordnung.
 
 | # | Prüffrage | Antwort | Status |
 |---|---|---|---|
-| 6.1 | **[K.O.]** Werden personenbezogene Daten verarbeitet? Zu bedenken: Eigentümer- und Mieterangaben, aber auch Adressen, Fotos oder genaue Koordinaten einzelner Objekte können Personen zuzuordnen sein. | | |
+| 6.1 | **[K.O. wenn: ja oder unklar und 6.2–6.8 nicht vollständig `geklärt`]** Werden personenbezogene Daten verarbeitet? Zu bedenken: Eigentümer- und Mieterangaben, aber auch Adressen, Fotos oder genaue Koordinaten einzelner Objekte können Personen zuzuordnen sein. | | |
 | 6.2 | Falls ja: Auf welche Rechtsgrundlage stützt sich jede Verarbeitung (Art. 6 DSGVO), und ist sie dokumentiert? | | |
 | 6.3 | Wie werden Betroffene informiert, wenn Daten nicht bei ihnen selbst erhoben werden (Art. 14 DSGVO)? | | |
 | 6.4 | Zweckbindung und Datenminimierung: Reichen aggregierte Daten (z. B. je Stadtteil) statt Einzelobjekten? | | |
@@ -121,7 +121,7 @@ sind Prüfhinweise, keine Einordnung.
 | Feld | Eintrag |
 |---|---|
 | Ergebnis | Go · No-Go · offen |
-| Offene [K.O.]-Fragen | (Nummern) |
+| K.O.-Fragen mit zutreffender Bedingung oder Status `offen` | (Nummern) |
 | Geprüft durch zugelassene Person? | ja (wer, wann – nur privat) · nein |
 | Erlaubter Zuschnitt (aus §1, ggf. eingeschränkt) | |
 | Freigegebene Quellen (aus §2, Name genügt) | |
