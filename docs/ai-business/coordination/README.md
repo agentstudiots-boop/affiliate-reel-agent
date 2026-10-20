@@ -98,16 +98,16 @@ Kein PR ist eingebunden oder aktiviert: keine Schalter gesetzt, nichts in `verce
 | 3 | #94 | Videoänderung: `recordModelCall` (zweite Sitzung) | – | approve · wer von #88/#94 zuletzt gemergt wird, bekommt den Eintrag `whatsapp_video_revision` |
 | 4 | #87 | G-01 Affiliate-Adapter (nur lesend) | #86 | approve (nach Nachprüfung) |
 | 4 | #89 | B-02 **Migration 039** Aufgabenbuch | – | approve · **Merge = Migration in Production** |
-| 5 | #90 | B-03 Repository Aufgabenbuch | #86, #89 | approve, danach J-02 L4 (`6105ff0`), Nachprüfung offen |
-| 6 | #91 | B-05 Budgetwächter | #90 | approve (`4fd38be`), danach J-02 L3 (`6d62a84`), Nachprüfung offen |
+| 5 | #90 | B-03 Repository Aufgabenbuch | #86, #89 | approve (nach Nachprüfung J-02 L4, `6105ff0`) |
+| 6 | #91 | B-05 Budgetwächter | #90 | approve (nach Nachprüfung J-02 L3, `45bca31`) |
 | 5 | #92 | E-01 **Migration 040** Kosten-/Erlösbuch | #89 | approve (nach Nachprüfung, Mikro-Beträge) · **Merge = Migration in Production** |
 | 6 | #93 | E-03 Importer `model_calls` → `cost_entries` | #92 | approve (nach Nachprüfung; minor behoben) |
-| 6 | #96 | B-06 **Migration 041** Entscheidungsvorlagen (nur Vorlage) | #92, #84 | approve (`070dff7`), danach J-02 M1 (`ec54358`), Nachprüfung offen · **Merge = Migration in Production** |
-| 7 | #98 | B-07 Executive-Zyklus + Cron-Route (`EXECUTIVE_ENABLED` aus, nicht geplant) | #91, #96, #87 | approve, danach J-02 L2 (`aa3f0b3`), Nachprüfung offen · **neue öffentliche Route (OD-B07-1)** |
+| 6 | #96 | B-06 **Migration 041** Entscheidungsvorlagen (nur Vorlage) | #92, #84 | approve (nach Nachprüfung J-02 M1, `ec54358`); minor umgesetzt `4b417a3`, kurze Nachprüfung offen · **Merge = Migration in Production** |
+| 7 | #98 | B-07 Executive-Zyklus + Cron-Route (`EXECUTIVE_ENABLED` aus, nicht geplant) | #91, #96, #87 | approve (nach Nachprüfung J-02 L2) · **neue öffentliche Route (OD-B07-1)** |
 | 8 | #99 | B-08 KI-Planer im Schattenbetrieb (nichts eingebunden) | #98, #88 | approve |
 | 7 | #100 | E-07 ControllingSnapshot + 2D-Anzeige (nur lesend) | #93, #88 | approve (minor umgesetzt) |
 | 9 | #102 | H-01 Unternehmensebene als lesender Datenvertrag (`/api/architecture` → `enterprise`) | #99, #100, #104 | approve (minor behoben `cc411b0`; enthält B-09) · **OD-H01-1** |
-| 8 | #104 | B-09 Monatsgrenze nur aus freigegebenem Budget (L4) | #98 | changes_requested (1 major = J-02 M1) → behoben `37ab038`, Nachprüfung offen |
+| 8 | #104 | B-09 Monatsgrenze nur aus freigegebenem Budget (L4) | #98 | approve (nach Nachprüfung `37ab038`; erst nach #96 mergen) |
 | 9 | #105 | J-01 Ende-zu-Ende-Szenarien (nur Tests) | #104 | approve |
 | 10 | #106 | J-03 Kostenobergrenzen unter Retries (nur Tests) | #105 | Review offen |
 | 10 | #103 | H-04/H-05 Ansicht „Unternehmen“ (2D, Detailpanel je Abteilung) | #102 | approve · visuelle Abnahme Betreiber |
