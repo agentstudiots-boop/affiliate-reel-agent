@@ -59,8 +59,9 @@ Mit Schritt 9 fallen die schon bekannten Betreiberentscheidungen an:
 - **Visuelle Abnahme** von #103 und #109.
 
 Mit Schritt 11 fällt **OD-E04-1** an. Mit Schritt 13 fällt die Entscheidung über `EXECUTIVE_WEEKLY_REPORT` an (erst nach dem
-Merge, Rückweg: Variable entfernen). #113 und #114 sind nach dem Leitfaden entstanden; ihre Endstände sind einzeln geprüft (J-04: 754 ✔,
-4 übersprungen; B-10: 802/802), aber nicht in der Gesamtsimulation enthalten.
+Merge, Rückweg: Variable entfernen). #113 und #114 sind nach dem Leitfaden entstanden. Probe-Merge beider auf den simulierten Endstand: ohne Konflikt; volle Prüfung
+lint ✔, 855 Tests ✔ (4 übersprungen: J-04 ohne lokale Datenbank), build ✔, typecheck ✔ (B-10-Stand `bb9dde7`; der Review-Fix `b1f492d`
+ändert nur B-10-eigene Dateien).
 Nicht gegen `main` und nicht Teil dieses Leitfadens: #81, #82 und #111 (Roadmap-Doku, Gate G0) sowie #10, #61 und #65 (ältere PRs außerhalb der Roadmap).
 
 ## Gefundene Fehler im Zusammenspiel
