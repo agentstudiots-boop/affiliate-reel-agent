@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "task_id": "J-03",
+  "title": "Kostenobergrenzen unter Wiederholungen und Parallelität (nur Tests)",
+  "module": "enterprise-ledger",
+  "phase": "J",
+  "status": "waiting_review",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "operator",
+  "base_commit": "08a4159",
+  "branch": "claude/J-03-cost-limits",
+  "depends_on": [
+    "J-01",
+    "B-09",
+    "B-05"
+  ],
+  "claims": {
+    "paths": [
+      "tests/enterprise-cost-limits.test.cjs"
+    ],
+    "hot_files": [],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Wiederholter Auftrag nie über Aufgabenbudget zum echten Betrag",
+      "verification": "Szenario 1 (deckte B-05-Fehler auf)",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Monatsbudget hält über Aufgaben und Retries; freigegebene Beträge wieder frei",
+      "verification": "Szenario 2",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Parallele Reservierungen und wiederholte Abschlussmeldung buchen nie doppelt",
+      "verification": "Szenario 3",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 300,
+    "notes": "Solo-Betrieb, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "tests/enterprise-cost-limits.test.cjs"
+  ],
+  "implemented": [
+    "3 Kostengrenzen-Szenarien"
+  ],
+  "tests": [
+    {
+      "command": "npm run lint && npm test && npm run build && npm run typecheck",
+      "result": "passed",
+      "detail": "753/753",
+      "commit": "ddca4cd",
+      "at": "2026-10-20T06:01:52Z"
+    }
+  ],
+  "known_issues": [
+    "Gestapelt auf J-01 (#105)",
+    "J-04 Lasttest braucht echtes Postgres (PGlite serialisiert)"
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/106",
+    "state": "draft",
+    "merge_commit": null,
+    "ci": "pending"
+  },
+  "approval": {
+    "reviewer": "pending",
+    "operator": "pending",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Review",
+    "Merge durch Betreiber nach #98"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-20T06:01:52Z",
+    "checkpoint_reason": "other",
+    "last_commit": "ddca4cd",
+    "active_branch": "claude/J-03-cost-limits",
+    "state_summary": "Draft-PR #106 offen",
+    "decisions_made": [],
+    "test_status": "753/753",
+    "next_action": "Review"
+  },
+  "revision": 1,
+  "based_on_commit": "1df310c",
+  "updated_at": "2026-10-20T06:01:52Z",
+  "log": [
+    {
+      "at": "2026-10-20T06:01:52Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "J-03 Draft-PR #106; Fehler in B-05 gefunden und behoben",
+      "commit": "ddca4cd"
+    }
+  ]
+}

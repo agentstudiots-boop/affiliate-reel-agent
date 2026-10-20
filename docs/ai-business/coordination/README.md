@@ -99,7 +99,7 @@ Kein PR ist eingebunden oder aktiviert: keine Schalter gesetzt, nichts in `verce
 | 4 | #87 | G-01 Affiliate-Adapter (nur lesend) | #86 | approve (nach Nachprüfung) |
 | 4 | #89 | B-02 **Migration 039** Aufgabenbuch | – | approve · **Merge = Migration in Production** |
 | 5 | #90 | B-03 Repository Aufgabenbuch | #86, #89 | approve (nach Nachprüfung) |
-| 6 | #91 | B-05 Budgetwächter | #90 | approve (nach Nachprüfung) |
+| 6 | #91 | B-05 Budgetwächter | #90 | approve, danach Fehler aus J-03 behoben (`4fd38be`), Nachprüfung offen |
 | 5 | #92 | E-01 **Migration 040** Kosten-/Erlösbuch | #89 | approve (nach Nachprüfung, Mikro-Beträge) · **Merge = Migration in Production** |
 | 6 | #93 | E-03 Importer `model_calls` → `cost_entries` | #92 | approve (nach Nachprüfung; minor behoben) |
 | 6 | #96 | B-06 **Migration 041** Entscheidungsvorlagen (nur Vorlage) | #92, #84 | changes_requested (1 major) → behoben `070dff7`, Nachprüfung offen · **Merge = Migration in Production** |
@@ -109,6 +109,7 @@ Kein PR ist eingebunden oder aktiviert: keine Schalter gesetzt, nichts in `verce
 | 9 | #102 | H-01 Unternehmensebene als lesender Datenvertrag (`/api/architecture` → `enterprise`) | #99, #100 | Review offen |
 | 8 | #104 | B-09 Monatsgrenze nur aus freigegebenem Budget (L4) | #98 | Review offen |
 | 9 | #105 | J-01 Ende-zu-Ende-Szenarien (nur Tests) | #104 | Review offen |
+| 10 | #106 | J-03 Kostenobergrenzen unter Retries (nur Tests) | #105 | Review offen |
 | 10 | #103 | H-04/H-05 Ansicht „Unternehmen“ (2D, Detailpanel je Abteilung) | #102 | Review offen · visuelle Abnahme Betreiber |
 | 1 | #101 | C-04 PR-Vorlage (zweite Sitzung) | – | approve (2 optionale Hinweise; nach #95 mergen) |
 
