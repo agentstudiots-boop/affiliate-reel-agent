@@ -5,7 +5,8 @@
 // reservation: it keeps counting against the budget and is never released automatically. Reservations of one department
 // and month are serialised by an advisory lock, as in lib/visual/runway-budget.ts. The monthly limit comes only from a
 // hard budget (migration 040) whose approved_decision_id names an operator decision (migration 041) that was approved for
-// exactly this department, month and amount (budgetSubjectKey) – never from the caller. Without such a budget the limit is
+// exactly this department, month and amount (budgetSubjectKey in ../decisions, which builds that key and the amount
+// shown to the operator from structured input) – never from the caller. Without such a budget the limit is
 // 0 and every reservation is refused (task B-09). No provider calls while the lock is held.
 // All times come from the database clock, like in the repository (B-03) – including the budget month, which the caller
 // cannot choose. Reserving, settling and releasing are bound to the worker's lease (holder + fencing token) of a running
@@ -34,12 +35,6 @@ export function periodOf(date: Date): string {
 // Everything that still counts against the limit: open and disputed reservations at their reserved amount, settled ones
 // at their real amount (which may exceed the reservation). Released reservations no longer count.
 const BERLIN_PERIOD = "to_char(now() AT TIME ZONE 'Europe/Berlin', 'YYYY-MM')";
-
-// Subject of the L4 decision (executive.budget_change) that makes a hard budget binding. The amount is part of the key, so
-// a changed limit needs a new decision.
-export function budgetSubjectKey(department: string, period: string, limitCents: number): string {
-  return `budget:${department}:${period}:${limitCents}`;
-}
 
 // The binding monthly limit, or null without an approved hard budget (tables of migration 040/041 missing ⇒ null as well).
 async function approvedLimit(sql: Sql, department: string, period: string): Promise<number | null> {
