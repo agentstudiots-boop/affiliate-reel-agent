@@ -43,6 +43,8 @@ const lock = (sql: Sql, provider: string, item: string) => sql.query("SELECT pg_
 function httpsUrl(value: unknown): string | null {
   const url = text(value, 2000);
   if (!url) return null;
+  // Literal lowercase scheme as required by the CHECK of 040 ("HTTPS://" would pass URL parsing but fail the insert).
+  if (!url.startsWith("https://")) return null;
   try { return new URL(url).protocol === "https:" ? url : null; } catch { return null; }
 }
 

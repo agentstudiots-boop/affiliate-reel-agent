@@ -26,7 +26,7 @@ test('prices are validated and parsed exactly, never guessed (AC-1)',async()=>{
   for(const [extra,pattern] of [[{provider:'Beispiel'},/Anbieter/],[{provider:''},/Anbieter/],[{item:' '},/Artikel/],[{item:'x'.repeat(121)},/Artikel/],
     [{unit:'token'},/Einheit/],[{unit:'toString'},/Einheit/],[{price:'0.000002'},/Preis/],[{price:'0,0000001'},/Preis/],[{price:'-1'},/Preis/],[{price:2},/Preis/],
     [{currency:'eur'},/Währung/],[{validFrom:'2026-02-30'},/Gültig ab/],[{validTo:'morgen'},/Gültig bis/],[{validTo:'2026-10-01'},/nach Gültig ab/],
-    [{sourceUrl:'http://example.com'},/https/],[{sourceUrl:'https//x'},/https/],[{sourceUrl:null},/https/],[{enteredBy:''},/Erfasst von/],[{enteredBy:'x'.repeat(101)},/Erfasst von/]])
+    [{sourceUrl:'http://example.com'},/https/],[{sourceUrl:'https//x'},/https/],[{sourceUrl:'HTTPS://example.com/preise'},/https/],[{sourceUrl:'https://'},/https/],[{sourceUrl:null},/https/],[{enteredBy:''},/Erfasst von/],[{enteredBy:'x'.repeat(101)},/Erfasst von/]])
     assert.match((await P.addPrice(db,entry(extra))).reason,pattern,JSON.stringify(extra));
   assert.equal(await count(db),2);
   await db.close();
