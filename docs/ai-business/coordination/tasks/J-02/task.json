@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "task_id": "J-02",
+  "title": "Sicherheitsreview beider Modelle – Claude-Hälfte (Executive-Kern, Controlling, Unternehmensebene)",
+  "module": "enterprise-security",
+  "phase": "J",
+  "status": "waiting_review",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "operator",
+  "base_commit": "e709752",
+  "branch": "(Korrekturen auf den Branches der jeweiligen Aufgabe)",
+  "depends_on": [
+    "J-03",
+    "H-04"
+  ],
+  "claims": {
+    "paths": [
+      "docs/ai-business/coordination/tasks/J-02/"
+    ],
+    "hot_files": [],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Diff origin/main...J-03 und ...H-04 auf Zugriff, Runtime-Guard, Injection, Secrets, öffentliche Routen, Freigaben, Nebenläufigkeit geprüft",
+      "verification": "nur lesendes Review (Agent), jeder Befund im Code nachgeprüft",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Bestätigte Befunde behoben, mit Test und Gegentest",
+      "verification": "M1 (B-06/B-09), L1 (H-01 enthält B-09), L2 (B-07), L3 (B-05), L4 (B-03)",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Zweite Hälfte durch das andere Modell",
+      "verification": "offen – braucht GPT-Sitzung/Freigabe Betreiber",
+      "met": false
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 300,
+    "notes": "Solo-Betrieb, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "lib/enterprise/decisions.ts",
+    "lib/enterprise/tasks/budget.ts",
+    "lib/enterprise/tasks/repository.ts",
+    "lib/enterprise/cycle.ts",
+    "lib/architecture/enterprise-snapshot.ts",
+    "tests/enterprise-decisions.test.cjs",
+    "tests/enterprise-budget-guard.test.cjs",
+    "tests/enterprise-cycle.test.cjs",
+    "tests/enterprise-cost-limits.test.cjs",
+    "tests/architecture-enterprise.test.cjs"
+  ],
+  "implemented": [
+    "Befundliste: findings-claude.md",
+    "M1 Budgetbetrag an Freigabe gebunden: B-06 ec54358, B-09 37ab038, J-03 e709752",
+    "L1 Merge-Reihenfolge: H-01 enthält B-09 (7b60880)",
+    "L2 Zeitüberschreitung ⇒ outcome_unknown: B-07 aa3f0b3",
+    "L3 resolveDispute nur mit Quelle+Akteur: B-05 6d62a84",
+    "L4 MAX_SKIPPED 50: B-03 6105ff0",
+    "Review #102 minor: readEnterpriseView wirft nie (H-01 cc411b0)"
+  ],
+  "tests": [
+    {
+      "command": "npm run lint && npm test && npm run build && npm run typecheck",
+      "result": "passed",
+      "detail": "J-03 754/754",
+      "commit": "e709752",
+      "at": "2026-10-20T06:25:00Z"
+    },
+    {
+      "command": "npm run lint && npm test && npm run build && npm run typecheck",
+      "result": "passed",
+      "detail": "H-04 784/784",
+      "commit": "782f6bd",
+      "at": "2026-10-20T06:42:00Z"
+    }
+  ],
+  "known_issues": [
+    "AbortSignal für Abteilungen folgt mit der ersten kostenpflichtigen Abteilung (Vertragsänderung B-04)",
+    "Info-Hinweise für die spätere Einbindung in findings-claude.md"
+  ],
+  "open_decisions": [
+    "OD-H01-1: Unternehmensebene im Command Center ohne eigenen Schalter (nur lesend, hinter Login)"
+  ],
+  "pr": {
+    "url": null,
+    "state": "none",
+    "merge_commit": null,
+    "ci": "n/a"
+  },
+  "approval": {
+    "reviewer": "pending",
+    "operator": "pending",
+    "latest_review_file": "findings-claude.md"
+  },
+  "next_steps": [
+    "Nachprüfung durch Session 2: #96, #104, #91, #98, #90",
+    "GPT-Hälfte von J-02 nach Freigabe"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-20T06:45:00Z",
+    "checkpoint_reason": "other",
+    "last_commit": "782f6bd",
+    "active_branch": "claude/H-04-enterprise-panel",
+    "state_summary": "Claude-Hälfte erledigt, Korrekturen gepusht",
+    "decisions_made": [],
+    "test_status": "grün",
+    "next_action": "Nachprüfungen abwarten"
+  },
+  "revision": 1,
+  "based_on_commit": "4a57838",
+  "updated_at": "2026-10-20T06:45:00Z",
+  "log": [
+    {
+      "at": "2026-10-20T06:45:00Z",
+      "actor": "claude-code",
+      "action": "review_done",
+      "summary": "Claude-Hälfte J-02: 0 kritisch/hoch, 1 mittel, 4 niedrig – alle behoben",
+      "commit": "782f6bd"
+    }
+  ]
+}
