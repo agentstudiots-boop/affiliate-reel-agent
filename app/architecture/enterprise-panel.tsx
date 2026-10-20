@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { DepartmentView, EnterpriseView } from "@/lib/architecture/enterprise";
+import type { DevelopmentView } from "@/lib/architecture/development";
 
 // Enterprise level of the Command Center in 2D (tasks H-04/H-05): one card per department of the executive register and a
 // detail panel. Pure presentation of the `enterprise` contract (H-01): every value is shown with its source, and a part
@@ -24,6 +25,26 @@ const TASK_LABEL: Record<string, string> = {
   outcome_unknown: "Ergebnis unklar", needs_decision: "Entscheidung nötig", cancelled: "abgebrochen", dead: "aufgegeben",
 };
 const NO_DATA = "keine Daten";
+const DEVELOPMENT_LABEL: Record<string, string> = {
+  planned: "geplant", ready: "bereit", in_progress: "in Arbeit", waiting_capacity: "wartet auf Kapazität", waiting_review: "wartet auf Review",
+  waiting_operator: "wartet auf Betreiber", in_review: "im Review", changes_requested: "Änderungen angefordert", approved_by_reviewer: "vom Review freigegeben",
+  merged: "gemergt", deployed: "deployed", verified: "live verifiziert", blocked: "blockiert", cancelled: "abgebrochen", superseded: "ersetzt",
+};
+
+// Development status of the roadmap (D-06): ids and states from the hand-over files of the build, shown for Engineering.
+function DevelopmentSection({ development }: { development: DevelopmentView | undefined }) {
+  return <>
+    <h5>Entwicklungsstand (Übergabedateien, Stand des Builds)</h5>
+    {!development ? <p className="muted">{NO_DATA}</p>
+      : !development.available ? <p className="muted">{development.reason ?? NO_DATA}</p>
+      : <>
+        <ul>{Object.entries(development.byStatus).map(([status, count]) => <li key={status}>{DEVELOPMENT_LABEL[status] ?? status}: <b>{count}</b></li>)}</ul>
+        <p className="muted">{development.tasks.map(task => `${task.id} ${DEVELOPMENT_LABEL[task.status] ?? task.status}`).join(" · ")}</p>
+        {development.skipped > 0 && <p className="muted">{development.skipped} Datei(en) nicht lesbar und ausgelassen.</p>}
+        <small className="muted">Quelle: {development.source}</small>
+      </>}
+  </>;
+}
 
 const time = (iso: string | null) => iso ? new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(iso)) : "–";
 const euro = (cents: number) => new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(cents / 100);
@@ -46,7 +67,7 @@ function tasksText(tasks: DepartmentView["tasks"]) {
   return `${tasks.total} gesamt · ${open} offen`;
 }
 
-export function DepartmentDetail({ department }: { department: DepartmentView }) {
+export function DepartmentDetail({ department, development }: { department: DepartmentView; development?: DevelopmentView }) {
   const health = department.health;
   return <div data-testid="cc-enterprise-detail">
     <h4>{department.label}</h4>
@@ -75,6 +96,7 @@ export function DepartmentDetail({ department }: { department: DepartmentView })
       <li>Erlöse gemessen: <b>{moneyText(department.controlling.revenue?.measured)}</b></li>
       <li>Modellaufrufe: <b>{department.controlling.modelUsage ? department.controlling.modelUsage.calls : NO_DATA}</b></li>
     </ul> : <p className="muted">{NO_DATA}</p>}
+    {department.id === "engineering" && <DevelopmentSection development={development} />}
     <h5>Aufgabenarten</h5>
     {department.taskKinds.length ? <ul>{department.taskKinds.map(kind => <li key={kind}><code>{kind}</code></li>)}</ul> : <p className="muted">keine (arbeitet außerhalb der App)</p>}
     <h5>KI-Agenten (laut Zuordnung, keine Aktivitätsanzeige)</h5>
@@ -96,7 +118,8 @@ export const DETAIL_HINT = "Abteilung wählen, um Zustand, Nachweise, Aufgaben, 
 
 // Selection is either kept here (initial) or controlled by the Command Center (selected/onSelect), so switching between the
 // 2D cards and the 3D planets keeps the chosen department.
-export function EnterprisePanel({ view, initial = null, selected, onSelect }: { view: EnterpriseView | undefined; initial?: DepartmentId | null;
+export function EnterprisePanel({ view, initial = null, selected, onSelect, development }: { view: EnterpriseView | undefined; initial?: DepartmentId | null;
+  development?: DevelopmentView;
   selected?: DepartmentId | null; onSelect?: (id: DepartmentId | null) => void }) {
   const [own, setOwn] = useState<DepartmentId | null>(initial);
   const current = selected !== undefined ? selected : own;
@@ -116,7 +139,7 @@ export function EnterprisePanel({ view, initial = null, selected, onSelect }: { 
           </button></div>)}
       </div>
       <aside className="ccDetail" aria-live="polite">
-        {department ? <DepartmentDetail department={department} /> : <p className="muted">{DETAIL_HINT}</p>}
+        {department ? <DepartmentDetail department={department} development={development} /> : <p className="muted">{DETAIL_HINT}</p>}
       </aside>
     </div>
   </div>;

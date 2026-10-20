@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["ogg-opus-decoder"],
   outputFileTracingIncludes: {
     "/api/admin/migrate": ["./db/migrations/*.sql"],
+    // Command Center development status (D-06): only the hand-over files, read-only.
+    "/api/architecture": ["./docs/ai-business/coordination/tasks/*/task.json"],
   },
 };
 

@@ -187,7 +187,7 @@ export function CommandCenter({ standalone = false }: { standalone?: boolean } =
       {mode !== "enterprise" && <nav className="ccChips" aria-label="Hauptbereiche">{clusters.map(id => <button key={id} type="button" aria-pressed={expanded === id} className={`ccChip ${expanded === id ? "ccChipOn" : ""}`}
         style={{ borderColor: data.labels.clusters[id].color }} onClick={() => select({ type: "cluster", id })}>{data.labels.clusters[id].label}</button>)}</nav>}
       {mode === "process" && <ProcessRibbon data={data} onSelect={select} />}
-      {mode === "enterprise" && !planetsShown && <EnterprisePanel view={data.enterprise} selected={department} onSelect={setDepartment} />}
+      {mode === "enterprise" && !planetsShown && <EnterprisePanel view={data.enterprise} selected={department} onSelect={setDepartment} development={data.development} />}
       {planetsShown && data.enterprise && <EnterpriseSummary view={data.enterprise} />}
       {mode === "profiles" && <ProfilesView data={data} query={query} onSelect={next => { setMode("architecture"); select(next); }} />}
       <div className="ccBody" hidden={mode === "profiles" || (mode === "enterprise" && !planetsShown)}>
@@ -203,7 +203,7 @@ export function CommandCenter({ standalone = false }: { standalone?: boolean } =
         </div>
         <aside className="ccDetail" data-testid="cc-detail">
           <p className="ccSr" aria-live="polite">{announce}</p>
-          {mode === "enterprise" ? currentDepartment ? <DepartmentDetail department={currentDepartment} /> : <p className="muted">{DETAIL_HINT}</p>
+          {mode === "enterprise" ? currentDepartment ? <DepartmentDetail department={currentDepartment} development={data.development} /> : <p className="muted">{DETAIL_HINT}</p>
             : selectedNode ? <NodePanel data={data} node={selectedNode} onSelect={select} />
             : selection?.type === "cluster" ? <ClusterPanel data={data} cluster={selection.id} onSelect={select} />
               : <OverviewPanel data={data} onSelect={select} />}

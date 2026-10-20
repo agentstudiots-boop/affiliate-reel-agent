@@ -177,7 +177,7 @@ test('Command Center offers the enterprise view without WebGL and reads nothing 
   const center=fs.readFileSync('app/architecture/command-center.tsx','utf8');
   assert.match(center,/setMode\("enterprise"\)[^]*>Unternehmen<\/button>/);
   // Without WebGL (or without enterprise data) the 2D cards are shown; with WebGL the planets use the same canvas (H-03).
-  assert.match(center,/mode === "enterprise" && !planetsShown && <EnterprisePanel view=\{data\.enterprise\} selected=\{department\} onSelect=\{setDepartment\} \/>/);
+  assert.match(center,/mode === "enterprise" && !planetsShown && <EnterprisePanel view=\{data\.enterprise\} selected=\{department\} onSelect=\{setDepartment\} development=\{data\.development\} \/>/);
   assert.match(center,/const planetsShown = enterprise3d && showScene;/);
   assert.match(center,/const enterprise3d = mode === "enterprise" && !!data\?\.enterprise;/);
   assert.match(center,/mode !== "profiles" && \(mode !== "enterprise" \|\| enterprise3d\), resetToken/,'the scene only runs in the enterprise view when there is data');
