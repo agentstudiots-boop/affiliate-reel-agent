@@ -14,6 +14,8 @@ import { REGISTRY, department, taskDefinition, type Registry } from "./registry"
 const cents = z.number().int().nonnegative().refine(Number.isSafeInteger, "außerhalb des sicheren Zahlenbereichs");
 // Absolute cap independent of the caller's limits, so an oversized model output is rejected before any per-step work.
 export const MAX_PLAN_STEPS = 200;
+// Upper bound per step (security review J-02): far above any real step, far below the integer column of the task ledger.
+export const MAX_MODEL_CALLS = 1000;
 
 const stepSchema = z.object({
   id: z.string().min(1).max(64),
@@ -24,7 +26,7 @@ const stepSchema = z.object({
   level: z.unknown().optional(),
   dependsOn: z.array(z.string().min(1)).max(50).default([]),
   maxCostCents: cents,
-  maxModelCalls: z.number().int().nonnegative(),
+  maxModelCalls: z.number().int().nonnegative().max(MAX_MODEL_CALLS),
   deadline: z.string().optional(),
 });
 

@@ -12,7 +12,7 @@
 // writes only cost_entries; not wired into the app.
 
 import { randomUUID } from "node:crypto";
-import type { Database } from "../../memory/db";
+import type { Database, Sql } from "../../memory/db";
 
 export type DepartmentOf = (agent: string) => string | null;
 export type ImportResult = { calls: number; inserted: number; priced: number; unpriced: number; lastCallId: number | null };
@@ -38,6 +38,15 @@ const PRICE_AT = `SELECT id, price_micros, currency FROM price_catalog
   WHERE provider=$1 AND item=$2 AND unit=$3 AND valid_from <= $4::timestamptz AND (valid_to IS NULL OR valid_to > $4::timestamptz)
   ORDER BY valid_from DESC LIMIT 1`;
 
+// Same advisory lock as the price catalogue maintenance (E-02, lib/enterprise/controlling/price-catalog.ts): a price that is
+// being added or ended for a provider and model cannot be read half-way by an import (security review J-02 / review #108).
+// All locks of a batch are taken up front in a fixed order, so two imports can never wait on each other in a cycle.
+export const priceCatalogLockKey = (provider: string, item: string) => `price-catalog:${provider}:${item}`;
+async function lockPrices(sql: Sql, pairs: Iterable<[string, string]>) {
+  const keys = [...new Set([...pairs].map(([provider, item]) => priceCatalogLockKey(provider, item)))].sort();
+  for (const key of keys) await sql.query("SELECT pg_advisory_xact_lock(hashtext($1))", [key]);
+}
+
 // Imports calls with id > afterId (oldest first, at most `limit`). The caller keeps the returned lastCallId as cursor;
 // re-importing an id range is harmless because existing lines are skipped.
 export async function importModelCalls(db: Database, options: { afterId?: number; limit?: number; departmentOf?: DepartmentOf } = {}): Promise<ImportResult> {
@@ -47,6 +56,7 @@ export async function importModelCalls(db: Database, options: { afterId?: number
     const calls = (await sql.query(`SELECT id, agent, model, provider, input_tokens, output_tokens, predict_time_s, created_at
       FROM model_calls WHERE id > $1 AND created_at < now() - interval '1 minute' ORDER BY id LIMIT $2`, [afterId, limit])).rows;
     const result: ImportResult = { calls: calls.length, inserted: 0, priced: 0, unpriced: 0, lastCallId: null };
+    await lockPrices(sql, calls.map(call => [String(call.provider), String(call.model)] as [string, string]));
     for (const call of calls) {
       result.lastCallId = Number(call.id);
       const agent = String(call.agent);
@@ -86,6 +96,7 @@ export async function repriceModelCallEntries(db: Database, options: { limit?: n
           AND p.valid_from <= c.occurred_at AND (p.valid_to IS NULL OR p.valid_to > c.occurred_at))
       ORDER BY c.occurred_at, c.id LIMIT $1 FOR UPDATE`, [limit])).rows;
     let repriced = 0;
+    await lockPrices(sql, open.map(line => [String(line.provider), String(line.item)] as [string, string]));
     for (const line of open) {
       const price = (await sql.query(PRICE_AT, [String(line.provider), String(line.item), String(line.unit), line.occurred_at])).rows[0];
       const amount = price ? amountMicros(Number(line.quantity), Number(price.price_micros)) : null;

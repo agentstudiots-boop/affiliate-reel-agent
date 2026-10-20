@@ -15,6 +15,13 @@ export type TaskSource = (typeof TASK_SOURCES)[number];
 
 const isoTime = z.string().datetime({ offset: true });
 const source = z.string().refine(value => value.trim().length > 0, "Quelle leer");
+// Bounds (security review J-02): same model call limit as MAX_MODEL_CALLS in ./plan (a test keeps both equal), amounts only
+// as safe integers, at most 100 evidence items, and a task result of at most 64 KiB as JSON.
+export const MAX_MODEL_CALLS = 1000;
+export const MAX_EVIDENCE = 100;
+export const MAX_OUTPUT_BYTES = 64 * 1024;
+const count = z.number().int().nonnegative().max(MAX_MODEL_CALLS);
+const amount = z.number().int().nonnegative().refine(Number.isSafeInteger, "außerhalb des sicheren Zahlenbereichs");
 
 export const taskEnvelopeSchema = z.object({
   schemaVersion: z.literal(1),
@@ -27,7 +34,7 @@ export const taskEnvelopeSchema = z.object({
   taskKind: z.string().min(1),
   handlerId: z.string().min(1),
   permissionLevel: z.enum(PERMISSION_LEVELS),
-  budget: z.object({ maxModelCalls: z.number().int().nonnegative(), maxCostCents: z.number().int().nonnegative(), deadline: isoTime.nullable() }),
+  budget: z.object({ maxModelCalls: count, maxCostCents: amount, deadline: isoTime.nullable() }),
   idempotencyKey: z.string().min(1).max(200),
   payload: z.record(z.string(), z.unknown()),
   createdAt: isoTime,
@@ -40,16 +47,16 @@ export const taskResultSchema = z.discriminatedUnion("status", [
   z.object({
     status: z.literal("succeeded"),
     output: z.record(z.string(), z.unknown()),
-    usedCostCents: z.number().int().nonnegative(),
-    usedModelCalls: z.number().int().nonnegative(),
-    evidence: z.array(z.object({ claim: z.string().min(1), kind: z.enum(["fact", "assumption", "forecast"]), source: source.optional() })).default([]),
+    usedCostCents: amount,
+    usedModelCalls: z.number().int().nonnegative().refine(Number.isSafeInteger, "außerhalb des sicheren Zahlenbereichs"),
+    evidence: z.array(z.object({ claim: z.string().min(1), kind: z.enum(["fact", "assumption", "forecast"]), source: source.optional() })).max(MAX_EVIDENCE).default([]),
   }),
   z.object({
     status: z.literal("failed"),
     failureClass: z.enum(FAILURE_CLASSES),
-    reason: z.string().min(1),
-    usedCostCents: z.number().int().nonnegative(),
-    usedModelCalls: z.number().int().nonnegative(),
+    reason: z.string().min(1).max(2000),
+    usedCostCents: amount,
+    usedModelCalls: z.number().int().nonnegative().refine(Number.isSafeInteger, "außerhalb des sicheren Zahlenbereichs"),
   }),
 ]);
 export type TaskResult = z.infer<typeof taskResultSchema>;
@@ -58,7 +65,7 @@ export const healthReportSchema = z.object({
   department: z.enum(DEPARTMENT_IDS),
   status: z.enum(["ok", "degraded", "error", "not_configured", "unknown"]),
   checkedAt: isoTime,
-  evidence: z.array(z.object({ label: z.string().min(1), value: z.union([z.string(), z.number(), z.boolean(), z.null()]), source })),
+  evidence: z.array(z.object({ label: z.string().min(1), value: z.union([z.string(), z.number(), z.boolean(), z.null()]), source })).max(MAX_EVIDENCE),
   reason: z.string().optional(),
 });
 export type HealthReport = z.infer<typeof healthReportSchema>;
@@ -142,6 +149,9 @@ export function checkResult(raw: unknown, envelope: TaskEnvelope): { ok: true; r
   if (result.usedCostCents > envelope.budget.maxCostCents) return { ok: false, reason: `Kosten ${result.usedCostCents} > Budget ${envelope.budget.maxCostCents}`, usage };
   if (result.usedModelCalls > envelope.budget.maxModelCalls) return { ok: false, reason: `Modellaufrufe ${result.usedModelCalls} > Budget ${envelope.budget.maxModelCalls}`, usage };
   if (result.status === "succeeded") {
+    // A result too large for the ledger is rejected with its usage, so reservations still settle at the real amount.
+    if (Buffer.byteLength(JSON.stringify({ output: result.output, evidence: result.evidence }), "utf8") > MAX_OUTPUT_BYTES)
+      return { ok: false, reason: `Ergebnis größer als ${MAX_OUTPUT_BYTES} Byte`, usage };
     const index = result.evidence.findIndex(item => item.kind === "fact" && !item.source);
     if (index >= 0) return { ok: false, reason: `Beleg ${index + 1}: Fakt ohne Quelle`, usage };
   }
