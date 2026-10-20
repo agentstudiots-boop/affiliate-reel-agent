@@ -39,6 +39,7 @@ Nächster Schritt: GPT-Gegenprüfung dieser Runde und Betreiberentscheidung BF-1
 | [`07_OFFENE_FRAGEN_RISIKEN_ENTSCHEIDUNGEN.md`](07_OFFENE_FRAGEN_RISIKEN_ENTSCHEIDUNGEN.md) | Offene Fragen, Risiken, ADRs, Betreiberfreigaben |
 | [`08_KAPAZITAETSGESTEUERTE_KOORDINATION.md`](08_KAPAZITAETSGESTEUERTE_KOORDINATION.md) | Betreiber-Chat-Notiz (in 04/05 übernommen) |
 | [`09_GPT_ARCHITEKTURPRUEFUNG.md`](09_GPT_ARCHITEKTURPRUEFUNG.md) | Unabhängige Prüfung durch GPT Work (A-02, PR #81) |
+| [`10_DATENQUELLEN_RECHTSCHECKLISTE.md`](10_DATENQUELLEN_RECHTSCHECKLISTE.md) | Vorlage Datenquellen- und Rechtscheckliste für eine mögliche Immobilienanalyse (I-02, Prüffragen, keine Rechtsberatung) |
 | [`coordination/`](coordination/README.md) | Die **einzige** Übergabestruktur (Schemas, Besitz, Ressourcen, Aufgaben A-01, A-02, B-01) |
 
 ## Abdeckung der erwarteten Ergebnisse (Auftrag §17)
