@@ -1,6 +1,7 @@
 import { getDatabase, type Database } from "../memory/db";
 import { cachedMetaConnection, metaConfig } from "../meta/connection";
 import { sendWhatsAppText, sendWeeklyNotificationTemplate, weeklyNotificationTemplateConfigured } from "../whatsapp/client";
+import { formatExecutiveWeekly, readExecutiveWeekly } from "../enterprise/executive-weekly";
 
 export type WeeklyReportMetrics = {
   publishedTotal: number;
@@ -197,7 +198,9 @@ export async function createWeeklyReport(reference = new Date(), db: Database = 
     try {
       const followers = await readMetaFollowers();
       const metrics = await buildWeeklyReportData(db, start, end, followers);
-      const text = formatWeeklyReport(start, end, metrics);
+      let text = formatWeeklyReport(start, end, metrics);
+      // Executive section (B-10), only with the switch; without it the report text is unchanged. Never fails the report.
+      if (process.env.EXECUTIVE_WEEKLY_REPORT === "true") text += `\n\n${formatExecutiveWeekly(await readExecutiveWeekly(db, start, end))}`;
       await db.query("UPDATE weekly_reports SET status='ready',report_text=$2,metrics=$3,updated_at=now() WHERE week_start=$1 AND status='claimed'",
         [weekStart, text, JSON.stringify(metrics)]);
     } catch (error) {
