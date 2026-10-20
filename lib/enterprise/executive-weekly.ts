@@ -3,6 +3,9 @@
 // only listed as a reminder – they can be approved solely as a reply to their own request message (lib/enterprise/decisions.ts),
 // never as a reply to the weekly report. Missing tables or a database error give an "unreadable" section, never an exception,
 // so the weekly report itself never fails because of the executive level. Used only with EXECUTIVE_WEEKLY_REPORT=true.
+//
+// Requests past their expiry count as expired even while still 'pending': expireDecisions runs only in the executive cycle
+// (B-07, off by default), and an expired request can never be approved (same rule as lib/architecture/enterprise-snapshot.ts).
 
 import type { Database } from "../memory/db";
 
@@ -30,8 +33,9 @@ const OPEN = ["queued", "leased", "running", "needs_decision"];
 
 const num = (value: unknown) => (value === null || value === undefined ? 0 : Number(value));
 
-export async function readExecutiveWeekly(db: Database, start: Date, end: Date): Promise<ExecutiveWeekly> {
+export async function readExecutiveWeekly(db: Database, start: Date, end: Date, asOf: Date = new Date()): Promise<ExecutiveWeekly> {
   const range = [start.toISOString(), end.toISOString()];
+  const now = asOf.toISOString();
   try {
     return await db.transaction(async sql => {
       await sql.query("SET TRANSACTION READ ONLY");
@@ -44,12 +48,14 @@ export async function readExecutiveWeekly(db: Database, start: Date, end: Date):
           (SELECT count(*)::int FROM enterprise_tasks WHERE status='outcome_unknown') AS unknown_open
         FROM enterprise_tasks WHERE created_at >= $1::timestamptz AND created_at < $2::timestamptz`, [...range, OPEN])).rows[0] ?? {};
       const pending = (await sql.query(`SELECT subject, level, expires_at, count(*) OVER ()::int AS total
-        FROM enterprise_decisions WHERE status='pending' ORDER BY expires_at, created_at LIMIT $1`, [MAX_LISTED_DECISIONS])).rows;
+        FROM enterprise_decisions WHERE status='pending' AND expires_at > $2::timestamptz ORDER BY expires_at, created_at LIMIT $1`,
+        [MAX_LISTED_DECISIONS, now])).rows;
       const decided = (await sql.query(`SELECT
           count(*) FILTER (WHERE status='approved' AND decided_at >= $1::timestamptz AND decided_at < $2::timestamptz)::int AS approved,
           count(*) FILTER (WHERE status='rejected' AND decided_at >= $1::timestamptz AND decided_at < $2::timestamptz)::int AS rejected,
-          count(*) FILTER (WHERE status='expired' AND expires_at >= $1::timestamptz AND expires_at < $2::timestamptz)::int AS expired
-        FROM enterprise_decisions`, range)).rows[0] ?? {};
+          count(*) FILTER (WHERE (status='expired' OR (status='pending' AND expires_at <= $3::timestamptz))
+            AND expires_at >= $1::timestamptz AND expires_at < $2::timestamptz)::int AS expired
+        FROM enterprise_decisions`, [...range, now])).rows[0] ?? {};
       const disputed = (await sql.query("SELECT count(*)::int AS disputed FROM budget_reservations WHERE status='disputed'")).rows[0] ?? {};
       const costs = (await sql.query(`SELECT count(*)::int AS entries,
           COALESCE(sum(amount_micros) FILTER (WHERE currency='EUR' AND value_kind='measured'),0)::bigint AS measured,
@@ -97,7 +103,7 @@ export function formatExecutiveWeekly(section: ExecutiveWeekly): string {
   const lines = [
     "Executive-Ebene (nur Bericht, keine Wirkung)",
     tasks.created
-      ? `Aufgaben neu: ${tasks.created} · erledigt ${tasks.succeeded} · fehlgeschlagen ${tasks.failed} · Wirkung unbekannt ${tasks.unknown} · offen ${tasks.open}${tasks.cancelled ? ` · abgebrochen ${tasks.cancelled}` : ""}`
+      ? `Aufgaben neu: ${tasks.created}, davon heute: erledigt ${tasks.succeeded} · fehlgeschlagen ${tasks.failed} · Wirkung unbekannt ${tasks.unknown} · offen ${tasks.open}${tasks.cancelled ? ` · abgebrochen ${tasks.cancelled}` : ""}`
       : "Aufgaben neu: keine",
   ];
   if (section.unknownOpen) lines.push(`Aufgaben mit unbekannter Wirkung insgesamt: ${section.unknownOpen} – bitte prüfen, sie werden nie automatisch wiederholt`);

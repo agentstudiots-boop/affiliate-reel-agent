@@ -41,6 +41,10 @@ async function scenario(){
   await decision(db,decided('rejected',IN));
   await decision(db,decided('rejected',BEFORE));       // decided before the week
   await decision(db,{status:'expired',expires_at:IN});
+  // Still 'pending' but past expiry (expireDecisions runs only in the switched-off cycle): never listed as open; counted as
+  // expired in the week it expired, and not at all when it expired before the week.
+  await decision(db,{subject:'Abgelaufen in der Woche',expires_at:'2026-10-15T10:00:00Z'});
+  await decision(db,{subject:'Abgelaufen vor der Woche',created_at:'2026-09-20T10:00:00Z',expires_at:'2026-10-01T10:00:00Z'});
   await cost(db,{amount_micros:1_234_567,currency:'EUR'});
   await cost(db,{amount_micros:500_000,currency:'EUR',value_kind:'estimated'});
   await cost(db,{amount_micros:9_000_000,currency:'EUR',value_kind:'forecast'});   // no cost: left out entirely
@@ -52,19 +56,19 @@ async function scenario(){
 
 test('the section reads only the report week and lists open decisions as a reminder (AC-1)',async()=>{
   const db=await scenario();
-  const section=await W.readExecutiveWeekly(db,START,END);
+  const section=await W.readExecutiveWeekly(db,START,END,END);
   assert.equal(section.readable,true);
   assert.deepEqual(section.tasks,{created:8,succeeded:2,failed:2,unknown:1,open:2,cancelled:1});
   assert.equal(section.unknownOpen,2);
   assert.equal(section.decisions.pendingTotal,7);
   assert.equal(section.decisions.pending.length,W.MAX_LISTED_DECISIONS);
-  assert.deepEqual([section.decisions.approved,section.decisions.rejected,section.decisions.expired],[1,1,1]);
+  assert.deepEqual([section.decisions.approved,section.decisions.rejected,section.decisions.expired],[1,1,2]);
   assert.equal(section.disputedReservations,1);
   assert.deepEqual(section.costs,{entries:4,measuredEurMicros:1_234_567,estimatedEurMicros:500_000,withoutPrice:1,otherCurrency:1});
   const text=W.formatExecutiveWeekly(section);
   const lines=text.replace(/\u00a0/g,' ').split('\n');
   assert.equal(lines[0],'Executive-Ebene (nur Bericht, keine Wirkung)');
-  assert.equal(lines[1],'Aufgaben neu: 8 · erledigt 2 · fehlgeschlagen 2 · Wirkung unbekannt 1 · offen 2 · abgebrochen 1');
+  assert.equal(lines[1],'Aufgaben neu: 8, davon heute: erledigt 2 · fehlgeschlagen 2 · Wirkung unbekannt 1 · offen 2 · abgebrochen 1');
   assert.match(lines[2],/^Aufgaben mit unbekannter Wirkung insgesamt: 2 – bitte prüfen/);
   assert.equal(lines[3],'Offene Entscheidungsvorlagen: 7');
   // Earliest expiry first, in Berlin time; the multi-line subject is one bounded line.
@@ -73,11 +77,11 @@ test('the section reads only the report week and lists open decisions as a remin
   assert.equal(lines[5],'– Vorlage 1 (L3b, gültig bis 20.10., 12:00)');
   assert.equal(lines[9],'– und 2 weitere');
   assert.equal(lines[10],'Freigeben oder Ablehnen nur als Antwort auf die jeweilige Anfrage-Nachricht, nicht auf diesen Bericht.');
-  assert.equal(lines[11],'Entschieden diese Woche: freigegeben 1 · abgelehnt 1 · abgelaufen 1');
+  assert.equal(lines[11],'Entschieden diese Woche: freigegeben 1 · abgelehnt 1 · abgelaufen 2');
   assert.equal(lines[12],'Strittige Budgetreservierungen: 1');
   assert.equal(lines[13],'Kostenbuch diese Woche: gemessen 1,23 € + geschätzt 0,50 €, 1 Eintrag ohne Preis (Betrag unbekannt), 1 in anderer Währung');
   assert.equal(lines.length,14);
-  assert.doesNotMatch(text,/9,00|5,00/);   // forecast and last week's cost are not in the report
+  assert.doesNotMatch(text,/9,00|5,00|Abgelaufen/);   // forecast and last week's cost are not in the report
   await db.close();
 });
 
