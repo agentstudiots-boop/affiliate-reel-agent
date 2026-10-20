@@ -102,12 +102,27 @@ export async function disputeReservation(db: Database, id: string): Promise<bool
   return updated.rows.length === 1;
 }
 
-// Disputed reservations are only resolved with a real amount (reconciliation or operator), never released.
-export async function resolveDispute(db: Database, id: string, settledAmountCents: number): Promise<boolean> {
-  if (!cents(settledAmountCents)) return false;
-  const updated = await db.query(`UPDATE budget_reservations SET status='settled',settled_amount_cents=$2,settled_at=now()
-    WHERE id=$1 AND status='disputed' RETURNING id`, [id, settledAmountCents]);
-  return updated.rows.length === 1;
+// Disputed reservations are only resolved with a real amount (reconciliation or operator), never released. The amount
+// needs a source (e.g. the provider's usage or invoice reference) and an actor; both are written to the task's event log in
+// the same transaction, so every resolution – also one with 0 – can be traced to its evidence.
+export type DisputeResolution = { settledAmountCents: number; source: string; actor: string };
+export async function resolveDispute(db: Database, id: string, resolution: DisputeResolution): Promise<boolean> {
+  const source = typeof resolution?.source === "string" ? resolution.source.trim() : "";
+  const actor = typeof resolution?.actor === "string" ? resolution.actor.trim() : "";
+  if (!cents(resolution?.settledAmountCents) || !source || !actor) return false;
+  return db.transaction(async sql => {
+    const reservation = (await sql.query("SELECT task_id FROM budget_reservations WHERE id=$1 AND status='disputed'", [id])).rows[0];
+    if (!reservation) return false;
+    // The task row lock serialises the event sequence, as in the repository.
+    await sql.query("SELECT id FROM enterprise_tasks WHERE id=$1 FOR UPDATE", [reservation.task_id]);
+    const updated = await sql.query(`UPDATE budget_reservations SET status='settled',settled_amount_cents=$2,settled_at=now()
+      WHERE id=$1 AND status='disputed' RETURNING id`, [id, resolution.settledAmountCents]);
+    if (updated.rows.length !== 1) return false;
+    await sql.query(`INSERT INTO enterprise_task_events(task_id,seq,kind,actor,fencing_token,detail)
+      SELECT $1, coalesce(max(seq),0)+1, 'dispute_resolved', $2, NULL, $3::jsonb FROM enterprise_task_events WHERE task_id=$1`,
+      [reservation.task_id, actor.slice(0, 100), JSON.stringify({ reservationId: id, settledAmountCents: resolution.settledAmountCents, source: source.slice(0, 500) })]);
+    return true;
+  });
 }
 
 // Used by the repository inside the transaction that records a task result.

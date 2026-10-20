@@ -49,20 +49,52 @@ test('only decision levels become requests; content is fingerprinted and validat
   const r=await request(db);
   assert.deepEqual([r.version,r.level,/^[a-f0-9]{64}$/.test(r.fingerprint)],[1,'L3b',true]);
   assert.equal((await request(db)).id,r.id,'same content keeps the open request');
+  // Subject key and plan are part of what is fingerprinted.
+  assert.notEqual((await request(db,{subjectKey:'affiliate:post:99'})).fingerprint,r.fingerprint);
+  const withoutPlan=await request(db,{subjectKey:'affiliate:post:98'});
+  assert.notEqual((await request(db,{subjectKey:'affiliate:post:98',planId:'plan-1'})).fingerprint,withoutPlan.fingerprint);
   for(const bad of [{options:[OPTIONS[0]]},{options:[OPTIONS[0],OPTIONS[0]]},{recommendation:{optionId:'maybe',reason:'x'}},{subject:'  '},
     {evidence:[{claim:'Reichweite steigt',kind:'fact'}]},{ttlHours:0},{ttlHours:24*30}])
     await assert.rejects(request(db,bad),D.DecisionError,JSON.stringify(bad));
-  const l4=await D.requestDecision(db,{step:budgetStep(),subjectKey:'budget:opportunity:2026-11',subject:'Budget erhöhen',options:OPTIONS});
+  const l4=await D.requestDecision(db,{step:budgetStep(),budget:{department:'opportunity',period:'2026-11',limitCents:2000},subject:'Budget erhöhen',options:OPTIONS});
   assert.equal(l4.level,'L4');
   // Key order does not change the fingerprint; content does.
-  const content={level:'L3b',department:'a',taskKind:'a.b',handlerId:'a.handler',subject:'s',options:OPTIONS,recommendation:{optionId:'yes',reason:'r'},evidence:[],
-    maxCostCents:0,maxModelCalls:0,taskId:null};
+  const content={subjectKey:'k',level:'L3b',department:'a',taskKind:'a.b',handlerId:'a.handler',subject:'s',options:OPTIONS,recommendation:{optionId:'yes',reason:'r'},evidence:[],
+    maxCostCents:0,maxModelCalls:0,taskId:null,planId:null};
   const a=D.decisionFingerprint(content);
-  const b=D.decisionFingerprint({taskId:null,maxModelCalls:0,maxCostCents:0,evidence:[],recommendation:{reason:'r',optionId:'yes'},options:OPTIONS,subject:'s',
-    handlerId:'a.handler',taskKind:'a.b',department:'a',level:'L3b'});
+  const b=D.decisionFingerprint({planId:null,taskId:null,maxModelCalls:0,maxCostCents:0,evidence:[],recommendation:{reason:'r',optionId:'yes'},options:OPTIONS,subject:'s',
+    handlerId:'a.handler',taskKind:'a.b',department:'a',level:'L3b',subjectKey:'k'});
   assert.equal(a,b);
-  for(const change of [{subject:'s '},{handlerId:'a.other'},{maxModelCalls:1},{maxCostCents:1},{taskId:'00000000-0000-4000-8000-000000000000'}])
+  for(const change of [{subject:'s '},{subjectKey:'k2'},{planId:'p'},{handlerId:'a.other'},{maxModelCalls:1},{maxCostCents:1},{taskId:'00000000-0000-4000-8000-000000000000'}])
     assert.notEqual(a,D.decisionFingerprint({...content,...change}),JSON.stringify(change));
+  await db.close();
+});
+
+test('a hand-built step is checked against the register; budget changes only as structured input (security review J-02)',async()=>{
+  const db=await pgliteDatabase();
+  const step=budgetStep();
+  // Level, handler, action or task kind that do not match the register are refused, whatever the caller claims.
+  for(const forged of [{...plan('executive','executive.prioritize').executable[0],level:'L4'},{...step,handlerId:'executive.other'},{...step,action:'research'},
+    {...step,level:'L3a'},{...step,taskKind:'executive.unknown'},{...step,department:'controlling'}])
+    await assert.rejects(D.requestDecision(db,{step:forged,subject:'x',options:OPTIONS,...(forged.taskKind==='executive.budget_change'
+      ?{budget:{department:'affiliate',period:'2026-10',limitCents:2000}}:{subjectKey:'forged:1'})}),D.DecisionError,JSON.stringify(forged));
+  // The key and the amount shown come from the structured budget, never from free text.
+  const budget={department:'affiliate',period:'2026-10',limitCents:2000};
+  const r=await D.requestDecision(db,{step,budget,subject:'Budget Affiliate Oktober',options:OPTIONS});
+  assert.equal(r.subjectKey,D.budgetSubjectKey('affiliate','2026-10',2000));
+  const shown=(await db.query('SELECT subject,subject_key FROM enterprise_decisions WHERE id=$1',[r.id])).rows[0];
+  assert.match(shown.subject,/Monatsbudget affiliate 2026-10: 20,00\s€$/);
+  assert.equal(shown.subject_key,'budget:affiliate:2026-10:2000');
+  await assert.rejects(D.requestDecision(db,{step,budget,subjectKey:'budget:affiliate:2026-10:2000000',subject:'Budget',options:OPTIONS}),D.DecisionError,'foreign key');
+  await assert.rejects(D.requestDecision(db,{step,subjectKey:'budget:affiliate:2026-10:2000',subject:'Budget',options:OPTIONS}),D.DecisionError,'free key');
+  for(const bad of [{...budget,department:'nobody'},{...budget,period:'2026-13'},{...budget,period:'Oktober'},{...budget,limitCents:0},{...budget,limitCents:12.5},{...budget,limitCents:-1}])
+    await assert.rejects(D.requestDecision(db,{step,budget:bad,subject:'Budget',options:OPTIONS}),D.DecisionError,JSON.stringify(bad));
+  // Other requests cannot use a budget key or carry budget data.
+  await assert.rejects(request(db,{subjectKey:'budget:affiliate:2026-10:2000000'}),D.DecisionError);
+  await assert.rejects(request(db,{budget}),D.DecisionError);
+  // A different amount is a different subject: a new request, not a new version of the old one.
+  const other=await D.requestDecision(db,{step,budget:{...budget,limitCents:2001},subject:'Budget Affiliate Oktober',options:OPTIONS});
+  assert.notEqual(other.subjectKey,r.subjectKey);
   await db.close();
 });
 
@@ -137,7 +169,7 @@ test('missing answers expire and never approve; an approval executes nothing (AC
 
 test('module is isolated: no WhatsApp sending, no publishing, not wired into app code; authorities unchanged (AC-6)',()=>{
   const source=fs.readFileSync('lib/enterprise/decisions.ts','utf8');
-  assert.deepEqual([...source.matchAll(/from\s+"([^"]+)"/g)].map(m=>m[1]).sort(),['../memory/db','../publishing/authority','../whatsapp/intent','./plan','./policy','node:crypto']);
+  assert.deepEqual([...source.matchAll(/from\s+"([^"]+)"/g)].map(m=>m[1]).sort(),['../memory/db','../publishing/authority','../whatsapp/intent','./plan','./policy','./registry','node:crypto']);
   assert.doesNotMatch(source,/process\.env|fetch\(|getDatabase|sendWhatsApp|publish\(|INSERT INTO enterprise_outbox|new Date\(\)|Date\.now/);
   assert.deepEqual(require('../.test-build/lib/publishing/authority').ACTIVE_APPROVAL_AUTHORITIES,['whatsapp_operator']);
   const users=[];
