@@ -19,7 +19,7 @@ async function approveBudget(db,limitCents,department='opportunity'){
   const period=(await db.query("SELECT to_char(now() AT TIME ZONE 'Europe/Berlin','YYYY-MM') AS p")).rows[0].p;
   const step=validatePlan({goal:'b',steps:[{id:'b',department:'executive',taskKind:'executive.budget_change',dependsOn:[],maxCostCents:0,maxModelCalls:0}],
     expectedValue:null,costCapCents:0},LIMITS).decisionRequests[0];
-  const r=await D.requestDecision(db,{step,subjectKey:B.budgetSubjectKey(department,period,limitCents),subject:'Budget',options:[{id:'yes',label:'Ja'},{id:'no',label:'Nein'}]});
+  const r=await D.requestDecision(db,{step,budget:{department,period,limitCents},subject:'Budget',options:[{id:'yes',label:'Ja'},{id:'no',label:'Nein'}]});
   const requestMessageId=`wamid.req.${crypto.randomUUID()}`;
   await D.attachRequestMessage(db,r.id,requestMessageId);
   const decided=await D.recordDecision(db,{authority:'whatsapp_operator',trustedWaId:OPERATOR,evidence:{channel:'whatsapp',messageId:`wamid.reply.${crypto.randomUUID()}`,
