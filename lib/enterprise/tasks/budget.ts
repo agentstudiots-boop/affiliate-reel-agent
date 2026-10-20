@@ -5,7 +5,8 @@
 // reservation: it keeps counting against the budget and is never released automatically. Reservations of one department
 // and month are serialised by an advisory lock, as in lib/visual/runway-budget.ts. The monthly limit comes only from a
 // hard budget (migration 040) whose approved_decision_id names an operator decision (migration 041) that was approved for
-// exactly this department, month and amount (budgetSubjectKey) – never from the caller. Without such a budget the limit is
+// exactly this department, month and amount (budgetSubjectKey in ../decisions, which builds that key and the amount
+// shown to the operator from structured input) – never from the caller. Without such a budget the limit is
 // 0 and every reservation is refused (task B-09). No provider calls while the lock is held.
 // All times come from the database clock, like in the repository (B-03) – including the budget month, which the caller
 // cannot choose. Reserving, settling and releasing are bound to the worker's lease (holder + fencing token) of a running
@@ -34,12 +35,6 @@ export function periodOf(date: Date): string {
 // Everything that still counts against the limit: open and disputed reservations at their reserved amount, settled ones
 // at their real amount (which may exceed the reservation). Released reservations no longer count.
 const BERLIN_PERIOD = "to_char(now() AT TIME ZONE 'Europe/Berlin', 'YYYY-MM')";
-
-// Subject of the L4 decision (executive.budget_change) that makes a hard budget binding. The amount is part of the key, so
-// a changed limit needs a new decision.
-export function budgetSubjectKey(department: string, period: string, limitCents: number): string {
-  return `budget:${department}:${period}:${limitCents}`;
-}
 
 // The binding monthly limit, or null without an approved hard budget (tables of migration 040/041 missing ⇒ null as well).
 async function approvedLimit(sql: Sql, department: string, period: string): Promise<number | null> {
@@ -122,12 +117,27 @@ export async function disputeReservation(db: Database, id: string): Promise<bool
   return updated.rows.length === 1;
 }
 
-// Disputed reservations are only resolved with a real amount (reconciliation or operator), never released.
-export async function resolveDispute(db: Database, id: string, settledAmountCents: number): Promise<boolean> {
-  if (!cents(settledAmountCents)) return false;
-  const updated = await db.query(`UPDATE budget_reservations SET status='settled',settled_amount_cents=$2,settled_at=now()
-    WHERE id=$1 AND status='disputed' RETURNING id`, [id, settledAmountCents]);
-  return updated.rows.length === 1;
+// Disputed reservations are only resolved with a real amount (reconciliation or operator), never released. The amount
+// needs a source (e.g. the provider's usage or invoice reference) and an actor; both are written to the task's event log in
+// the same transaction, so every resolution – also one with 0 – can be traced to its evidence.
+export type DisputeResolution = { settledAmountCents: number; source: string; actor: string };
+export async function resolveDispute(db: Database, id: string, resolution: DisputeResolution): Promise<boolean> {
+  const source = typeof resolution?.source === "string" ? resolution.source.trim() : "";
+  const actor = typeof resolution?.actor === "string" ? resolution.actor.trim() : "";
+  if (!cents(resolution?.settledAmountCents) || !source || !actor) return false;
+  return db.transaction(async sql => {
+    const reservation = (await sql.query("SELECT task_id FROM budget_reservations WHERE id=$1 AND status='disputed'", [id])).rows[0];
+    if (!reservation) return false;
+    // The task row lock serialises the event sequence, as in the repository.
+    await sql.query("SELECT id FROM enterprise_tasks WHERE id=$1 FOR UPDATE", [reservation.task_id]);
+    const updated = await sql.query(`UPDATE budget_reservations SET status='settled',settled_amount_cents=$2,settled_at=now()
+      WHERE id=$1 AND status='disputed' RETURNING id`, [id, resolution.settledAmountCents]);
+    if (updated.rows.length !== 1) return false;
+    await sql.query(`INSERT INTO enterprise_task_events(task_id,seq,kind,actor,fencing_token,detail)
+      SELECT $1, coalesce(max(seq),0)+1, 'dispute_resolved', $2, NULL, $3::jsonb FROM enterprise_task_events WHERE task_id=$1`,
+      [reservation.task_id, actor.slice(0, 100), JSON.stringify({ reservationId: id, settledAmountCents: resolution.settledAmountCents, source: source.slice(0, 500) })]);
+    return true;
+  });
 }
 
 // Used by the repository inside the transaction that records a task result.
