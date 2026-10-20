@@ -4,7 +4,7 @@
   "title": "Datenquellen- und Rechtscheckliste „Immobilienanalyse“ als Vorlage für den Betreiber (nur Doku)",
   "module": "opportunity",
   "phase": "I",
-  "status": "in_progress",
+  "status": "waiting_review",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -47,42 +47,57 @@
   },
   "lease": null,
   "waiting": null,
-  "changed_files": [],
-  "implemented": [],
-  "tests": [],
+  "changed_files": [
+    "docs/ai-business/10_DATENQUELLEN_RECHTSCHECKLISTE.md",
+    "docs/ai-business/README.md"
+  ],
+  "implemented": [
+    "Vorlage §0–§7 mit Prüffragen, Antwort-/Status-/Nachweisfeldern, K.O.-Kriterien, Mindestbedingungen für I-03"
+  ],
+  "tests": [
+    {
+      "command": "Doku-Review",
+      "result": "passed",
+      "detail": "Review approve, 1 minor (K.O.-Richtung)",
+      "commit": "5f7888f",
+      "at": "2026-10-20T13:20:00Z"
+    }
+  ],
   "known_issues": [
-    "Laut Roadmap ursprünglich GPT Work; hier zweite Claude-Sitzung, Prüfung durch Claude-Hauptsitzung"
+    "Rollenabweichung: laut 04 Phase I setzt GPT Work um und Claude prüft; hier Claude-zu-Claude (Umsetzung zweite Sitzung, Prüfung Hauptsitzung). Zusätzliche GPT-Prüfung durch Betreiber möglich.",
+    "minor offen: K.O.-Regel hat bei 4.4, 5.1, 5.2, 6.1 die falsche Richtung"
   ],
   "open_decisions": [],
   "pr": {
-    "url": null,
-    "state": "none",
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/111",
+    "state": "draft",
     "merge_commit": null,
     "ci": "unknown"
   },
   "approval": {
-    "reviewer": "pending",
+    "reviewer": "approved",
     "operator": "pending",
     "latest_review_file": null
   },
   "next_steps": [
-    "Umsetzung durch Session 2",
-    "Review"
+    "Session 2: minor beheben",
+    "Nachprüfung",
+    "Merge durch Betreiber in architecture/ai-business-roadmap"
   ],
   "session": {
     "system": "claude-code",
-    "last_checkpoint_at": "2026-10-20T13:15:00Z",
+    "last_checkpoint_at": "2026-10-20T13:20:00Z",
     "checkpoint_reason": "other",
-    "last_commit": "e15bdbc",
+    "last_commit": "5f7888f",
     "active_branch": "claude/I-02-data-legal-checklist",
-    "state_summary": "von Session 2 übernommen",
+    "state_summary": "Draft-PR #111, Review approve mit 1 minor",
     "decisions_made": [],
-    "test_status": "–",
-    "next_action": "Umsetzung"
+    "test_status": "Doku",
+    "next_action": "minor beheben"
   },
-  "revision": 1,
+  "revision": 2,
   "based_on_commit": "e15bdbc",
-  "updated_at": "2026-10-20T13:15:00Z",
+  "updated_at": "2026-10-20T13:20:00Z",
   "log": [
     {
       "at": "2026-10-20T13:15:00Z",
@@ -90,6 +105,13 @@
       "action": "created",
       "summary": "Aufgabe angelegt, Umsetzung durch zweite Claude-Sitzung",
       "commit": "e15bdbc"
+    },
+    {
+      "at": "2026-10-20T13:20:00Z",
+      "actor": "claude-code",
+      "action": "review_received",
+      "summary": "Review #111: approve, 1 minor (K.O.-Richtung); Rollenabweichung vermerkt",
+      "commit": "5f7888f"
     }
   ]
 }

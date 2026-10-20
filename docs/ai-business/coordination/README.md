@@ -116,6 +116,7 @@ Kein PR ist eingebunden oder aktiviert: keine Schalter gesetzt, nichts in `verce
 | 11 | #109 | H-03 Planetenebene in der 3D-Szene (nur lesend) | #103 | approve (nach Nachprüfung `0a9c683`) · visuelle Abnahme Betreiber |
 | 9 | #108 | E-02 Preiskatalog-Pflege (zweite Sitzung, nicht eingebunden) | #107 | approve (nach Nachprüfung `f05623f`) |
 | 12 | #110 | D-06 Entwicklungsstand aus den Übergabedateien (nur ID/Phase/Status) | #109 | approve (nach Nachprüfung `9f7e609`) · wirkt erst nach #82 |
+| 0 | #111 | I-02 Datenquellen-/Rechtscheckliste (Doku, zweite Sitzung; Basis Roadmap-Branch) | #82 | approve (1 minor offen) · Rolle: Claude-zu-Claude statt GPT |
 
 **J-02 Sicherheitsreview (Claude-Hälfte, 20.10.):** 0 kritisch/hoch, 1 mittel, 4 niedrig – alle behoben, Details `tasks/J-02/findings-claude.md`.
 Volle Prüfung grün auf J-03 `e709752` (754/754) und H-04 `782f6bd` (784/784).
