@@ -112,7 +112,8 @@ Kein PR ist eingebunden oder aktiviert: keine Schalter gesetzt, nichts in `verce
 | 10 | #106 | J-03 Kostenobergrenzen unter Retries (nur Tests) | #105 | Review offen |
 | 10 | #103 | H-04/H-05 Ansicht „Unternehmen“ (2D, Detailpanel je Abteilung) | #102 | approve · visuelle Abnahme Betreiber |
 | 1 | #101 | C-04 PR-Vorlage (zweite Sitzung) | – | approve (2 optionale Hinweise; nach #95 mergen) |
-| 8 | #107 | E-04 manuelle Belege/Erlöse/CSV-Import (zweite Sitzung, nicht eingebunden) | #100 | approve (2 minor offen) · **OD-E04-1** PartnerNet-Bericht/Kopfzeile |
+| 8 | #107 | E-04 manuelle Belege/Erlöse/CSV-Import (zweite Sitzung, nicht eingebunden) | #100 | approve (nach Nachprüfung `a70442d`) · **OD-E04-1** PartnerNet-Bericht/Kopfzeile |
+| 11 | #109 | H-03 Planetenebene in der 3D-Szene (nur lesend) | #103 | Review offen · visuelle Abnahme Betreiber |
 
 **J-02 Sicherheitsreview (Claude-Hälfte, 20.10.):** 0 kritisch/hoch, 1 mittel, 4 niedrig – alle behoben, Details `tasks/J-02/findings-claude.md`.
 Volle Prüfung grün auf J-03 `e709752` (754/754) und H-04 `782f6bd` (784/784).

@@ -99,8 +99,6 @@
     "latest_review_file": null
   },
   "next_steps": [
-    "Session 2: minor 1 (Schlüssel-Trennzeichen) und minor 2 (Duplikatprüfung Kosten) beheben",
-    "Nachprüfung",
     "Merge durch Betreiber nach #100"
   ],
   "session": {
@@ -114,9 +112,9 @@
     "test_status": "725/725",
     "next_action": "minor beheben"
   },
-  "revision": 2,
+  "revision": 3,
   "based_on_commit": "563e398",
-  "updated_at": "2026-10-20T07:45:00Z",
+  "updated_at": "2026-10-20T12:25:00Z",
   "log": [
     {
       "at": "2026-10-20T07:25:00Z",
@@ -131,6 +129,13 @@
       "action": "review_received",
       "summary": "Review #107: approve, 2 minor (Schlüsselkollision, Duplikatprüfung Kosten)",
       "commit": "12d08cc"
+    },
+    {
+      "at": "2026-10-20T12:25:00Z",
+      "actor": "claude-code",
+      "action": "approved",
+      "summary": "Nachprüfung #107 @a70442d: approve (beide minor behoben)",
+      "commit": "a70442d"
     }
   ]
 }
