@@ -50,13 +50,17 @@ Geprüfte Zwischenstände: siehe Abschnitt „Prüfnachweise“.
 | 9 | #112 | J-02 Härtung | #86, #87, #88, #90, #91, #93, #98, #99, #100, #102, #103, #104, #109, #110 |
 | 10 | #106 | J-03 Kostenobergrenzen (nur Tests) | #105 J-01 |
 | 11 | #108 | E-02 Preiskatalog-Pflege (nicht eingebunden) | #107 E-04 |
+| 12 | #113 | J-04 Lasttest (nur Tests, ohne Variable übersprungen) | – (gestapelt auf #106) |
+| 13 | #114 | B-10 Executive-Abschnitt im Wochenbericht (Schalter `EXECUTIVE_WEEKLY_REPORT` aus) | – (gestapelt auf #112) |
 
 Mit Schritt 9 fallen die schon bekannten Betreiberentscheidungen an:
 - **OD-B07-1:** öffentliche Route `/api/cron/executive-cycle`. Sie ist durch `CRON_SECRET` geschützt, nicht geplant und durch `EXECUTIVE_ENABLED` aus.
 - **OD-H01-1:** Unternehmensebene im Command Center, nur lesend und hinter Login.
 - **Visuelle Abnahme** von #103 und #109.
 
-Mit Schritt 11 fällt **OD-E04-1** an.
+Mit Schritt 11 fällt **OD-E04-1** an. Mit Schritt 13 fällt die Entscheidung über `EXECUTIVE_WEEKLY_REPORT` an (erst nach dem
+Merge, Rückweg: Variable entfernen). #113 und #114 sind nach dem Leitfaden entstanden; ihre Endstände sind einzeln geprüft (J-04: 754 ✔,
+4 übersprungen; B-10: 802/802), aber nicht in der Gesamtsimulation enthalten.
 Nicht gegen `main` und nicht Teil dieses Leitfadens: #81, #82 und #111 (Roadmap-Doku, Gate G0) sowie #10, #61 und #65 (ältere PRs außerhalb der Roadmap).
 
 ## Gefundene Fehler im Zusammenspiel

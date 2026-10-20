@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "task_id": "J-04",
+  "title": "Lasttest Aufgabenbuch und Budgetwächter gegen echtes Postgres (nur Tests, lokal, übersprungen ohne J04_DATABASE_URL)",
+  "module": "enterprise-ledger",
+  "phase": "J",
+  "status": "waiting_review",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "claude-code",
+  "base_commit": "b837528",
+  "branch": "claude/J-04-load-test",
+  "depends_on": [
+    "J-03"
+  ],
+  "claims": {
+    "paths": [
+      "tests/enterprise-load-postgres.test.cjs"
+    ],
+    "hot_files": [],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Jede Aufgabe genau einmal unter 16 parallelen Workern",
+      "verification": "Lauf a gegen lokales Postgres 16",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Abgelaufene Leases: nie zwei Erfolge, Fencing eindeutig, laufende Aufgaben outcome_unknown",
+      "verification": "Lauf b",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Monats- und Aufgabenbudget halten exakt unter parallelen Reservierungen",
+      "verification": "Läufe c und d",
+      "met": true
+    },
+    {
+      "id": "AC-4",
+      "criterion": "Nie gegen Neon/Production; ohne Variable übersprungen",
+      "verification": "assertLocal + skip",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 300,
+    "notes": "Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "tests/enterprise-load-postgres.test.cjs"
+  ],
+  "implemented": [
+    "Lasttest a–d (zweite Sitzung, lokale Instanz mit Freigabe ihres Betreibers)"
+  ],
+  "tests": [
+    {
+      "command": "J04_DATABASE_URL=… node --test tests/enterprise-load-postgres.test.cjs; volle Prüfung",
+      "result": "passed",
+      "detail": "4/4 in zwei Läufen; volle Prüfung 754 bestanden, 4 übersprungen",
+      "commit": "cfe2c8d",
+      "at": "2026-10-20T22:00:00Z"
+    }
+  ],
+  "known_issues": [
+    "Gegenprobe mit entfernter Budgetsperre nicht ausgeführt (verweigert)",
+    "Lauf b zeitabhängig"
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/113",
+    "state": "draft",
+    "merge_commit": null,
+    "ci": "pending"
+  },
+  "approval": {
+    "reviewer": "approved",
+    "operator": "pending",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Merge durch Betreiber nach #106"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-20T22:00:00Z",
+    "checkpoint_reason": "other",
+    "last_commit": "cfe2c8d",
+    "active_branch": "claude/J-04-load-test",
+    "state_summary": "Draft-PR #113, approve durch Session 1",
+    "decisions_made": [],
+    "test_status": "4/4 lokal",
+    "next_action": "Merge durch Betreiber"
+  },
+  "revision": 1,
+  "based_on_commit": "6eea13f",
+  "updated_at": "2026-10-20T22:00:00Z",
+  "log": [
+    {
+      "at": "2026-10-20T22:00:00Z",
+      "actor": "claude-code",
+      "action": "approved",
+      "summary": "Review Session 1: approve (Kommentar in #113), 2 optionale Hinweise",
+      "commit": "cfe2c8d"
+    }
+  ]
+}

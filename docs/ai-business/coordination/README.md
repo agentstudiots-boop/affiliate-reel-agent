@@ -89,8 +89,8 @@ gegen #94 (Schritt 8). Endstand: 849/849 Tests, lint, build und typecheck grün.
 **Nummernkollision B-09 (gefunden 20.10. abends):** In `04_ROADMAP.md` bezeichnet B-09 den Executive-Wochenbericht (Erweiterung
 `lib/reporting/weekly.ts`, gebündelte Entscheidungsnachricht, Router-Absicht `executive.*`). Die Aufgabe `tasks/B-09` (#104) ist dagegen
 die Budget-Monatsgrenze aus dem Sicherheitsreview. Der Wochenbericht ist **noch nicht umgesetzt** und läuft künftig als **B-10**.
-Er berührt Hot Files und wird erst nach den Merges laut `MERGE_GUIDE.md` begonnen. Ebenfalls offen nach dem Merge: G-02 (Aufgabenart
-`affiliate.status_report`).
+Er berührt Hot Files und wird erst nach den Merges laut `MERGE_GUIDE.md` begonnen. **G-02** (Aufgabenart `affiliate.status_report`) ist bereits durch G-01 (#87, `handle()` des Adapters) und B-07 (#98, Einbindung
+im Zyklus) abgedeckt; keine eigene Umsetzung nötig. **B-10** ist umgesetzt (#114).
 
 ## Stand 19.10.2026, nachmittags: offene Draft-PRs und Merge-Reihenfolge
 
@@ -130,6 +130,8 @@ Kein PR ist eingebunden oder aktiviert: keine Schalter gesetzt, nichts in `verce
 | 9 | #108 | E-02 Preiskatalog-Pflege (zweite Sitzung, nicht eingebunden) | #107 | approve (nach Nachprüfung `f05623f`) |
 | 12 | #110 | D-06 Entwicklungsstand aus den Übergabedateien (nur ID/Phase/Status) | #109 | approve (nach Nachprüfung `9f7e609`) · wirkt erst nach #82 |
 | 13 | #112 | J-02 Härtung: Obergrenzen Plan/Ergebnis, Importer-Sperre wie E-02 | #110 | approve (nach Nachprüfung `82a52ee`; major behoben: Grenzen behalten den Verbrauch) |
+| 14 | #113 | J-04 Lasttest gegen echtes Postgres (nur Tests, zweite Sitzung, übersprungen ohne `J04_DATABASE_URL`) | #106 | approve (Session 1, 2 optionale Hinweise) |
+| 14 | #114 | B-10 Executive-Abschnitt im Wochenbericht (nur lesend, `EXECUTIVE_WEEKLY_REPORT` aus) | #112 | Review durch zweite Sitzung offen |
 | 0 | #111 | I-02 Datenquellen-/Rechtscheckliste (Doku, zweite Sitzung; Basis Roadmap-Branch) | #82 | approve (nach Nachprüfung `a96acb0`) · Rolle: Claude-zu-Claude statt GPT |
 
 **J-02 Sicherheitsreview (Claude-Hälfte, 20.10.):** 0 kritisch/hoch, 1 mittel, 4 niedrig – alle behoben, Details `tasks/J-02/findings-claude.md`.
