@@ -76,7 +76,8 @@
     "L2 Zeitüberschreitung ⇒ outcome_unknown: B-07 aa3f0b3",
     "L3 resolveDispute nur mit Quelle+Akteur: B-05 6d62a84",
     "L4 MAX_SKIPPED 50: B-03 6105ff0",
-    "Review #102 minor: readEnterpriseView wirft nie (H-01 cc411b0)"
+    "Review #102 minor: readEnterpriseView wirft nie (H-01 cc411b0)",
+    "Härtung (Info-Hinweise + Review #108): Obergrenzen Plan/Ergebnis, Importer-Sperre – #112 (430df22)"
   ],
   "tests": [
     {
@@ -92,11 +93,18 @@
       "detail": "H-04 784/784",
       "commit": "782f6bd",
       "at": "2026-10-20T06:42:00Z"
+    },
+    {
+      "command": "npm run lint && npm test && npm run build && npm run typecheck",
+      "result": "passed",
+      "detail": "795/795",
+      "commit": "430df22",
+      "at": "2026-10-20T13:55:00Z"
     }
   ],
   "known_issues": [
     "AbortSignal für Abteilungen folgt mit der ersten kostenpflichtigen Abteilung (Vertragsänderung B-04)",
-    "Info-Hinweise für die spätere Einbindung in findings-claude.md"
+    "Abbruchsignal für Abteilungen folgt mit der ersten kostenpflichtigen Abteilung"
   ],
   "open_decisions": [
     {
@@ -106,10 +114,10 @@
     }
   ],
   "pr": {
-    "url": null,
-    "state": "none",
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/112",
+    "state": "draft",
     "merge_commit": null,
-    "ci": "unknown"
+    "ci": "pending"
   },
   "approval": {
     "reviewer": "pending",
@@ -131,9 +139,9 @@
     "test_status": "grün",
     "next_action": "Nachprüfungen abwarten"
   },
-  "revision": 1,
+  "revision": 2,
   "based_on_commit": "4a57838",
-  "updated_at": "2026-10-20T06:45:00Z",
+  "updated_at": "2026-10-20T13:55:00Z",
   "log": [
     {
       "at": "2026-10-20T06:45:00Z",
@@ -141,6 +149,13 @@
       "action": "fixed",
       "summary": "Claude-Hälfte J-02: 0 kritisch/hoch, 1 mittel, 4 niedrig – alle behoben",
       "commit": "782f6bd"
+    },
+    {
+      "at": "2026-10-20T13:55:00Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Härtung als Draft-PR #112 oben auf dem Stapel",
+      "commit": "430df22"
     }
   ]
 }
