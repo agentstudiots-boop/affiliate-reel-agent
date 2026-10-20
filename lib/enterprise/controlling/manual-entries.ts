@@ -73,9 +73,13 @@ export async function recordManualCost(db: Database, cost: ManualCost): Promise<
     ON CONFLICT (source, source_ref) DO NOTHING RETURNING id`,
     [randomUUID(), row.day, row.department, row.provider, row.item, row.category, row.quantity, row.unit, row.micros, row.kind, source, sourceRef]);
   if (inserted.rows.length) return { status: "recorded" };
-  const existing = (await db.query(`SELECT department, amount_micros, currency, to_char(occurred_at AT TIME ZONE 'Europe/Berlin','YYYY-MM-DD') AS day
-    FROM cost_entries WHERE source=$1 AND source_ref=$2`, [source, sourceRef])).rows[0];
-  const same = existing && existing.department === row.department && Number(existing.amount_micros) === row.micros && existing.currency === "EUR" && existing.day === row.day;
+  // A duplicate must match in every field; anything else under the same reference (e.g. a second line of one invoice) is a
+  // conflict, so it is reported instead of silently dropped. Several lines of one receipt need their own references.
+  const existing = (await db.query(`SELECT department, category, provider, item, quantity::float8 AS quantity, unit, amount_micros, currency, value_kind,
+      to_char(occurred_at AT TIME ZONE 'Europe/Berlin','YYYY-MM-DD') AS day FROM cost_entries WHERE source=$1 AND source_ref=$2`, [source, sourceRef])).rows[0];
+  const same = existing && existing.department === row.department && existing.category === row.category && existing.provider === row.provider
+    && (existing.item ?? null) === row.item && Number(existing.quantity) === row.quantity && existing.unit === row.unit
+    && Number(existing.amount_micros) === row.micros && existing.currency === "EUR" && existing.value_kind === row.kind && existing.day === row.day;
   return same ? { status: "duplicate" } : rejected("Referenz bereits mit anderem Inhalt erfasst – nicht überschrieben");
 }
 
@@ -93,10 +97,10 @@ async function insertRevenue(db: Database, row: RevenueRow): Promise<EntryResult
     VALUES($1,$2::date,$3::date,$4,$5,$6,'EUR',$7,$8,$9) ON CONFLICT (source, source_ref) DO NOTHING RETURNING id`,
     [randomUUID(), row.periodStart, row.periodEnd, row.department, row.channel, row.cents, row.kind, row.source, row.sourceRef]);
   if (inserted.rows.length) return { status: "recorded" };
-  const existing = (await db.query(`SELECT department, amount_cents, currency, to_char(period_start,'YYYY-MM-DD') AS s, to_char(period_end,'YYYY-MM-DD') AS e
-    FROM revenue_entries WHERE source=$1 AND source_ref=$2`, [row.source, row.sourceRef])).rows[0];
-  const same = existing && existing.department === row.department && Number(existing.amount_cents) === row.cents && existing.currency === "EUR"
-    && existing.s === row.periodStart && existing.e === row.periodEnd;
+  const existing = (await db.query(`SELECT department, channel, amount_cents, currency, value_kind, to_char(period_start,'YYYY-MM-DD') AS s,
+      to_char(period_end,'YYYY-MM-DD') AS e FROM revenue_entries WHERE source=$1 AND source_ref=$2`, [row.source, row.sourceRef])).rows[0];
+  const same = existing && existing.department === row.department && existing.channel === row.channel && Number(existing.amount_cents) === row.cents
+    && existing.currency === "EUR" && existing.value_kind === row.kind && existing.s === row.periodStart && existing.e === row.periodEnd;
   return same ? { status: "duplicate" } : rejected("Referenz bereits mit anderem Inhalt erfasst – nicht überschrieben");
 }
 
@@ -173,7 +177,7 @@ export function parseRevenueCsv(content: string, mapping: RevenueCsvMapping): Pa
     if (mapping.currency && cells[index(mapping.currency)].toUpperCase() !== "EUR") { rejectedRows.push({ line, status: "rejected", reason: "Währung nicht EUR" }); continue; }
     const keyParts = mapping.key.map(column => cells[index(column)]);
     if (keyParts.some(part => !part)) { rejectedRows.push({ line, status: "rejected", reason: "Schlüsselspalte leer" }); continue; }
-    rows.push({ line, day, cents, channel: mapping.channel ? cells[index(mapping.channel)] || null : null, key: keyParts.join("|") });
+    rows.push({ line, day, cents, channel: mapping.channel ? cells[index(mapping.channel)] || null : null, key: JSON.stringify(keyParts) });
   }
   // A key that appears more than once is ambiguous: all its rows are rejected, none is imported.
   const count = new Map<string, number>();
@@ -192,7 +196,7 @@ export async function importRevenueCsv(db: Database, rows: readonly RevenueCsvRo
   for (const row of rows) {
     const channel = text(row.channel, 60) ?? fallback;
     if (!channel) { results.push({ line: row.line, status: "rejected", reason: "Kanal fehlt" }); continue; }
-    const sourceRef = `partnernet:${createHash("sha256").update(`${target.department}|${row.key}`).digest("hex").slice(0, 40)}`;
+    const sourceRef = `partnernet:${createHash("sha256").update(JSON.stringify([target.department, row.key])).digest("hex").slice(0, 40)}`;
     results.push({ line: row.line, ...await insertRevenue(db, { periodStart: row.day, periodEnd: row.day, department: target.department, channel,
       cents: row.cents, kind: "measured", source: "partnernet_export", sourceRef }) });
   }

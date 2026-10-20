@@ -112,3 +112,21 @@ test('module is isolated: only db type, crypto and the register; no clock, env o
   for(const file of fs.readdirSync('.'))if(/\.(ts|tsx)$/.test(file))scan(file);
   assert.deepEqual(users,[]);
 });
+
+test('a reference only counts as duplicate if every field matches; colliding keys stay apart (review #107)',async()=>{
+  const db=await pgliteDatabase();
+  // Two lines of one invoice under the same receipt number: the second is a conflict, never silently dropped.
+  assert.deepEqual(await M.recordManualCost(db,cost({receiptRef:'RE-TEST-2'})),{status:'recorded'});
+  for(const extra of [{provider:'anderer-anbieter'},{category:'infra'},{item:'Zusatzpaket'},{quantity:2},{unit:'monat'}])
+    assert.equal((await M.recordManualCost(db,cost({receiptRef:'RE-TEST-2',...extra}))).status,'rejected',JSON.stringify(extra));
+  // Revenue: same reference with another channel is a conflict as well.
+  const revenue={periodStart:'2026-10-01',periodEnd:'2026-10-31',department:'affiliate',channel:'amazon_partnernet',amount:'1,00',kind:'measured',entryRef:'k-1'};
+  assert.deepEqual(await M.recordManualRevenue(db,revenue),{status:'recorded'});
+  assert.equal((await M.recordManualRevenue(db,{...revenue,channel:'anderer_kanal'})).status,'rejected');
+  // Key columns "a|b"+"c" and "a"+"b|c" must not collide (they did with join("|")).
+  const csv=['Datum;A;B;Provision','01.10.2026;x|y;z;1,00','01.10.2026;x;y|z;2,00'].join('\n');
+  const parsed=M.parseRevenueCsv(csv,{day:'Datum',amount:'Provision',key:['A','B']});
+  assert.deepEqual([parsed.rows.length,parsed.rejected.length],[2,0]);
+  assert.deepEqual((await M.importRevenueCsv(db,parsed.rows,{department:'affiliate',channel:'amazon_partnernet'})).map(row=>row.status),['recorded','recorded']);
+  await db.close();
+});
