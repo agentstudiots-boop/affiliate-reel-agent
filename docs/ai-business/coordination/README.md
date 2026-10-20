@@ -114,9 +114,13 @@ Kein PR ist eingebunden oder aktiviert: keine Schalter gesetzt, nichts in `verce
 | 1 | #101 | C-04 PR-Vorlage (zweite Sitzung) | – | approve (2 optionale Hinweise; nach #95 mergen) |
 | 8 | #107 | E-04 manuelle Belege/Erlöse/CSV-Import (zweite Sitzung, nicht eingebunden) | #100 | approve (nach Nachprüfung `a70442d`) · **OD-E04-1** PartnerNet-Bericht/Kopfzeile |
 | 11 | #109 | H-03 Planetenebene in der 3D-Szene (nur lesend) | #103 | Review offen · visuelle Abnahme Betreiber |
+| 9 | #108 | E-02 Preiskatalog-Pflege (zweite Sitzung, nicht eingebunden) | #107 | approve (1 minor offen) |
+| 12 | #110 | D-06 Entwicklungsstand aus den Übergabedateien (nur ID/Phase/Status) | #109 | Review offen · wirkt erst nach #82 |
 
 **J-02 Sicherheitsreview (Claude-Hälfte, 20.10.):** 0 kritisch/hoch, 1 mittel, 4 niedrig – alle behoben, Details `tasks/J-02/findings-claude.md`.
 Volle Prüfung grün auf J-03 `e709752` (754/754) und H-04 `782f6bd` (784/784).
+
+**J-04 (Lasttest mit echtem Postgres):** in dieser Cloud-Sitzung nicht ausführbar – der Zugriff auf eine lokale Postgres-Instanz wurde verweigert; PGlite serialisiert und taugt nicht als Lasttest.
 
 Gestapelte PRs enthalten die Commits ihrer Basis; nach deren Merge zeigt der Diff nur den eigenen Zuwachs. Bekannte triviale Konflikte:
 `tsconfig.test.json`-Includes benachbarter PRs (beide Einträge behalten); ich löse sie per Merge-Commit, sobald die Basis gemergt ist.

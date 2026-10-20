@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "task_id": "D-06",
+  "title": "Command Center: Entwicklungsstand aus den Übergabedateien (nur ID, Phase, Status)",
+  "module": "command-center",
+  "phase": "D",
+  "status": "waiting_review",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "claude-code",
+  "base_commit": "1a2f35d",
+  "branch": "claude/D-06-development-status",
+  "depends_on": [
+    "H-03"
+  ],
+  "claims": {
+    "paths": [
+      "lib/architecture/development.ts",
+      "app/api/architecture/route.ts",
+      "next.config.ts"
+    ],
+    "hot_files": [],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Nur task_id, phase, status gelesen; alles andere bleibt draußen",
+      "verification": "tests/architecture-development.test.cjs",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Unpassende Dateien gezählt und ausgelassen, nie geraten; fehlender Ordner sichtbar",
+      "verification": "Tests + Gegentests",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 300,
+    "notes": "Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "lib/architecture/development.ts",
+    "app/api/architecture/route.ts",
+    "app/architecture/enterprise-panel.tsx",
+    "app/architecture/command-center.tsx",
+    "app/architecture/types.ts",
+    "next.config.ts",
+    "tests/architecture-development.test.cjs"
+  ],
+  "implemented": [
+    "Feld development in /api/architecture",
+    "Abschnitt Entwicklungsstand bei Engineering"
+  ],
+  "tests": [
+    {
+      "command": "npm run lint && npm test && npm run build && npm run typecheck",
+      "result": "passed",
+      "detail": "792/792",
+      "commit": "3d28f99",
+      "at": "2026-10-20T13:00:00Z"
+    }
+  ],
+  "known_issues": [
+    "Wirkt erst, wenn die Übergabedateien auf main liegen (#82)"
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/110",
+    "state": "draft",
+    "merge_commit": null,
+    "ci": "pending"
+  },
+  "approval": {
+    "reviewer": "pending",
+    "operator": "pending",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Review",
+    "Merge durch Betreiber nach #109"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-20T13:05:00Z",
+    "checkpoint_reason": "other",
+    "last_commit": "3d28f99",
+    "active_branch": "claude/D-06-development-status",
+    "state_summary": "Draft-PR #110 offen",
+    "decisions_made": [],
+    "test_status": "792/792",
+    "next_action": "Review"
+  },
+  "revision": 1,
+  "based_on_commit": "5d3b95e",
+  "updated_at": "2026-10-20T13:05:00Z",
+  "log": [
+    {
+      "at": "2026-10-20T13:05:00Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Draft-PR #110 offen",
+      "commit": "3d28f99"
+    }
+  ]
+}
