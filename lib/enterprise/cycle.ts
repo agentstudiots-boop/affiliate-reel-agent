@@ -4,8 +4,9 @@
 // Nothing here decides or approves anything: tasks are L0–L2 by construction (B-01/B-03), decision requests stay requests
 // (B-06), and a department result goes through the repository's checks (lease, fencing, budget, outcome_unknown). A
 // department that throws has an unknown usage, so its result is recorded as unreadable – the repository fails the task
-// and disputes its budget reservations. A department that does not answer within handlerTimeoutMs is treated the same way
-// (its usage is unknown), so one hanging task cannot use up the route's time budget for the others.
+// and disputes its budget reservations. A department that does not answer within handlerTimeoutMs may still be running and
+// acting, so its task ends in outcome_unknown (never retried, reservations disputed), with the task budget given as the upper
+// bound of its usage; one hanging task cannot use up the route's time budget for the others.
 // The cron route calls this only with EXECUTIVE_ENABLED=true in production.
 
 import type { Database } from "../memory/db";
@@ -65,7 +66,9 @@ export async function runExecutiveCycle(db: Database, options: CycleOptions): Pr
       let result: unknown;
       try {
         const answer = await withTimeout(Promise.resolve().then(() => handler.handle(lease.envelope, options.contextFor(department))), handlerTimeoutMs);
-        result = answer === TIMED_OUT ? { status: "unreadable", reason: "Zeitlimit überschritten" } : answer;
+        result = answer === TIMED_OUT ? { status: "failed", failureClass: "outcome_unknown",
+          reason: "Zeitlimit überschritten: Wirkung und Verbrauch unbekannt (Obergrenze: Aufgabenbudget)",
+          usedCostCents: lease.envelope.budget.maxCostCents, usedModelCalls: lease.envelope.budget.maxModelCalls } : answer;
       } catch { result = { status: "unreadable" }; }
       const done = await completeTask(db, lease, result);
       outcome = done.ok ? done.outcome : done.reason;
