@@ -51,13 +51,15 @@ export function planets(view: EnterpriseView | undefined): Planet[] {
   return view.departments.map(department => {
     const { label: status, color } = state(department);
     const pending = department.decisions ? department.decisions.pending : null;
-    const open = pending ? ` · ${pending} ${pending === 1 ? "Entscheidung" : "Entscheidungen"} offen` : "";
+    // Unreadable decisions are said in words: a planet without a ring must not look like "no open decision".
+    const open = pending === null ? " · Entscheidungen: keine Daten" : pending ? ` · ${pending} ${pending === 1 ? "Entscheidung" : "Entscheidungen"} offen` : "";
     const plain = department.module === "none"
       ? `${department.label}: ${department.runtime ? "Laufzeitmodul noch nicht gebaut" : "arbeitet außerhalb der App"}. Klicken für Details.`
       : `${department.label}: ${status}${department.health?.reason ? ` – ${department.health.reason}` : ""}. Klicken für Details.`;
+    const decisionsText = pending === null ? " Entscheidungsvorlagen: keine Daten." : "";
     return {
       id: department.id, label: department.label, position: positions[department.id], radius: department.id === CENTRE ? 2.1 : 1.45,
-      color, wireframe: department.module === "none", status, pendingDecisions: pending, sub: `${status}${open}`, plain,
+      color, wireframe: department.module === "none", status, pendingDecisions: pending, sub: `${status}${open}`, plain: plain + decisionsText,
     };
   });
 }
