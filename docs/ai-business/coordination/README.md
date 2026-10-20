@@ -86,6 +86,12 @@ Alle offenen Roadmap-PRs wurden lokal auf `main` zusammengeführt und in Stufen 
 auftreten, sind dort beschrieben: E-02-Isolationstest gegen einen J-02-Kommentar (behoben in #112 `3f35aaa`) und E-06-Registertest
 gegen #94 (Schritt 8). Endstand: 849/849 Tests, lint, build und typecheck grün.
 
+**Nummernkollision B-09 (gefunden 20.10. abends):** In `04_ROADMAP.md` bezeichnet B-09 den Executive-Wochenbericht (Erweiterung
+`lib/reporting/weekly.ts`, gebündelte Entscheidungsnachricht, Router-Absicht `executive.*`). Die Aufgabe `tasks/B-09` (#104) ist dagegen
+die Budget-Monatsgrenze aus dem Sicherheitsreview. Der Wochenbericht ist **noch nicht umgesetzt** und läuft künftig als **B-10**.
+Er berührt Hot Files und wird erst nach den Merges laut `MERGE_GUIDE.md` begonnen. Ebenfalls offen nach dem Merge: G-02 (Aufgabenart
+`affiliate.status_report`).
+
 ## Stand 19.10.2026, nachmittags: offene Draft-PRs und Merge-Reihenfolge
 
 Zweite Claude-Code-Sitzung (`session_01Srrz6J98VFXDsVBnE82VPC`) prüft PRs als **Zweitsitzung desselben Modells** – hilfreich, aber kein
