@@ -175,7 +175,7 @@ test('2D detail panel: health with sources, task counts, open decisions, costs a
 
 test('Command Center offers the enterprise view without WebGL and reads nothing itself (AC-11)',()=>{
   const center=fs.readFileSync('app/architecture/command-center.tsx','utf8');
-  assert.match(center,/setMode\("enterprise"\)[^]*>Unternehmen<\/button>/);
+  assert.match(center,/switchMode\("enterprise"\)[^]*>Unternehmen<\/button>/);
   // Without WebGL (or without enterprise data) the 2D cards are shown; with WebGL the planets use the same canvas (H-03).
   assert.match(center,/mode === "enterprise" && !planetsShown && <EnterprisePanel view=\{data\.enterprise\} selected=\{department\} onSelect=\{setDepartment\} development=\{data\.development\} \/>/);
   assert.match(center,/const planetsShown = enterprise3d && showScene;/);
@@ -211,6 +211,7 @@ test('planets: Executive in the centre, the other departments on one orbit, fixe
   }
   assert.match(byId.engineering.plain,/arbeitet außerhalb der App/);
   assert.equal(byId.controlling.pendingDecisions,0);
+  assert.doesNotMatch(byId.controlling.sub,/Entscheidung/,'a known zero shows no decision text');
 });
 
 test('planets: without evidence nothing is invented; unreadable report and missing ledger stay visible (H-03 AC-2)',()=>{
@@ -218,6 +219,8 @@ test('planets: without evidence nothing is invented; unreadable report and missi
   for(const p of P.planets(empty)){
     assert.equal(p.pendingDecisions,null,p.id);
     assert.doesNotMatch(p.sub,/In Ordnung|offen/,p.id);
+    assert.match(p.sub,/Entscheidungen: keine Daten/,'unreadable decisions are said, not shown as zero');
+    assert.match(p.plain,/Entscheidungsvorlagen: keine Daten/);
   }
   const unreadable=P.planets(buildEnterpriseView({now:NOW,health:{affiliate:null},tasks:null,decisions:null,controlling:null}));
   assert.equal(unreadable.find(p=>p.id==='affiliate').status,'Bericht nicht lesbar');

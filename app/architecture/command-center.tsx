@@ -38,6 +38,8 @@ export function CommandCenter({ standalone = false }: { standalone?: boolean } =
   const [sceneError, setSceneError] = useState("");
   const [reduced, setReduced] = useState(false);
   const [hover, setHover] = useState<Hover>(null);
+  // A tooltip of the previous view must not stay when the view changes (e.g. by keyboard, without pointer movement).
+  const switchMode = (next: typeof mode) => { setHover(null); setMode(next); };
   // The canvas is mounted once and afterwards only hidden: unmounting a react-three-fiber root inside a React commit logs
   // "synchronously unmount a root" errors with React 19. A hidden scene renders nothing (frameloop "never").
   const [sceneMounted, setSceneMounted] = useState(false);
@@ -174,10 +176,10 @@ export function CommandCenter({ standalone = false }: { standalone?: boolean } =
       <div className="ccToolbar">
         <input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Komponente suchen …" aria-label="Komponente suchen" />
         <div role="group" aria-label="Ansicht" className="ccSegment">
-          <button type="button" className={mode === "architecture" ? "primary" : "ghost"} aria-pressed={mode === "architecture"} onClick={() => setMode("architecture")}>Architektur</button>
-          <button type="button" className={mode === "process" ? "primary" : "ghost"} aria-pressed={mode === "process"} onClick={() => { setMode("process"); setSelection(null); }}>Ablauf</button>
-          <button type="button" className={mode === "profiles" ? "primary" : "ghost"} aria-pressed={mode === "profiles"} onClick={() => { setMode("profiles"); setSelection(null); }}>Steckbriefe</button>
-          <button type="button" className={mode === "enterprise" ? "primary" : "ghost"} aria-pressed={mode === "enterprise"} onClick={() => { setMode("enterprise"); setSelection(null); }}>Unternehmen</button>
+          <button type="button" className={mode === "architecture" ? "primary" : "ghost"} aria-pressed={mode === "architecture"} onClick={() => switchMode("architecture")}>Architektur</button>
+          <button type="button" className={mode === "process" ? "primary" : "ghost"} aria-pressed={mode === "process"} onClick={() => { switchMode("process"); setSelection(null); }}>Ablauf</button>
+          <button type="button" className={mode === "profiles" ? "primary" : "ghost"} aria-pressed={mode === "profiles"} onClick={() => { switchMode("profiles"); setSelection(null); }}>Steckbriefe</button>
+          <button type="button" className={mode === "enterprise" ? "primary" : "ghost"} aria-pressed={mode === "enterprise"} onClick={() => { switchMode("enterprise"); setSelection(null); }}>Unternehmen</button>
         </div>
         <button type="button" className="ghost" onClick={() => { setSelection(null); setDepartment(null); setQuery(""); setResetToken(token => token + 1); }}>Gesamtansicht</button>
         {use3d && !sceneError && <button type="button" className="ghost" onClick={() => setUse3d(false)}>2D-Ansicht</button>}
@@ -189,7 +191,7 @@ export function CommandCenter({ standalone = false }: { standalone?: boolean } =
       {mode === "process" && <ProcessRibbon data={data} onSelect={select} />}
       {mode === "enterprise" && !planetsShown && <EnterprisePanel view={data.enterprise} selected={department} onSelect={setDepartment} development={data.development} />}
       {planetsShown && data.enterprise && <EnterpriseSummary view={data.enterprise} />}
-      {mode === "profiles" && <ProfilesView data={data} query={query} onSelect={next => { setMode("architecture"); select(next); }} />}
+      {mode === "profiles" && <ProfilesView data={data} query={query} onSelect={next => { switchMode("architecture"); select(next); }} />}
       <div className="ccBody" hidden={mode === "profiles" || (mode === "enterprise" && !planetsShown)}>
         <div className="ccStage" data-testid="cc-stage" tabIndex={showScene ? 0 : -1} onKeyDown={showScene ? onStageKey : undefined}
           aria-label={showScene ? mode === "enterprise" ? "3D-Ansicht der Abteilungen. Pfeiltasten wechseln die Abteilung, Pfeil hoch oder Escape geht zurück, Pos1 zeigt alle."
