@@ -34,6 +34,7 @@
     "lib/enterprise/opportunity/scoring.ts",
     "lib/enterprise/opportunity/economics.ts",
     "lib/enterprise/opportunity/ledger.ts",
+    "lib/enterprise/opportunity/research.ts",
     "lib/daily/product-lock.ts",
     "lib/daily/slots.ts",
     "lib/daily/evidence.ts",
