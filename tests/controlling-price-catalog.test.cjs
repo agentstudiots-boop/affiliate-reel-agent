@@ -125,7 +125,9 @@ test('module is isolated: writes only price_catalog, reads no clock or network, 
   assert.deepEqual([...new Set([...source.matchAll(/(?:INSERT INTO|UPDATE|DELETE FROM)\s+(\w+)/g)].map(m=>m[1]))],['price_catalog']);
   assert.doesNotMatch(source,/DELETE|DROP|TRUNCATE|require\(|import\(|Date\.now|new Date\(\)|process\.|fetch\(/);
   const users=[];
-  const scan=full=>{if(/\.(ts|tsx|js|mjs|cjs)$/.test(full)&&/controlling\/price-catalog/.test(fs.readFileSync(full,'utf8')))users.push(full);};
+  // Only real imports count (from/import()/require); a comment naming the module is not a use (review #112).
+  const USE=/(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)["'][^"']*\/price-catalog(?:\.[cm]?[jt]s)?["']/;
+  const scan=full=>{if(/\.(ts|tsx|js|mjs|cjs)$/.test(full)&&!full.endsWith(path.join('controlling','price-catalog.ts'))&&USE.test(fs.readFileSync(full,'utf8')))users.push(full);};
   const walk=dir=>{for(const item of fs.readdirSync(dir,{withFileTypes:true})){
     const full=path.join(dir,item.name);
     if(item.isDirectory()){if(item.name!=='node_modules')walk(full);}else scan(full);
@@ -133,4 +135,8 @@ test('module is isolated: writes only price_catalog, reads no clock or network, 
   walk('app');walk('lib');walk('scripts');
   for(const file of fs.readdirSync('.'))if(/\.(ts|tsx)$/.test(file))scan(file);
   assert.deepEqual(users,[]);
+  // The pattern sees imports in every form, but not a mention in a comment.
+  for(const used of ['import { addPrice } from "./price-catalog";',"const P=require('../lib/enterprise/controlling/price-catalog');",'await import("@/lib/enterprise/controlling/price-catalog.ts")'])
+    assert.match(used,USE,used);
+  assert.doesNotMatch('// same lock as the catalogue module (lib/enterprise/controlling/price-catalog.ts)',USE);
 });
