@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { ContentJob } from "../content/schema";
 import { videoSchema } from "../content/schema";
+import { predictionMetrics, recordModelCall } from "../observability/model-calls";
 import { INSTRUCTION_MODEL, InstructionParserError, predictionText } from "./instruction";
 
 const responseSchema = z.object({
@@ -19,6 +20,11 @@ export async function interpretVideoRevision(job: ContentJob, feedback: string, 
     product: { name: job.opportunity.product.name, asin: job.opportunity.product.asin, category: job.opportunity.category },
     verifiedFacts: job.opportunity.verifiedFacts, current_video: job.content });
   if (input.length > 18000) throw new InstructionParserError("parser_context_too_large");
+  // Every attempted paid call is recorded once (model_calls): ok once the model returned a valid structured answer,
+  // otherwise as a failure with the provider metrics seen so far.
+  const started = Date.now();
+  let seen: unknown = null;
+  let recorded = false;
   try {
     const response = await request(`https://api.replicate.com/v1/models/${INSTRUCTION_MODEL}/predictions`, {
       method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Prefer: "wait=20", "Cancel-After": "40s" },
@@ -33,6 +39,7 @@ export async function interpretVideoRevision(job: ContentJob, feedback: string, 
       throw new InstructionParserError(response.status === 402 ? "parser_billing_required" : [401,403].includes(response.status) ? "parser_auth_rejected" : "parser_unavailable");
     }
     let prediction = await response.json();
+    seen = prediction;
     const id = prediction.id;
     if (typeof id !== "string" || !/^[a-z0-9]{12,64}$/.test(id)) throw new InstructionParserError("parser_unavailable");
     for (let i = 0; ["starting", "processing"].includes(prediction.status) && i < 8; i++) {
@@ -40,6 +47,7 @@ export async function interpretVideoRevision(job: ContentJob, feedback: string, 
       const poll = await request(`https://api.replicate.com/v1/predictions/${id}`, { headers: { Authorization: `Bearer ${token}` }, redirect: "error", signal: AbortSignal.timeout(5000) });
       if (!poll.ok) {console.warn(JSON.stringify({event:"video_parser_poll_error",httpStatus:poll.status}));throw new InstructionParserError("parser_unavailable");}
       prediction = await poll.json();
+      seen = prediction;
       if (prediction.id !== id) throw new InstructionParserError("parser_unavailable");
     }
     const output=predictionText(prediction.output);
@@ -49,10 +57,14 @@ export async function interpretVideoRevision(job: ContentJob, feedback: string, 
     }
     if (output.length > 18000) throw new InstructionParserError("parser_unavailable");
     const result = responseSchema.parse(JSON.parse(output));
+    recorded = true;
+    await recordModelCall({ agent: "whatsapp_video_revision", model: INSTRUCTION_MODEL, ok: true, latencyMs: Date.now() - started, ...predictionMetrics(prediction) });
     if (result.intent === "change_product") throw new Error("Für ein anderes Produkt ist ein neuer Auftrag nötig.");
     if (result.intent !== "revise_video" || result.confidence < .85 || !result.video) throw new Error("Videoänderung nicht eindeutig. Bitte die betroffene Szene oder den gewünschten Text genauer beschreiben.");
     return result.video;
   } catch (error) {
+    if (!recorded) await recordModelCall({ agent: "whatsapp_video_revision", model: INSTRUCTION_MODEL, ok: false,
+      errorClass: error instanceof InstructionParserError ? error.message : "invalid_or_unknown_response", latencyMs: Date.now() - started, ...predictionMetrics(seen) });
     if (error instanceof InstructionParserError) throw error;
     if (error instanceof Error && /anderes Produkt|nicht eindeutig/.test(error.message)) throw error;
     throw new InstructionParserError("parser_unavailable");
