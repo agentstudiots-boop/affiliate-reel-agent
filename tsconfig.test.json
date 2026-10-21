@@ -20,6 +20,10 @@
   },
   "include": [
     "lib/content/**/*.ts",
+    "lib/enterprise/registry.ts",
+    "lib/enterprise/policy.ts",
+    "lib/enterprise/plan.ts",
+    "lib/enterprise/decisions.ts",
     "lib/product-resolver.ts",
     "lib/enterprise/opportunity/scoring.ts",
     "lib/enterprise/opportunity/economics.ts",
