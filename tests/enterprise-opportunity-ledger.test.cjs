@@ -110,7 +110,7 @@ test('one opportunity per WhatsApp message; parallel assessments get distinct ve
   await db.close();
 });
 
-test('the ledger is isolated: no network, no model, no clock, no approval path, not wired into app code yet (AC-5)',()=>{
+test('the ledger is isolated: no network, no model, no clock, no approval path, used only by the WhatsApp trigger (AC-5)',()=>{
   const source=fs.readFileSync('lib/enterprise/opportunity/ledger.ts','utf8');
   assert.deepEqual([...source.matchAll(/from\s+"([^"]+)"/g)].map(m=>m[1]).sort(),['../../memory/db','./economics','./scoring','node:crypto']);
   assert.doesNotMatch(source,/fetch\(|process\.env|Date\.now|new Date\(\)|recordModelCall|enterprise_decisions|DELETE|DROP|require\(|import\(/);
@@ -121,5 +121,6 @@ test('the ledger is isolated: no network, no model, no clock, no approval path, 
     if(entry.isDirectory()){if(entry.name!=='node_modules'&&!full.startsWith(path.join('lib','enterprise')))walk(full);}
     else if(/\.(ts|tsx)$/.test(entry.name)&&/opportunity\/ledger/.test(fs.readFileSync(full,'utf8')))users.push(full);}};
   walk('app');walk('lib');
-  assert.deepEqual(users,[]);
+  // Only the WhatsApp trigger (F-05, switch OPPORTUNITY_SCOUT_ENABLED off by default) uses it.
+  assert.deepEqual(users,[path.join('lib','whatsapp','opportunity-check.ts')]);
 });

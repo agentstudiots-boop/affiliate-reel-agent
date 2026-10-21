@@ -76,7 +76,7 @@ test('the prompt carries the idea, the grid and the sources; the system prompt f
   assert.match(f.calls.model[0].system,/Erfinde keine Zahlen/);
 });
 
-test('the module calls only Tavily and the logged router model; it is not wired into app code yet (AC-5)',()=>{
+test('the module calls only Tavily and the logged router model; it is used only by the WhatsApp trigger (AC-5)',()=>{
   const source=fs.readFileSync('lib/enterprise/opportunity/research.ts','utf8');
   assert.deepEqual([...source.matchAll(/from\s+"([^"]+)"/g)].map(m=>m[1]).sort(),['../../tavily','../../whatsapp/route-llm','./scoring','zod']);
   assert.match(source,/agent: "opportunity_research"/);
@@ -86,7 +86,8 @@ test('the module calls only Tavily and the logged router model; it is not wired 
     if(entry.isDirectory()){if(entry.name!=='node_modules'&&!full.startsWith(path.join('lib','enterprise')))walk(full);}
     else if(/\.(ts|tsx)$/.test(entry.name)&&/opportunity\/research/.test(fs.readFileSync(full,'utf8')))users.push(full);}};
   walk('app');walk('lib');
-  assert.deepEqual(users,[]);
+  // Only the WhatsApp trigger (F-05, switch OPPORTUNITY_SCOUT_ENABLED off by default) uses it.
+  assert.deepEqual(users,[path.join('lib','whatsapp','opportunity-check.ts')]);
 });
 
 test('router options for long answers: defaults unchanged, raised limits only where passed, both capped (AC-6)',async()=>{

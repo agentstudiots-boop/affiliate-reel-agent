@@ -127,7 +127,7 @@ test('inputs are not mutated and results are deterministic (AC-1)',()=>{
   assert.equal(JSON.stringify([input,cfg]),snapshot);
 });
 
-test('module is pure and isolated: no imports, no clock, not used by app code (AC-1, AC-7)',()=>{
+test('module is pure and isolated: no imports, no clock, used only by the scout trigger (AC-1, AC-7)',()=>{
   const source=fs.readFileSync('lib/enterprise/opportunity/scoring.ts','utf8');
   assert.doesNotMatch(source,/^\s*import\s/m);
   assert.doesNotMatch(source,/require\(|Date\.|new Date|Math\.random|process\.|fetch\(/);
@@ -140,5 +140,6 @@ test('module is pure and isolated: no imports, no clock, not used by app code (A
   }};
   walk('app');walk('lib');walk('scripts');
   for(const file of fs.readdirSync('.'))if(/\.(ts|tsx)$/.test(file))scan(file);
-  assert.deepEqual(users,[]);
+  // Only the WhatsApp trigger of the scout (F-05, switch OPPORTUNITY_SCOUT_ENABLED off by default) reads the criteria labels.
+  assert.deepEqual(users,[path.join('lib','whatsapp','opportunity-check.ts')]);
 });

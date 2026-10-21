@@ -21,6 +21,7 @@ import { startImagePostFromWhatsApp, startProductSearch } from "@/lib/whatsapp/s
 import { handleManualOrder } from "@/lib/whatsapp/manual-order";
 import { handleImageQualityReply } from "@/lib/whatsapp/image-quality-reply";
 import { handleExecutiveStatus } from "@/lib/whatsapp/executive-status";
+import { handleOpportunityCheck } from "@/lib/whatsapp/opportunity-check";
 import { answerWhatsAppConversation } from "@/lib/whatsapp/chat";
 import { sendWhatsAppText } from "@/lib/whatsapp/client";
 import { completeVoice, releaseVoice, resolveVoiceMessage } from "@/lib/whatsapp/voice";
@@ -142,6 +143,10 @@ export async function POST(request: Request) {
       }
       // „Executive“ (B-11, only with EXECUTIVE_WHATSAPP=true): read-only executive status, deterministic, no model call.
       if (process.env.EXECUTIVE_WHATSAPP === "true" && await handleExecutiveStatus({ ...message, payload }, { database: getDatabase, send: sendWhatsAppText })) continue;
+      // „Geschäftsidee prüfen: …“ (F-05, only with OPPORTUNITY_SCOUT_ENABLED=true): bounded research after the reply, result as a
+      // recommendation only. Without the switch the message continues through the unchanged chain.
+      if (process.env.OPPORTUNITY_SCOUT_ENABLED === "true" && await handleOpportunityCheck({ ...message, payload },
+        { database: getDatabase, send: sendWhatsAppText, defer: work => after(work) })) continue;
       // Replies to a stopped image job's notice are the operator's manual decision for exactly that job.
       if (await handleImageQualityReply({ ...message, payload }, { database: getDatabase, request: (jobId, mode) => requestFacebookApproval(jobId, mode), send: sendWhatsAppText, notified: alreadyNotified })) continue;
       // Explicit product orders and their short follow-ups („Erstelle einen Beitrag zum …“, „Mach es trotzdem“) are clear
