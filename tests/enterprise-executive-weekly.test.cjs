@@ -116,13 +116,13 @@ test('the reader runs in a READ ONLY transaction and the module cannot send or d
   const source=fs.readFileSync('lib/enterprise/executive-weekly.ts','utf8');
   assert.deepEqual([...source.matchAll(/from\s+"([^"]+)"/g)].map(m=>m[1]),['../memory/db']);
   assert.doesNotMatch(source,/\b(INSERT|UPDATE|DELETE|DROP|TRUNCATE)\b|fetch\(|process\.env|sendWhatsApp|require\(|import\(/);
-  // Only the weekly report uses it.
+  // Only the weekly report (B-10) and the WhatsApp command (B-11) use it.
   const users=[];
   const walk=dir=>{for(const entry of fs.readdirSync(dir,{withFileTypes:true})){const full=path.join(dir,entry.name);
     if(entry.isDirectory()){if(entry.name!=='node_modules'&&!full.startsWith(path.join('lib','enterprise')))walk(full);}
     else if(/\.(ts|tsx)$/.test(entry.name)&&/enterprise\/executive-weekly/.test(fs.readFileSync(full,'utf8')))users.push(full);}};
   walk('app');walk('lib');
-  assert.deepEqual(users,[path.join('lib','reporting','weekly.ts')]);
+  assert.deepEqual(users.sort(),[path.join('lib','reporting','weekly.ts'),path.join('lib','whatsapp','executive-status.ts')].sort());
 });
 
 const weeklyWith=(db,sent)=>loadRoute('lib/reporting/weekly.ts',{
