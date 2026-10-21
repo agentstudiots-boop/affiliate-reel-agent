@@ -77,6 +77,8 @@ test('accepted idea: acknowledgement first, then bounded research and a stored a
     assert.match(result,/Gesamt: unbekannt – Gewichte fehlen \(Betreiberentscheidung Q-07\)/);
     assert.match(result,/Empfehlung: keine Empfehlung möglich/);
     assert.match(result,/Es wurde nichts gestartet, gekauft oder veröffentlicht/);
+    // No reply hint that is itself a command („Weiter“ resumes approved daily publications, „Status“ …).
+    assert.doesNotMatch(result,/\b(Weiter|Status|Freigeben|Ablehnen|Executive)\b/);
     assert.ok(result.length<=4000);
     const row=(await db.query(`SELECT o.status,o.summary,a.created_by,a.model_calls,a.recommendation,a.test_recommended,a.research
       FROM opportunities o JOIN opportunity_assessments a ON a.opportunity_id=o.id WHERE o.source_message_id=$1`,[m.id])).rows[0];

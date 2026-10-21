@@ -6,6 +6,8 @@
 // opportunity's source message) and at most OPPORTUNITY_DAILY_LIMIT checks run per Berlin day (default 3, at most 10).
 // The research runs after the acknowledgement (defer), so the webhook answers Meta at once. Used by the webhook only with
 // OPPORTUNITY_SCOUT_ENABLED=true; without that switch nothing here runs and nothing costs.
+// Known limit: a run cut off by the function time limit stays 'researching' and is not repeated; a later clean-up may only
+// end such a run, never research it again (review #120).
 
 import type { Database } from "../memory/db";
 import { claimResearch, createOperatorOpportunity, recordAssessment, releaseResearch } from "../enterprise/opportunity/ledger";
@@ -58,7 +60,7 @@ export function formatOpportunityResult(title: string, evaluation: OpportunityEv
   lines.push(`Gesamtkonfidenz: ${Math.round(evaluation.confidence * 100)} % · Quellen: ${sources}`);
   lines.push(`Empfehlung: ${testRecommended ? "Test empfohlen" : evaluation.recommendation.status === "not_recommended" ? "nicht empfohlen" : "keine Empfehlung möglich"}`);
   if (evaluation.recommendation.reasons.length) lines.push(`Gründe: ${evaluation.recommendation.reasons.slice(0, 3).join("; ")}`);
-  lines.push("", "Es wurde nichts gestartet, gekauft oder veröffentlicht. Weiter geht es nur mit deiner ausdrücklichen Entscheidung.");
+  lines.push("", "Es wurde nichts gestartet, gekauft oder veröffentlicht. Jeder nächste Schritt braucht deine ausdrückliche Entscheidung.");
   return lines.join("\n").slice(0, 4000);
 }
 
