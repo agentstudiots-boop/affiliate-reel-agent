@@ -7,18 +7,21 @@
 // holds tasks. Only tests; nothing is wired in.
 //
 //   J04_DATABASE_URL='postgresql://postgres@/postgres?host=/tmp/j04-pg' node --test tests/enterprise-load-postgres.test.cjs
+//
+// Scenario b depends on timing (300 ms leases, 400 ms stalls). On a very slow machine its minimum checks (stale workers and
+// outcome_unknown actually occurred) may not be reached in a run; that is a test of the test, not of the ledger – rerun once.
 const {test,before,after}=require('node:test');
 const assert=require('node:assert/strict');
 const crypto=require('node:crypto');
-const {Pool}=require('pg');
+const {Pool,Client}=require('pg');
 
 const URL_ENV=process.env.J04_DATABASE_URL;
 const skip=URL_ENV?false:'J04_DATABASE_URL nicht gesetzt (Lasttest nur gegen eine lokale Postgres-Instanz)';
 
 function assertLocal(url){
-  // Same parser as pg itself, so the check sees exactly the host pg connects to.
-  const host=String(require('pg-connection-string').parse(url).host??'');
-  const local=host.startsWith('/')||['localhost','127.0.0.1','::1'].includes(host);
+  // The host exactly as pg itself resolves it (pg's own Client parses the connection string; no transitive import).
+  const host=String(new Client({connectionString:url}).host??'');
+  const local=host.startsWith('/')||['localhost','127.0.0.1','::1','[::1]'].includes(host);
   if(!local)throw new Error('J-04 läuft nur gegen eine lokale Instanz (Unix-Socket oder localhost)');
 }
 
