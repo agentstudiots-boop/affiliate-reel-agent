@@ -8,7 +8,7 @@ unberührt bleibt.
 
 ## 1. Ziel und Empfehlung
 
-Ein Preview-Deployment soll die Executive-/Controlling-Bausteine (Migrationen 039–041, Aufgabenbuch, Entscheidungsvorlagen,
+Ein Preview-Deployment soll die Executive-/Controlling-Bausteine (Migrationen 039–042, Aufgabenbuch, Entscheidungsvorlagen, Opportunity-Scout,
 Kostenbuch) gegen eine **eigene Datenbank** ausprobieren können, ohne Production zu berühren.
 
 **Empfohlener Zuschnitt:** nur `database` und `blob` isolieren; WhatsApp, Veröffentlichen und Bezahl-Provider bleiben
@@ -94,7 +94,7 @@ Ergebnis: **bleibt fail-closed.** Geprüft am Code von `main` (5f59d36) und an d
 - `scripts/check-preview-isolation.cjs`: fehlende Zugangsdaten ergänzt (siehe §2).
 - `scripts/check-production-untouched.cjs` (neu): lesender Vorher-/Nachher-Vergleich von Production (nur Tabellennamen, Zeilenzahlen,
   Migrationsnamen; Transaktion `READ ONLY`). Ruhige Tabellen = Tabellen, die Production heute nicht schreibt (Executive-Kern,
-  Kosten-/Erlösbuch) – jede Änderung dort ist ein Befund.
+  Kosten-/Erlösbuch, Opportunity-Scout aus Migration 042) – jede Änderung dort ist ein Befund.
 - `tests/preview-isolation-j05.test.cjs`: Drift-Test Code ↔ Prüfskript, Erkennung geteilter Pinterest-/Session-Werte,
   Vorher-/Nachher-Logik mit PGlite, Lesbarkeit/keine Ausgabe der Verbindung.
 

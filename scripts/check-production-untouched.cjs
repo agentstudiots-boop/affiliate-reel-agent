@@ -7,7 +7,7 @@
 //   DATABASE_URL=<production, read-capable> node scripts/check-production-untouched.cjs compare before.json
 //
 // Production writes on its own (cron, webhook), so tables are split into two groups:
-//   QUIET  – production does not write them today (executive kernel, ledgers, unused migrations 039–041): any change is a
+//   QUIET  – production does not write them today (executive kernel, ledgers, opportunity scout; migrations 039–042): any change is a
 //            finding. A new migration recorded in schema_migrations is a finding too, unless production was deployed
 //            in between (then the operator judges).
 //   ACTIVE – production writes them itself: changes are only listed for the operator's judgement (run in a quiet window,
@@ -16,7 +16,7 @@
 const fs = require('node:fs');
 
 const QUIET = ['enterprise_tasks', 'enterprise_task_events', 'enterprise_decisions', 'budget_reservations', 'budgets', 'price_catalog',
-  'cost_entries', 'revenue_entries'];
+  'cost_entries', 'revenue_entries', 'opportunities', 'opportunity_assessments'];
 const ACTIVE = ['whatsapp_events', 'whatsapp_delivery_statuses', 'whatsapp_context_log', 'model_calls', 'content_jobs', 'job_events', 'daily_drafts',
   'daily_slot_runs', 'content_approval_requests', 'approval_requests', 'publication_requests', 'publications', 'publish_approvals', 'publish_attempts',
   'weekly_reports', 'image_generation_attempts', 'image_quality_notices', 'topic_runs', 'topic_contents', 'visual_jobs', 'provider_usage', 'landing_clicks'];

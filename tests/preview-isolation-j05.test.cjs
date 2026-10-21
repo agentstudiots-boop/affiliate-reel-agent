@@ -45,6 +45,7 @@ test('production before/after: quiet tables and new migrations are findings, act
   assert.ok(before.migrations.length>0);
   assert.equal(before.tables.model_calls,0);
   for(const name of U.QUIET)assert.ok(name in before.tables);
+  for(const name of ['opportunities','opportunity_assessments'])assert.ok(U.QUIET.includes(name),name); // migration 042 (F-02)
   // Production's own activity: a model call. Not a finding.
   await db.query(`INSERT INTO model_calls(agent,model,provider,ok,latency_ms,created_at) VALUES('content_text','m','p',true,1,now())`);
   let diff=U.diffSnapshots(before,await U.takeSnapshot(db));
