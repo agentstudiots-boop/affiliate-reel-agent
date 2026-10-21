@@ -88,3 +88,30 @@ test('the module calls only Tavily and the logged router model; it is not wired 
   walk('app');walk('lib');
   assert.deepEqual(users,[]);
 });
+
+test('router options for long answers: defaults unchanged, raised limits only where passed, both capped (AC-6)',async()=>{
+  const {routerModelCall}=require('../.test-build/lib/whatsapp/route-llm');
+  const {setModelCallStore}=require('../.test-build/lib/observability/model-calls');
+  const {z}=require('zod');
+  const recorded=[];setModelCallStore(async call=>{recorded.push(call);});
+  const old=process.env.REPLICATE_API_TOKEN;process.env.REPLICATE_API_TOKEN='r8_test';
+  try{
+    // Output of a given length; `pending` GETs answer "processing" before "succeeded".
+    const fake=(length,pending=0)=>{let polls=0;const output=JSON.stringify({text:'x'.repeat(length)});
+      return async url=>{const get=String(url).includes('/predictions/');if(get)polls++;
+        const status=!get||polls<=pending?(get?'processing':'starting'):'succeeded';
+        return new Response(JSON.stringify({id:'abcdefghijkl1234',status,output:status==='succeeded'?output:null}),{status:get?200:201,headers:{'content-type':'application/json'}});};};
+    const schema=z.object({text:z.string()});
+    const call=(request,options={})=>routerModelCall('S',schema,'P',request,async()=>{},{agent:'opportunity_research',...options});
+    await assert.rejects(call(fake(7000)),/router_no_output/);                       // default 6000 unchanged
+    assert.equal((await call(fake(7000),{maxOutputChars:16000})).text.length,7000);
+    await assert.rejects(call(fake(25000),{maxOutputChars:1e9}),/router_no_output/);  // capped at 20000
+    await assert.rejects(call(fake(10,10)),/router_no_output/);                       // default 8 polls unchanged
+    assert.equal((await call(fake(10,10),{pollAttempts:20})).text.length,10);
+    await assert.rejects(call(fake(10,40),{pollAttempts:1000}),/router_no_output/);  // capped at 30
+    assert.ok(recorded.every(c=>c.agent==='opportunity_research'));
+    assert.equal(recorded.length,6);
+  }finally{setModelCallStore(null);if(old===undefined)delete process.env.REPLICATE_API_TOKEN;else process.env.REPLICATE_API_TOKEN=old;}
+  const source=fs.readFileSync('lib/enterprise/opportunity/research.ts','utf8');
+  assert.match(source,/maxOutputChars: MAX_OUTPUT_CHARS, pollAttempts: POLL_ATTEMPTS/);
+});
