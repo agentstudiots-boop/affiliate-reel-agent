@@ -20,7 +20,13 @@
   },
   "include": [
     "lib/content/**/*.ts",
+    "lib/enterprise/registry.ts",
+    "lib/enterprise/policy.ts",
+    "lib/enterprise/plan.ts",
+    "lib/enterprise/decisions.ts",
     "lib/product-resolver.ts",
+    "lib/enterprise/opportunity/scoring.ts",
+    "lib/enterprise/opportunity/economics.ts",
     "lib/daily/product-lock.ts",
     "lib/daily/slots.ts",
     "lib/daily/evidence.ts",
@@ -44,6 +50,7 @@
     "lib/security/**/*.ts",
     "lib/trendsetter/**/*.ts",
     "lib/architecture/**/*.ts",
-    "lib/tavily.ts"
+    "lib/tavily.ts",
+    "lib/enterprise/controlling/metrics.ts"
   ]
 }
