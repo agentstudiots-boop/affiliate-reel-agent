@@ -58,7 +58,8 @@ export async function routerModelCall<T>(system: string, schema: z.ZodType<T>, p
   if (!token) throw new RouterUnavailable("router_auth_missing");
   if (prompt.length > 20000) throw new RouterUnavailable("router_context_too_large");
   const model = options.model ?? ROUTER_MODEL, agent = options.agent ?? "whatsapp_router", started = Date.now();
-  const maxOutputChars = Math.min(Math.max(options.maxOutputChars ?? 6000, 1), 20000), pollAttempts = Math.min(Math.max(options.pollAttempts ?? 8, 0), 30);
+  const bounded = (value: number | undefined, fallback: number, min: number, max: number) => Number.isFinite(value) ? Math.min(Math.max(value as number, min), max) : fallback;
+  const maxOutputChars = bounded(options.maxOutputChars, 6000, 1, 20000), pollAttempts = bounded(options.pollAttempts, 8, 0, 30);
   let seen: unknown = null;
   try {
     const post = () => request(`https://api.replicate.com/v1/models/${options.model ?? ROUTER_MODEL}/predictions`, {
