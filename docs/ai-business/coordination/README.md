@@ -79,6 +79,15 @@ Planer/Implementierer/Prüfer zwischen zwei Systemen (ADR-15, ADR-16) und das Le
   (die Claude-Routine wurde am 19.10.2026 gelöscht), kein Validator, keine neuen Koordinationswerkzeuge.
 - Unverändert: kein Merge durch Claude, keine Produktionsänderung, keine Schalter, keine Secrets, keine kostenpflichtigen Aufrufe, keine zusätzlichen Credits.
 
+## Stand 21.10.2026: Betreiberfreigaben und Ausbau
+
+Der Betreiber hat am 21.10. alle offenen Punkte freigegeben: Merges nach `MERGE_GUIDE.md` durch Claude, Migrationen 039–041,
+OD-B07-1, OD-H01-1, OD-E04-1, Sichtabnahme #103/#109; Schalter bleiben vorerst aus; Ausbau B-11, F-02/F-03/F-05, I-01/I-03, J-05.
+Gemergt: #95 (`5f59d36`). Der Merge von #101 wurde in der Werkzeugfreigabe abgelehnt – weitere Merges warten auf die Klärung,
+wer mergt. Ausbau Session 1: #117 (B-11), #118 (F-02), #119 (F-03), #120 (F-05). Session 2: I-01 und J-05 (Vorbereitung);
+I-03 erst nach einem Go auf I-01. Offene Betreiberentscheidung neu: **Q-07** Gewichte/Schwellen des Bewertungsrasters
+(ohne sie keine Gesamtbewertung im Scout).
+
 ## Stand 20.10.2026, abends: geprüfter Merge-Leitfaden
 
 Alle offenen Roadmap-PRs wurden lokal auf `main` zusammengeführt und in Stufen voll geprüft. **Verbindliche Reihenfolge für den Betreiber:
@@ -131,7 +140,11 @@ Kein PR ist eingebunden oder aktiviert: keine Schalter gesetzt, nichts in `verce
 | 12 | #110 | D-06 Entwicklungsstand aus den Übergabedateien (nur ID/Phase/Status) | #109 | approve (nach Nachprüfung `9f7e609`) · wirkt erst nach #82 |
 | 13 | #112 | J-02 Härtung: Obergrenzen Plan/Ergebnis, Importer-Sperre wie E-02 | #110 | approve (nach Nachprüfung `82a52ee`; major behoben: Grenzen behalten den Verbrauch) |
 | 14 | #113 | J-04 Lasttest gegen echtes Postgres (nur Tests, zweite Sitzung, übersprungen ohne `J04_DATABASE_URL`) | #106 | approve (Session 1, 2 optionale Hinweise) |
-| 14 | #114 | B-10 Executive-Abschnitt im Wochenbericht (nur lesend, `EXECUTIVE_WEEKLY_REPORT` aus) | #112 | Review durch zweite Sitzung offen |
+| 14 | #114 | B-10 Executive-Abschnitt im Wochenbericht (nur lesend, `EXECUTIVE_WEEKLY_REPORT` aus) | #112 | approve (zweite Sitzung, nach Fix `b1f492d`) |
+| 15 | #117 | B-11 WhatsApp-Befehl „Executive“ (nur lesend, `EXECUTIVE_WHATSAPP` aus) | #114 | Review offen |
+| 15 | #118 | F-02 **Migration 042** Opportunity-Ledger | #112, #97 | Review offen · **Merge = Migration in Production** |
+| 16 | #119 | F-03 Recherche-Schritt (Tavily + 1 Modellaufruf, begrenzt) | #118 | Review offen |
+| 17 | #120 | F-05 WhatsApp „Geschäftsidee prüfen: …“ (`OPPORTUNITY_SCOUT_ENABLED` aus, Tageslimit) | #119, #117 | Review offen |
 | 0 | #111 | I-02 Datenquellen-/Rechtscheckliste (Doku, zweite Sitzung; Basis Roadmap-Branch) | #82 | approve (nach Nachprüfung `a96acb0`) · Rolle: Claude-zu-Claude statt GPT |
 
 **J-02 Sicherheitsreview (Claude-Hälfte, 20.10.):** 0 kritisch/hoch, 1 mittel, 4 niedrig – alle behoben, Details `tasks/J-02/findings-claude.md`.

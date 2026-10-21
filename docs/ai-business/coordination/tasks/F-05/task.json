@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "task_id": "F-05",
+  "title": "WhatsApp-Auslöser „Geschäftsidee prüfen“ (Schalter OPPORTUNITY_SCOUT_ENABLED, Tageslimit)",
+  "module": "opportunity",
+  "phase": "F",
+  "status": "waiting_review",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "claude-code",
+  "base_commit": "bbe41c7",
+  "branch": "claude/F-05-opportunity-whatsapp",
+  "depends_on": [
+    "F-03",
+    "B-11"
+  ],
+  "claims": {
+    "paths": [
+      "lib/whatsapp/opportunity-check.ts",
+      "tests/opportunity-whatsapp.test.cjs"
+    ],
+    "hot_files": [
+      "app/api/whatsapp/webhook/route.ts",
+      "lib/enterprise/opportunity/ledger.ts",
+      "CLAUDE.md"
+    ],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Nur Betreiber, einmal je Nachricht, Tageslimit unter Lock",
+      "verification": "PGlite-Test",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Bestätigung vor jeder kostenpflichtigen Recherche; Ergebnis nur Vorlage",
+      "verification": "Test + Gegentest",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 300,
+    "notes": "Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "lib/whatsapp/opportunity-check.ts",
+    "lib/enterprise/opportunity/ledger.ts",
+    "app/api/whatsapp/webhook/route.ts",
+    "CLAUDE.md",
+    "tests/opportunity-whatsapp.test.cjs",
+    "tests/enterprise-opportunity-scoring.test.cjs",
+    "tests/enterprise-opportunity-ledger.test.cjs",
+    "tests/enterprise-opportunity-research.test.cjs"
+  ],
+  "implemented": [
+    "handleOpportunityCheck mit after()"
+  ],
+  "tests": [
+    {
+      "command": "npm run lint && npm test && npm run build && npm run typecheck",
+      "result": "passed",
+      "detail": "856/856",
+      "commit": "393a2b8",
+      "at": "2026-10-21T12:00:00Z"
+    }
+  ],
+  "known_issues": [
+    "Ohne Q-07-Gewichte keine Gesamtbewertung",
+    "Bei Funktions-Timeout kann eine Idee auf researching hängen bleiben"
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/120",
+    "state": "draft",
+    "merge_commit": null,
+    "ci": "pending"
+  },
+  "approval": {
+    "reviewer": "pending",
+    "operator": "pending",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Review",
+    "Merge nach #117 und #119",
+    "Betreiber: OPPORTUNITY_SCOUT_ENABLED, Q-07"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-21T12:00:00Z",
+    "checkpoint_reason": "other",
+    "last_commit": "393a2b8",
+    "active_branch": "claude/F-05-opportunity-whatsapp",
+    "state_summary": "Draft-PR #120 offen",
+    "decisions_made": [],
+    "test_status": "856/856",
+    "next_action": "Review"
+  },
+  "revision": 1,
+  "based_on_commit": "ca0cf80",
+  "updated_at": "2026-10-21T12:00:00Z",
+  "log": [
+    {
+      "at": "2026-10-21T12:00:00Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Draft-PR #120 offen (Freigabe Betreiber 21.10.)",
+      "commit": "393a2b8"
+    }
+  ]
+}
