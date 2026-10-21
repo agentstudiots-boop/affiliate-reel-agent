@@ -1,21 +1,21 @@
 // Opportunity ledger (task F-02): opportunities and their versioned assessments (migration 042).
 //
 // The stored evaluation and economics are always computed here by the reviewed pure functions – evaluateOpportunity (F-01)
-// and assessEconomics (F-04) – from the criteria the caller passes. A caller (scout, executive, operator) can never store
-// a recommendation of its own. A recommendation is never an approval and starts nothing. No network, no model calls.
+// and assessEconomics (F-04) – from the criteria the caller passes. Weights, thresholds and the payback limit come only from
+// the operator-approved operator-config.ts, measured economics are not accepted at all (review #118): a caller (scout,
+// executive, operator) can neither store a recommendation of its own nor steer one through its own settings. A
+// recommendation is never an approval and starts nothing. No network, no model calls.
 
 import { randomUUID } from "node:crypto";
 import type { Database, Sql } from "../../memory/db";
-import { assessEconomics, type EconomicsLimits, type MeasuredInput } from "./economics";
-import { evaluateOpportunity, type CriterionAssessment, type ScoringConfig } from "./scoring";
+import { assessEconomics } from "./economics";
+import { ECONOMICS_LIMITS, SCORING_CONFIG } from "./operator-config";
+import { evaluateOpportunity, type CriterionAssessment } from "./scoring";
 
 export type OpportunityOrigin = "operator" | "scout" | "executive";
 export type ResearchSource = { reference: string; note?: string };
 export type AssessmentInput = {
   criteria: readonly CriterionAssessment[];
-  config: ScoringConfig | null;
-  measured?: MeasuredInput | null;
-  limits?: EconomicsLimits | null;
   research?: readonly ResearchSource[];
   usage?: { modelCalls: number; costCents: number };
   taskId?: string | null;
@@ -28,6 +28,7 @@ export type OpportunitySummary = {
 
 export const MAX_RESEARCH_SOURCES = 50;
 export const MAX_DAILY_OPERATOR_CHECKS = 10;
+export const MAX_CRITERIA_BYTES = 64 * 1024;
 const MAX_REFERENCE_CHARS = 500;
 const MAX_NOTE_CHARS = 500;
 const ORIGINS: readonly OpportunityOrigin[] = ["operator", "scout", "executive"];
@@ -98,13 +99,14 @@ function researchSources(value: readonly ResearchSource[] | undefined) {
 export async function recordAssessment(db: Database, opportunityId: string, input: AssessmentInput) {
   if (!CREATORS.includes(input.createdBy)) throw new OpportunityInputError("unbekannter Urheber");
   const criteria = Array.isArray(input.criteria) ? input.criteria : [];
-  const evaluation = evaluateOpportunity(criteria, input.config);
-  const economics = assessEconomics({ evaluation, assessments: criteria, measured: input.measured ?? null, limits: input.limits ?? null });
+  if (Buffer.byteLength(JSON.stringify(criteria)) > MAX_CRITERIA_BYTES) throw new OpportunityInputError("Kriterien zu umfangreich (höchstens 64 KiB)");
+  const evaluation = evaluateOpportunity(criteria, SCORING_CONFIG);
+  const economics = assessEconomics({ evaluation, assessments: criteria, measured: null, limits: ECONOMICS_LIMITS });
   const research = researchSources(input.research);
   const modelCalls = count(input.usage?.modelCalls ?? 0, "Modellaufrufe");
   const costCents = count(input.usage?.costCents ?? 0, "Kosten");
-  const weightsVersion = typeof input.config?.version === "string" && input.config.version.trim()
-    ? input.config.version.trim().slice(0, 80) : "keine Gewichtung";
+  // The version of the weights actually used: only a known total was computed with them.
+  const weightsVersion = evaluation.total.status === "known" ? evaluation.total.weightsVersion.slice(0, 80) : "keine Gewichtung";
   return db.transaction(async sql => {
     const opportunity = (await sql.query("SELECT status FROM opportunities WHERE id=$1 FOR UPDATE", [opportunityId])).rows[0];
     if (!opportunity) throw new OpportunityInputError("Opportunity nicht gefunden");

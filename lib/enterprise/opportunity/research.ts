@@ -3,7 +3,9 @@
 // Costs are bounded per run: at most MAX_SEARCHES searches with MAX_RESULTS results each and exactly one model call; the
 // caller decides whether it runs at all (`enabled`, switch default off) – without it nothing is called and nothing costs.
 // The model output is untrusted data: only known criteria are kept (first per criterion), and a source counts only if it is
-// one of the URLs actually retrieved, so a "fact" whose sources were invented is left without sources and rejected by F-01.
+// one of the URLs actually retrieved, so a "fact" whose sources were invented is left without sources and rejected by F-01,
+// and the confidence of anything without a retrieved source is capped (review #119: injected text could otherwise claim
+// certainty for unsupported grades).
 // The validity of every assessment is decided by evaluateOpportunity (F-01), never here. The model call is logged in
 // model_calls as agent "opportunity_research" (routerModelCall). Page contents go to the model only, never to the ledger.
 
@@ -16,7 +18,8 @@ export const RESEARCH_AGENT = "opportunity_research";
 export const MAX_SEARCHES = 3;
 export const MAX_RESULTS = 5;
 const MAX_CONTENT_CHARS = 700;
-const MAX_PROMPT_CHARS = 19_000; // routerModelCall refuses prompts above 20 000 characters
+const MAX_PROMPT_CHARS = 19_000;
+export const MAX_UNSOURCED_CONFIDENCE = 0.3; // routerModelCall refuses prompts above 20 000 characters
 const MAX_OUTPUT_TOKENS = 3000;  // 14 criteria do not fit into the router default of 900
 const MAX_OUTPUT_CHARS = 16_000; // router default 6000 would reject a full grid
 const POLL_ATTEMPTS = 20;        // up to ~40 s like the prediction's Cancel-After
@@ -62,7 +65,10 @@ export function shapeCriteria(raw: unknown, retrieved: ReadonlySet<string>): Cri
     const sources = Array.isArray(entry.sources) ? entry.sources
       .map(source => (source && typeof source === "object" ? String((source as { reference?: unknown }).reference ?? "") : ""))
       .filter(reference => retrieved.has(reference)).map(reference => ({ reference })) : [];
-    kept.push({ criterion, kind: entry.kind, confidence: entry.confidence, sources, value: entry.value, score: entry.score ?? null,
+    // Without a retrieved source the model's certainty is not evidence: cap it (invalid values are left to F-01).
+    const confidence = sources.length === 0 && typeof entry.confidence === "number" && entry.confidence > MAX_UNSOURCED_CONFIDENCE
+      ? MAX_UNSOURCED_CONFIDENCE : entry.confidence;
+    kept.push({ criterion, kind: entry.kind, confidence, sources, value: entry.value, score: entry.score ?? null,
       ...(typeof entry.rationale === "string" ? { rationale: entry.rationale.slice(0, 1000) } : {}) } as CriterionAssessment);
   }
   return kept;

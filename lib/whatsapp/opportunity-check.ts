@@ -72,9 +72,9 @@ async function runResearch(db: Database, opportunityId: string, deps: Opportunit
       await deps.send(`Geschäftsidee „${claimed.title}“: Recherche nicht möglich (${result.status === "disabled" ? "abgeschaltet" : result.reason}). Nichts bewertet, nichts gestartet.`);
       return;
     }
-    // Weights are an operator decision (Q-07) that is still open: without them the total stays unknown and nothing is
-    // recommended; the single criteria are still shown.
-    const stored = await recordAssessment(db, opportunityId, { criteria: result.criteria, config: null, research: result.research,
+    // Weights and limits come only from the operator config (Q-07, still open): without them the total stays unknown and
+    // nothing is recommended; the single criteria are still shown.
+    const stored = await recordAssessment(db, opportunityId, { criteria: result.criteria, research: result.research,
       usage: { modelCalls: result.usage.modelCalls, costCents: 0 }, createdBy: "operator" });
     await deps.send(formatOpportunityResult(claimed.title, stored.evaluation, result.research.length, stored.testRecommended));
   } catch {
