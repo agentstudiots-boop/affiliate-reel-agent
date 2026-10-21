@@ -31,6 +31,8 @@
     "lib/enterprise/cycle.ts",
     "lib/enterprise/planner.ts",
     "lib/product-resolver.ts",
+    "lib/enterprise/opportunity/scoring.ts",
+    "lib/enterprise/opportunity/economics.ts",
     "lib/daily/product-lock.ts",
     "lib/daily/slots.ts",
     "lib/daily/evidence.ts",
@@ -59,6 +61,7 @@
     "lib/architecture/**/*.ts",
     "app/architecture/enterprise-panel.tsx",
     "app/architecture/enterprise-planets.ts",
-    "lib/tavily.ts"
+    "lib/tavily.ts",
+    "lib/enterprise/controlling/metrics.ts"
   ]
 }
