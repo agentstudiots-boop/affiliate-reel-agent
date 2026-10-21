@@ -26,7 +26,7 @@ test('only exact agent names are mapped; unknown and inherited names stay unassi
 test('every agent name the code records in model_calls is mapped (AC-2)',()=>{
   const recorders=files.filter(file=>/\brecordModelCall\b/.test(read(file))&&!file.startsWith(path.join('lib','observability')));
   // New recording sites must be added here and to MODEL_AGENT_DEPARTMENTS; dynamic names are resolved below.
-  assert.deepEqual(recorders.sort(),['lib/content/model.ts','lib/whatsapp/chat.ts','lib/whatsapp/instruction.ts','lib/whatsapp/route-llm.ts','lib/whatsapp/transcribe.ts'].map(p=>path.join(...p.split('/'))).sort());
+  assert.deepEqual(recorders.sort(),['lib/content/model.ts','lib/whatsapp/chat.ts','lib/whatsapp/instruction.ts','lib/whatsapp/route-llm.ts','lib/whatsapp/transcribe.ts','lib/whatsapp/video-revision.ts'].map(p=>path.join(...p.split('/'))).sort());
   const names=new Set();
   // lib/content/model.ts records `content_${agent}` for each generate("<agent>", ...) call – also from the topic pipeline
   // (lib/topic-pipeline), which is part of the Content Studio and therefore counts as affiliate. Searched everywhere.
