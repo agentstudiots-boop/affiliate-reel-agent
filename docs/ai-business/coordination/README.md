@@ -142,11 +142,11 @@ Kein PR ist eingebunden oder aktiviert: keine Schalter gesetzt, nichts in `verce
 | 14 | #113 | J-04 Lasttest gegen echtes Postgres (nur Tests, zweite Sitzung, übersprungen ohne `J04_DATABASE_URL`) | #106 | approve (Session 1, 2 optionale Hinweise) |
 | 14 | #114 | B-10 Executive-Abschnitt im Wochenbericht (nur lesend, `EXECUTIVE_WEEKLY_REPORT` aus) | #112 | approve (zweite Sitzung, nach Fix `b1f492d`) |
 | 15 | #117 | B-11 WhatsApp-Befehl „Executive“ (nur lesend, `EXECUTIVE_WHATSAPP` aus) | #114 | approve (zweite Sitzung) |
-| 15 | #118 | F-02 **Migration 042** Opportunity-Ledger | #112, #97 | Major (Konfiguration vom Aufrufer) behoben `8d77888`, Nachprüfung offen · **Merge = Migration in Production** |
-| 16 | #119 | F-03 Recherche-Schritt (Tavily + 1 Modellaufruf, begrenzt) | #118 | approve (zweite Sitzung); Minor umgesetzt `6d50593` |
-| 17 | #120 | F-05 WhatsApp „Geschäftsidee prüfen: …“ (`OPPORTUNITY_SCOUT_ENABLED` aus, Tageslimit) | #119, #117 | Review offen (Fixes übernommen `ddff4ed`) |
+| 15 | #118 | F-02 **Migration 042** Opportunity-Ledger | #112, #97 | approve (nach Nachprüfung `8d77888`; Major behoben) · **Merge = Migration in Production** |
+| 16 | #119 | F-03 Recherche-Schritt (Tavily + 1 Modellaufruf, begrenzt) | #118 | approve (nach Nachprüfung `6d50593`; Nit `f7f3efe`) |
+| 17 | #120 | F-05 WhatsApp „Geschäftsidee prüfen: …“ (`OPPORTUNITY_SCOUT_ENABLED` aus, Tageslimit) | #119, #117 | approve (zweite Sitzung); Formulierung „Weiter“ behoben `23c3a6a`, Kopf `35a0239` |
 | 16 | #115 | I-01 Bewertung „Immobilienanalyse“ (zweite Sitzung): **Daten fehlen**, I-03 nicht gebaut | #97 | approve (Session 1) |
-| 1 | #116 | J-05 Preview-Lauf mit isolierten Ressourcen – Leitfaden und Prüfskripte (zweite Sitzung) | – | approve mit Minor (042-Tabellen in QUIET) |
+| 1 | #116 | J-05 Preview-Lauf mit isolierten Ressourcen – Leitfaden und Prüfskripte (zweite Sitzung) | – | approve (Minor behoben `54a9dc7`) |
 | 0 | #111 | I-02 Datenquellen-/Rechtscheckliste (Doku, zweite Sitzung; Basis Roadmap-Branch) | #82 | approve (nach Nachprüfung `a96acb0`) · Rolle: Claude-zu-Claude statt GPT |
 
 **J-02 Sicherheitsreview (Claude-Hälfte, 20.10.):** 0 kritisch/hoch, 1 mittel, 4 niedrig – alle behoben, Details `tasks/J-02/findings-claude.md`.
