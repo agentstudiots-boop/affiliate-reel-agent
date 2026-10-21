@@ -1,0 +1,50 @@
+{
+  "opportunity": "Immobilienanalyse (mögliche Abteilung, Roadmap Phase I)",
+  "note": "Nur Annahmen mit Quelle oder fehlende Kriterien. Keine Marktdaten, keine Geschäftszahlen des Betreibers. Fehlende Kriterien sind bewusst nicht aufgeführt und gelten als unbekannt.",
+  "assessments": [
+    {
+      "criterion": "targetAudience",
+      "kind": "assumption",
+      "confidence": 0.3,
+      "sources": [{ "reference": "docs/ai-business/03_ARCHITEKTURKRITIK.md (K-05)", "note": "Zuschnitt offen, I-02 §1" }],
+      "value": { "type": "text", "text": "Offen: allgemeine Markt-/Gebietsinhalte für Privatpersonen oder Analysen einzelner Objekte – erst mit I-02 §1 festzulegen" },
+      "score": null,
+      "rationale": "Ohne festgelegten Zuschnitt ist keine Zielgruppe belegbar; daher keine Bewertung."
+    },
+    {
+      "criterion": "legalRisks",
+      "kind": "assumption",
+      "confidence": 0.3,
+      "sources": [
+        { "reference": "docs/ai-business/03_ARCHITEKTURKRITIK.md (K-05)" },
+        { "reference": "docs/ai-business/10_DATENQUELLEN_RECHTSCHECKLISTE.md (I-02, PR #111)", "note": "K.O.-Fragen 3.1, 3.2, 4.4, 5.1, 5.2, 6.1" }
+      ],
+      "value": { "type": "list", "items": [
+        "Nutzungsbedingungen von Portalen gegen automatisiertes Auslesen (I-02 3.1)",
+        "Gewerbliche Nutzung der Datenquellen (I-02 3.2)",
+        "Fotos, Grundrisse, Kartenkacheln Dritter (I-02 4.4)",
+        "Nähe zu Anlageberatung/-vermittlung (I-02 5.1)",
+        "Nähe zu Immobilien-/Darlehensvermittlung (I-02 5.2)",
+        "Personenbezug von Adressen, Fotos, Koordinaten (I-02 6.1)"
+      ] },
+      "score": null,
+      "rationale": "Risiken sind benannt, aber nicht geprüft; eine Bewertung erst nach Prüfung durch eine zugelassene Person (I-02 §7)."
+    },
+    {
+      "criterion": "thirdPartyDependency",
+      "kind": "assumption",
+      "confidence": 0.3,
+      "sources": [
+        { "reference": "CLAUDE.md §2 (Agenten: Tavily, Replicate)" },
+        { "reference": "docs/ai-business/10_DATENQUELLEN_RECHTSCHECKLISTE.md (I-02 §2)" }
+      ],
+      "value": { "type": "list", "items": [
+        "Datenquellen (noch keine ausgewählt, I-02 §2)",
+        "Recherche-API Tavily",
+        "Modellanbieter Replicate"
+      ] },
+      "score": null,
+      "rationale": "Ohne gewählte Datenquelle ist die Abhängigkeit nicht bewertbar."
+    }
+  ]
+}
