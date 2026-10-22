@@ -24,6 +24,7 @@ export const MODEL_AGENT_DEPARTMENTS: Readonly<Record<string, DepartmentId>> = O
   whatsapp_chat: "affiliate",
   whatsapp_instruction: "affiliate",
   whatsapp_transcription: "affiliate",
+  whatsapp_video_revision: "affiliate",
   topic_router: "affiliate",
   // Executive kernel (B-08): the AI planner in shadow mode.
   executive_planner: "executive",
