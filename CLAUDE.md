@@ -10,7 +10,7 @@ Blocker und Übergabe stehen in `docs/PROJECT_STATUS.md`; Soll-Ist-Matrix des Au
 - Repository `agentstudiots-boop/affiliate-reel-agent`, Default-Branch `main` (kein Branch-Schutz – trotzdem nie direkt auf `main` arbeiten).
 - Vercel-Projekt `affiliate-reel-agent` (`prj_tcYmiHTgJ3VF6E1bmapnNYkDHikI`, Team-Slug `agentstudiots-boop`, Hobby-Plan, Region `fra1`).
   Production-Domain `https://affiliate-reel-agent.vercel.app`. Merge nach `main` ⇒ automatisches Production-Deployment.
-- Next.js **16.3.8** (fest gepinnt, App Router, `proxy.ts` statt Middleware, Node-Runtime). Vor Next-spezifischem Code die Doku unter
+- Next.js **16.4.2** (fest gepinnt; am 22.10.2026 mit Freigabe des Betreibers von 16.3.8 angehoben wegen kritischer Advisories GHSA-2464-fhr4-w9xw, GHSA-p3m5-59mp-jv5r, GHSA-673q-mjm6-r5xr; App Router, `proxy.ts` statt Middleware, Node-Runtime). Vor Next-spezifischem Code die Doku unter
   `node_modules/next/dist/docs/` lesen. React 19, TypeScript strict, Zod, `pg` (Neon Postgres), Vercel Blob.
 - Betreiber kommuniziert auf Deutsch; Oberfläche, WhatsApp-Texte und Doku sind deutsch.
 
