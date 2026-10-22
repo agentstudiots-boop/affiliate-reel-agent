@@ -30,6 +30,7 @@
     "lib/enterprise/departments/affiliate.ts",
     "lib/enterprise/cycle.ts",
     "lib/enterprise/planner.ts",
+    "lib/enterprise/executive-weekly.ts",
     "lib/product-resolver.ts",
     "lib/enterprise/opportunity/scoring.ts",
     "lib/enterprise/opportunity/economics.ts",
