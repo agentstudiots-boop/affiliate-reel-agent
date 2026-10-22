@@ -84,8 +84,8 @@ Planer/Implementierer/Prüfer zwischen zwei Systemen (ADR-15, ADR-16) und das Le
 Mit Freigabe des Betreibers (21.10.: „Claude merged“) hat Session 1 alle Roadmap-PRs gegen `main` gemergt, in der Reihenfolge aus
 [`MERGE_GUIDE.md`](MERGE_GUIDE.md) und danach den Ausbau. Vor jedem Merge liefen die vollen Prüfungen auf dem simulierten Ergebnis.
 
-- **Migrationen 039–042:** mit #89, #92, #96 und #118 gemergt. Sie werden beim nächsten Cron- oder Webhook-Aufruf durch
-  `ensureAutomationSchema` angewendet. Nachweis in der DB steht aus (Cron-Check der zweiten Sitzung, 16:45 UTC).
+- **Migrationen 039–042:** mit #89, #92, #96 und #118 gemergt und **in der Production-DB angewendet**. Nachweis durch den Betreiber,
+  22.10. ca. 15:35 UTC: `/api/admin/migrate` (angemeldet) meldet „Schema bereits aktuell“ für 001–042.
 - **Ausbau:** #117 B-11 (`4c976e7`), #118 F-02 (`a8ce404`), #119 F-03 (`0d2f632`), #120 F-05 (`a736bf4`), #115 I-01 (`b91ff44`),
   #116 J-05 (`06ae6cc`).
   - F-05 bekam vor dem Merge einen Fix: Das Tageslimit zählt jetzt im Berliner Tag von `asOf`, nicht nach der DB-Uhr (`2130525`).
