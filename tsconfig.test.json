@@ -57,6 +57,8 @@
     "lib/enterprise/controlling/import-model-calls.ts",
     "lib/enterprise/controlling/agent-departments.ts",
     "lib/enterprise/controlling/snapshot.ts",
+    "lib/enterprise/controlling/manual-entries.ts",
+    "lib/enterprise/controlling/price-catalog.ts",
     "lib/trendsetter/**/*.ts",
     "lib/architecture/**/*.ts",
     "app/architecture/enterprise-panel.tsx",
