@@ -110,6 +110,24 @@ Mit Freigabe des Betreibers (21.10.: „Claude merged“) hat Session 1 alle Roa
 - **Aufgabenstand:** Die 31 Aufgaben mit gemergtem PR stehen in `tasks/<ID>/task.json` auf `merged`. Für I-01 und J-05 gibt es keine eigene
   Übergabedatei; ihr Stand steht in den PRs #115 und #116.
 
+## Stand 22.10.2026, abends: Nachzüge, Sicherheitsupdate, Diagnose
+
+- **#121** Doku-Nachzug (`CLAUDE.md`, `docs/PROJECT_STATUS.md`), gemergt als `c677759`.
+- **#124 Sicherheit:** Next.js von 16.3.8 auf **16.4.2**, gemergt als `1fe0bb2`.
+  - Anlass: kritische Advisories GHSA-2464-fhr4-w9xw, GHSA-p3m5-59mp-jv5r und GHSA-673q-mjm6-r5xr. Wegen `npm audit` war die CI für jeden Branch rot.
+  - Betreiberfreigabe am 22.10. erteilt.
+  - Production-Deployment READY, keine Laufzeitfehler. Login, Webhook und Cron sind unter 16.4.2 noch nicht durch echte Aufrufe belegt;
+    der Frühcheck am 23.10. nach dem daily-draft 07 UTC holt das nach.
+- **#122 DIAG-MODEL** (Stufe A, Betreiberfreigabe 22.10.), gemergt als `ab77937`. Die zweite Sitzung hat es umgesetzt.
+  - `model_calls.error_class` unterscheidet `invalid_json`, `schema_violation` und `invalid_provider_result`.
+  - Das Log `editorial_model_failed.detail` enthält Schema-Pfade, Code und Grenze bzw. die Form der Antwort bzw. den Provider-Status, nie Inhalte.
+  - Stufe B (Korrektur) erst nach Auswertung von 1–2 Tagen Daten und nach erneuter Absprache.
+- **#123** Command Center: Die Lücke „Migration 034–042 nicht verifiziert“ ist gestrichen; der Nachweis steht als `proof`. Gemergt als `d6217f9`.
+- **Anlass für die Diagnose:** Die Tagesentwürfe 07, 16 und 17 UTC scheiterten am Modell `openai/gpt-4.1` auf Replicate.
+  - 07 und 16 UTC: ungültiges JSON oder Schema.
+  - 17 UTC: Antwort zu langsam, danach waren alle Ersatzkandidaten durch die 7-Tage-Sperre blockiert.
+  - Code und Merges sind nicht die Ursache.
+
 ## Stand 21.10.2026: Betreiberfreigaben und Ausbau
 
 Der Betreiber hat am 21.10. alle offenen Punkte freigegeben: Merges nach `MERGE_GUIDE.md` durch Claude, Migrationen 039–041,
