@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Generator } from "./agent";
 import { editorialPolicy } from "./agent";
 import { predictionText } from "../whatsapp/instruction";
+import { jsonShape, providerState, schemaIssues, schemaKeys } from "./model-diagnostics";
 
 const MODEL = "openai/gpt-4.1";
 export const EDITORIAL_MODEL_ERROR = "Der KI-Entwurf konnte nicht sicher geprüft werden. Keine automatische Freigabe oder Veröffentlichung.";
@@ -25,8 +26,13 @@ function throttleDelay(response: Response, detail: string) {
   return Math.min(60_000, Math.max(2_000, (Number.isFinite(seconds) ? seconds : 30) * 1000 + 1000));
 }
 
+// The answer text was not JSON at all (as opposed to a provider response that could not be read).
+class OutputJsonError extends Error {}
+
 function failureCategory(error: unknown) {
-  if (error instanceof z.ZodError || error instanceof SyntaxError) return "invalid_json_or_schema";
+  if (error instanceof OutputJsonError) return "invalid_json";
+  if (error instanceof z.ZodError) return "schema_violation";
+  if (error instanceof SyntaxError) return "invalid_provider_result";
   if (error instanceof Error && /^Modellantwort HTTP \d{3}$/.test(error.message)) return `http_${error.message.slice(-3)}`;
   if (error instanceof Error && /timeout|aborted|unterbrochen/i.test(error.name + " " + error.message)) return "timeout_or_abort";
   if (error instanceof Error && /Modellantwort fehlt|Modellstatus|Ungültige Modellantwort/.test(error.message)) return "invalid_provider_result";
@@ -51,6 +57,8 @@ export function createGenerator(options: { mode: "reference" | "ai"; signal?: Ab
     const headers={Authorization:`Bearer ${token}`};
     const started=Date.now();
     let seen:unknown=null;
+    let polls=0;
+    let answer:string|null=null;
     try {
       const scheduled = nextPredictionAt - Date.now();
       if(scheduled>0) await wait(scheduled,signal);
@@ -82,6 +90,7 @@ export function createGenerator(options: { mode: "reference" | "ai"; signal?: Ab
           signal.addEventListener("abort",aborted,{once:true});
           if(signal.aborted)aborted();
         });
+        polls++;
         const poll=await request(`https://api.replicate.com/v1/predictions/${id}`,{headers,redirect:"error",signal});
         if(!poll.ok)throw new Error("Modellstatus unklar.");
         prediction=await poll.json();
@@ -91,13 +100,21 @@ export function createGenerator(options: { mode: "reference" | "ai"; signal?: Ab
       const output=predictionText(prediction?.output);
       if(prediction.status!=="succeeded"||!output||output.length>28000)throw new Error("Modellantwort fehlt oder ist unklar.");
       // Models sometimes wrap the JSON in a markdown fence despite the instruction; the content is still validated by the schema.
-      const parsed=schema.parse(JSON.parse(output.trim().replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,"")));
+      answer=output;
+      let json:unknown;
+      try{json=JSON.parse(output.trim().replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,""));}catch{throw new OutputJsonError("Modellantwort ist kein JSON.");}
+      const parsed=schema.parse(json);
       await recordModelCall({agent:`content_${agent}`,model:MODEL,ok:true,latencyMs:Date.now()-started,...predictionMetrics(prediction)});
       return parsed;
     }catch(error){
       await recordModelCall({agent:`content_${agent}`,model:MODEL,ok:false,errorClass:options.signal?.aborted?"aborted":failureCategory(error),latencyMs:Date.now()-started,...predictionMetrics(seen)});
       if(options.signal?.aborted)throw error;
-      console.warn(JSON.stringify({event:"editorial_model_failed",agent,model:MODEL,reason:failureCategory(error)}));
+      const reason=failureCategory(error);
+      // Diagnostics only: schema paths, codes and limits, the shape of the answer or the last prediction state – never text or values.
+      const detail=reason==="schema_violation"&&error instanceof z.ZodError?{issues:schemaIssues(error,schemaKeys(schema))}
+        :reason==="invalid_json"&&answer!==null?{shape:jsonShape(answer)}
+        :reason==="invalid_provider_result"||reason==="timeout_or_abort"?{provider:providerState(seen,polls,Date.now()-started)}:undefined;
+      console.warn(JSON.stringify({event:"editorial_model_failed",agent,model:MODEL,reason,...(detail?{detail}:{})}));
       throw new Error(failureCategory(error)==="http_429"?EDITORIAL_RATE_LIMIT_ERROR:EDITORIAL_MODEL_ERROR);
     }
   };
