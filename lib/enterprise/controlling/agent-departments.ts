@@ -28,6 +28,8 @@ export const MODEL_AGENT_DEPARTMENTS: Readonly<Record<string, DepartmentId>> = O
   topic_router: "affiliate",
   // Executive kernel (B-08): the AI planner in shadow mode.
   executive_planner: "executive",
+  // Opportunity Scout (F-03): research step that fills the F-01 grid.
+  opportunity_research: "opportunity",
 });
 
 export function departmentForAgent(agent: unknown): DepartmentId | null {

@@ -51,11 +51,15 @@ export class RouterUnavailable extends Error {}
 // (interpretTopicMessage, lib/whatsapp/topic-route.ts) with their own instructions and schemas.
 // options.model / options.input: the image quality gate reuses this transport with a vision-capable model and image_input.
 export async function routerModelCall<T>(system: string, schema: z.ZodType<T>, prompt: string, request: typeof fetch = fetch,
-  sleep: (ms: number) => Promise<void> = ms => new Promise(resolve => setTimeout(resolve, ms)), options: { model?: string; input?: Record<string, unknown>; agent?: string } = {}): Promise<T> {
+  sleep: (ms: number) => Promise<void> = ms => new Promise(resolve => setTimeout(resolve, ms)), options: { model?: string; input?: Record<string, unknown>; agent?: string;
+    // Longer structured answers (F-03 research): defaults keep every existing caller unchanged; both are capped.
+    maxOutputChars?: number; pollAttempts?: number } = {}): Promise<T> {
   const token = process.env.REPLICATE_API_TOKEN?.trim();
   if (!token) throw new RouterUnavailable("router_auth_missing");
   if (prompt.length > 20000) throw new RouterUnavailable("router_context_too_large");
   const model = options.model ?? ROUTER_MODEL, agent = options.agent ?? "whatsapp_router", started = Date.now();
+  const bounded = (value: number | undefined, fallback: number, min: number, max: number) => Number.isFinite(value) ? Math.min(Math.max(value as number, min), max) : fallback;
+  const maxOutputChars = bounded(options.maxOutputChars, 6000, 1, 20000), pollAttempts = bounded(options.pollAttempts, 8, 0, 30);
   let seen: unknown = null;
   try {
     const post = () => request(`https://api.replicate.com/v1/models/${options.model ?? ROUTER_MODEL}/predictions`, {
@@ -76,7 +80,7 @@ export async function routerModelCall<T>(system: string, schema: z.ZodType<T>, p
     seen = prediction;
     if (!prediction.id || !/^[a-z0-9]{12,64}$/.test(prediction.id)) throw new RouterUnavailable("router_bad_response");
     // GETs observe the same inference; there is never a second paid POST.
-    for (let attempt = 0; ["starting", "processing"].includes(prediction.status || "") && attempt < 8; attempt++) {
+    for (let attempt = 0; ["starting", "processing"].includes(prediction.status || "") && attempt < pollAttempts; attempt++) {
       await new Promise(resolve => setTimeout(resolve, 1000));
       const poll = await request(`https://api.replicate.com/v1/predictions/${prediction.id}`, { headers: { Authorization: `Bearer ${token}` }, redirect: "error", signal: AbortSignal.timeout(5000) });
       if (!poll.ok) throw new RouterUnavailable("router_poll_failed");
@@ -86,7 +90,7 @@ export async function routerModelCall<T>(system: string, schema: z.ZodType<T>, p
       seen = prediction;
     }
     const output = predictionText(prediction.output);
-    if (prediction.status !== "succeeded" || !output || output.length > 6000) throw new RouterUnavailable("router_no_output");
+    if (prediction.status !== "succeeded" || !output || output.length > maxOutputChars) throw new RouterUnavailable("router_no_output");
     const json = output.trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
     const parsed = schema.parse(JSON.parse(json));
     await recordModelCall({ agent, model, ok: true, latencyMs: Date.now() - started, ...predictionMetrics(prediction) });
