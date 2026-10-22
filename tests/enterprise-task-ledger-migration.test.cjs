@@ -115,5 +115,6 @@ test('no application code uses the ledger yet (AC-6)',()=>{
     else if(/\.(ts|tsx)$/.test(entry.name)&&/\b(enterprise_tasks|enterprise_task_events|enterprise_outbox|budget_reservations)\b/.test(fs.readFileSync(full,'utf8')))users.push(full);
   }};
   walk('app');walk('lib');
-  assert.deepEqual(users,[path.join('lib','memory','ensure-automation-schema.ts')]);
+  // H-01 only counts tasks per department and status (SELECT in a READ ONLY transaction).
+  assert.deepEqual(users.sort(),[path.join('lib','architecture','enterprise-snapshot.ts'),path.join('lib','memory','ensure-automation-schema.ts')].sort());
 });

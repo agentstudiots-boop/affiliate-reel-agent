@@ -116,7 +116,7 @@ select { width: 100%; min-height: 44px; padding: 12px; border: 1px solid #4c5549
 .ccToolbar button,.ccHead button,.ccChips button{width:auto}
 .ccHead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.ccHead h3{margin:0;font-size:clamp(18px,3vw,24px)}
 .ccToolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0}.ccToolbar input{flex:1 1 180px;min-width:0}
-.ccSegment{display:flex;gap:4px}
+.ccSegment{display:flex;flex-wrap:wrap;gap:4px;max-width:100%}
 .ccChips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
 .ccChip{background:transparent;color:var(--text);border:1px solid;border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer;min-height:36px}
 .ccChipOn{background:#18202c;font-weight:700}

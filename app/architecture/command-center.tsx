@@ -5,6 +5,8 @@ import { Component, useEffect, useMemo, useState, type KeyboardEvent as ReactKey
 import type { ClusterId } from "@/lib/architecture/model";
 import type { SceneProps } from "@/app/architecture/scene";
 import { ClusterPanel, GroupedView, NodePanel, OverviewPanel, ProcessRibbon, ProfilesView } from "@/app/architecture/panels";
+import { DETAIL_HINT, DepartmentDetail, EnterprisePanel, EnterpriseSummary } from "@/app/architecture/enterprise-panel";
+import type { DepartmentId } from "@/app/architecture/enterprise-planets";
 import type { Hover, Payload, Selection } from "@/app/architecture/types";
 import { webglAvailable } from "@/lib/architecture/webgl";
 
@@ -26,14 +28,18 @@ export function CommandCenter({ standalone = false }: { standalone?: boolean } =
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [selection, setSelection] = useState<Selection>(null);
+  // Enterprise level (H-03/H-04): shared by the 2D cards and the 3D planets, so switching views keeps the department.
+  const [department, setDepartment] = useState<DepartmentId | null>(null);
   const [query, setQuery] = useState("");
-  const [mode, setMode] = useState<"architecture" | "process" | "profiles">(standalone ? "profiles" : "architecture");
+  const [mode, setMode] = useState<"architecture" | "process" | "profiles" | "enterprise">(standalone ? "profiles" : "architecture");
   const [resetToken, setResetToken] = useState(0);
   const [use3d, setUse3d] = useState(true);
   const [webglSupported, setWebglSupported] = useState(false);
   const [sceneError, setSceneError] = useState("");
   const [reduced, setReduced] = useState(false);
   const [hover, setHover] = useState<Hover>(null);
+  // A tooltip of the previous view must not stay when the view changes (e.g. by keyboard, without pointer movement).
+  const switchMode = (next: typeof mode) => { setHover(null); setMode(next); };
   // The canvas is mounted once and afterwards only hidden: unmounting a react-three-fiber root inside a React commit logs
   // "synchronously unmount a root" errors with React 19. A hidden scene renders nothing (frameloop "never").
   const [sceneMounted, setSceneMounted] = useState(false);
@@ -46,14 +52,17 @@ export function CommandCenter({ standalone = false }: { standalone?: boolean } =
   }, []);
 
   // Escape goes one level up (component → area → overview); only from the overview it closes the dialog.
-  const up = () => setSelection(current => {
+  const up = () => {
+    if (mode === "enterprise") { if (department) setDepartment(null); else if (!standalone) setOpen(false); return; }
+    setSelection(current => {
     if (!current) { if (!standalone) setOpen(false); return null; }
     if (current.type === "node" && data) {
       const node = data.nodes.find(item => item.id === current.id);
       return node && node.cluster !== "core" ? { type: "cluster", id: node.cluster } : null;
     }
     return null;
-  });
+    });
+  };
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { event.preventDefault(); up(); } };
@@ -66,7 +75,7 @@ export function CommandCenter({ standalone = false }: { standalone?: boolean } =
       document.body.style.cursor = ""; setHover(null);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, data]);
+  }, [open, data, mode, department]);
 
   async function load() {
     setLoading(true); setError("");
@@ -107,6 +116,17 @@ export function CommandCenter({ standalone = false }: { standalone?: boolean } =
   // Keyboard control of the 3D stage: ←/→ areas or components, Enter/↓ open, ↑ back, Home overview.
   function onStageKey(event: ReactKeyboardEvent) {
     if (!data) return;
+    if (mode === "enterprise") {
+      // ← → departments, ↑ back to the overview, Pos1 overview with camera reset.
+      const ids = data.enterprise?.departments.map(item => item.id) ?? [];
+      if ((event.key === "ArrowRight" || event.key === "ArrowLeft") && ids.length) {
+        event.preventDefault();
+        const index = department ? ids.indexOf(department) : -1;
+        setDepartment(ids[(index + (event.key === "ArrowRight" ? 1 : -1) + ids.length) % ids.length]);
+      } else if (event.key === "ArrowUp") { event.preventDefault(); setDepartment(null); }
+      else if (event.key === "Home") { event.preventDefault(); setDepartment(null); setResetToken(token => token + 1); }
+      return;
+    }
     const members = expanded ? data.nodes.filter(node => node.cluster === expanded) : [];
     const cycle = <T,>(items: T[], current: T | undefined, step: number) => items[((current === undefined ? -1 : items.indexOf(current)) + step + items.length) % items.length];
     if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
@@ -129,10 +149,15 @@ export function CommandCenter({ standalone = false }: { standalone?: boolean } =
   };
   const background = () => setSelection(current => current?.type === "node" && data
     ? (() => { const node = data.nodes.find(item => item.id === current.id); return node && node.cluster !== "core" ? { type: "cluster" as const, id: node.cluster } : null; })() : null);
-  const sceneProps: SceneProps | null = data ? { data, selection, expanded, mode: mode === "process" ? "process" : "architecture", highlightIds: highlight, reducedMotion: reduced, active: open && use3d && !sceneError && mode !== "profiles", resetToken,
-    onSelect: select, onBackground: background, onHover: setHover } : null;
+  // The enterprise planets use the same canvas; without enterprise data the 2D panel explains why.
+  const enterprise3d = mode === "enterprise" && !!data?.enterprise;
+  const sceneProps: SceneProps | null = data ? { data, selection, expanded, mode: mode === "process" ? "process" : enterprise3d ? "enterprise" : "architecture", highlightIds: highlight,
+    reducedMotion: reduced, active: open && use3d && !sceneError && mode !== "profiles" && (mode !== "enterprise" || enterprise3d), resetToken,
+    onSelect: select, onBackground: background, onHover: setHover, department, onSelectDepartment: id => { setHover(null); setDepartment(id); } } : null;
   const showScene = use3d && !sceneError;
-  const announce = data ? selectedNode ? `${selectedNode.label}: ${data.labels.operation[data.runtime.nodes[selectedNode.id]?.status ?? "unknown"].label}`
+  const planetsShown = enterprise3d && showScene;
+  const currentDepartment = data?.enterprise?.departments.find(item => item.id === department) ?? null;
+  const announce = data ? mode === "enterprise" ? currentDepartment ? `Abteilung ${currentDepartment.label}` : "Unternehmensebene, alle Abteilungen" : selectedNode ? `${selectedNode.label}: ${data.labels.operation[data.runtime.nodes[selectedNode.id]?.status ?? "unknown"].label}`
     : selection?.type === "cluster" ? `Bereich ${data.labels.clusters[selection.id].label} geöffnet` : selection?.type === "jarvis" ? "Jarvis, Gesamtübersicht" : "Gesamtansicht" : "";
 
   return <>
@@ -151,31 +176,37 @@ export function CommandCenter({ standalone = false }: { standalone?: boolean } =
       <div className="ccToolbar">
         <input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Komponente suchen …" aria-label="Komponente suchen" />
         <div role="group" aria-label="Ansicht" className="ccSegment">
-          <button type="button" className={mode === "architecture" ? "primary" : "ghost"} aria-pressed={mode === "architecture"} onClick={() => setMode("architecture")}>Architektur</button>
-          <button type="button" className={mode === "process" ? "primary" : "ghost"} aria-pressed={mode === "process"} onClick={() => { setMode("process"); setSelection(null); }}>Ablauf</button>
-          <button type="button" className={mode === "profiles" ? "primary" : "ghost"} aria-pressed={mode === "profiles"} onClick={() => { setMode("profiles"); setSelection(null); }}>Steckbriefe</button>
+          <button type="button" className={mode === "architecture" ? "primary" : "ghost"} aria-pressed={mode === "architecture"} onClick={() => switchMode("architecture")}>Architektur</button>
+          <button type="button" className={mode === "process" ? "primary" : "ghost"} aria-pressed={mode === "process"} onClick={() => { switchMode("process"); setSelection(null); }}>Ablauf</button>
+          <button type="button" className={mode === "profiles" ? "primary" : "ghost"} aria-pressed={mode === "profiles"} onClick={() => { switchMode("profiles"); setSelection(null); }}>Steckbriefe</button>
+          <button type="button" className={mode === "enterprise" ? "primary" : "ghost"} aria-pressed={mode === "enterprise"} onClick={() => { switchMode("enterprise"); setSelection(null); }}>Unternehmen</button>
         </div>
-        <button type="button" className="ghost" onClick={() => { setSelection(null); setQuery(""); setResetToken(token => token + 1); }}>Gesamtansicht</button>
+        <button type="button" className="ghost" onClick={() => { setSelection(null); setDepartment(null); setQuery(""); setResetToken(token => token + 1); }}>Gesamtansicht</button>
         {use3d && !sceneError && <button type="button" className="ghost" onClick={() => setUse3d(false)}>2D-Ansicht</button>}
         {!use3d && webglSupported && <button type="button" className="ghost" onClick={() => { setSceneError(""); setUse3d(true); setSceneMounted(true); }}>3D-Ansicht</button>}
         <button type="button" className="ghost" onClick={() => void load()} title="Status neu vom Server laden">Aktualisieren</button>
       </div>
-      <nav className="ccChips" aria-label="Hauptbereiche">{clusters.map(id => <button key={id} type="button" aria-pressed={expanded === id} className={`ccChip ${expanded === id ? "ccChipOn" : ""}`}
-        style={{ borderColor: data.labels.clusters[id].color }} onClick={() => select({ type: "cluster", id })}>{data.labels.clusters[id].label}</button>)}</nav>
+      {mode !== "enterprise" && <nav className="ccChips" aria-label="Hauptbereiche">{clusters.map(id => <button key={id} type="button" aria-pressed={expanded === id} className={`ccChip ${expanded === id ? "ccChipOn" : ""}`}
+        style={{ borderColor: data.labels.clusters[id].color }} onClick={() => select({ type: "cluster", id })}>{data.labels.clusters[id].label}</button>)}</nav>}
       {mode === "process" && <ProcessRibbon data={data} onSelect={select} />}
-      {mode === "profiles" && <ProfilesView data={data} query={query} onSelect={next => { setMode("architecture"); select(next); }} />}
-      <div className="ccBody" hidden={mode === "profiles"}>
+      {mode === "enterprise" && !planetsShown && <EnterprisePanel view={data.enterprise} selected={department} onSelect={setDepartment} development={data.development} />}
+      {planetsShown && data.enterprise && <EnterpriseSummary view={data.enterprise} />}
+      {mode === "profiles" && <ProfilesView data={data} query={query} onSelect={next => { switchMode("architecture"); select(next); }} />}
+      <div className="ccBody" hidden={mode === "profiles" || (mode === "enterprise" && !planetsShown)}>
         <div className="ccStage" data-testid="cc-stage" tabIndex={showScene ? 0 : -1} onKeyDown={showScene ? onStageKey : undefined}
-          aria-label={showScene ? "3D-Ansicht. Pfeiltasten wechseln Bereiche und Komponenten, Enter öffnet, Pfeil hoch oder Escape geht zurück, Pos1 zeigt alles." : undefined}>
+          aria-label={showScene ? mode === "enterprise" ? "3D-Ansicht der Abteilungen. Pfeiltasten wechseln die Abteilung, Pfeil hoch oder Escape geht zurück, Pos1 zeigt alle."
+            : "3D-Ansicht. Pfeiltasten wechseln Bereiche und Komponenten, Enter öffnet, Pfeil hoch oder Escape geht zurück, Pos1 zeigt alles." : undefined}>
           {sceneMounted && !sceneError && sceneProps && <div style={{ height: "100%", display: showScene ? "block" : "none" }}><SceneBoundary onFail={setSceneError}><Scene {...sceneProps} onContextLost={() => setSceneError("WebGL-Kontext vom Browser beendet")} /></SceneBoundary></div>}
           {!showScene && <GroupedView data={data} selection={selection} query={query} onSelect={select} />}
           {showScene && hover && <div className="ccTooltip" role="tooltip" style={{ left: hover.x, top: hover.y }}>
             <b>{hover.title}</b><span>{hover.text}</span></div>}
-          {showScene && <p className="ccHint">Ziehen = drehen · Mausrad/Pinch = zoomen · Bereich anklicken = aufklappen · Leerraum = zurück · Tastatur: ← → Enter ↑ Pos1</p>}
+          {showScene && <p className="ccHint">{mode === "enterprise" ? "Ziehen = drehen · Mausrad/Pinch = zoomen · Abteilung anklicken = Details · Leerraum = zurück · Tastatur: ← → ↑ Pos1 · Ring = offene Entscheidung, Gitter = kein Laufzeitmodul"
+            : "Ziehen = drehen · Mausrad/Pinch = zoomen · Bereich anklicken = aufklappen · Leerraum = zurück · Tastatur: ← → Enter ↑ Pos1"}</p>}
         </div>
         <aside className="ccDetail" data-testid="cc-detail">
           <p className="ccSr" aria-live="polite">{announce}</p>
-          {selectedNode ? <NodePanel data={data} node={selectedNode} onSelect={select} />
+          {mode === "enterprise" ? currentDepartment ? <DepartmentDetail department={currentDepartment} development={data.development} /> : <p className="muted">{DETAIL_HINT}</p>
+            : selectedNode ? <NodePanel data={data} node={selectedNode} onSelect={select} />
             : selection?.type === "cluster" ? <ClusterPanel data={data} cluster={selection.id} onSelect={select} />
               : <OverviewPanel data={data} onSelect={select} />}
         </aside>

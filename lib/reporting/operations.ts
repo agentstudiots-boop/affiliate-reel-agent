@@ -3,6 +3,7 @@ import { getDatabase, type Database } from "../memory/db";
 import { imageProviderStatus } from "../content/image-provider";
 import { dailyNotificationTemplateConfigured, weeklyNotificationTemplateConfigured, whatsappApprovalReady } from "../whatsapp/client";
 import { ensureAutomationSchema } from "../memory/ensure-automation-schema";
+import { readControllingSnapshot } from "../enterprise/controlling/snapshot";
 
 export async function getOperationsSnapshot(db: Database = getDatabase()) {
   await ensureAutomationSchema(db);
@@ -47,8 +48,11 @@ export async function getOperationsSnapshot(db: Database = getDatabase()) {
   const provider = imageProviderStatus();
   // Model costs per agent: provider metrics of the last 7 days (no invented Euro amounts). Missing table → unknown, not zero.
   const modelUsage = await modelCallSummary(db, 7).catch(() => null);
+  // Controlling data contract (E-07), read-only; unreadable ⇒ null ("nicht verfügbar"), never zero.
+  const controlling = await readControllingSnapshot(db).catch(() => null);
   return {
     modelUsage,
+    controlling,
     environment: process.env.VERCEL_ENV === "production" ? "production" : "preview_or_local",
     readiness: {
       cronSecretConfigured: !!process.env.CRON_SECRET,
