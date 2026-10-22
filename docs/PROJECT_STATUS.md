@@ -15,13 +15,13 @@ Ausführlicher Abschluss mit Soll-Ist-Matrix: [`docs/PRODUCTION_AUDIT_FINAL_2026
 | Production-Deployment | je Merge automatisch; letzter geprüfter: `dpl_BedbCi8tuyEVsjWpABs8gCrPfXb4` READY (`06ae6cc`, 22.10.); `vercel.json` unverändert 12 Cron-Einträge |
 | Tests | 892 Tests (888 bestanden, 0 fehlgeschlagen, 4 übersprungen, u. a. J-04 ohne `J04_DATABASE_URL`), Typecheck, Lint (0 Fehler), Build – Stand `main` a736bf4 + #115 + #116 |
 | Offene PRs (alt) | #61 (verletzt Importregel), #65 (überholt), #10 (Migrationskonflikt) – schließen oder neu aufsetzen |
-| Migrationen | 001–042, nur additiv (038: Zustellstatus Themenvorschläge, Themenvideo-Felder, `topic_video_days`; 039: Executive-Aufgabenbuch `enterprise_*`/`budget_reservations`; 040: Kosten-/Erlösbuch `price_catalog`, `cost_entries`, `revenue_entries`, `budgets`; 041: Entscheidungsvorlagen `enterprise_decisions`; 042: Opportunity-Scout `opportunities`, `opportunity_assessments`). 039/041 liest das Command Center (Unternehmensebene), 040 lesen Command Center und `/api/operations` (Controlling); 042 liest noch keine Oberfläche; `budget_reservations` liest nur der Wochenbericht-Abschnitt (Schalter). Geschrieben wird nur hinter Schaltern (alle aus). Ob 039–042 in der Production-DB angewendet sind, ist von der Sitzung nicht prüfbar (erster Cron-/Webhook-Aufruf oder `/api/admin/migrate`) |
+| Migrationen | 001–042, nur additiv (038: Zustellstatus Themenvorschläge, Themenvideo-Felder, `topic_video_days`; 039: Executive-Aufgabenbuch `enterprise_*`/`budget_reservations`; 040: Kosten-/Erlösbuch `price_catalog`, `cost_entries`, `revenue_entries`, `budgets`; 041: Entscheidungsvorlagen `enterprise_decisions`; 042: Opportunity-Scout `opportunities`, `opportunity_assessments`). 039/041 liest das Command Center (Unternehmensebene), 040 lesen Command Center und `/api/operations` (Controlling); 042 liest noch keine Oberfläche; `budget_reservations` liest nur der Wochenbericht-Abschnitt (Schalter). Geschrieben wird nur hinter Schaltern (alle aus). 039–042 in Production angewendet, Nachweis: Betreiber, `/api/admin/migrate` „Schema bereits aktuell“ (22.10.) |
 | Production-Env (nur Namen) | vorhanden: `CONTENT_STUDIO_PASSWORD`, `CRON_SECRET`, DB/Blob, WhatsApp (`WHATTSAPP_*`), Meta-System-User, Replicate, Tavily, Runway (+Budget), Faceless, YouTube (3 OAuth), `HEYGEN_API_KEY`, `WHATSAPP_DAILY_TEMPLATE_*` (`ENABLED=false`), seit 18.10. `TOPIC_PIPELINE_ENABLED`, `TOPIC_DAILY_VIDEO`, `TOPIC_COPY_MODE` (Werte nicht gelesen). **Fehlend:** `EXECUTIVE_ENABLED`, `EXECUTIVE_WEEKLY_REPORT`, `EXECUTIVE_WHATSAPP`, `OPPORTUNITY_SCOUT_ENABLED`, `OPPORTUNITY_DAILY_LIMIT` (= aus), `TOPIC_STANDARD_VIDEO_PROVIDER`, `TOPIC_RUNWAY_MONTHLY_VIDEO_LIMIT`, `HEYGEN_AVATAR_ID`, `HEYGEN_VOICE_ID`, `HEYGEN_MONTHLY_VIDEO_LIMIT`, `HEYGEN_ENABLED`, `META_PAGE_ID`, `META_INSTAGRAM_USER_ID`, Pinterest/TikTok/X, `ADMIN_SESSION_SECRET` (optional) |
 
 ## 2. Gemergte PRs der Ausbau-Roadmap (21./22.10.)
 
 Nachweis je Merge (D-05, `docs/ai-business/RELEASE_CHECKLIST.md`): Production-Deployment READY und keine neuen Laufzeitfehler (Vercel, nur lesend).
-**Aktiviert:** keiner der neuen Schalter ist gesetzt. **Live verifiziert:** nichts – echte Production-Aufrufe sind aus den Sitzungen
+**Aktiviert:** keiner der neuen Schalter ist gesetzt. **Live verifiziert:** nur die Anwendung der Migrationen 039–042 (Betreiber, `/api/admin/migrate`, 22.10.); die Funktionen selbst nicht – echte Production-Aufrufe sind aus den Sitzungen
 nicht möglich; Laufzeitfehler seit den Merges nur der bekannte `pg`-SSL-Hinweis.
 
 | PR | Inhalt | gemergt | deployed | aktiviert | live verifiziert |
@@ -31,16 +31,16 @@ nicht möglich; Laufzeitfehler seit den Merges nur der bekannte `pg`-SSL-Hinweis
 | #101 | C-04 PR-Vorlage | `f5ad79b` | `dpl_5wpuHMqNzjdibnud3AMp9n1mFJsw` READY | – (Doku) | – |
 | #97 (+#83, #85) | F-04 Wirtschaftlichkeitsrechnung, E-05, F-01 (reine Funktionen) | `c29815c` | `dpl_5pNZgRd8tZeGnNDtbYRNL6bs1QVX` READY | nicht eingebunden | – |
 | #94 | Videomodellaufrufe in `model_calls` | `e270bcc` | `dpl_5XMNRRdBxxr52C6SnGvq1uV6Cem6` READY | wirkt ohne Schalter (nur bei Videoaufruf) | – (kein Videoaufruf beobachtet) |
-| #89 | B-02 Migration 039 Aufgabenbuch | `7257fd7` | `dpl_J3FRAHRoWjNFChZwa6peW9F88pv2` READY | – | Anwendung in Production-DB nicht geprüft |
-| #92 | E-01 Migration 040 Kosten-/Erlösbuch | `ca4a986` | eigener Build abgebrochen, enthalten in `dpl_2TJBadjG9uMYaxePz3ULyqXjeLxL` READY | – | Anwendung nicht geprüft |
-| #96 (+#84) | B-06 Migration 041 Entscheidungsvorlagen, B-01 | `f0187eb` | `dpl_2TJBadjG9uMYaxePz3ULyqXjeLxL` READY | – | Anwendung nicht geprüft |
+| #89 | B-02 Migration 039 Aufgabenbuch | `7257fd7` | `dpl_J3FRAHRoWjNFChZwa6peW9F88pv2` READY | – | Migration angewendet (Betreiber, 22.10.) |
+| #92 | E-01 Migration 040 Kosten-/Erlösbuch | `ca4a986` | eigener Build abgebrochen, enthalten in `dpl_2TJBadjG9uMYaxePz3ULyqXjeLxL` READY | – | Migration angewendet (Betreiber, 22.10.) |
+| #96 (+#84) | B-06 Migration 041 Entscheidungsvorlagen, B-01 | `f0187eb` | `dpl_2TJBadjG9uMYaxePz3ULyqXjeLxL` READY | – | Migration angewendet (Betreiber, 22.10.) |
 | #112 (+14 PRs) | J-02 Härtung, Executive-Kern inkl. B-07 `executive-cycle` (nicht geplant) | `90f3737` | `dpl_2wjFdr1HMy64ccezERnSJpS76Mtn` READY | nein (`EXECUTIVE_ENABLED` fehlt) | – |
 | #106 (+#105) | J-03/J-01 Kostenobergrenzen unter Retries (nur Tests) | `b7d1089` | `dpl_7YmuCU757kCcgSrCgnZrgcnMrYid` READY | – (Tests) | – |
 | #108 (+#107) | E-02 Preiskatalog-Pflege, E-04 | `b5d4dcf` | `dpl_2Fx2BnSWgGcA4Mgh9ZoqMB1LPZSR` READY | nicht eingebunden | – |
 | #113 | J-04 Lasttest gegen echtes Postgres (nur Tests) | `2bd4772` | eigener Build abgebrochen, enthalten in `dpl_2zQoxAcykCj6STSLkXiQPuNiSi8M` READY | – (Tests) | – |
 | #114 | B-10 Executive-Abschnitt im Wochenbericht | `9023e64` | `dpl_2zQoxAcykCj6STSLkXiQPuNiSi8M` READY | nein (`EXECUTIVE_WEEKLY_REPORT` fehlt) | – |
 | #117 | B-11 WhatsApp „Executive“ (nur lesend) | `4c976e7` | `dpl_HZfbFtz7if4ou7xgfuXxhfH2RjTC` READY | nein (`EXECUTIVE_WHATSAPP` fehlt) | – |
-| #118 | F-02 Migration 042 + Opportunity-Ledger | `a8ce404` | `dpl_Dq9DCh6yDf2DPeZ7JGDjPEEjoJDq` READY | – | Anwendung nicht geprüft |
+| #118 | F-02 Migration 042 + Opportunity-Ledger | `a8ce404` | `dpl_Dq9DCh6yDf2DPeZ7JGDjPEEjoJDq` READY | – | Migration angewendet (Betreiber, 22.10.) |
 | #119 | F-03 Opportunity-Recherche | `0d2f632` | `dpl_13S81cpec4ibSJrdcoETk6NQSeqD` READY | nein (`OPPORTUNITY_SCOUT_ENABLED` fehlt) | – |
 | #120 | F-05 WhatsApp „Geschäftsidee prüfen: …“ (Tageslimit) | `a736bf4` | `dpl_DJcgghtePDAexDFnwBunCT5mX99Q` READY | nein (`OPPORTUNITY_SCOUT_ENABLED` fehlt) | – |
 | #115 | I-01 Bewertung „Immobilienanalyse“ – Ergebnis „Daten fehlen“ (Doku + Test) | `b91ff44` | `dpl_E2LTDxbnbHvumAUHuME3hgYSGoUT` READY | – (Doku/Test) | – |
@@ -95,7 +95,6 @@ Offen, nicht für `main` vorgesehen (Basis `architecture/ai-business-roadmap`): 
 3. Login-Bremse nur je Serverinstanz → starker Zugangscode; optional Firewall-Regel.
 4. Alt-PRs #61, #65, #10.
 5. Kein Modellvergleich (kostenpflichtig, Freigabe nötig).
-6. Anwendung der Migrationen 039–042 in der Production-DB nicht belegt (Betreiber: Command Center oder `/api/admin/migrate`).
 
 ## 5. Externe Blocker / Betreiberentscheidungen
 
@@ -122,7 +121,7 @@ Offen, nicht für `main` vorgesehen (Basis `architecture/ai-business-roadmap`): 
 
 ## 7. Nächste Schritte (priorisiert)
 
-1. Betreiber: per WhatsApp „Status“ bzw. Command Center prüfen, ob die Themen-Pipeline tatsächlich läuft (Variablen seit 18.10. vorhanden) und ob Migrationen 039–042 angewendet sind.
+1. Betreiber: per WhatsApp „Status“ bzw. Command Center prüfen, ob die Themen-Pipeline tatsächlich läuft (Variablen seit 18.10. vorhanden).
 2. Ersten Reel-Praxistest nach `docs/FIRST_REEL_TEST.md` (Kostenfreigabe ≈ 3 USD Runway).
 3. Betreiber: anmelden, Command Center → „Steckbriefe“ prüfen (macht DB-Nachweise sichtbar).
 4. `TRENDSCOUT_TOPICS=on` eine Woche testen (nur Recherche, keine Veröffentlichung), dann `PRODUCT_MIX=balance`.
