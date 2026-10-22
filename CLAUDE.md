@@ -109,8 +109,9 @@ Kein Modellwechsel ohne nachvollziehbare Daten; kostenpflichtige Vergleiche nur 
   durch `ensureAutomationSchema` (transaktional, Advisory-Lock) oder `/api/admin/migrate` (angemeldet).
 - **Nur additive Migrationen** (`CREATE … IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`), keine destruktiven Änderungen.
   Neue Migration ⇒ Liste in `migrations.ts`, Prüfung in `ensure-automation-schema.ts`, `tests/migration-upgrade.test.cjs`,
-  Anzeige in `lib/architecture/model.ts` anpassen. Aktuell: 001–042 (037 = `model_calls`, 038 = Zustellstatus/Themenvideo, 039 = Executive-Aufgabenbuch, 040 = Kosten-/Erlösbuch, 041 = Executive-Entscheidungsvorlagen, 042 = Opportunity-Scout). 039–042: Command Center und `/api/operations` lesen sie (Wochenbericht nur mit Schalter);
-  geschrieben wird nur hinter Schaltern (Executive-Zyklus, „Geschäftsidee prüfen“); Preiskatalog/Kostenimport (`lib/enterprise/controlling/`) sind nicht eingebunden.
+  Anzeige in `lib/architecture/model.ts` anpassen. Aktuell: 001–042 (037 = `model_calls`, 038 = Zustellstatus/Themenvideo, 039 = Executive-Aufgabenbuch, 040 = Kosten-/Erlösbuch, 041 = Executive-Entscheidungsvorlagen, 042 = Opportunity-Scout). 039/041 liest das Command Center (Unternehmensebene), 040 lesen Command Center und `/api/operations` (Controlling);
+  042 liest noch keine Oberfläche; `budget_reservations` liest nur der Wochenbericht-Abschnitt (Schalter). Geschrieben wird nur hinter Schaltern
+  (Executive-Zyklus, „Geschäftsidee prüfen“); Preiskatalog/Kostenimport (`lib/enterprise/controlling/`) sind nicht eingebunden.
 
 ## 7. Cron-Jobs (`vercel.json`, UTC)
 
