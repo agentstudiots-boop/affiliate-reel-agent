@@ -84,8 +84,12 @@ Planer/Implementierer/Prüfer zwischen zwei Systemen (ADR-15, ADR-16) und das Le
 Mit Freigabe des Betreibers (21.10.: „Claude merged“) hat Session 1 alle Roadmap-PRs gegen `main` gemergt, in der Reihenfolge aus
 [`MERGE_GUIDE.md`](MERGE_GUIDE.md) und danach den Ausbau. Vor jedem Merge liefen die vollen Prüfungen auf dem simulierten Ergebnis.
 
-- **Migrationen 039–042:** mit #89, #92, #96 und #118 gemergt und **in der Production-DB angewendet**. Nachweis durch den Betreiber,
-  22.10. ca. 15:35 UTC: `/api/admin/migrate` (angemeldet) meldet „Schema bereits aktuell“ für 001–042.
+- **Migrationen 039–042:** mit #89, #92, #96 und #118 gemergt und **in der Production-DB angewendet**:
+  - 039–041 waren vorher schon angewendet.
+  - 042 hat der Betreiber am 22.10. um 15:50:56 UTC selbst angewendet, über `/api/admin/migrate` (angemeldet). Der Laufzeitlog
+    `database_migration` meldet dazu `applied: ["042_opportunities.sql"]`. Zwei weitere Aufrufe ergaben „Schema bereits aktuell“
+    für 001–042; dieser Stand ist auf dem Screenshot des Betreibers zu sehen.
+  - Fehler gab es dabei keine, außer dem bekannten `pg`-SSL-Hinweis.
 - **Ausbau:** #117 B-11 (`4c976e7`), #118 F-02 (`a8ce404`), #119 F-03 (`0d2f632`), #120 F-05 (`a736bf4`), #115 I-01 (`b91ff44`),
   #116 J-05 (`06ae6cc`).
   - F-05 bekam vor dem Merge einen Fix: Das Tageslimit zählt jetzt im Berliner Tag von `asOf`, nicht nach der DB-Uhr (`2130525`).
