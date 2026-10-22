@@ -109,7 +109,9 @@ Kein Modellwechsel ohne nachvollziehbare Daten; kostenpflichtige Vergleiche nur 
   durch `ensureAutomationSchema` (transaktional, Advisory-Lock) oder `/api/admin/migrate` (angemeldet).
 - **Nur additive Migrationen** (`CREATE … IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`), keine destruktiven Änderungen.
   Neue Migration ⇒ Liste in `migrations.ts`, Prüfung in `ensure-automation-schema.ts`, `tests/migration-upgrade.test.cjs`,
-  Anzeige in `lib/architecture/model.ts` anpassen. Aktuell: 001–042 (037 = `model_calls`, 038 = Zustellstatus/Themenvideo, 039 = Executive-Aufgabenbuch, 040 = Kosten-/Erlösbuch, 041 = Executive-Entscheidungsvorlagen, 042 = Opportunity-Scout; 039–042 ungenutzt).
+  Anzeige in `lib/architecture/model.ts` anpassen. Aktuell: 001–042 (037 = `model_calls`, 038 = Zustellstatus/Themenvideo, 039 = Executive-Aufgabenbuch, 040 = Kosten-/Erlösbuch, 041 = Executive-Entscheidungsvorlagen, 042 = Opportunity-Scout). 039/041 liest das Command Center (Unternehmensebene), 040 lesen Command Center und `/api/operations` (Controlling);
+  042 liest noch keine Oberfläche; `budget_reservations` liest nur der Wochenbericht-Abschnitt (Schalter). Geschrieben wird nur hinter Schaltern
+  (Executive-Zyklus, „Geschäftsidee prüfen“); Preiskatalog/Kostenimport (`lib/enterprise/controlling/`) sind nicht eingebunden.
 
 ## 7. Cron-Jobs (`vercel.json`, UTC)
 
@@ -117,7 +119,8 @@ Kein Modellwechsel ohne nachvollziehbare Daten; kostenpflichtige Vergleiche nur 
 - `/api/cron/topic-scout` 07/08 UTC → ein Themenvorschlag im Fenster 08–11 Uhr Berlin (Tageslimit); `/api/cron/topic-video` 10/11/12 UTC →
   höchstens ein Themenvideo-Vorschlag je Berliner Tag (Fenster 12–14 Uhr, Claim `topic_video_days`). Beide wirken nur mit `TOPIC_PIPELINE_ENABLED=true`
   (Video zusätzlich `TOPIC_DAILY_VIDEO=true`). Außerhalb des 24-h-Fensters werden Themenvorschläge gehalten und mit der nächsten Betreiber-Nachricht nachgeliefert.
-- `/api/cron/weekly-report` Mo 08:15 UTC. `/api/cron/continue` existiert, ist aber nicht geplant.
+- `/api/cron/weekly-report` Mo 08:15 UTC. `/api/cron/continue` und `/api/cron/executive-cycle` (B-07, ohne `EXECUTIVE_ENABLED=true` → `disabled`)
+  existieren, sind aber nicht geplant.
 - Hobby-Plan: Ausführungszeit innerhalb der Stunde unscharf, Runtime-Logs nur 1 h → Nachweise in der DB.
 
 ## 8. Entwicklungs-, Test- und Deployment-Regeln
@@ -127,6 +130,9 @@ Kein Modellwechsel ohne nachvollziehbare Daten; kostenpflichtige Vergleiche nur 
   Netzaufrufe), `npm run build`. Tests für Regressionen mit realem Code, nur I/O wird ersetzt (`tests/helpers/`).
 - Keine kostenpflichtigen Aufrufe (Bild, Video, Modellvergleich) und keine Live-Posts ohne ausdrückliche Freigabe.
 - Neue Funktionen hinter Schaltern mit Standard „aus“ (Rollback = Variable entfernen); Schalter nie eigenmächtig aktivieren.
+- Executive-/Opportunity-Schalter (alle in Production nicht gesetzt = aus): `EXECUTIVE_ENABLED` (Executive-Zyklus), `EXECUTIVE_WEEKLY_REPORT`
+  (Abschnitt im Wochenbericht), `EXECUTIVE_WHATSAPP` (Befehl „Executive“, nur lesend), `OPPORTUNITY_SCOUT_ENABLED` („Geschäftsidee prüfen: …“,
+  Tavily + Modell, kostenpflichtig) mit Tageslimit `OPPORTUNITY_DAILY_LIMIT`.
 - Cloud-Sitzungen: nicht in einem Git-Worktree mit verlinktem `node_modules` bauen (Turbopack-Fehler), sondern im Hauptcheckout.
 - Nach Deployment: Production-Status mit echtem Aufruf prüfen (Build allein ist kein Nachweis). Begriffe strikt trennen:
   implementiert · getestet · gemergt · deployed · aktiviert · live verifiziert.
