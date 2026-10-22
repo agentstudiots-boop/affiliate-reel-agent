@@ -42,15 +42,16 @@ const count = (value: unknown, label: string) => {
   return value as number;
 };
 
-export async function createOpportunity(db: Sql, input: { title: string; summary?: string; origin: OpportunityOrigin; sourceMessageId?: string | null }) {
+export async function createOpportunity(db: Sql, input: { title: string; summary?: string; origin: OpportunityOrigin; sourceMessageId?: string | null; createdAt?: Date }) {
   const title = typeof input.title === "string" ? input.title.replace(/\s+/g, " ").trim() : "";
   const summary = typeof input.summary === "string" ? input.summary.trim() : "";
   if (!title || title.length > 200) throw new OpportunityInputError("Titel fehlt oder ist länger als 200 Zeichen");
   if (summary.length > 2000) throw new OpportunityInputError("Beschreibung ist länger als 2000 Zeichen");
   if (!ORIGINS.includes(input.origin)) throw new OpportunityInputError("unbekannte Herkunft");
   const sourceMessageId = input.sourceMessageId ?? null;
-  const inserted = await db.query(`INSERT INTO opportunities(id,title,summary,origin,source_message_id) VALUES($1,$2,$3,$4,$5)
-    ON CONFLICT (source_message_id) DO NOTHING RETURNING id`, [randomUUID(), title, summary, input.origin, sourceMessageId]);
+  const createdAt = input.createdAt instanceof Date && Number.isFinite(input.createdAt.getTime()) ? input.createdAt.toISOString() : null;
+  const inserted = await db.query(`INSERT INTO opportunities(id,title,summary,origin,source_message_id,created_at) VALUES($1,$2,$3,$4,$5,COALESCE($6::timestamptz, now()))
+    ON CONFLICT (source_message_id) DO NOTHING RETURNING id`, [randomUUID(), title, summary, input.origin, sourceMessageId, createdAt]);
   if (inserted.rows[0]) return { id: String(inserted.rows[0].id), created: true };
   // Only a redelivered message can conflict (a NULL source never conflicts): return the opportunity it already created.
   const existing = await db.query("SELECT id FROM opportunities WHERE source_message_id=$1", [sourceMessageId]);
@@ -58,7 +59,8 @@ export async function createOpportunity(db: Sql, input: { title: string; summary
 }
 
 // Operator trigger (F-05): one opportunity per WhatsApp message and at most `dailyLimit` per Berlin day. Count and insert run
-// under one advisory lock, so parallel messages cannot exceed the limit.
+// under one advisory lock, so parallel messages cannot exceed the limit. The opportunity is stamped with `asOf` and counted
+// within the Berlin day of `asOf`, so the limit follows the same clock as the caller (not the database clock).
 export async function createOperatorOpportunity(db: Database, input: { title: string; summary?: string; sourceMessageId: string; dailyLimit: number; asOf: Date }) {
   const limit = Math.min(Math.max(Number.isSafeInteger(input.dailyLimit) ? input.dailyLimit : 0, 0), MAX_DAILY_OPERATOR_CHECKS);
   if (typeof input.sourceMessageId !== "string" || !input.sourceMessageId) throw new OpportunityInputError("Nachricht fehlt");
@@ -67,9 +69,12 @@ export async function createOperatorOpportunity(db: Database, input: { title: st
     const existing = (await sql.query("SELECT id FROM opportunities WHERE source_message_id=$1", [input.sourceMessageId])).rows[0];
     if (existing) return { status: "duplicate" as const, id: String(existing.id) };
     const used = Number((await sql.query(`SELECT count(*)::int AS n FROM opportunities WHERE origin='operator'
-      AND created_at >= (date_trunc('day', $1::timestamptz AT TIME ZONE 'Europe/Berlin') AT TIME ZONE 'Europe/Berlin')`, [input.asOf.toISOString()])).rows[0].n);
+      AND created_at >= (date_trunc('day', $1::timestamptz AT TIME ZONE 'Europe/Berlin') AT TIME ZONE 'Europe/Berlin')
+      AND created_at < ((date_trunc('day', $1::timestamptz AT TIME ZONE 'Europe/Berlin') + interval '1 day') AT TIME ZONE 'Europe/Berlin')`,
+      [input.asOf.toISOString()])).rows[0].n);
     if (used >= limit) return { status: "limit" as const, used, limit };
-    const created = await createOpportunity(sql, { title: input.title, summary: input.summary, origin: "operator", sourceMessageId: input.sourceMessageId });
+    const created = await createOpportunity(sql, { title: input.title, summary: input.summary, origin: "operator", sourceMessageId: input.sourceMessageId,
+      createdAt: input.asOf });
     return { status: "created" as const, id: created.id };
   });
 }

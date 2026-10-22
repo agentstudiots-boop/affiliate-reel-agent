@@ -121,6 +121,20 @@ test('one opportunity per WhatsApp message; parallel assessments get distinct ve
   await db.close();
 });
 
+test('the operator daily limit counts the Berlin day of asOf, not the database clock (F-05)',async()=>{
+  const db=await pgliteDatabase();
+  const make=(n,asOf)=>L.createOperatorOpportunity(db,{title:`Idee ${n}`,sourceMessageId:`wamid.day.${n}`,dailyLimit:2,asOf:new Date(asOf)});
+  // 21.10. Berlin: 00:30 local is 22:30 UTC of the day before; both calls are long before the database clock.
+  assert.equal((await make(1,'2026-10-20T22:30:00Z')).status,'created');
+  assert.equal((await make(2,'2026-10-21T21:59:00Z')).status,'created');
+  assert.deepEqual(await make(3,'2026-10-21T12:00:00Z'),{status:'limit',used:2,limit:2});
+  assert.equal((await make(4,'2026-10-21T22:00:00Z')).status,'created',"00:00 Berlin on 22.10. is a new day");
+  assert.equal((await make(5,'2026-10-20T21:00:00Z')).status,'created',"23:00 Berlin on 20.10. is the day before");
+  const stamped=(await db.query("SELECT created_at FROM opportunities WHERE source_message_id='wamid.day.1'")).rows[0].created_at;
+  assert.equal(new Date(stamped).toISOString(),'2026-10-20T22:30:00.000Z');
+  await db.close();
+});
+
 test('the ledger is isolated: no network, no model, no clock, no approval path, used only by the WhatsApp trigger (AC-5)',()=>{
   const source=fs.readFileSync('lib/enterprise/opportunity/ledger.ts','utf8');
   assert.deepEqual([...source.matchAll(/from\s+"([^"]+)"/g)].map(m=>m[1]).sort(),['../../memory/db','./economics','./operator-config','./scoring','node:crypto']);
