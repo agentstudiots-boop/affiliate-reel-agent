@@ -4,7 +4,7 @@
   "title": "Abteilungszuordnung der Modellaufrufe über das Register (ohne Schemaänderung)",
   "module": "controlling-metrics",
   "phase": "E",
-  "status": "waiting_review",
+  "status": "merged",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -108,18 +108,17 @@
   "open_decisions": [],
   "pr": {
     "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/88",
-    "state": "draft",
+    "state": "merged",
     "merge_commit": null,
-    "ci": "pending"
+    "ci": "green"
   },
   "approval": {
     "reviewer": "approved",
-    "operator": "pending",
+    "operator": "approved",
     "latest_review_file": null
   },
   "next_steps": [
-    "CI auf #88",
-    "Merge durch Betreiber erst nach #84"
+    "CI auf #88"
   ],
   "session": {
     "system": "claude-code",
@@ -127,16 +126,16 @@
     "checkpoint_reason": "other",
     "last_commit": "c4c8f02",
     "active_branch": "claude/E-06-model-call-departments",
-    "state_summary": "Draft-PR #88 offen",
+    "state_summary": "PR #88 auf main gemergt",
     "decisions_made": [
       "Empfehlung aus 04 §E umgesetzt: Register statt Spalte department, keine Migration"
     ],
     "test_status": "5/5 gezielt",
-    "next_action": "CI/Review #88"
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
   },
-  "revision": 4,
+  "revision": 5,
   "based_on_commit": "5dcbf75",
-  "updated_at": "2026-10-19T12:19:00Z",
+  "updated_at": "2026-10-22T15:20:00Z",
   "log": [
     {
       "at": "2026-10-19T06:44:00Z",
@@ -165,6 +164,12 @@
       "action": "fixed",
       "summary": "Suche überall, mehrzeilige routerModelCall, ungültige Zähler",
       "commit": "c4c8f02"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #88 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
     }
   ]
 }

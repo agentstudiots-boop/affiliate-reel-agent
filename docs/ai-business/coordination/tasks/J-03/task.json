@@ -4,7 +4,7 @@
   "title": "Kostenobergrenzen unter Wiederholungen und Parallelität (nur Tests)",
   "module": "enterprise-ledger",
   "phase": "J",
-  "status": "waiting_review",
+  "status": "merged",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -80,18 +80,17 @@
   "open_decisions": [],
   "pr": {
     "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/106",
-    "state": "draft",
+    "state": "merged",
     "merge_commit": null,
-    "ci": "pending"
+    "ci": "green"
   },
   "approval": {
     "reviewer": "pending",
-    "operator": "pending",
+    "operator": "approved",
     "latest_review_file": null
   },
   "next_steps": [
-    "Review",
-    "Merge durch Betreiber nach #98"
+    "Keiner im Code; eine Aktivierung (Schalter, Cron-Eintrag) entscheidet nur der Betreiber"
   ],
   "session": {
     "system": "claude-code",
@@ -99,14 +98,14 @@
     "checkpoint_reason": "other",
     "last_commit": "ddca4cd",
     "active_branch": "claude/J-03-cost-limits",
-    "state_summary": "Draft-PR #106 offen",
+    "state_summary": "PR #106 auf main gemergt",
     "decisions_made": [],
     "test_status": "753/753",
-    "next_action": "Review"
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
   },
-  "revision": 1,
+  "revision": 2,
   "based_on_commit": "1df310c",
-  "updated_at": "2026-10-20T06:01:52Z",
+  "updated_at": "2026-10-22T15:20:00Z",
   "log": [
     {
       "at": "2026-10-20T06:01:52Z",
@@ -114,6 +113,12 @@
       "action": "pr_opened",
       "summary": "J-03 Draft-PR #106; Fehler in B-05 gefunden und behoben",
       "commit": "ddca4cd"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #106 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
     }
   ]
 }

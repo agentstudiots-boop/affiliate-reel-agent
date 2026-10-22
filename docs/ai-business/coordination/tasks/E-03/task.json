@@ -4,7 +4,7 @@
   "title": "Importer model_calls → cost_entries (gemessen, Preis nur aus dem Katalog)",
   "module": "controlling-ledger",
   "phase": "E",
-  "status": "approved_by_reviewer",
+  "status": "merged",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -119,13 +119,13 @@
   "open_decisions": [],
   "pr": {
     "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/93",
-    "state": "draft",
+    "state": "merged",
     "merge_commit": null,
-    "ci": "pending"
+    "ci": "green"
   },
   "approval": {
     "reviewer": "approved",
-    "operator": "pending",
+    "operator": "approved",
     "latest_review_file": null
   },
   "next_steps": [
@@ -137,16 +137,16 @@
     "checkpoint_reason": "other",
     "last_commit": "44ec71f",
     "active_branch": "claude/E-03-model-call-importer",
-    "state_summary": "Nachprüfung approve; minor (Nachbepreisung hängt an Altzeilen) behoben",
+    "state_summary": "PR #93 auf main gemergt",
     "decisions_made": [
       "Abteilung als Funktion hereingereicht"
     ],
     "test_status": "19/19 gezielt",
-    "next_action": "Volle Prüfung, Draft-PR"
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
   },
-  "revision": 4,
+  "revision": 5,
   "based_on_commit": "e8149a7",
-  "updated_at": "2026-10-19T18:45:08Z",
+  "updated_at": "2026-10-22T15:20:00Z",
   "log": [
     {
       "at": "2026-10-19T11:34:00Z",
@@ -175,6 +175,12 @@
       "action": "fixed",
       "summary": "Nachprüfung approve; minor (Nachbepreisung hängt an Altzeilen) behoben",
       "commit": "44ec71f"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #93 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
     }
   ]
 }

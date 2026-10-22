@@ -4,7 +4,7 @@
   "title": "Entscheidungsvorlagen (Migration 041, nur Vorlage, keine Wirkung)",
   "module": "enterprise-decisions",
   "phase": "B",
-  "status": "waiting_review",
+  "status": "merged",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -129,18 +129,17 @@
   ],
   "pr": {
     "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/96",
-    "state": "draft",
+    "state": "merged",
     "merge_commit": null,
-    "ci": "pending"
+    "ci": "green"
   },
   "approval": {
     "reviewer": "changes_requested",
-    "operator": "pending",
+    "operator": "approved",
     "latest_review_file": null
   },
   "next_steps": [
-    "Review zweite Sitzung",
-    "Merge durch Betreiber in Stapelreihenfolge"
+    "Keiner im Code; eine Aktivierung (Schalter, Cron-Eintrag) entscheidet nur der Betreiber"
   ],
   "session": {
     "system": "claude-code",
@@ -148,16 +147,16 @@
     "checkpoint_reason": "other",
     "last_commit": "070dff7",
     "active_branch": "claude/B-06-decision-requests",
-    "state_summary": "Review #96: major (recordDecision vertraute Aufrufer) behoben – WhatsApp-Beweis wie Freigabe-Gate; minor umgesetzt; Nachprüfung offen",
+    "state_summary": "PR #96 auf main gemergt",
     "decisions_made": [
       "Betreiberauftrag 19.10.: in Abwesenheit durchgehend weiterarbeiten; Wirkung bleibt hinter Schaltern/Entscheidungen"
     ],
     "test_status": "alle vier Exit 0, 705/705",
-    "next_action": "Review abwarten"
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
   },
-  "revision": 2,
+  "revision": 3,
   "based_on_commit": "d9e9d1e",
-  "updated_at": "2026-10-19T18:45:08Z",
+  "updated_at": "2026-10-22T15:20:00Z",
   "log": [
     {
       "at": "2026-10-19T12:11:00Z",
@@ -172,6 +171,12 @@
       "action": "fixed",
       "summary": "Review #96: major (recordDecision vertraute Aufrufer) behoben – WhatsApp-Beweis wie Freigabe-Gate; minor umgesetzt; Nachprüfung offen",
       "commit": "070dff7"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #96 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
     }
   ]
 }

@@ -4,7 +4,7 @@
   "title": "Budgetwächter: Monatsgrenze nur aus freigegebenem hartem Budget (L4-Entscheidung), nie vom Aufrufer",
   "module": "enterprise-ledger",
   "phase": "B",
-  "status": "waiting_review",
+  "status": "merged",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -83,18 +83,17 @@
   "open_decisions": [],
   "pr": {
     "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/104",
-    "state": "draft",
+    "state": "merged",
     "merge_commit": null,
-    "ci": "pending"
+    "ci": "green"
   },
   "approval": {
     "reviewer": "pending",
-    "operator": "pending",
+    "operator": "approved",
     "latest_review_file": null
   },
   "next_steps": [
-    "Review",
-    "Merge durch Betreiber nach #98"
+    "Keiner im Code; eine Aktivierung (Schalter, Cron-Eintrag) entscheidet nur der Betreiber"
   ],
   "session": {
     "system": "claude-code",
@@ -102,16 +101,16 @@
     "checkpoint_reason": "other",
     "last_commit": "12d829e",
     "active_branch": "claude/B-09-budget-limits",
-    "state_summary": "Testhilfe an neue Entscheidungsschnittstelle angepasst",
+    "state_summary": "PR #104 auf main gemergt",
     "decisions_made": [
       "Betrag ist Teil des Entscheidungsbetreffs (budget:<abteilung>:<monat>:<cent>)"
     ],
     "test_status": "744/744",
-    "next_action": "Review"
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
   },
-  "revision": 2,
+  "revision": 3,
   "based_on_commit": "1df310c",
-  "updated_at": "2026-10-19T18:45:08Z",
+  "updated_at": "2026-10-22T15:20:00Z",
   "log": [
     {
       "at": "2026-10-19T17:57:55Z",
@@ -126,6 +125,12 @@
       "action": "pushed",
       "summary": "Testhilfe an neue Entscheidungsschnittstelle angepasst",
       "commit": "12d829e"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #104 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
     }
   ]
 }

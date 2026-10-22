@@ -4,7 +4,7 @@
   "title": "Wirtschaftlichkeitsrechnung: F-01-Bewertung mit E-05-Kennzahlen verbinden (reine Funktionen)",
   "module": "opportunity",
   "phase": "F",
-  "status": "approved_by_reviewer",
+  "status": "merged",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -149,19 +149,17 @@
   ],
   "pr": {
     "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/97",
-    "state": "draft",
+    "state": "merged",
     "merge_commit": null,
-    "ci": "pending"
+    "ci": "green"
   },
   "approval": {
     "reviewer": "approved",
-    "operator": "pending",
+    "operator": "approved",
     "latest_review_file": null
   },
   "next_steps": [
-    "Befund aus Review #97 beheben (zweite Sitzung)",
-    "Nachprüfung",
-    "Merge durch Betreiber nach #85 und #83"
+    "Nachprüfung"
   ],
   "session": {
     "system": "claude-code",
@@ -169,16 +167,16 @@
     "checkpoint_reason": "work_package_done",
     "last_commit": "22a68a2",
     "active_branch": "claude/F-04-opportunity-economics",
-    "state_summary": "unverändert approve",
+    "state_summary": "PR #97 auf main gemergt",
     "decisions_made": [
       "Messung schlägt Prognose; Prognose nach ungünstigem Ende beurteilt",
       "Amortisation gemessen = Investition*Monate/Deckungsbeitrag (keine Rundung des Monatszuflusses)"
     ],
     "test_status": "707/707",
-    "next_action": "Reviews #87, #91, #92, #93"
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
   },
-  "revision": 4,
-  "updated_at": "2026-10-19T18:45:08Z",
+  "revision": 5,
+  "updated_at": "2026-10-22T15:20:00Z",
   "log": [
     {
       "at": "2026-10-19T12:25:00Z",
@@ -207,6 +205,12 @@
       "action": "note",
       "summary": "unverändert approve",
       "commit": "22a68a2"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #97 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
     }
   ]
 }

@@ -4,7 +4,7 @@
   "title": "Reine Kennzahlenfunktionen: Deckungsbeitrag, einfacher ROI und Amortisation",
   "module": "controlling",
   "phase": "E",
-  "status": "waiting_review",
+  "status": "merged",
   "planner": "gpt-work",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -143,18 +143,17 @@
   "open_decisions": [],
   "pr": {
     "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/83",
-    "state": "draft",
+    "state": "merged",
     "merge_commit": null,
-    "ci": "pending"
+    "ci": "green"
   },
   "approval": {
     "reviewer": "approved",
-    "operator": "pending",
+    "operator": "approved",
     "latest_review_file": null
   },
   "next_steps": [
-    "Review des Draft-PR #83",
-    "Betreiber: Merge nach Review/CI"
+    "Keiner im Code; eine Aktivierung (Schalter, Cron-Eintrag) entscheidet nur der Betreiber"
   ],
   "session": {
     "system": "claude-code",
@@ -162,15 +161,15 @@
     "checkpoint_reason": "work_package_done",
     "last_commit": "b2eef4c",
     "active_branch": "claude/E-05-controlling-metrics",
-    "state_summary": "E-05 implementiert, alle Projektprüfungen grün, Draft-PR #83 offen.",
+    "state_summary": "PR #83 auf main gemergt",
     "decisions_made": [
       "MoneyInput erlaubt negative Beträge; Domänenprüfung je Funktion"
     ],
     "test_status": "685/685, typecheck/lint/build ok",
-    "next_action": "Review abwarten; kein Merge"
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
   },
-  "revision": 5,
-  "updated_at": "2026-10-19T06:25:00Z",
+  "revision": 6,
+  "updated_at": "2026-10-22T15:20:00Z",
   "log": [
     {
       "at": "2026-10-19T05:40:52.550Z",
@@ -205,13 +204,14 @@
       "action": "review_received",
       "summary": "Review zweite Claude-Sitzung (gleiches Modell, kein Zweitmodell): approve; Befunde in 074546a umgesetzt",
       "commit": "074546a"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #83 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
     }
   ],
   "based_on_commit": "f8dbcba",
-  "waiting": {
-    "reason": "operator",
-    "since": "2026-10-19T06:15:00Z",
-    "resume_condition": "Betreiber prüft Draft-PR #83 und merged; GPT-Nachprüfung optional",
-    "wake_mechanism": "manual_start"
-  }
+  "waiting": null
 }

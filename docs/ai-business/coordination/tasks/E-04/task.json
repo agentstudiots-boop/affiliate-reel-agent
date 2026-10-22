@@ -4,7 +4,7 @@
   "title": "Manuelle Belege und Erlöse (Kosten, Erlöse, PartnerNet-CSV) – nur Code und Tests",
   "module": "enterprise-controlling",
   "phase": "E",
-  "status": "waiting_review",
+  "status": "merged",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -89,17 +89,17 @@
   ],
   "pr": {
     "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/107",
-    "state": "draft",
+    "state": "merged",
     "merge_commit": null,
-    "ci": "unknown"
+    "ci": "green"
   },
   "approval": {
     "reviewer": "approved",
-    "operator": "pending",
+    "operator": "approved",
     "latest_review_file": null
   },
   "next_steps": [
-    "Merge durch Betreiber nach #100"
+    "Keiner im Code; eine Aktivierung (Schalter, Cron-Eintrag) entscheidet nur der Betreiber"
   ],
   "session": {
     "system": "claude-code",
@@ -107,14 +107,14 @@
     "checkpoint_reason": "other",
     "last_commit": "12d08cc",
     "active_branch": "claude/E-04-manual-entries",
-    "state_summary": "Draft-PR #107, Review approve mit 2 minor",
+    "state_summary": "PR #107 auf main gemergt",
     "decisions_made": [],
     "test_status": "725/725",
-    "next_action": "minor beheben"
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
   },
-  "revision": 3,
+  "revision": 4,
   "based_on_commit": "563e398",
-  "updated_at": "2026-10-20T12:25:00Z",
+  "updated_at": "2026-10-22T15:20:00Z",
   "log": [
     {
       "at": "2026-10-20T07:25:00Z",
@@ -136,6 +136,12 @@
       "action": "approved",
       "summary": "Nachprüfung #107 @a70442d: approve (beide minor behoben)",
       "commit": "a70442d"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #107 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
     }
   ]
 }

@@ -4,7 +4,7 @@
   "title": "Sicherheitsreview beider Modelle – Claude-Hälfte (Executive-Kern, Controlling, Unternehmensebene)",
   "module": "enterprise-security",
   "phase": "J",
-  "status": "waiting_review",
+  "status": "merged",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -115,13 +115,13 @@
   ],
   "pr": {
     "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/112",
-    "state": "draft",
+    "state": "merged",
     "merge_commit": null,
-    "ci": "pending"
+    "ci": "green"
   },
   "approval": {
     "reviewer": "pending",
-    "operator": "pending",
+    "operator": "approved",
     "latest_review_file": "findings-claude.md"
   },
   "next_steps": [
@@ -134,14 +134,14 @@
     "checkpoint_reason": "other",
     "last_commit": "782f6bd",
     "active_branch": "claude/H-04-enterprise-panel",
-    "state_summary": "Claude-Hälfte erledigt, Korrekturen gepusht",
+    "state_summary": "PR #112 auf main gemergt",
     "decisions_made": [],
     "test_status": "grün",
-    "next_action": "Nachprüfungen abwarten"
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
   },
-  "revision": 2,
+  "revision": 3,
   "based_on_commit": "4a57838",
-  "updated_at": "2026-10-20T13:55:00Z",
+  "updated_at": "2026-10-22T15:20:00Z",
   "log": [
     {
       "at": "2026-10-20T06:45:00Z",
@@ -156,6 +156,12 @@
       "action": "pr_opened",
       "summary": "Härtung als Draft-PR #112 oben auf dem Stapel",
       "commit": "430df22"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #112 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
     }
   ]
 }

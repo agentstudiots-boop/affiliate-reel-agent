@@ -4,7 +4,7 @@
   "title": "Budgetwächter: Reservierung vor dem Aufruf, Abrechnung danach, unklarer Status hält die Reservierung",
   "module": "enterprise-ledger",
   "phase": "B",
-  "status": "waiting_review",
+  "status": "merged",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -143,18 +143,17 @@
   "open_decisions": [],
   "pr": {
     "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/91",
-    "state": "draft",
+    "state": "merged",
     "merge_commit": null,
-    "ci": "pending"
+    "ci": "green"
   },
   "approval": {
     "reviewer": "pending",
-    "operator": "pending",
+    "operator": "approved",
     "latest_review_file": null
   },
   "next_steps": [
-    "Review",
-    "Merge durch Betreiber nach #84, #86, #89, #90"
+    "Keiner im Code; eine Aktivierung (Schalter, Cron-Eintrag) entscheidet nur der Betreiber"
   ],
   "session": {
     "system": "claude-code",
@@ -162,17 +161,17 @@
     "checkpoint_reason": "other",
     "last_commit": "4fd38be",
     "active_branch": "claude/B-05-budget-guard",
-    "state_summary": "Fehler aus J-03 behoben, Nachprüfung offen",
+    "state_summary": "PR #91 auf main gemergt",
     "decisions_made": [
       "Abrechnung im Repository in derselben Transaktion wie das Ergebnis",
       "Verlorene Worker ⇒ disputed"
     ],
     "test_status": "39/39 gezielt",
-    "next_action": "Review abwarten"
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
   },
-  "revision": 7,
+  "revision": 8,
   "based_on_commit": "7502b48",
-  "updated_at": "2026-10-20T06:01:52Z",
+  "updated_at": "2026-10-22T15:20:00Z",
   "log": [
     {
       "at": "2026-10-19T07:31:00Z",
@@ -215,6 +214,12 @@
       "action": "fixed",
       "summary": "Aufgabenbudget zählt abgerechnete Versuche zum echten Betrag (gefunden durch J-03)",
       "commit": "4fd38be"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #91 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
     }
   ]
 }

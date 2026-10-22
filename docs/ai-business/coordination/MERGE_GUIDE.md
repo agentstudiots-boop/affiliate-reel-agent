@@ -1,5 +1,10 @@
 # Merge-Leitfaden für die offenen Draft-PRs (geprüft am 20.10.2026)
 
+> **Erledigt (22.10.2026):** Alle hier genannten PRs gegen `main` sind gemergt, ebenso der Ausbau (#115–#120). Die Merges hat Claude
+> ausgeführt, mit Freigabe des Betreibers vom 21.10. Vor jedem Merge lief eine volle Prüfung auf dem simulierten Ergebnis. Stand und Commits:
+> `README.md`, Abschnitt „Stand 22.10.2026“. Dieser Leitfaden bleibt als Nachweis; der Satz „Die Merges führt nur der Betreiber aus“
+> ist damit überholt.
+
 Für den Betreiber. Die Merges führt nur der Betreiber aus. Claude hat alle offenen PRs lokal auf `origin/main` (`c56711e`)
 zusammengeführt. Gepusht wurde dabei nichts außer der Korrektur in #112. Danach liefen auf jedem genannten Zwischenstand die
 vollen Prüfungen (lint, `npm test`, build, typecheck). Die Zahlen unten stammen aus diesen Läufen.

@@ -4,7 +4,7 @@
   "title": "Preiskatalog-Pflege (addPrice, endPrice, listPrices) – nur Code und Tests",
   "module": "enterprise-controlling",
   "phase": "E",
-  "status": "waiting_review",
+  "status": "merged",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -76,18 +76,17 @@
   "open_decisions": [],
   "pr": {
     "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/108",
-    "state": "draft",
+    "state": "merged",
     "merge_commit": null,
-    "ci": "unknown"
+    "ci": "green"
   },
   "approval": {
     "reviewer": "approved",
-    "operator": "pending",
+    "operator": "approved",
     "latest_review_file": null
   },
   "next_steps": [
-    "Session 2: minor beheben",
-    "Merge durch Betreiber nach #107"
+    "Session 2: minor beheben"
   ],
   "session": {
     "system": "claude-code",
@@ -95,14 +94,14 @@
     "checkpoint_reason": "other",
     "last_commit": "2c0ed8a",
     "active_branch": "claude/E-02-price-catalog",
-    "state_summary": "Draft-PR #108, Review approve mit 1 minor",
+    "state_summary": "PR #108 auf main gemergt",
     "decisions_made": [],
     "test_status": "733/733 (Session 2)",
-    "next_action": "Session 2: minor beheben"
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
   },
-  "revision": 1,
+  "revision": 2,
   "based_on_commit": "5d3b95e",
-  "updated_at": "2026-10-20T13:05:00Z",
+  "updated_at": "2026-10-22T15:20:00Z",
   "log": [
     {
       "at": "2026-10-20T13:05:00Z",
@@ -110,6 +109,12 @@
       "action": "review_received",
       "summary": "Draft-PR #108, Review approve mit 1 minor",
       "commit": "2c0ed8a"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #108 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
     }
   ]
 }

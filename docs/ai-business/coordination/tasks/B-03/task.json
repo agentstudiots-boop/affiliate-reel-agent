@@ -4,7 +4,7 @@
   "title": "Repository Aufgabenbuch: Lease mit Fencing, SKIP LOCKED, Idempotenz, Outbox, outcome_unknown, Dead-Letter",
   "module": "enterprise-ledger",
   "phase": "B",
-  "status": "waiting_operator",
+  "status": "merged",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -124,17 +124,17 @@
   "open_decisions": [],
   "pr": {
     "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/90",
-    "state": "draft",
+    "state": "merged",
     "merge_commit": null,
-    "ci": "pending"
+    "ci": "green"
   },
   "approval": {
     "reviewer": "approved",
-    "operator": "pending",
+    "operator": "approved",
     "latest_review_file": null
   },
   "next_steps": [
-    "Merge durch Betreiber in Stapelreihenfolge"
+    "Keiner im Code; eine Aktivierung (Schalter, Cron-Eintrag) entscheidet nur der Betreiber"
   ],
   "session": {
     "system": "claude-code",
@@ -142,17 +142,17 @@
     "checkpoint_reason": "other",
     "last_commit": "26d778c",
     "active_branch": "claude/B-03-task-repository",
-    "state_summary": "Draft-PR #90 offen",
+    "state_summary": "PR #90 auf main gemergt",
     "decisions_made": [
       "Erneute Registerprüfung beim Leasen",
       "Nur provider_error automatisch wiederholbar"
     ],
     "test_status": "33/33 gezielt",
-    "next_action": "Nachprüfung #90"
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
   },
-  "revision": 4,
+  "revision": 5,
   "based_on_commit": "5f0f9e0",
-  "updated_at": "2026-10-19T12:19:00Z",
+  "updated_at": "2026-10-22T15:20:00Z",
   "log": [
     {
       "at": "2026-10-19T07:08:00Z",
@@ -188,6 +188,12 @@
       "action": "review_received",
       "summary": "Nachprüfung zweite Sitzung (PR #90): approve",
       "commit": "26d778c"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #90 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
     }
   ]
 }

@@ -4,7 +4,7 @@
   "title": "Command Center: Unternehmensebene als lesender Datenvertrag (Feld enterprise in /api/architecture)",
   "module": "command-center",
   "phase": "H",
-  "status": "waiting_review",
+  "status": "merged",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -138,18 +138,17 @@
   "open_decisions": [],
   "pr": {
     "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/102",
-    "state": "draft",
+    "state": "merged",
     "merge_commit": null,
-    "ci": "pending"
+    "ci": "green"
   },
   "approval": {
     "reviewer": "pending",
-    "operator": "pending",
+    "operator": "approved",
     "latest_review_file": null
   },
   "next_steps": [
-    "Review",
-    "Merge durch Betreiber nach dem gesamten Stapel"
+    "Keiner im Code; eine Aktivierung (Schalter, Cron-Eintrag) entscheidet nur der Betreiber"
   ],
   "session": {
     "system": "claude-code",
@@ -157,16 +156,16 @@
     "checkpoint_reason": "other",
     "last_commit": "7b92194",
     "active_branch": "claude/H-01-enterprise-model",
-    "state_summary": "Draft-PR #102 nach voller Prüfung (775/775), Stapel inkl. Review-Korrekturen",
+    "state_summary": "PR #102 auf main gemergt",
     "decisions_made": [
       "H-01 und H-02 (API-Feld) zusammen, da die API der erste und einzige Nutzer ist"
     ],
     "test_status": "8/8 gezielt",
-    "next_action": "volle Prüfung abwarten, Draft-PR"
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
   },
-  "revision": 2,
+  "revision": 3,
   "based_on_commit": "1df310c",
-  "updated_at": "2026-10-19T17:08:15Z",
+  "updated_at": "2026-10-22T15:20:00Z",
   "log": [
     {
       "at": "2026-10-19T16:33:11Z",
@@ -181,6 +180,12 @@
       "action": "pr_opened",
       "summary": "Draft-PR #102 nach voller Prüfung (775/775), Stapel inkl. Review-Korrekturen",
       "commit": "7b92194"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #102 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
     }
   ]
 }

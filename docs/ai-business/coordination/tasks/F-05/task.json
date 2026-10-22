@@ -4,7 +4,7 @@
   "title": "WhatsApp-Auslöser „Geschäftsidee prüfen“ (Schalter OPPORTUNITY_SCOUT_ENABLED, Tageslimit)",
   "module": "opportunity",
   "phase": "F",
-  "status": "waiting_review",
+  "status": "merged",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -85,18 +85,16 @@
   "open_decisions": [],
   "pr": {
     "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/120",
-    "state": "draft",
-    "merge_commit": null,
-    "ci": "pending"
+    "state": "merged",
+    "merge_commit": "a736bf4",
+    "ci": "green"
   },
   "approval": {
     "reviewer": "pending",
-    "operator": "pending",
+    "operator": "approved",
     "latest_review_file": null
   },
   "next_steps": [
-    "Review",
-    "Merge nach #117 und #119",
     "Betreiber: OPPORTUNITY_SCOUT_ENABLED, Q-07"
   ],
   "session": {
@@ -105,14 +103,14 @@
     "checkpoint_reason": "other",
     "last_commit": "393a2b8",
     "active_branch": "claude/F-05-opportunity-whatsapp",
-    "state_summary": "Draft-PR #120 offen",
+    "state_summary": "PR #120 auf main gemergt",
     "decisions_made": [],
     "test_status": "856/856",
-    "next_action": "Review"
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
   },
-  "revision": 1,
+  "revision": 2,
   "based_on_commit": "ca0cf80",
-  "updated_at": "2026-10-21T12:00:00Z",
+  "updated_at": "2026-10-22T15:20:00Z",
   "log": [
     {
       "at": "2026-10-21T12:00:00Z",
@@ -120,6 +118,13 @@
       "action": "pr_opened",
       "summary": "Draft-PR #120 offen (Freigabe Betreiber 21.10.)",
       "commit": "393a2b8"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #120 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert. Vor dem Merge: Tageslimit zählt im Berliner Tag von asOf (2130525).",
+      "commit": "a736bf4"
     }
   ]
 }

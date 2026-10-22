@@ -79,6 +79,33 @@ Planer/Implementierer/Prüfer zwischen zwei Systemen (ADR-15, ADR-16) und das Le
   (die Claude-Routine wurde am 19.10.2026 gelöscht), kein Validator, keine neuen Koordinationswerkzeuge.
 - Unverändert: kein Merge durch Claude, keine Produktionsänderung, keine Schalter, keine Secrets, keine kostenpflichtigen Aufrufe, keine zusätzlichen Credits.
 
+## Stand 22.10.2026: alle Roadmap-PRs gegen `main` gemergt
+
+Mit Freigabe des Betreibers (21.10.: „Claude merged“) hat Session 1 alle Roadmap-PRs gegen `main` gemergt, in der Reihenfolge aus
+[`MERGE_GUIDE.md`](MERGE_GUIDE.md) und danach den Ausbau. Vor jedem Merge liefen die vollen Prüfungen auf dem simulierten Ergebnis.
+
+- **Migrationen 039–042:** mit #89, #92, #96 und #118 gemergt. Sie werden beim nächsten Cron- oder Webhook-Aufruf durch
+  `ensureAutomationSchema` angewendet. Nachweis in der DB steht aus (Cron-Check der zweiten Sitzung, 16:45 UTC).
+- **Ausbau:** #117 B-11 (`4c976e7`), #118 F-02 (`a8ce404`), #119 F-03 (`0d2f632`), #120 F-05 (`a736bf4`), #115 I-01 (`b91ff44`),
+  #116 J-05 (`06ae6cc`).
+  - F-05 bekam vor dem Merge einen Fix: Das Tageslimit zählt jetzt im Berliner Tag von `asOf`, nicht nach der DB-Uhr (`2130525`).
+    Gefunden durch einen datumsabhängigen Testfehler, unabhängig auch von der zweiten Sitzung.
+- **Letzte Simulation** main `a736bf4` + #115 + #116: build, typecheck, lint (bekannte Warnung), 888 Tests ✔, 0 ✖, 4 übersprungen
+  (J-04 ohne `J04_DATABASE_URL`).
+- **Stand je Begriff:**
+  - gemergt: ja
+  - deployed: ja, laut D-05 der zweiten Sitzung bis #120; #115/#116 werden noch geprüft
+  - aktiviert: nein. `EXECUTIVE_*`, `OPPORTUNITY_SCOUT_ENABLED` und `OPPORTUNITY_DAILY_LIMIT` sind nicht gesetzt, `executive-cycle` steht nicht in `vercel.json`.
+  - live verifiziert: nein
+- **Offen, nicht gegen `main`:** #81, #82 (dieser Branch) und #111. Sie zielen auf `architecture/ai-business-roadmap` (Doku, Gate G0)
+  und sind nicht Teil des Merge-Leitfadens.
+- **Offene Betreiberentscheidungen:**
+  - Q-07: Gewichte und Schwellen des Bewertungsrasters, ohne sie ergibt jede Bewertung „blocked“
+  - Aktivierung der Schalter
+  - I-01-Folgeentscheidungen: Zuschnitt, Recherchebudget, rechtliche Prüfung; I-03 erst nach einem Go
+- **Aufgabenstand:** Die 31 Aufgaben mit gemergtem PR stehen in `tasks/<ID>/task.json` auf `merged`. Für I-01 und J-05 gibt es keine eigene
+  Übergabedatei; ihr Stand steht in den PRs #115 und #116.
+
 ## Stand 21.10.2026: Betreiberfreigaben und Ausbau
 
 Der Betreiber hat am 21.10. alle offenen Punkte freigegeben: Merges nach `MERGE_GUIDE.md` durch Claude, Migrationen 039–041,

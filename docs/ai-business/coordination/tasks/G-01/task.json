@@ -4,7 +4,7 @@
   "title": "Affiliate-Adapter: Content Studio als erste Abteilung hinter dem Vertrag (nur lesend)",
   "module": "affiliate-adapter",
   "phase": "G",
-  "status": "waiting_review",
+  "status": "merged",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -126,18 +126,17 @@
   "open_decisions": [],
   "pr": {
     "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/87",
-    "state": "draft",
+    "state": "merged",
     "merge_commit": null,
-    "ci": "pending"
+    "ci": "green"
   },
   "approval": {
     "reviewer": "changes_requested",
-    "operator": "pending",
+    "operator": "approved",
     "latest_review_file": null
   },
   "next_steps": [
-    "CI auf #87 abwarten",
-    "Merge durch Betreiber erst nach #84 und #86"
+    "CI auf #87 abwarten"
   ],
   "session": {
     "system": "claude-code",
@@ -145,17 +144,17 @@
     "checkpoint_reason": "other",
     "last_commit": "2da8140",
     "active_branch": "claude/G-01-affiliate-adapter",
-    "state_summary": "G-01 vollständig geprüft, Draft-PR #87 offen",
+    "state_summary": "PR #87 auf main gemergt",
     "decisions_made": [
       "Solo-Betrieb: Planung, Implementierung und Kriterien durch Claude",
       "Nur lesende Sichten statt DB-Handle (B-04)"
     ],
     "test_status": "volle Prüfungen grün",
-    "next_action": "Nachprüfung #87"
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
   },
-  "revision": 5,
+  "revision": 6,
   "based_on_commit": "c797df0",
-  "updated_at": "2026-10-19T11:34:00Z",
+  "updated_at": "2026-10-22T15:20:00Z",
   "log": [
     {
       "at": "2026-10-19T06:30:00Z",
@@ -198,6 +197,12 @@
       "action": "fixed",
       "summary": "nur zugestellte Freigaben zählen, Drift beidseitig, Plattformen getrennt, Zukunftszeit",
       "commit": "2da8140"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #87 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
     }
   ]
 }

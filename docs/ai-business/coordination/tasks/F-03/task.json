@@ -4,7 +4,7 @@
   "title": "Recherche-Schritt (Tavily + ein Modellaufruf, begrenzt, Schalter beim Aufrufer)",
   "module": "opportunity",
   "phase": "F",
-  "status": "waiting_review",
+  "status": "merged",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -80,18 +80,17 @@
   "open_decisions": [],
   "pr": {
     "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/119",
-    "state": "draft",
-    "merge_commit": null,
-    "ci": "pending"
+    "state": "merged",
+    "merge_commit": "0d2f632",
+    "ci": "green"
   },
   "approval": {
     "reviewer": "pending",
-    "operator": "pending",
+    "operator": "approved",
     "latest_review_file": null
   },
   "next_steps": [
-    "Review",
-    "Merge nach #118"
+    "Keiner im Code; eine Aktivierung (Schalter, Cron-Eintrag) entscheidet nur der Betreiber"
   ],
   "session": {
     "system": "claude-code",
@@ -99,14 +98,14 @@
     "checkpoint_reason": "other",
     "last_commit": "bbe41c7",
     "active_branch": "claude/F-03-opportunity-research",
-    "state_summary": "Draft-PR #119 offen",
+    "state_summary": "PR #119 auf main gemergt",
     "decisions_made": [],
     "test_status": "838/838",
-    "next_action": "Review"
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
   },
-  "revision": 1,
+  "revision": 2,
   "based_on_commit": "ca0cf80",
-  "updated_at": "2026-10-21T12:00:00Z",
+  "updated_at": "2026-10-22T15:20:00Z",
   "log": [
     {
       "at": "2026-10-21T12:00:00Z",
@@ -114,6 +113,13 @@
       "action": "pr_opened",
       "summary": "Draft-PR #119 offen (Freigabe Betreiber 21.10.)",
       "commit": "bbe41c7"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #119 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert.",
+      "commit": "0d2f632"
     }
   ]
 }

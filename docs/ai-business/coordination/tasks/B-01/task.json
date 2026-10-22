@@ -4,7 +4,7 @@
   "title": "Executive-Kern v0: Plan-Vertrag, Richtlinien L0–L4 und Abteilungsregister (reine Funktionen)",
   "module": "enterprise-kernel",
   "phase": "B",
-  "status": "waiting_operator",
+  "status": "merged",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -106,12 +106,7 @@
     "notes": "Abo-Kontingente unbekannt; bei Erschöpfung waiting_capacity + Checkpoint"
   },
   "lease": null,
-  "waiting": {
-    "reason": "operator",
-    "since": "2026-10-19T06:25:00Z",
-    "resume_condition": "Review (zweite Claude-Sitzung geplant) und Merge durch den Betreiber",
-    "wake_mechanism": "manual_start"
-  },
+  "waiting": null,
   "changed_files": [
     "lib/enterprise/policy.ts",
     "lib/enterprise/registry.ts",
@@ -168,13 +163,13 @@
   ],
   "pr": {
     "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/84",
-    "state": "draft",
+    "state": "merged",
     "merge_commit": null,
-    "ci": "pending"
+    "ci": "green"
   },
   "approval": {
     "reviewer": "approved",
-    "operator": "pending",
+    "operator": "approved",
     "latest_review_file": null
   },
   "next_steps": [
@@ -187,17 +182,17 @@
     "checkpoint_reason": "work_package_done",
     "last_commit": "81aa6ce",
     "active_branch": "claude/B-01-executive-kernel",
-    "state_summary": "Review-Befunde behoben, Nachprüfung offen",
+    "state_summary": "PR #84 auf main gemergt",
     "decisions_made": [
       "Reine Funktionen ohne DB als erster Baustein (ADR-16)",
       "Unbekannte Aktion → L4 (fail closed)"
     ],
     "test_status": "685/685",
-    "next_action": "Nachprüfung anfordern"
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
   },
-  "revision": 8,
+  "revision": 9,
   "based_on_commit": "e002446",
-  "updated_at": "2026-10-19T11:34:00Z",
+  "updated_at": "2026-10-22T15:20:00Z",
   "log": [
     {
       "at": "2026-10-18T21:30:00Z",
@@ -261,6 +256,12 @@
       "action": "review_received",
       "summary": "Review zweite Sitzung (PR #84): approve nach Nachprüfung; Befunde geschlossen",
       "commit": "81aa6ce"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #84 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
     }
   ]
 }

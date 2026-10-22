@@ -4,7 +4,7 @@
   "title": "Executive-Wochenbericht: Abschnitt „Executive-Ebene“ (nur lesend, Schalter EXECUTIVE_WEEKLY_REPORT, Standard aus)",
   "module": "enterprise-ledger",
   "phase": "B",
-  "status": "waiting_review",
+  "status": "merged",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -113,18 +113,16 @@
   "open_decisions": [],
   "pr": {
     "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/114",
-    "state": "draft",
-    "merge_commit": null,
-    "ci": "pending"
+    "state": "merged",
+    "merge_commit": "9023e64",
+    "ci": "green"
   },
   "approval": {
     "reviewer": "pending",
-    "operator": "pending",
+    "operator": "approved",
     "latest_review_file": null
   },
   "next_steps": [
-    "Review durch zweite Sitzung",
-    "Merge durch Betreiber nach #112",
     "Betreiberentscheidung EXECUTIVE_WEEKLY_REPORT"
   ],
   "session": {
@@ -133,14 +131,14 @@
     "checkpoint_reason": "other",
     "last_commit": "b1f492d",
     "active_branch": "claude/B-10-executive-weekly",
-    "state_summary": "Draft-PR #114, Review-Fix gepusht, Nachprüfung offen",
+    "state_summary": "PR #114 auf main gemergt",
     "decisions_made": [],
     "test_status": "802/802",
-    "next_action": "Review"
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
   },
-  "revision": 2,
+  "revision": 3,
   "based_on_commit": "6eea13f",
-  "updated_at": "2026-10-20T22:15:00Z",
+  "updated_at": "2026-10-22T15:20:00Z",
   "log": [
     {
       "at": "2026-10-20T22:00:00Z",
@@ -162,6 +160,13 @@
       "action": "fixed",
       "summary": "Minor und Nit umgesetzt",
       "commit": "b1f492d"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #114 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert.",
+      "commit": "9023e64"
     }
   ]
 }

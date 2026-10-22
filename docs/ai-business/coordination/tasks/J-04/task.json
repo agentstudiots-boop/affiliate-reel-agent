@@ -4,7 +4,7 @@
   "title": "Lasttest Aufgabenbuch und Budgetwächter gegen echtes Postgres (nur Tests, lokal, übersprungen ohne J04_DATABASE_URL)",
   "module": "enterprise-ledger",
   "phase": "J",
-  "status": "waiting_review",
+  "status": "merged",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -84,17 +84,17 @@
   "open_decisions": [],
   "pr": {
     "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/113",
-    "state": "draft",
+    "state": "merged",
     "merge_commit": null,
-    "ci": "pending"
+    "ci": "green"
   },
   "approval": {
     "reviewer": "approved",
-    "operator": "pending",
+    "operator": "approved",
     "latest_review_file": null
   },
   "next_steps": [
-    "Merge durch Betreiber nach #106"
+    "Keiner im Code; eine Aktivierung (Schalter, Cron-Eintrag) entscheidet nur der Betreiber"
   ],
   "session": {
     "system": "claude-code",
@@ -102,14 +102,14 @@
     "checkpoint_reason": "other",
     "last_commit": "cfe2c8d",
     "active_branch": "claude/J-04-load-test",
-    "state_summary": "Draft-PR #113, approve durch Session 1",
+    "state_summary": "PR #113 auf main gemergt",
     "decisions_made": [],
     "test_status": "4/4 lokal",
-    "next_action": "Merge durch Betreiber"
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
   },
-  "revision": 1,
+  "revision": 2,
   "based_on_commit": "6eea13f",
-  "updated_at": "2026-10-20T22:00:00Z",
+  "updated_at": "2026-10-22T15:20:00Z",
   "log": [
     {
       "at": "2026-10-20T22:00:00Z",
@@ -117,6 +117,12 @@
       "action": "approved",
       "summary": "Review Session 1: approve (Kommentar in #113), 2 optionale Hinweise",
       "commit": "cfe2c8d"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #113 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
     }
   ]
 }

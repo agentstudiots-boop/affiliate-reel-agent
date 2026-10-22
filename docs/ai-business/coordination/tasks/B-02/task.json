@@ -4,7 +4,7 @@
   "title": "Migration 039: Aufgabenbuch, Ereignisse, Outbox, Budgetreservierungen (additiv, ungenutzt)",
   "module": "enterprise-ledger",
   "phase": "B",
-  "status": "waiting_operator",
+  "status": "merged",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -133,17 +133,17 @@
   ],
   "pr": {
     "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/89",
-    "state": "draft",
+    "state": "merged",
     "merge_commit": null,
-    "ci": "pending"
+    "ci": "green"
   },
   "approval": {
     "reviewer": "approved",
-    "operator": "pending",
+    "operator": "approved",
     "latest_review_file": null
   },
   "next_steps": [
-    "Merge durch Betreiber in Stapelreihenfolge"
+    "Keiner im Code; eine Aktivierung (Schalter, Cron-Eintrag) entscheidet nur der Betreiber"
   ],
   "session": {
     "system": "claude-code",
@@ -151,17 +151,17 @@
     "checkpoint_reason": "other",
     "last_commit": "73e76c7",
     "active_branch": "claude/B-02-task-ledger-migration",
-    "state_summary": "Draft-PR #89 offen",
+    "state_summary": "PR #89 auf main gemergt",
     "decisions_made": [
       "Direkt von main, unabhängig von B-01-Code (Migration zuerst allein)",
       "Fehlerklassen an B-04 angeglichen"
     ],
     "test_status": "34/34 gezielt",
-    "next_action": "Nachprüfung #89"
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
   },
-  "revision": 5,
+  "revision": 6,
   "based_on_commit": "d19edb1",
-  "updated_at": "2026-10-19T12:19:00Z",
+  "updated_at": "2026-10-22T15:20:00Z",
   "log": [
     {
       "at": "2026-10-19T06:52:00Z",
@@ -204,6 +204,12 @@
       "action": "review_received",
       "summary": "Nachprüfung zweite Sitzung (PR #89): approve",
       "commit": "73e76c7"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #89 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
     }
   ]
 }

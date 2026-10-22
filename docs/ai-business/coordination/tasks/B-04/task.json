@@ -4,7 +4,7 @@
   "title": "Abteilungsvertrag: Task-Envelope, Ergebnis, Health, begrenzte Lesefähigkeiten (reine Funktionen)",
   "module": "enterprise-kernel",
   "phase": "B",
-  "status": "waiting_operator",
+  "status": "merged",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -124,18 +124,17 @@
   "open_decisions": [],
   "pr": {
     "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/86",
-    "state": "draft",
+    "state": "merged",
     "merge_commit": null,
-    "ci": "pending"
+    "ci": "green"
   },
   "approval": {
     "reviewer": "approved",
-    "operator": "pending",
+    "operator": "approved",
     "latest_review_file": null
   },
   "next_steps": [
-    "CI auf #86 abwarten",
-    "Merge durch Betreiber erst nach #84 (B-01)"
+    "CI auf #86 abwarten"
   ],
   "session": {
     "system": "claude-code",
@@ -143,16 +142,16 @@
     "checkpoint_reason": "other",
     "last_commit": "19890a4",
     "active_branch": "claude/B-04-department-contract",
-    "state_summary": "Review approve, Minor-Befunde behoben",
+    "state_summary": "PR #86 auf main gemergt",
     "decisions_made": [
       "Planung, Implementierung und Kriterien im Solo-Betrieb durch Claude"
     ],
     "test_status": "volle Prüfungen grün",
-    "next_action": "Volle Suite über G-01-Stapel"
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
   },
-  "revision": 5,
+  "revision": 6,
   "based_on_commit": "af7f39b",
-  "updated_at": "2026-10-19T11:34:00Z",
+  "updated_at": "2026-10-22T15:20:00Z",
   "log": [
     {
       "at": "2026-10-19T06:25:00Z",
@@ -188,6 +187,12 @@
       "action": "review_received",
       "summary": "Review zweite Sitzung (PR #86): approve nach Nachprüfung; alle Befunde geschlossen",
       "commit": "19890a4"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #86 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
     }
   ]
 }

@@ -4,7 +4,7 @@
   "title": "ControllingSnapshot (lesender Datenvertrag) und Anzeige in der 2D-Betriebsübersicht",
   "module": "controlling-snapshot",
   "phase": "E",
-  "status": "approved_by_reviewer",
+  "status": "merged",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -131,13 +131,13 @@
   "open_decisions": [],
   "pr": {
     "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/100",
-    "state": "draft",
+    "state": "merged",
     "merge_commit": null,
-    "ci": "pending"
+    "ci": "green"
   },
   "approval": {
     "reviewer": "approved",
-    "operator": "pending",
+    "operator": "approved",
     "latest_review_file": null
   },
   "next_steps": [
@@ -149,16 +149,16 @@
     "checkpoint_reason": "other",
     "last_commit": "43873e3",
     "active_branch": "claude/E-07-controlling-snapshot",
-    "state_summary": "Review approve; minor unassigned.revenue umgesetzt",
+    "state_summary": "PR #100 auf main gemergt",
     "decisions_made": [
       "Keine erfundene Null: null/unbekannt/mind./nicht verfügbar"
     ],
     "test_status": "voll 715/715",
-    "next_action": "Review abwarten"
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
   },
-  "revision": 4,
+  "revision": 5,
   "based_on_commit": "77c26e8",
-  "updated_at": "2026-10-19T18:45:08Z",
+  "updated_at": "2026-10-22T15:20:00Z",
   "log": [
     {
       "at": "2026-10-19T12:19:00Z",
@@ -187,6 +187,12 @@
       "action": "fixed",
       "summary": "Review approve; minor unassigned.revenue umgesetzt",
       "commit": "43873e3"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #100 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
     }
   ]
 }

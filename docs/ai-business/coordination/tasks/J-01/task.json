@@ -4,7 +4,7 @@
   "title": "Ende-zu-Ende-Szenarien Plan → Aufgabe → Abteilung → Entscheidung (nur Tests)",
   "module": "enterprise-ledger",
   "phase": "J",
-  "status": "waiting_review",
+  "status": "merged",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -87,18 +87,17 @@
   "open_decisions": [],
   "pr": {
     "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/105",
-    "state": "draft",
+    "state": "merged",
     "merge_commit": null,
-    "ci": "pending"
+    "ci": "green"
   },
   "approval": {
     "reviewer": "pending",
-    "operator": "pending",
+    "operator": "approved",
     "latest_review_file": null
   },
   "next_steps": [
-    "Review",
-    "Merge durch Betreiber nach #98"
+    "Keiner im Code; eine Aktivierung (Schalter, Cron-Eintrag) entscheidet nur der Betreiber"
   ],
   "session": {
     "system": "claude-code",
@@ -106,14 +105,14 @@
     "checkpoint_reason": "other",
     "last_commit": "08a4159",
     "active_branch": "claude/J-01-e2e-scenarios",
-    "state_summary": "Draft-PR #105 offen",
+    "state_summary": "PR #105 auf main gemergt",
     "decisions_made": [],
     "test_status": "749/749",
-    "next_action": "Review"
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
   },
-  "revision": 1,
+  "revision": 2,
   "based_on_commit": "1df310c",
-  "updated_at": "2026-10-19T18:45:08Z",
+  "updated_at": "2026-10-22T15:20:00Z",
   "log": [
     {
       "at": "2026-10-19T18:45:08Z",
@@ -121,6 +120,12 @@
       "action": "pr_opened",
       "summary": "J-01 Draft-PR #105 (749/749)",
       "commit": "08a4159"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #105 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
     }
   ]
 }
