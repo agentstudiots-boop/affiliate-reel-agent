@@ -95,7 +95,9 @@ function euroFromMicros(micros: number) {
   return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(micros / 1_000_000);
 }
 
-export function formatExecutiveWeekly(section: ExecutiveWeekly): string {
+// period: how the decided counts are labelled – "diese Woche" in the weekly report, "in den letzten 7 Tagen" for the
+// WhatsApp command (B-11), which reads a rolling window.
+export function formatExecutiveWeekly(section: ExecutiveWeekly, period = "diese Woche"): string {
   if (!section.readable) return "Executive-Ebene: nicht lesbar (Tabellen fehlen oder Datenbankfehler) – keine Angaben.";
   const berlin = (iso: string) => new Date(iso).toLocaleString("de-DE", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit",
     hour: "2-digit", minute: "2-digit" });
@@ -115,15 +117,15 @@ export function formatExecutiveWeekly(section: ExecutiveWeekly): string {
   } else {
     lines.push("Offene Entscheidungsvorlagen: keine");
   }
-  lines.push(`Entschieden diese Woche: freigegeben ${decisions.approved} · abgelehnt ${decisions.rejected} · abgelaufen ${decisions.expired}`);
+  lines.push(`Entschieden ${period}: freigegeben ${decisions.approved} · abgelehnt ${decisions.rejected} · abgelaufen ${decisions.expired}`);
   lines.push(`Strittige Budgetreservierungen: ${section.disputedReservations || "keine"}`);
   if (!costs.entries) {
-    lines.push("Kostenbuch diese Woche: keine Einträge");
+    lines.push(`Kostenbuch ${period}: keine Einträge`);
   } else {
     const extra = [costs.estimatedEurMicros ? `geschätzt ${euroFromMicros(costs.estimatedEurMicros)}` : "",
       costs.withoutPrice ? `${costs.withoutPrice} ${costs.withoutPrice === 1 ? "Eintrag" : "Einträge"} ohne Preis (Betrag unbekannt)` : "",
       costs.otherCurrency ? `${costs.otherCurrency} in anderer Währung` : ""].filter(Boolean);
-    lines.push(`Kostenbuch diese Woche: gemessen ${euroFromMicros(costs.measuredEurMicros)}${extra.length ? ` + ${extra.join(", ")}` : ""}`);
+    lines.push(`Kostenbuch ${period}: gemessen ${euroFromMicros(costs.measuredEurMicros)}${extra.length ? ` + ${extra.join(", ")}` : ""}`);
   }
   return lines.join("\n");
 }
