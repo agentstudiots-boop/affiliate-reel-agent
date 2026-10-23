@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { productSchema } from "../schema";
 import { CHANCE_TYPES, contentChanceRecordSchema } from "./strategy";
+import { softTextLimits } from "./soft-limits";
 
 const text = z.string().min(1).max(2400);
 export const formatSchema = z.enum(["video", "image", "text"]);
@@ -81,11 +82,13 @@ export const imageSpecSchema = z.object({
   learned_guidance: z.array(z.string().max(200)).max(4).default([]),
 });
 export type ImageSpec = z.infer<typeof imageSpecSchema>;
-export const imageSchema = z.object({ ...base, format: z.literal("image"), layout: z.enum(["single", "carousel"]),
+// imageSpec.composition only describes the scene inside the image prompt (never published): cut to 240 instead of
+// discarding the whole image plan (soft-limits.ts). Published texts stay hard limits.
+export const imageSchema = softTextLimits(z.object({ ...base, format: z.literal("image"), layout: z.enum(["single", "carousel"]),
   visualConcept: visualConceptSchema.optional(),
   imageSpec: imageSpecSchema.optional(),
   slides: z.array(z.object({ headline: text, copy: text, visual: text, prompt: text, alt: text })).min(1).max(7), caption: text,
-});
+}), ["imageSpec.composition"]);
 export const textSchema = z.object({ ...base, format: z.literal("text"), style: z.enum(["recommendation", "expert", "community"]), body: z.string().min(120).max(5000) });
 export const contentSchema = z.discriminatedUnion("format", [videoSchema, imageSchema, textSchema]);
 export type Content = z.infer<typeof contentSchema>;
