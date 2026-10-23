@@ -1,0 +1,179 @@
+{
+  "schema_version": 1,
+  "task_id": "B-10",
+  "title": "Executive-Wochenbericht: Abschnitt „Executive-Ebene“ (nur lesend, Schalter EXECUTIVE_WEEKLY_REPORT, Standard aus)",
+  "module": "enterprise-ledger",
+  "phase": "B",
+  "status": "deployed",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "claude-code",
+  "base_commit": "3f35aaa",
+  "branch": "claude/B-10-executive-weekly",
+  "depends_on": [
+    "J-02",
+    "B-06",
+    "E-01"
+  ],
+  "claims": {
+    "paths": [
+      "lib/enterprise/executive-weekly.ts",
+      "tests/enterprise-executive-weekly.test.cjs"
+    ],
+    "hot_files": [
+      "lib/reporting/weekly.ts",
+      "tsconfig.test.json"
+    ],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Nur die Berichtswoche zählt; offene Entscheidungsvorlagen höchstens 5, früheste Ablaufzeit zuerst, Betreff einzeilig gekürzt",
+      "verification": "tests/enterprise-executive-weekly.test.cjs",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Leere Tabellen ergeben „keine“; Kleinstbeträge nicht als 0",
+      "verification": "PGlite-Test",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Fehlende Tabellen oder DB-Fehler ergeben „nicht lesbar“, nie eine Ausnahme",
+      "verification": "PGlite-Test + Gegentest",
+      "met": true
+    },
+    {
+      "id": "AC-4",
+      "criterion": "READ ONLY, nur SELECT, keine Sende- oder Entscheidungswege; einziger Nutzer lib/reporting/weekly.ts",
+      "verification": "Quelltext- und Spionagetest",
+      "met": true
+    },
+    {
+      "id": "AC-5",
+      "criterion": "Ohne Schalter (oder anderer Wert als exakt true) bleibt der Wochenbericht identisch",
+      "verification": "echter createWeeklyReport",
+      "met": true
+    },
+    {
+      "id": "AC-6",
+      "criterion": "Ein defekter Executive-Teil bricht den Wochenbericht nie",
+      "verification": "PGlite-Test",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 350,
+    "notes": "Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "lib/enterprise/executive-weekly.ts",
+    "lib/reporting/weekly.ts",
+    "tests/enterprise-executive-weekly.test.cjs",
+    "tsconfig.test.json"
+  ],
+  "implemented": [
+    "Abschnitt Executive-Ebene (Aufgaben, offene/entschiedene Entscheidungsvorlagen, strittige Reservierungen, Kostenbuch)",
+    "Schalter EXECUTIVE_WEEKLY_REPORT (Standard aus)"
+  ],
+  "tests": [
+    {
+      "command": "npm run lint && npm test && npm run build && npm run typecheck",
+      "result": "passed",
+      "detail": "802/802; Gegentests (READ ONLY, Prognose, catch, Kürzung, Wochenfilter) rot",
+      "commit": "bb9dde7",
+      "at": "2026-10-20T22:00:00Z"
+    },
+    {
+      "command": "npm run lint && npm test && npm run build && npm run typecheck",
+      "result": "passed",
+      "detail": "802/802 nach Review-Fix; Gegentests Ablaufprüfung rot",
+      "commit": "b1f492d",
+      "at": "2026-10-20T22:15:00Z"
+    }
+  ],
+  "known_issues": [
+    "Router-Absicht executive.* bewusst nicht enthalten → B-11 (Betreiberentscheidung, Hot File Router)",
+    "Ursprüngliche Roadmap-ID B-09 kollidierte mit #104"
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/114",
+    "state": "merged",
+    "merge_commit": "9023e64",
+    "ci": "green"
+  },
+  "approval": {
+    "reviewer": "pending",
+    "operator": "approved",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Betreiberentscheidung EXECUTIVE_WEEKLY_REPORT"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-20T22:15:00Z",
+    "checkpoint_reason": "other",
+    "last_commit": "b1f492d",
+    "active_branch": "claude/B-10-executive-weekly",
+    "state_summary": "PR #114 gemergt (9023e64) und deployed",
+    "decisions_made": [],
+    "test_status": "802/802",
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
+  },
+  "revision": 4,
+  "based_on_commit": "6eea13f",
+  "updated_at": "2026-10-23T14:00:00Z",
+  "log": [
+    {
+      "at": "2026-10-20T22:00:00Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Draft-PR #114 offen",
+      "commit": "bb9dde7"
+    },
+    {
+      "at": "2026-10-20T22:15:00Z",
+      "actor": "claude-code",
+      "action": "review_received",
+      "summary": "Session 2: approve mit 1 Minor (abgelaufene pending-Vorlagen) + Nit",
+      "commit": "bb9dde7"
+    },
+    {
+      "at": "2026-10-20T22:15:00Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "Minor und Nit umgesetzt",
+      "commit": "b1f492d"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #114 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert.",
+      "commit": "9023e64"
+    },
+    {
+      "at": "2026-10-23T14:00:00Z",
+      "actor": "claude-code",
+      "action": "deployed",
+      "summary": "Deployed: Merge 9023e64 (über #114) im READY-Production-Deployment dpl_2zQoxAcykCj6STSLkXiQPuNiSi8M; D-05-Nachweis in docs/PROJECT_STATUS.md §2. Nicht live geprüft; Schalter unverändert.",
+      "commit": "9023e64"
+    }
+  ]
+}

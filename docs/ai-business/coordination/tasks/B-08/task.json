@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "task_id": "B-08",
+  "title": "KI-Planer im Schattenbetrieb (nur Vorschlag, nichts eingebunden)",
+  "module": "enterprise-planner",
+  "phase": "B",
+  "status": "deployed",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "operator",
+  "base_commit": "c74a0a7",
+  "branch": "claude/B-08-shadow-planner",
+  "depends_on": [
+    "B-01",
+    "B-07",
+    "E-06"
+  ],
+  "claims": {
+    "paths": [
+      "lib/enterprise/planner.ts",
+      "tests/enterprise-planner.test.cjs"
+    ],
+    "hot_files": [
+      "lib/enterprise/controlling/agent-departments.ts",
+      "tsconfig.test.json"
+    ],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Ohne enabled kein Modellaufruf",
+      "verification": "Test",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Modell sieht nur Ziel, Registerkatalog (Laufzeitabteilungen) und Health-Nachweise; keine Secrets",
+      "verification": "Test",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Feindliche/ungültige/übergroße Vorschläge ergeben nie mehr als der Validator erlaubt (Prompt-Injection)",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-4",
+      "criterion": "Nicht verfügbares Modell wird gemeldet, nicht wiederholt oder geraten",
+      "verification": "Test",
+      "met": true
+    },
+    {
+      "id": "AC-5",
+      "criterion": "Aufruf als executive_planner protokolliert und der Abteilung executive zugeordnet; nichts eingereiht, nicht eingebunden",
+      "verification": "Isolationstest + E-06-Drift-Test",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 300,
+    "notes": "Solo-Betrieb, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "lib/enterprise/planner.ts",
+    "tests/enterprise-planner.test.cjs",
+    "lib/enterprise/controlling/agent-departments.ts",
+    "tsconfig.test.json"
+  ],
+  "implemented": [
+    "proposePlan",
+    "plannerPrompt"
+  ],
+  "tests": [
+    {
+      "command": "node --test tests/enterprise-*.test.cjs tests/controlling-*.test.cjs tests/admin-session.test.cjs tests/migration-upgrade.test.cjs",
+      "result": "passed",
+      "detail": "86/86 gezielt",
+      "commit": "18f838e",
+      "at": "2026-10-19T12:11:00Z"
+    },
+    {
+      "command": "npm run typecheck && npm run lint && npm test && npm run build",
+      "result": "passed",
+      "detail": "volle Prüfung im Hauptcheckout, 752/752",
+      "commit": "18f838e",
+      "at": "2026-10-19T12:32:52Z"
+    }
+  ],
+  "known_issues": [
+    "Gestapelt auf B-07 mit E-06 (#88) per Merge",
+    "Speicherung/Anzeige der Schattenpläne und Schalter folgen getrennt",
+    "Keine echten Modellaufrufe in Tests"
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/99",
+    "state": "merged",
+    "merge_commit": "90f3737",
+    "ci": "green"
+  },
+  "approval": {
+    "reviewer": "approved",
+    "operator": "approved",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Keiner im Code; eine Aktivierung (Schalter, Cron-Eintrag) entscheidet nur der Betreiber"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-19T18:45:08Z",
+    "checkpoint_reason": "other",
+    "last_commit": "ad3c487",
+    "active_branch": "claude/B-08-shadow-planner",
+    "state_summary": "PR #99 gemergt (90f3737) und deployed",
+    "decisions_made": [
+      "Betreiberauftrag 19.10.: in Abwesenheit durchgehend weiterarbeiten; Wirkung bleibt hinter Schaltern/Entscheidungen"
+    ],
+    "test_status": "voll 752/752",
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
+  },
+  "revision": 5,
+  "based_on_commit": "d9e9d1e",
+  "updated_at": "2026-10-23T14:00:00Z",
+  "log": [
+    {
+      "at": "2026-10-19T12:11:00Z",
+      "actor": "claude-code",
+      "action": "created",
+      "summary": "B-08 geplant und implementiert (Solo-Betrieb), Commit 18f838e",
+      "commit": "18f838e"
+    },
+    {
+      "at": "2026-10-19T12:32:52Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Draft-PR #99 geöffnet nach voller Prüfung (752/752)",
+      "commit": "18f838e"
+    },
+    {
+      "at": "2026-10-19T18:45:08Z",
+      "actor": "claude-code",
+      "action": "approved",
+      "summary": "Review approve (nits)",
+      "commit": "ad3c487"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #99 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
+    },
+    {
+      "at": "2026-10-23T14:00:00Z",
+      "actor": "claude-code",
+      "action": "deployed",
+      "summary": "Deployed: Merge 90f3737 (über #112) im READY-Production-Deployment dpl_2wjFdr1HMy64ccezERnSJpS76Mtn; D-05-Nachweis in docs/PROJECT_STATUS.md §2. Nicht live geprüft; Schalter unverändert.",
+      "commit": "90f3737"
+    }
+  ]
+}

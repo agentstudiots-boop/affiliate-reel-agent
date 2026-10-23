@@ -1,0 +1,206 @@
+{
+  "schema_version": 1,
+  "task_id": "B-03",
+  "title": "Repository Aufgabenbuch: Lease mit Fencing, SKIP LOCKED, Idempotenz, Outbox, outcome_unknown, Dead-Letter",
+  "module": "enterprise-ledger",
+  "phase": "B",
+  "status": "deployed",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "operator",
+  "base_commit": "19890a4",
+  "branch": "claude/B-03-task-repository",
+  "depends_on": [
+    "B-02",
+    "B-04"
+  ],
+  "claims": {
+    "paths": [
+      "lib/enterprise/tasks/repository.ts",
+      "tests/enterprise-task-repository.test.cjs"
+    ],
+    "hot_files": [
+      "tsconfig.test.json"
+    ],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "enqueueTask nimmt nur von checkEnvelope geprüfte Envelopes (L0–L2) an, idempotent je Schlüssel; gleicher Schlüssel mit anderer Aufgabe ⇒ Fehler; Ereignis in derselben Transaktion",
+      "verification": "PGlite-Tests",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Lease exklusiv (FOR UPDATE SKIP LOCKED), Fencing-Zähler steigt; start/heartbeat/complete nur mit aktuellem Halter und Zähler; zweite Fertigmeldung ändert nichts; Lease-Dauer begrenzt",
+      "verification": "Tests + Gegentest (Fencing-Bedingung entfernt ⇒ rot)",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Abgelaufene Lease kann nicht mehr festschreiben; reclaimExpired erhöht den Zähler, stellt zurück oder setzt dead (manuelle Prüfung)",
+      "verification": "Tests + Gegentest (Lease-Ablauf entfernt ⇒ rot)",
+      "met": true
+    },
+    {
+      "id": "AC-4",
+      "criterion": "outcome_unknown wird nie erneut vergeben; nur provider_error wird wiederholt, solange Versuche übrig sind; invalid_input nie",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-5",
+      "criterion": "Ergebnis über Budget ⇒ failed/budget_exhausted mit tatsächlichem Verbrauch; Outbox nur bei Erfolg und in derselben Transaktion (Fehler ⇒ vollständiger Rollback)",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-6",
+      "criterion": "Gespeichertes Envelope wird beim Leasen gegen das aktuelle Register geprüft (Manipulation/Registeränderung ⇒ failed/invalid_input); Fristablauf ⇒ deadline_exceeded; Abbruch nur aus queued",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-7",
+      "criterion": "Nicht eingebunden; Importe nur Vertrag, DB-Typ und node:crypto; keine Umgebungsvariablen, kein Netz, Zeit vom Aufrufer",
+      "verification": "Isolationstest",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 400,
+    "notes": "Solo-Betrieb, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "lib/enterprise/tasks/repository.ts",
+    "tests/enterprise-task-repository.test.cjs",
+    "tsconfig.test.json"
+  ],
+  "implemented": [
+    "enqueueTask",
+    "leaseNext",
+    "startTask",
+    "heartbeat",
+    "completeTask",
+    "reclaimExpired",
+    "cancelTask"
+  ],
+  "tests": [
+    {
+      "command": "node --test tests/enterprise-*.test.cjs tests/migration-upgrade.test.cjs",
+      "result": "passed",
+      "detail": "33/33; zwei Gegentests bestätigt",
+      "commit": "a8aef79",
+      "at": "2026-10-19T07:08:00Z"
+    },
+    {
+      "command": "npm run typecheck / lint / test / build (auf B-03-Stapel a8aef79, enthält B-02 3bb3362)",
+      "result": "passed",
+      "detail": "alle vier Exit 0, 707/707",
+      "commit": "a8aef79",
+      "at": "2026-10-19T07:24:00Z"
+    }
+  ],
+  "known_issues": [
+    "Gestapelt auf B-04 (#86, inkl. B-01 #84) und B-02 (Migration 039); Merge erst danach",
+    "PGlite hat nur eine Verbindung: SKIP LOCKED ist syntaktisch geprüft, echte Nebenläufigkeit erst gegen Postgres; die Exklusivität sichern zusätzlich Fencing und Lease-Ablauf",
+    "Kein Backoff zwischen Wiederholungen von provider_error; folgt bei Bedarf mit B-07",
+    "Budgetreservierungen (budget_reservations) nutzt erst B-05",
+    "API ohne Zeitparameter: alle Zeiten aus der DB-Uhr"
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/90",
+    "state": "merged",
+    "merge_commit": "90f3737",
+    "ci": "green"
+  },
+  "approval": {
+    "reviewer": "approved",
+    "operator": "approved",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Keiner im Code; eine Aktivierung (Schalter, Cron-Eintrag) entscheidet nur der Betreiber"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-19T11:34:00Z",
+    "checkpoint_reason": "other",
+    "last_commit": "26d778c",
+    "active_branch": "claude/B-03-task-repository",
+    "state_summary": "PR #90 gemergt (90f3737) und deployed",
+    "decisions_made": [
+      "Erneute Registerprüfung beim Leasen",
+      "Nur provider_error automatisch wiederholbar"
+    ],
+    "test_status": "33/33 gezielt",
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
+  },
+  "revision": 6,
+  "based_on_commit": "5f0f9e0",
+  "updated_at": "2026-10-23T14:00:00Z",
+  "log": [
+    {
+      "at": "2026-10-19T07:08:00Z",
+      "actor": "claude-code",
+      "action": "created",
+      "summary": "B-03 geplant und implementiert (Solo-Betrieb), Commits 7c67d00, a8aef79",
+      "commit": "a8aef79"
+    },
+    {
+      "at": "2026-10-19T07:24:00Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Volle Prüfung grün (707/707), Draft-PR 90",
+      "commit": "a8aef79"
+    },
+    {
+      "at": "2026-10-19T11:34:00Z",
+      "actor": "claude-code",
+      "action": "review_received",
+      "summary": "Review zweite Sitzung (PR #90): changes_requested; 3 major (Aufruferzeit, running neu vergeben, Outbox ohne Stufe)",
+      "commit": "a8aef79"
+    },
+    {
+      "at": "2026-10-19T11:34:00Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "DB-Uhr, running+abgelaufen ⇒ outcome_unknown, keine Outbox in completeTask, Budgetklasse aus Zahlen, Idempotenz inkl. Budget/Payload",
+      "commit": "26d778c"
+    },
+    {
+      "at": "2026-10-19T12:19:00Z",
+      "actor": "claude-code",
+      "action": "review_received",
+      "summary": "Nachprüfung zweite Sitzung (PR #90): approve",
+      "commit": "26d778c"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #90 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
+    },
+    {
+      "at": "2026-10-23T14:00:00Z",
+      "actor": "claude-code",
+      "action": "deployed",
+      "summary": "Deployed: Merge 90f3737 (über #112) im READY-Production-Deployment dpl_2wjFdr1HMy64ccezERnSJpS76Mtn; D-05-Nachweis in docs/PROJECT_STATUS.md §2. Nicht live geprüft; Schalter unverändert.",
+      "commit": "90f3737"
+    }
+  ]
+}

@@ -4,7 +4,7 @@
 > Begriffe strikt getrennt: **implementiert** (Code auf Branch) · **getestet** (automatisierte Offline-Tests) · **gemergt** (in `main`)
 > · **deployed** (im READY-Production-Deployment) · **aktiviert** (Schalter/Zugänge in Production gesetzt) · **live verifiziert** (echter Production-Aufruf beobachtet).
 
-Stand: **2026-10-22**, Claude-Code-Cloud-Sitzungen (Ausbau-Roadmap, zwei Sitzungen), Doku-Branch `claude/docs-status-nachzug`. Erster Reel-Praxistest: [`docs/FIRST_REEL_TEST.md`](FIRST_REEL_TEST.md).
+Stand: **2026-10-23**, Claude-Code-Cloud-Sitzungen (Ausbau-Roadmap, zwei Sitzungen). AI-Business-Stand je Aufgabe: [`docs/ai-business/11_UMSETZUNGSSTAND.md`](ai-business/11_UMSETZUNGSSTAND.md). Erster Reel-Praxistest: [`docs/FIRST_REEL_TEST.md`](FIRST_REEL_TEST.md).
 Ausführlicher Abschluss mit Soll-Ist-Matrix: [`docs/PRODUCTION_AUDIT_FINAL_2026-10-15.md`](PRODUCTION_AUDIT_FINAL_2026-10-15.md).
 
 ## 1. Aktueller Stand
@@ -45,8 +45,13 @@ nicht möglich; Laufzeitfehler seit den Merges nur der bekannte `pg`-SSL-Hinweis
 | #120 | F-05 WhatsApp „Geschäftsidee prüfen: …“ (Tageslimit) | `a736bf4` | `dpl_DJcgghtePDAexDFnwBunCT5mX99Q` READY | nein (`OPPORTUNITY_SCOUT_ENABLED` fehlt) | – |
 | #115 | I-01 Bewertung „Immobilienanalyse“ – Ergebnis „Daten fehlen“ (Doku + Test) | `b91ff44` | `dpl_E2LTDxbnbHvumAUHuME3hgYSGoUT` READY | – (Doku/Test) | – |
 | #116 | J-05 Preview-Lauf mit isolierten Ressourcen (Leitfaden, Prüfskripte) | `06ae6cc` | `dpl_BedbCi8tuyEVsjWpABs8gCrPfXb4` READY | – (Skripte, Betreiber führt aus) | – |
+| #121 | Doku: Projektstand 22.10. und Schalterliste | `c677759` | `dpl_45i7xRiFwW7Xfc8aJ1pxGt5Yx8ws` READY | – (Doku) | – |
+| #124 | **Sicherheit:** Next.js 16.3.8 → 16.4.2 (GHSA-2464-fhr4-w9xw, GHSA-p3m5-59mp-jv5r, GHSA-673q-mjm6-r5xr) | `1fe0bb2` | `dpl_4WCCNjTxLfpWgbgrb2AWnFt59iXd` READY | – | Cron topic-scout/daily-draft unter 16.4.2 am 23.10. ohne Fehler; Login/Webhook noch ohne Aufruf |
+| #122 | DIAG-MODEL Stufe A: Diagnose der Redaktionsmodell-Fehler (nur Log/Fehlerklasse) | `ab77937` | `dpl_3T1KLWLvCYpz5VEvNUpo6nG4FoB5` READY | – | erste Daten 23.10. 07 UTC: zu lange Freitextfelder |
+| #123 | Command Center: Migrationen 001–042 als belegt | `d6217f9` | `dpl_BcciBQqdpAdxszUgQsSDVPmHRLuT` READY | – | – |
+| #125 | DIAG-MODEL Stufe B: zu lange interne Freitexte kürzen statt verwerfen | `07f3987` | `dpl_81nfxtja2LJfyVKk3hQ5xYfWFxrR` READY | wirkt ohne Schalter (nur bei sonst verworfenen Antworten) | Wirkung noch nicht beobachtet |
 
-Offen, nicht für `main` vorgesehen (Basis `architecture/ai-business-roadmap`): #81, #82, #111.
+#81, #82 und #111 (Architektur-, Roadmap- und Koordinationsdoku): am 23.10. per Betreiberfreigabe als konsolidierter Doku-PR #126 nach `main` übernommen (`docs/ai-business/`), danach als ersetzt geschlossen.
 
 ## 2a. Gemergte PRs bis 18.10. (Historie)
 
@@ -70,7 +75,7 @@ Offen, nicht für `main` vorgesehen (Basis `architecture/ai-business-roadmap`): 
 | Command Center | deployed, erreichbar; Inhalte mit Produktionsdaten nicht von der Sitzung gesehen. Fehlend: Einzellisten je Entscheidung, Euro-Kosten |
 | WhatsApp-Freigaben | deployed + live genutzt; Fixes aus #72 noch ohne Live-Bildstopp-Fall |
 | WhatsApp-Servicefenster | Vorlage `content_entwurf` vorhanden, **aus** (Betreiberentscheidung). Themenvorschläge außerhalb des Fensters werden gehalten und mit der nächsten Betreiber-Nachricht nachgeliefert |
-| Themen-Pipeline | implementiert, getestet, deployed. Variable `TOPIC_PIPELINE_ENABLED` seit 18.10. in Production vorhanden; Wert und Wirkung von den Sitzungen nicht geprüft (Nachweis: `topic_runs` im Command Center bzw. „Status“ per WhatsApp). Cron 07:00 UTC = 09:00 Uhr Berlin → Vorschlag; Zustellung sofort im 24-h-Fenster, sonst mit der nächsten Betreiber-Nachricht |
+| Themen-Pipeline | implementiert, getestet, deployed. Variable `TOPIC_PIPELINE_ENABLED` seit 18.10. in Production vorhanden; **aktiv belegt** am 23.10.: Cron 07:15 UTC `topic_cron_completed status=proposed`, Vorschlag wegen geschlossenem Servicefenster gehalten (Laufzeitlog, zweite Sitzung). Nächster Auftrag: Ausrichtung der Themen auf Storytelling, Aha-Effekte, Humor, Emotionen und Hacks (`docs/ai-business/11_UMSETZUNGSSTAND.md` §6). Cron 07:00 UTC = 09:00 Uhr Berlin → Vorschlag; Zustellung sofort im 24-h-Fenster, sonst mit der nächsten Betreiber-Nachricht |
 | Themenvideo täglich | implementiert, getestet, deployed; Variable `TOPIC_DAILY_VIDEO` vorhanden, Wert nicht geprüft; Rendering zusätzlich nur mit Anbieter (`TOPIC_STANDARD_VIDEO_PROVIDER=runway` + Limit) und Kostenfreigabe |
 | Trendscout / Trend-Agent | aktiv (`gpt-4.1` + Tavily). Neu, **aus**: `TRENDSCOUT_TOPICS=on` (Themenrecherche im selben Lauf), `PRODUCT_MIX=balance` (Preissegmente) |
 | Trendsetter | deployed, aus (`TRENDSETTER_AFFILIATE`) |

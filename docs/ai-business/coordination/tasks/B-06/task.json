@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "task_id": "B-06",
+  "title": "Entscheidungsvorlagen (Migration 041, nur Vorlage, keine Wirkung)",
+  "module": "enterprise-decisions",
+  "phase": "B",
+  "status": "deployed",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "operator",
+  "base_commit": "570e410",
+  "branch": "claude/B-06-decision-requests",
+  "depends_on": [
+    "B-01",
+    "E-01"
+  ],
+  "claims": {
+    "paths": [
+      "db/migrations/041_enterprise_decisions.sql",
+      "lib/enterprise/decisions.ts",
+      "tests/enterprise-decisions.test.cjs"
+    ],
+    "hot_files": [
+      "lib/memory/migrations.ts",
+      "lib/memory/ensure-automation-schema.ts",
+      "tests/migration-upgrade.test.cjs",
+      "lib/architecture/model.ts",
+      "CLAUDE.md",
+      "docs/PROJECT_STATUS.md",
+      "tsconfig.test.json"
+    ],
+    "migration_numbers": [
+      "041"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Migration 041 additiv, idempotent, registriert; Schema: nur L3a/L3b/L4, nur whatsapp_operator, entschieden nur mit Nachweisen, eine offene Vorlage je Betreff",
+      "verification": "PGlite-Test",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Nur Entscheidungsstufen werden Vorlagen; Optionen/Empfehlung/Fakten geprüft; Fingerprint unabhängig von Schlüsselreihenfolge",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Geänderte Vorlage ersetzt die offene; alte Antworten zählen nicht mehr",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-4",
+      "criterion": "Nur Betreiber, nur Antwort auf genau die Anfragenachricht, Fingerprint muss passen, nur einmal",
+      "verification": "Tests + 2 Gegentests",
+      "met": true
+    },
+    {
+      "id": "AC-5",
+      "criterion": "Fehlende Antwort läuft ab; eine Freigabe erzeugt keine Aufgabe, keinen Outbox-Eintrag, keinen Publish-Versuch",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-6",
+      "criterion": "Kein WhatsApp-Versand, kein Publish, nicht eingebunden; ACTIVE_APPROVAL_AUTHORITIES unverändert",
+      "verification": "Isolationstest",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 300,
+    "notes": "Solo-Betrieb, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "db/migrations/041_enterprise_decisions.sql",
+    "lib/enterprise/decisions.ts",
+    "tests/enterprise-decisions.test.cjs",
+    "lib/memory/migrations.ts",
+    "lib/memory/ensure-automation-schema.ts",
+    "tests/migration-upgrade.test.cjs",
+    "lib/architecture/model.ts",
+    "CLAUDE.md",
+    "docs/PROJECT_STATUS.md",
+    "tsconfig.test.json"
+  ],
+  "implemented": [
+    "requestDecision",
+    "attachRequestMessage",
+    "recordDecision",
+    "expireDecisions",
+    "decisionFingerprint"
+  ],
+  "tests": [
+    {
+      "command": "npm run typecheck / lint / test / build",
+      "result": "passed",
+      "detail": "alle vier Exit 0, 705/705",
+      "commit": "4561ecb",
+      "at": "2026-10-19T12:11:00Z"
+    }
+  ],
+  "known_issues": [
+    "Gestapelt auf E-01 (#92, damit #89) und B-01 (#84)",
+    "Nach Merge von #91 trivialer Include-Konflikt in tsconfig.test.json",
+    "WhatsApp-Versand und Umsetzung einer Freigabe sind eigene spätere Schritte (Hot Files)"
+  ],
+  "open_decisions": [
+    {
+      "id": "OD-B06-1",
+      "question": "Merge = Migration 041 wird in Production angewendet (additiv, ungenutzt). Freigeben?",
+      "owner": "operator"
+    }
+  ],
+  "pr": {
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/96",
+    "state": "merged",
+    "merge_commit": "f0187eb",
+    "ci": "green"
+  },
+  "approval": {
+    "reviewer": "changes_requested",
+    "operator": "approved",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Keiner im Code; eine Aktivierung (Schalter, Cron-Eintrag) entscheidet nur der Betreiber"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-19T18:45:08Z",
+    "checkpoint_reason": "other",
+    "last_commit": "070dff7",
+    "active_branch": "claude/B-06-decision-requests",
+    "state_summary": "PR #96 gemergt (f0187eb) und deployed",
+    "decisions_made": [
+      "Betreiberauftrag 19.10.: in Abwesenheit durchgehend weiterarbeiten; Wirkung bleibt hinter Schaltern/Entscheidungen"
+    ],
+    "test_status": "alle vier Exit 0, 705/705",
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
+  },
+  "revision": 4,
+  "based_on_commit": "d9e9d1e",
+  "updated_at": "2026-10-23T14:00:00Z",
+  "log": [
+    {
+      "at": "2026-10-19T12:11:00Z",
+      "actor": "claude-code",
+      "action": "created",
+      "summary": "B-06 geplant und implementiert (Solo-Betrieb), Commit 4561ecb",
+      "commit": "4561ecb"
+    },
+    {
+      "at": "2026-10-19T18:45:08Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "Review #96: major (recordDecision vertraute Aufrufer) behoben – WhatsApp-Beweis wie Freigabe-Gate; minor umgesetzt; Nachprüfung offen",
+      "commit": "070dff7"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #96 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
+    },
+    {
+      "at": "2026-10-23T14:00:00Z",
+      "actor": "claude-code",
+      "action": "deployed",
+      "summary": "Deployed: Merge f0187eb (über #96) im READY-Production-Deployment dpl_2TJBadjG9uMYaxePz3ULyqXjeLxL; D-05-Nachweis in docs/PROJECT_STATUS.md §2. Nicht live geprüft; Schalter unverändert.",
+      "commit": "f0187eb"
+    }
+  ]
+}

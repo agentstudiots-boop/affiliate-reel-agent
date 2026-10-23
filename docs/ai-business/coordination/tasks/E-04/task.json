@@ -1,0 +1,154 @@
+{
+  "schema_version": 1,
+  "task_id": "E-04",
+  "title": "Manuelle Belege und Erlöse (Kosten, Erlöse, PartnerNet-CSV) – nur Code und Tests",
+  "module": "enterprise-controlling",
+  "phase": "E",
+  "status": "deployed",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "claude-code",
+  "base_commit": "43873e3",
+  "branch": "claude/E-04-manual-entries",
+  "depends_on": [
+    "E-01",
+    "E-07"
+  ],
+  "claims": {
+    "paths": [
+      "lib/enterprise/controlling/manual-entries.ts",
+      "tests/controlling-manual-entries.test.cjs"
+    ],
+    "hot_files": [],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "recordManualCost/recordManualRevenue schreiben idempotent (UNIQUE source, source_ref); measured nur mit Belegreferenz; Abteilung nur aus dem Register",
+      "verification": "PGlite-Tests",
+      "met": false
+    },
+    {
+      "id": "AC-2",
+      "criterion": "PartnerNet-CSV: Spaltenzuordnung über Kopfzeile, unbekannte Spalten/Formate abgelehnt, Dezimalkomma, nur EUR; Ergebnis je Zeile (übernommen/Duplikat/abgelehnt mit Grund)",
+      "verification": "Tests mit synthetischer CSV",
+      "met": false
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Nicht eingebunden: keine Route, UI, Cron, Migration; keine echten Geschäftsdaten im Repo",
+      "verification": "Isolationstest",
+      "met": false
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 400,
+    "notes": "Zweite Claude-Sitzung, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "lib/enterprise/controlling/manual-entries.ts",
+    "tests/controlling-manual-entries.test.cjs",
+    "tsconfig.test.json"
+  ],
+  "implemented": [
+    "recordManualCost (measured nur mit Belegnummer)",
+    "recordManualRevenue (negativ erlaubt)",
+    "parseRevenueCsv/importRevenueCsv (Zuordnung fail-closed, idempotent)"
+  ],
+  "tests": [
+    {
+      "command": "npm run lint && npm test && npm run build && npm run typecheck",
+      "result": "passed",
+      "detail": "725/725 (Session 2)",
+      "commit": "12d08cc",
+      "at": "2026-10-20T07:30:00Z"
+    }
+  ],
+  "known_issues": [
+    "Falls Migration 040 nicht reicht: melden, nicht ändern"
+  ],
+  "open_decisions": [
+    {
+      "id": "OD-E04-1",
+      "question": "Welcher PartnerNet-Bericht (nur Einnahmen/Auszahlung als measured), echte Kopfzeile und eindeutige Schlüsselspalten?",
+      "owner": "operator"
+    }
+  ],
+  "pr": {
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/107",
+    "state": "merged",
+    "merge_commit": "b5d4dcf",
+    "ci": "green"
+  },
+  "approval": {
+    "reviewer": "approved",
+    "operator": "approved",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Keiner im Code; eine Aktivierung (Schalter, Cron-Eintrag) entscheidet nur der Betreiber"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-20T07:45:00Z",
+    "checkpoint_reason": "other",
+    "last_commit": "12d08cc",
+    "active_branch": "claude/E-04-manual-entries",
+    "state_summary": "PR #107 gemergt (b5d4dcf) und deployed",
+    "decisions_made": [],
+    "test_status": "725/725",
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
+  },
+  "revision": 5,
+  "based_on_commit": "563e398",
+  "updated_at": "2026-10-23T14:00:00Z",
+  "log": [
+    {
+      "at": "2026-10-20T07:25:00Z",
+      "actor": "claude-code",
+      "action": "created",
+      "summary": "Aufgabe angelegt, Umsetzung durch zweite Claude-Sitzung",
+      "commit": "563e398"
+    },
+    {
+      "at": "2026-10-20T07:45:00Z",
+      "actor": "claude-code",
+      "action": "review_received",
+      "summary": "Review #107: approve, 2 minor (Schlüsselkollision, Duplikatprüfung Kosten)",
+      "commit": "12d08cc"
+    },
+    {
+      "at": "2026-10-20T12:25:00Z",
+      "actor": "claude-code",
+      "action": "approved",
+      "summary": "Nachprüfung #107 @a70442d: approve (beide minor behoben)",
+      "commit": "a70442d"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #107 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
+    },
+    {
+      "at": "2026-10-23T14:00:00Z",
+      "actor": "claude-code",
+      "action": "deployed",
+      "summary": "Deployed: Merge b5d4dcf (über #108) im READY-Production-Deployment dpl_2Fx2BnSWgGcA4Mgh9ZoqMB1LPZSR; D-05-Nachweis in docs/PROJECT_STATUS.md §2. Nicht live geprüft; Schalter unverändert.",
+      "commit": "b5d4dcf"
+    }
+  ]
+}
