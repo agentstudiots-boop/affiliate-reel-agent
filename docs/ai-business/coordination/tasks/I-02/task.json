@@ -4,7 +4,7 @@
   "title": "Datenquellen- und Rechtscheckliste „Immobilienanalyse“ als Vorlage für den Betreiber (nur Doku)",
   "module": "opportunity",
   "phase": "I",
-  "status": "waiting_review",
+  "status": "merged",
   "planner": "claude-code",
   "responsible": "claude-code",
   "implementer": "claude-code",
@@ -75,10 +75,10 @@
   ],
   "open_decisions": [],
   "pr": {
-    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/111",
-    "state": "draft",
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/126",
+    "state": "merged",
     "merge_commit": null,
-    "ci": "unknown"
+    "ci": "green"
   },
   "approval": {
     "reviewer": "approved",
@@ -86,7 +86,7 @@
     "latest_review_file": null
   },
   "next_steps": [
-    "Merge durch Betreiber in architecture/ai-business-roadmap"
+    "Keine im Doku-Umfang; offene Betreiberentscheidungen siehe docs/ai-business/11_UMSETZUNGSSTAND.md §4"
   ],
   "session": {
     "system": "claude-code",
@@ -94,14 +94,14 @@
     "checkpoint_reason": "other",
     "last_commit": "a96acb0",
     "active_branch": "claude/I-02-data-legal-checklist",
-    "state_summary": "Draft-PR #111 approve nach Nachprüfung",
+    "state_summary": "Doku mit #126 auf main",
     "decisions_made": [],
     "test_status": "Doku",
-    "next_action": "Merge durch Betreiber"
+    "next_action": "keine"
   },
-  "revision": 3,
+  "revision": 4,
   "based_on_commit": "e15bdbc",
-  "updated_at": "2026-10-20T13:25:00Z",
+  "updated_at": "2026-10-23T14:30:00Z",
   "log": [
     {
       "at": "2026-10-20T13:15:00Z",
@@ -123,6 +123,12 @@
       "action": "approved",
       "summary": "Nachprüfung #111 @a96acb0: approve",
       "commit": "a96acb0"
+    },
+    {
+      "at": "2026-10-23T14:30:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "Inhalt aus #111 mit dem konsolidierten Doku-PR #126 nach main übernommen (Betreiberfreigabe 23.10.2026, nur Dokumentation; keine Architektur- oder Betriebsfreigabe). Reviewstand unverändert (approve, Sitzung 1)."
     }
   ]
 }

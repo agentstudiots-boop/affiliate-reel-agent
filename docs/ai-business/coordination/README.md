@@ -20,7 +20,7 @@ Regeln gegen veraltete Zustände: vor dem Schreiben `git fetch`; ist `revision` 
 `revision` bei jeder Änderung +1; `log[]` nur anhängen. Eine automatische Validierung in CI war mit C-02 geplant; C-02 ist zurückgestellt.
 Bis dahin prüft das schreibende System jede `task.json` selbst gegen `schema/task.schema.json`.
 
-> **Stand 23.10.2026:** Diese Struktur liegt jetzt auf `main` (konsolidierter Doku-PR; er ersetzt #81, #82 und #111). Das Command
+> **Stand 23.10.2026:** Diese Struktur liegt jetzt auf `main` (konsolidierter Doku-PR #126; er ersetzt #81, #82 und #111). Das Command
 > Center liest daraus je Aufgabe nur ID, Phase und Status (D-06, `lib/architecture/development.ts`).
 > - Maßgeblicher Überblick: [`../11_UMSETZUNGSSTAND.md`](../11_UMSETZUNGSSTAND.md).
 > - Die datierten Abschnitte unten sind der Verlauf ihres Datums. „Draft“, „nicht mergen“, „Merge nur durch den Betreiber“ oder
@@ -132,9 +132,9 @@ Dokumentation**. Sie ist keine Architektur- oder Betriebsfreigabe und keine Ents
   schon liegt.
 - **Neu:** [`../11_UMSETZUNGSSTAND.md`](../11_UMSETZUNGSSTAND.md), der Überblick je Aufgabe mit Nachweisen.
 - **Übergabedateien angepasst:** Aufgaben mit belegtem READY-Deployment (D-05) stehen auf `deployed`. A-01, A-02 und I-02
-  stehen mit dem Doku-PR auf `merged`. `verified` (live geprüft) wird für keine Aufgabe gesetzt: Es gibt keine Live-Prüfung der
+  stehen mit #126 auf `merged`. `verified` (live geprüft) wird für keine Aufgabe gesetzt: Es gibt keine Live-Prüfung der
   Funktionen.
-- **Danach:** #81, #82 und #111 werden mit Verweis auf den Doku-PR als ersetzt geschlossen.
+- **Danach:** #81, #82 und #111 werden mit Verweis auf #126 als ersetzt geschlossen.
 
 ## Stand 23.10.2026: DIAG-MODEL Stufe B
 

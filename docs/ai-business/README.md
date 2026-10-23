@@ -5,7 +5,7 @@
 > I-03, BF-16).
 > - Alle Roadmap-PRs gegen `main` sind gemergt und deployed; die Migrationen 039–042 sind angewendet.
 > - Keine neue Funktion ist aktiviert.
-> - Dieses Verzeichnis kam am 23.10. mit dem konsolidierten Doku-PR auf `main`; er ersetzt #81, #82 und #111. Das ist eine reine
+> - Dieses Verzeichnis kam am 23.10. mit dem konsolidierten Doku-PR #126 auf `main`; er ersetzt #81, #82 und #111. Das ist eine reine
 >   Doku-Übernahme, keine Architektur- oder Betriebsfreigabe.
 >
 > Alles unterhalb dieser Box ist der **Planungsbericht vom 18.10.2026 (Runde 2)**. Er bleibt unverändert als Verlauf erhalten.

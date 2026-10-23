@@ -25,7 +25,7 @@ Ein erfolgreicher Build oder grüne Tests sind kein Nachweis für den Livebetrie
   `OPPORTUNITY_SCOUT_ENABLED` und `OPPORTUNITY_DAILY_LIMIT` sind nicht gesetzt (Vercel-Namensliste, 22.10.).
   `/api/cron/executive-cycle` steht nicht in `vercel.json`.
 - **Live geprüft:** nur die Anwendung der Migrationen. Die neuen Funktionen selbst sind nicht live geprüft, weil sie aus sind.
-- **Dokumentation:** Mit dem konsolidierten Doku-PR (23.10.) liegen Architektur, Roadmap, Übergabedateien, Reviews und die
+- **Dokumentation:** Mit dem konsolidierten Doku-PR #126 (23.10.) liegen Architektur, Roadmap, Übergabedateien, Reviews und die
   Daten-/Rechtscheckliste auf `main`. Er ersetzt #81, #82 und #111. Diese Übernahme ist eine reine Doku-Freigabe des Betreibers,
   keine Architektur- oder Betriebsfreigabe.
 
@@ -39,8 +39,8 @@ Bei gestapelten PRs ist der Merge-Commit der des PRs, der sie auf `main` brachte
 
 | Aufgabe | Inhalt | PR | Merge auf `main` | Wirkung in Production | Übergabedatei |
 |---|---|---|---|---|---|
-| A-01 | Architektur, Roadmap, Koordination (Doku) | #82 → Doku-PR | 23.10. (Doku-PR) | – (Doku) | ja |
-| A-02 | Unabhängige Architekturprüfung GPT Work (Doku) | #81 → Doku-PR | 23.10. (Doku-PR) | – (Doku) | ja |
+| A-01 | Architektur, Roadmap, Koordination (Doku) | #82 → #126 | 23.10. (#126) | – (Doku) | ja |
+| A-02 | Unabhängige Architekturprüfung GPT Work (Doku) | #81 → #126 | 23.10. (#126) | – (Doku) | ja |
 | B-01 | Plan-Vertrag, Richtlinien, Register | #84 | `f0187eb` (mit #96) | rein, ohne eigene Wirkung | ja |
 | B-02 | Migration 039 Aufgabenbuch | #89 | `7257fd7` | Migration angewendet | ja |
 | B-03 | Repository Aufgabenbuch | #90 | `90f3737` (mit #112) | nur hinter `EXECUTIVE_ENABLED` | ja |
@@ -52,14 +52,14 @@ Bei gestapelten PRs ist der Merge-Commit der des PRs, der sie auf `main` brachte
 | B-09 | Monatsgrenze nur aus freigegebenem Budget | #104 | `90f3737` | nur hinter `EXECUTIVE_ENABLED` | ja |
 | B-10 | Executive-Abschnitt im Wochenbericht | #114 | `9023e64` | **aus**: `EXECUTIVE_WEEKLY_REPORT` fehlt | ja |
 | B-11 | WhatsApp-Befehl „Executive“ (nur lesend) | #117 | `4c976e7` | **aus**: `EXECUTIVE_WHATSAPP` fehlt | ja |
-| C-01 | Übergabestruktur (`coordination/`) | #82 → Doku-PR | 23.10. (Doku-PR) | wird vom Command Center gelesen (D-06) | – |
+| C-01 | Übergabestruktur (`coordination/`) | #82 → #126 | 23.10. (#126) | wird vom Command Center gelesen (D-06) | – |
 | C-02, C-03 | Validator + CI-Schritt | – | – | **zurückgestellt** (04 §C) | – |
 | C-04 | PR-Vorlage | #101 | `f5ad79b` | – (Repo) | – |
 | D-01 | Claude-Routine „Review-Wache“ | – | – | **nicht eingerichtet**; die Routine wurde am 19.10. gelöscht | – |
 | D-02, D-03, D-07, D-08 | GPT-Automatisierung, Review-Action, Reviewer-Identität, Ereignis-Trigger | – | – | offen, Betreiberentscheidungen (BF-15 u. a.) | – |
 | D-04 | Branch-Schutz `main` | – | – | **nicht eingerichtet**; `CLAUDE.md` §1: kein Branch-Schutz | – |
 | D-05 | Release-Checkliste | #95 | `5f59d36` | – (Doku, wird angewendet) | – |
-| D-06 | Entwicklungsstand aus den Übergabedateien | #110 | `90f3737` | **zeigt Daten erst ab dem Doku-PR**: vorher lag kein `coordination/tasks/` auf `main` | ja |
+| D-06 | Entwicklungsstand aus den Übergabedateien | #110 | `90f3737` | **zeigt Daten erst ab #126**: vorher lag kein `coordination/tasks/` auf `main` | ja |
 | E-01 | Migration 040 Kosten-/Erlösbuch | #92 | `ca4a986` | Migration angewendet | ja |
 | E-02 | Preiskatalog-Pflege | #108 | `b5d4dcf` | nicht eingebunden | ja |
 | E-03 | Importer `model_calls` → `cost_entries` | #93 | `90f3737` | nicht eingebunden | ja |
@@ -80,7 +80,7 @@ Bei gestapelten PRs ist der Merge-Commit der des PRs, der sie auf `main` brachte
 | H-03 | Planetenebene in der 3D-Szene | #109 | `90f3737` | lesend; Sichtabnahme Betreiber 21.10. | ja |
 | H-04, H-05 | Ansicht „Unternehmen“ (2D, Detailpanel) | #103 | `90f3737` | lesend; Sichtabnahme Betreiber 21.10. | ja (H-04) |
 | I-01 | Bewertung „Immobilienanalyse“ | #115 | `b91ff44` | Ergebnis **„Daten fehlen“** (`I01_BEWERTUNG_IMMOBILIENANALYSE.md`) | – |
-| I-02 | Datenquellen- und Rechtscheckliste | #111 → Doku-PR | 23.10. (Doku-PR) | Vorlage, keine Rechtsberatung (`10_DATENQUELLEN_RECHTSCHECKLISTE.md`) | ja |
+| I-02 | Datenquellen- und Rechtscheckliste | #111 → #126 | 23.10. (#126) | Vorlage, keine Rechtsberatung (`10_DATENQUELLEN_RECHTSCHECKLISTE.md`) | ja |
 | I-03 | Abteilungsskelett Immobilienanalyse | – | – | **nicht gebaut**: nur nach Go auf I-01 | – |
 | J-01 | Ende-zu-Ende-Szenarien (Tests) | #105 | `b7d1089` (mit #106) | – (Tests) | ja |
 | J-02 | Härtung (Obergrenzen, Importer-Sperre) | #112 | `90f3737` | wie die gehärteten Bausteine | ja |
@@ -92,7 +92,7 @@ Für D-05, C-04, F-01, I-01 und J-05 gibt es keine Übergabedatei. Sie wurden oh
 Doku), ihr Stand steht in den PRs. Das Command Center (D-06) zeigt deshalb nur die Aufgaben mit Übergabedatei.
 
 Die Übergabedatei von **A-02** schreibt nur GPT Work (Regel in `coordination/README.md`). Sie steht deshalb unverändert auf
-`in_review`, obwohl der Inhalt mit dem Doku-PR auf `main` liegt. A-01 behält das letzte Review-Ergebnis von GPT Work
+`in_review`, obwohl der Inhalt mit #126 auf `main` liegt. A-01 behält das letzte Review-Ergebnis von GPT Work
 (`changes_requested`, `tasks/A-01/review-2.json`) als historischen Stand. Es wurde kein neues Review erstellt oder angenommen.
 
 ### Weitere gemergte Änderungen außerhalb der Aufgabenliste

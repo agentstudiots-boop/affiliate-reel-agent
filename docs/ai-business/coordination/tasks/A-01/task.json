@@ -4,7 +4,7 @@
   "title": "Planungsdokumente und Architektur (Runde 2 nach GPT-Review A-01/review-1.json)",
   "module": "planning",
   "phase": "A",
-  "status": "waiting_operator",
+  "status": "merged",
   "responsible": "claude-code",
   "implementer": "claude-code",
   "reviewer": "gpt-work",
@@ -116,8 +116,8 @@
     }
   ],
   "pr": {
-    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/82",
-    "state": "draft",
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/126",
+    "state": "merged",
     "merge_commit": null,
     "ci": "green"
   },
@@ -127,8 +127,7 @@
     "latest_review_file": "tasks/A-01/review-2.json"
   },
   "next_steps": [
-    "Betreiber: PR #81 und #82 mergen (nur Doku) oder Änderungen nennen",
-    "Claude: B-01 implementieren (Solo-Betrieb)"
+    "Keine im Doku-Umfang; offene Betreiberentscheidungen siehe docs/ai-business/11_UMSETZUNGSSTAND.md §4"
   ],
   "session": {
     "system": "claude-code",
@@ -136,18 +135,18 @@
     "checkpoint_reason": "work_package_done",
     "last_commit": "93231ea",
     "active_branch": "claude/nice-ptolemy-k4p1c3",
-    "state_summary": "Runde 3: alle 5 Befunde aus review-2 akzeptiert und eingearbeitet (Doku + B-01-ACs). Wartet auf GPT-Review Runde 3.",
+    "state_summary": "Doku mit #126 auf main",
     "decisions_made": [
       "Ein Koordinationssystem (docs/ai-business/coordination); kein zweites",
       "Kein Merge; Draft bleibt zur Gegenprüfung",
       "Erster Code-Baustein B-01 ∥ E-05 statt Validator (ADR-16, Betreiber entscheidet)"
     ],
     "test_status": "JSON-Schemas und Instanzen valide; App-Tests nicht ausgeführt (nur Doku)",
-    "next_action": "GPT Work: Draft-PR #82 am neuen Head prüfen und review-3.json schreiben"
+    "next_action": "keine"
   },
-  "revision": 9,
+  "revision": 10,
   "based_on_commit": "93231ea",
-  "updated_at": "2026-10-19T06:15:00Z",
+  "updated_at": "2026-10-23T14:30:00Z",
   "log": [
     {
       "at": "2026-10-18T17:04:47Z",
@@ -232,6 +231,12 @@
       "action": "note",
       "summary": "Betreiberbeschluss Solo-Betrieb in coordination/README.md, 05 §2, 07 (ADR-17, R-19), resources.json, B-01 und E-05 dokumentiert; stündliche Routine gelöscht",
       "commit": null
+    },
+    {
+      "at": "2026-10-23T14:30:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "Inhalt aus #82 mit dem konsolidierten Doku-PR #126 nach main übernommen (Betreiberfreigabe 23.10.2026, nur Dokumentation; keine Architektur- oder Betriebsfreigabe). Das letzte Review von GPT Work (review-2, changes_requested) bleibt als historischer Stand; es wurde kein neues Review erstellt."
     }
   ],
   "planner": "claude-code",
@@ -407,10 +412,5 @@
     }
   ],
   "lease": null,
-  "waiting": {
-    "reason": "operator",
-    "since": "2026-10-19T06:15:00Z",
-    "resume_condition": "Betreiber merged PR #81 und #82 in den Architektur-Branch (Doku); kein weiteres GPT-Review erforderlich (Solo-Betrieb)",
-    "wake_mechanism": "manual_start"
-  }
+  "waiting": null
 }

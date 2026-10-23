@@ -51,7 +51,7 @@ nicht möglich; Laufzeitfehler seit den Merges nur der bekannte `pg`-SSL-Hinweis
 | #123 | Command Center: Migrationen 001–042 als belegt | `d6217f9` | `dpl_BcciBQqdpAdxszUgQsSDVPmHRLuT` READY | – | – |
 | #125 | DIAG-MODEL Stufe B: zu lange interne Freitexte kürzen statt verwerfen | `07f3987` | `dpl_81nfxtja2LJfyVKk3hQ5xYfWFxrR` READY | wirkt ohne Schalter (nur bei sonst verworfenen Antworten) | Wirkung noch nicht beobachtet |
 
-#81, #82 und #111 (Architektur-, Roadmap- und Koordinationsdoku): am 23.10. per Betreiberfreigabe als konsolidierter Doku-PR nach `main` übernommen (`docs/ai-business/`), danach als ersetzt geschlossen.
+#81, #82 und #111 (Architektur-, Roadmap- und Koordinationsdoku): am 23.10. per Betreiberfreigabe als konsolidierter Doku-PR #126 nach `main` übernommen (`docs/ai-business/`), danach als ersetzt geschlossen.
 
 ## 2a. Gemergte PRs bis 18.10. (Historie)
 
