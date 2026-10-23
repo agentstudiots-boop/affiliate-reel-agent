@@ -1,0 +1,234 @@
+{
+  "schema_version": 1,
+  "task_id": "E-01",
+  "title": "Migration 040: Preis-, Kosten-, Erlös- und Budgetbuch (additiv, ungenutzt)",
+  "module": "controlling-ledger",
+  "phase": "E",
+  "status": "deployed",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "operator",
+  "base_commit": "3bb3362",
+  "branch": "claude/E-01-cost-ledger-migration",
+  "depends_on": [
+    "E-05",
+    "B-02"
+  ],
+  "claims": {
+    "paths": [
+      "db/migrations/040_controlling_cost_ledger.sql",
+      "tests/controlling-ledger-migration.test.cjs"
+    ],
+    "hot_files": [
+      "lib/memory/migrations.ts",
+      "lib/memory/ensure-automation-schema.ts",
+      "tests/migration-upgrade.test.cjs",
+      "lib/architecture/model.ts",
+      "CLAUDE.md",
+      "docs/PROJECT_STATUS.md"
+    ],
+    "migration_numbers": [
+      "040"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Nur CREATE … IF NOT EXISTS, zweimal anwendbar, nichts vorbelegt; an allen Pflichtstellen registriert",
+      "verification": "PGlite-Test, Upgrade-Test",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Preise nur mit https-Quelle und Autor, gültiger Zeitraum, eindeutig je Anbieter/Artikel/Einheit/Beginn",
+      "verification": "Negativtests",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Betrag aus Nutzung nur mit Katalogpreis, sonst NULL; Rechnung/manuell ohne Preis erlaubt; Import idempotent je (source, source_ref); Aufgabe nur als echte FK",
+      "verification": "Tests + Gegentest",
+      "met": true
+    },
+    {
+      "id": "AC-4",
+      "criterion": "Gemessener Erlös nur mit Betrag (negativ erlaubt), Periode geordnet, Import idempotent, keine Klicks als Erlösquelle",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-5",
+      "criterion": "Ein Budget je Abteilung/Monat/Art; Freigabe nie implizit (approved_decision_id leer)",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-6",
+      "criterion": "Kein App-Code nutzt die Tabellen",
+      "verification": "Isolationstest",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 250,
+    "notes": "Solo-Betrieb, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "db/migrations/040_controlling_cost_ledger.sql",
+    "tests/controlling-ledger-migration.test.cjs",
+    "lib/memory/migrations.ts",
+    "lib/memory/ensure-automation-schema.ts",
+    "tests/migration-upgrade.test.cjs",
+    "lib/architecture/model.ts",
+    "CLAUDE.md",
+    "docs/PROJECT_STATUS.md"
+  ],
+  "implemented": [
+    "price_catalog",
+    "cost_entries",
+    "revenue_entries",
+    "budgets"
+  ],
+  "tests": [
+    {
+      "command": "node --test tests/controlling-ledger-migration.test.cjs tests/enterprise-task-ledger-migration.test.cjs tests/migration-upgrade.test.cjs tests/architecture.test.cjs",
+      "result": "passed",
+      "detail": "40/40; Gegentest bestätigt",
+      "commit": "dccea46",
+      "at": "2026-10-19T07:40:00Z"
+    },
+    {
+      "command": "npm run typecheck / lint / test / build",
+      "result": "passed",
+      "detail": "alle vier Exit 0, 688/688 (auf dccea46)",
+      "commit": "dccea46",
+      "at": "2026-10-19T11:34:00Z"
+    },
+    {
+      "command": "npm run typecheck / lint / test / build (auf E-03-Stapel a398e5a)",
+      "result": "passed",
+      "detail": "alle vier Exit 0, 693/693",
+      "commit": "570e410",
+      "at": "2026-10-19T11:50:00Z"
+    },
+    {
+      "command": "node --test tests/controlling-ledger-migration.test.cjs tests/migration-upgrade.test.cjs",
+      "result": "passed",
+      "detail": "8/8",
+      "commit": "3736fd2",
+      "at": "2026-10-19T17:08:15Z"
+    },
+    {
+      "command": "npm run lint && npm test && npm run build && npm run typecheck (Stapelspitze H-01)",
+      "result": "passed",
+      "detail": "775/775, enthält diesen Stand per Merge",
+      "commit": "7b92194",
+      "at": "2026-10-19T17:08:15Z"
+    }
+  ],
+  "known_issues": [
+    "Gestapelt auf B-02 (#89): 040 nach 039, cost_entries.task_id verweist auf enterprise_tasks; Merge erst nach #89",
+    "Merge wendet die Migration in Production automatisch an: eigene Betreiberfreigabe",
+    "budgets.approved_decision_id ohne FK, bis enterprise_decisions (B-06) existiert",
+    "Keine Überlappungssperre für Preiszeiträume (bräuchte btree_gist); Importer E-03 wählt den gültigen Preis eindeutig"
+  ],
+  "open_decisions": [
+    {
+      "id": "OD-E01-1",
+      "question": "Merge = Migration 040 wird in Production angewendet (additiv, ungenutzt). Freigeben?",
+      "owner": "operator"
+    }
+  ],
+  "pr": {
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/92",
+    "state": "merged",
+    "merge_commit": "ca4a986",
+    "ci": "green"
+  },
+  "approval": {
+    "reviewer": "approved",
+    "operator": "approved",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Volle Prüfungen im Hauptcheckout, Draft-PR gegen main"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-19T18:45:08Z",
+    "checkpoint_reason": "other",
+    "last_commit": "3736fd2",
+    "active_branch": "claude/E-01-cost-ledger-migration",
+    "state_summary": "PR #92 gemergt (ca4a986) und deployed",
+    "decisions_made": [
+      "Auf B-02 gestapelt statt parallel zu main (gleiche Registrierungszeilen, Nummernfolge)"
+    ],
+    "test_status": "40/40 gezielt",
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
+  },
+  "revision": 7,
+  "based_on_commit": "315306d",
+  "updated_at": "2026-10-23T14:00:00Z",
+  "log": [
+    {
+      "at": "2026-10-19T07:40:00Z",
+      "actor": "claude-code",
+      "action": "created",
+      "summary": "E-01 geplant und implementiert (Solo-Betrieb), Commit dccea46",
+      "commit": "dccea46"
+    },
+    {
+      "at": "2026-10-19T11:34:00Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "B-02-Fixes per Merge 5fc6855; Isolationstest lässt Kernmodule in lib/enterprise zu",
+      "commit": "570e410"
+    },
+    {
+      "at": "2026-10-19T11:50:00Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Draft-PR #92",
+      "commit": "570e410"
+    },
+    {
+      "at": "2026-10-19T17:08:15Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "Review #92 umgesetzt: amount_micros statt amount_cents, item, Währung nur mit Betrag, Quelle↔Werteart; Migration 040 weiterhin Betreiberfreigabe",
+      "commit": "3736fd2"
+    },
+    {
+      "at": "2026-10-19T18:45:08Z",
+      "actor": "claude-code",
+      "action": "approved",
+      "summary": "Nachprüfung zweite Sitzung: approve (Mikro-Beträge)",
+      "commit": "3736fd2"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #92 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
+    },
+    {
+      "at": "2026-10-23T14:00:00Z",
+      "actor": "claude-code",
+      "action": "deployed",
+      "summary": "Deployed: Merge ca4a986 (über #92) im READY-Production-Deployment dpl_2TJBadjG9uMYaxePz3ULyqXjeLxL (eigener Build abgebrochen, im Folge-Deployment enthalten); D-05-Nachweis in docs/PROJECT_STATUS.md §2. Nicht live geprüft; Schalter unverändert.",
+      "commit": "ca4a986"
+    }
+  ]
+}

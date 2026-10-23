@@ -1,0 +1,138 @@
+{
+  "schema_version": 1,
+  "task_id": "J-01",
+  "title": "Ende-zu-Ende-Szenarien Plan → Aufgabe → Abteilung → Entscheidung (nur Tests)",
+  "module": "enterprise-ledger",
+  "phase": "J",
+  "status": "deployed",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "operator",
+  "base_commit": "883a259",
+  "branch": "claude/J-01-e2e-scenarios",
+  "depends_on": [
+    "B-09",
+    "B-07",
+    "B-06",
+    "G-01"
+  ],
+  "claims": {
+    "paths": [
+      "tests/enterprise-e2e.test.cjs"
+    ],
+    "hot_files": [],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Auftrag wird in ausführbare Leseaufgabe und Entscheidungsvorlage getrennt; keine Wirkung",
+      "verification": "Szenario 1",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Ablehnung, falscher Absender, unklarer Text, falsche Nachricht/Fingerprint, geänderte Vorlage ergeben nie Freigabe",
+      "verification": "Szenario 2 + Gegentest",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Fristablauf nie Freigabe; Freigabe löst nichts aus",
+      "verification": "Szenario 3",
+      "met": true
+    },
+    {
+      "id": "AC-4",
+      "criterion": "bezahlter Schritt braucht freigegebenes Budget; outcome_unknown nie wiederholt",
+      "verification": "Szenario 4",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 300,
+    "notes": "Solo-Betrieb, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "tests/enterprise-e2e.test.cjs"
+  ],
+  "implemented": [
+    "4 E2E-Szenarien"
+  ],
+  "tests": [
+    {
+      "command": "npm run lint && npm test && npm run build && npm run typecheck",
+      "result": "passed",
+      "detail": "749/749",
+      "commit": "08a4159",
+      "at": "2026-10-19T18:45:08Z"
+    }
+  ],
+  "known_issues": [
+    "Gestapelt auf B-09 (#104)",
+    "J-02..J-05 folgen"
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/105",
+    "state": "merged",
+    "merge_commit": "b7d1089",
+    "ci": "green"
+  },
+  "approval": {
+    "reviewer": "pending",
+    "operator": "approved",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Keiner im Code; eine Aktivierung (Schalter, Cron-Eintrag) entscheidet nur der Betreiber"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-19T18:45:08Z",
+    "checkpoint_reason": "other",
+    "last_commit": "08a4159",
+    "active_branch": "claude/J-01-e2e-scenarios",
+    "state_summary": "PR #105 gemergt (b7d1089) und deployed",
+    "decisions_made": [],
+    "test_status": "749/749",
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
+  },
+  "revision": 3,
+  "based_on_commit": "1df310c",
+  "updated_at": "2026-10-23T14:00:00Z",
+  "log": [
+    {
+      "at": "2026-10-19T18:45:08Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "J-01 Draft-PR #105 (749/749)",
+      "commit": "08a4159"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #105 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
+    },
+    {
+      "at": "2026-10-23T14:00:00Z",
+      "actor": "claude-code",
+      "action": "deployed",
+      "summary": "Deployed: Merge b7d1089 (über #106) im READY-Production-Deployment dpl_7YmuCU757kCcgSrCgnZrgcnMrYid; D-05-Nachweis in docs/PROJECT_STATUS.md §2. Nicht live geprüft; Schalter unverändert.",
+      "commit": "b7d1089"
+    }
+  ]
+}

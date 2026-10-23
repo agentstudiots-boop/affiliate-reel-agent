@@ -1,0 +1,222 @@
+{
+  "schema_version": 1,
+  "task_id": "B-02",
+  "title": "Migration 039: Aufgabenbuch, Ereignisse, Outbox, Budgetreservierungen (additiv, ungenutzt)",
+  "module": "enterprise-ledger",
+  "phase": "B",
+  "status": "deployed",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "operator",
+  "base_commit": "c56711e",
+  "branch": "claude/B-02-task-ledger-migration",
+  "depends_on": [
+    "B-01"
+  ],
+  "claims": {
+    "paths": [
+      "db/migrations/039_enterprise_task_ledger.sql",
+      "tests/enterprise-task-ledger-migration.test.cjs"
+    ],
+    "hot_files": [
+      "lib/memory/migrations.ts",
+      "lib/memory/ensure-automation-schema.ts",
+      "tests/migration-upgrade.test.cjs",
+      "lib/architecture/model.ts",
+      "CLAUDE.md",
+      "docs/PROJECT_STATUS.md"
+    ],
+    "migration_numbers": [
+      "039"
+    ]
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Nur CREATE … IF NOT EXISTS, kein DROP/ALTER/UPDATE; zweimal anwendbar; registriert in migrations.ts, ensureAutomationSchema, Upgrade-Test, Command-Center-Inventar, CLAUDE.md, PROJECT_STATUS",
+      "verification": "PGlite-Test, Upgrade-Test",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Aufgabenbuch nimmt nur Stufen L0–L2 an (L3a/L3b/L4 ⇒ Entscheidungsvorlage, nie Aufgabe); Idempotenzschlüssel eindeutig; Formate department/task_kind/created_by geprüft",
+      "verification": "Negativtests",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Lease-Felder genau bei leased/running gesetzt, auch bei UPDATE; Fencing-Zähler nicht negativ",
+      "verification": "Negativtests + Gegentest (CHECK entfernt ⇒ rot)",
+      "met": true
+    },
+    {
+      "id": "AC-4",
+      "criterion": "succeeded nur mit output ohne Fehlerklasse; failed/dead/outcome_unknown nur mit Fehlerklasse; outcome_unknown nur mit Klasse outcome_unknown; Klassen = FAILURE_CLASSES aus B-04",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-5",
+      "criterion": "Ereignisse je Aufgabe fortlaufend eindeutig; Outbox pending ⇔ nicht abgeschlossen, externer Idempotenzschlüssel eindeutig, Fencing-Zähler Pflicht; Reservierung > 0, Periode YYYY-MM, disputed bleibt offen",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-6",
+      "criterion": "Kein App-Code liest oder schreibt die Tabellen (nur die Schemaprüfung kennt budget_reservations)",
+      "verification": "Isolationstest",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 250,
+    "notes": "Solo-Betrieb, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "db/migrations/039_enterprise_task_ledger.sql",
+    "tests/enterprise-task-ledger-migration.test.cjs",
+    "lib/memory/migrations.ts",
+    "lib/memory/ensure-automation-schema.ts",
+    "tests/migration-upgrade.test.cjs",
+    "lib/architecture/model.ts",
+    "CLAUDE.md",
+    "docs/PROJECT_STATUS.md"
+  ],
+  "implemented": [
+    "enterprise_tasks",
+    "enterprise_task_events",
+    "enterprise_outbox",
+    "budget_reservations",
+    "Registrierung an allen Pflichtstellen"
+  ],
+  "tests": [
+    {
+      "command": "node --test tests/enterprise-task-ledger-migration.test.cjs tests/migration-upgrade.test.cjs tests/architecture.test.cjs",
+      "result": "passed",
+      "detail": "34/34; Gegentest bestätigt",
+      "commit": "a3d1a88",
+      "at": "2026-10-19T06:52:00Z"
+    },
+    {
+      "command": "npm run typecheck / lint / test / build (auf B-03-Stapel a8aef79, enthält B-02 3bb3362)",
+      "result": "passed",
+      "detail": "alle vier Exit 0, 707/707",
+      "commit": "3bb3362",
+      "at": "2026-10-19T07:24:00Z"
+    }
+  ],
+  "known_issues": [
+    "Merge wendet die Migration in Production automatisch an (ensureAutomationSchema): eigene Betreiberfreigabe nötig, auch wenn die Tabellen ungenutzt bleiben",
+    "Append-only der Ereignistabelle wird nicht per Trigger erzwungen (Bestand nutzt keine Trigger), sondern durch das Repository B-03",
+    "Monotonie des Fencing-Zählers erzwingt erst B-03 (bedingtes UPDATE)",
+    "Nummer 039 gegen parallele Studio-Arbeit vor dem Merge erneut prüfen",
+    "Hot Files: migrations.ts, ensure-automation-schema.ts, migration-upgrade-Test, architecture/model.ts, CLAUDE.md, PROJECT_STATUS.md"
+  ],
+  "open_decisions": [
+    {
+      "id": "OD-B02-1",
+      "question": "Merge = Migration 039 wird in Production angewendet (additiv, ungenutzt). Freigeben?",
+      "owner": "operator"
+    }
+  ],
+  "pr": {
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/89",
+    "state": "merged",
+    "merge_commit": "7257fd7",
+    "ci": "green"
+  },
+  "approval": {
+    "reviewer": "approved",
+    "operator": "approved",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Keiner im Code; eine Aktivierung (Schalter, Cron-Eintrag) entscheidet nur der Betreiber"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-19T11:34:00Z",
+    "checkpoint_reason": "other",
+    "last_commit": "73e76c7",
+    "active_branch": "claude/B-02-task-ledger-migration",
+    "state_summary": "PR #89 gemergt (7257fd7) und deployed",
+    "decisions_made": [
+      "Direkt von main, unabhängig von B-01-Code (Migration zuerst allein)",
+      "Fehlerklassen an B-04 angeglichen"
+    ],
+    "test_status": "34/34 gezielt",
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
+  },
+  "revision": 7,
+  "based_on_commit": "d19edb1",
+  "updated_at": "2026-10-23T14:00:00Z",
+  "log": [
+    {
+      "at": "2026-10-19T06:52:00Z",
+      "actor": "claude-code",
+      "action": "created",
+      "summary": "B-02 geplant und implementiert (Solo-Betrieb), Commit a3d1a88",
+      "commit": "a3d1a88"
+    },
+    {
+      "at": "2026-10-19T07:08:00Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "Isolationstest lässt Kernmodule in lib/enterprise zu (B-03-Repository)",
+      "commit": "3bb3362"
+    },
+    {
+      "at": "2026-10-19T07:24:00Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Volle Prüfung grün (707/707), Draft-PR 89",
+      "commit": "3bb3362"
+    },
+    {
+      "at": "2026-10-19T11:34:00Z",
+      "actor": "claude-code",
+      "action": "review_received",
+      "summary": "Review zweite Sitzung (PR #89): changes_requested; 1 major (outcome_unknown-Klasse außerhalb Status), 2 minor",
+      "commit": "3bb3362"
+    },
+    {
+      "at": "2026-10-19T11:34:00Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "CHECK Fehlerklasse nur in Fehlerzuständen, bigint, handler_id-Format, Kommentar per Konvention",
+      "commit": "73e76c7"
+    },
+    {
+      "at": "2026-10-19T12:19:00Z",
+      "actor": "claude-code",
+      "action": "review_received",
+      "summary": "Nachprüfung zweite Sitzung (PR #89): approve",
+      "commit": "73e76c7"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #89 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
+    },
+    {
+      "at": "2026-10-23T14:00:00Z",
+      "actor": "claude-code",
+      "action": "deployed",
+      "summary": "Deployed: Merge 7257fd7 (über #89) im READY-Production-Deployment dpl_J3FRAHRoWjNFChZwa6peW9F88pv2; D-05-Nachweis in docs/PROJECT_STATUS.md §2. Nicht live geprüft; Schalter unverändert.",
+      "commit": "7257fd7"
+    }
+  ]
+}

@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "task_id": "F-03",
+  "title": "Recherche-Schritt (Tavily + ein Modellaufruf, begrenzt, Schalter beim Aufrufer)",
+  "module": "opportunity",
+  "phase": "F",
+  "status": "deployed",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "claude-code",
+  "base_commit": "a0d1d99",
+  "branch": "claude/F-03-opportunity-research",
+  "depends_on": [
+    "F-02"
+  ],
+  "claims": {
+    "paths": [
+      "lib/enterprise/opportunity/research.ts",
+      "tests/enterprise-opportunity-research.test.cjs"
+    ],
+    "hot_files": [
+      "lib/whatsapp/route-llm.ts",
+      "lib/enterprise/controlling/agent-departments.ts"
+    ],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Höchstens 3 Suchen à 5 Treffer und 1 Modellaufruf; ohne enabled nichts",
+      "verification": "Tests mit simulierter Suche/Modell",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Quellen nur aus gefundenen URLs; Gültigkeit entscheidet F-01",
+      "verification": "Tests + Gegentests",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 300,
+    "notes": "Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "lib/enterprise/opportunity/research.ts",
+    "lib/whatsapp/route-llm.ts",
+    "lib/enterprise/controlling/agent-departments.ts",
+    "tests/enterprise-opportunity-research.test.cjs",
+    "tsconfig.test.json"
+  ],
+  "implemented": [
+    "researchOpportunity",
+    "routerModelCall: maxOutputChars/pollAttempts optional, Standard unverändert"
+  ],
+  "tests": [
+    {
+      "command": "npm run lint && npm test && npm run build && npm run typecheck",
+      "result": "passed",
+      "detail": "838/838",
+      "commit": "bbe41c7",
+      "at": "2026-10-21T12:00:00Z"
+    }
+  ],
+  "known_issues": [
+    "Tavily-Kosten werden nicht in cost_entries erfasst (nur Anzahl Suchen begrenzt)"
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/119",
+    "state": "merged",
+    "merge_commit": "0d2f632",
+    "ci": "green"
+  },
+  "approval": {
+    "reviewer": "pending",
+    "operator": "approved",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Keiner im Code; eine Aktivierung (Schalter, Cron-Eintrag) entscheidet nur der Betreiber"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-21T12:00:00Z",
+    "checkpoint_reason": "other",
+    "last_commit": "bbe41c7",
+    "active_branch": "claude/F-03-opportunity-research",
+    "state_summary": "PR #119 gemergt (0d2f632) und deployed",
+    "decisions_made": [],
+    "test_status": "838/838",
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
+  },
+  "revision": 3,
+  "based_on_commit": "ca0cf80",
+  "updated_at": "2026-10-23T14:00:00Z",
+  "log": [
+    {
+      "at": "2026-10-21T12:00:00Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Draft-PR #119 offen (Freigabe Betreiber 21.10.)",
+      "commit": "bbe41c7"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #119 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert.",
+      "commit": "0d2f632"
+    },
+    {
+      "at": "2026-10-23T14:00:00Z",
+      "actor": "claude-code",
+      "action": "deployed",
+      "summary": "Deployed: Merge 0d2f632 (über #119) im READY-Production-Deployment dpl_13S81cpec4ibSJrdcoETk6NQSeqD; D-05-Nachweis in docs/PROJECT_STATUS.md §2. Nicht live geprüft; Schalter unverändert.",
+      "commit": "0d2f632"
+    }
+  ]
+}

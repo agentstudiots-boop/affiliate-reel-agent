@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "task_id": "A-01",
+  "round": 1,
+  "reviewer": "gpt-work",
+  "reviewed_commit": "22272fd9d04a21672205bfc2e846a36f46f62af9",
+  "pr_url": null,
+  "verdict": "changes_requested",
+  "checklist": {
+    "architecture": "issue",
+    "approval_invariants": "ok",
+    "security": "issue",
+    "error_handling": "issue",
+    "costs": "issue",
+    "database": "issue",
+    "tests": "issue",
+    "integration": "issue",
+    "tech_debt": "issue",
+    "honest_status": "issue"
+  },
+  "findings": [
+    {
+      "id": "GPT-01",
+      "severity": "blocker",
+      "file": "docs/ai-business/02_ZIELARCHITEKTUR.md",
+      "summary": "README/02/03/ADR-01 beschränken KI auf Sprache; 08 und Betreiberauftrag verlangen offene KI-Planung. Vor Umsetzung eine konsistente Hybrid-Spezifikation entscheiden.",
+      "status": "open"
+    },
+    {
+      "id": "GPT-02",
+      "severity": "major",
+      "file": "docs/ai-business/04_ROADMAP.md",
+      "summary": "E-07 benötigt H-Grundlage, H benötigt E-07: Abhängigkeitskreis. E-07 zunächst in vorhandener 2D-Oberfläche; H konsumiert dessen fertigen Datenvertrag.",
+      "status": "open"
+    },
+    {
+      "id": "GPT-03",
+      "severity": "major",
+      "file": "docs/ai-business/coordination/schema/task.schema.json",
+      "summary": "08 verlangt waiting_capacity und Task-Leases; task.schema erlaubt den Status nicht und hat weder Lease noch strukturierte Akzeptanzkriterien/Testanforderungen/Ressourcenbudget. 05 nennt foreign_paths, das Schema verbietet es. Schema/Validator gemeinsam spezifizieren.",
+      "status": "open"
+    },
+    {
+      "id": "GPT-04",
+      "severity": "major",
+      "file": "docs/ai-business/coordination/ownership.json",
+      "summary": "A-01 beansprucht docs/ai-business/**, einschließlich fremder Review-Dateien. Ownership setzt gesamten Baum auf Claude. Reviewer-Ausnahme und aufgabengenaue Claims fehlen. Read-then-write mit revision schützt zudem nicht atomar gegen zwei Schreiber.",
+      "status": "open"
+    },
+    {
+      "id": "GPT-05",
+      "severity": "major",
+      "file": "docs/ai-business/05_ENTWICKLUNGSORGANISATION.md",
+      "summary": "Ein gemeinsames GitHub-Konto ist keine unabhängige GitHub-Reviewer-Identität. PR-Autor kann eigene PRs nicht genehmigen. Modellkennungen in JSON sind Selbstauskünfte. Separaten Reviewer/Bot oder verifizierten Check mit geschützter Vertrauensgrenze planen.",
+      "status": "open"
+    },
+    {
+      "id": "GPT-06",
+      "severity": "major",
+      "file": "docs/ai-business/02_ZIELARCHITEKTUR.md",
+      "summary": "UNIQUE idempotency_key in Postgres garantiert keine genau-einmalige Wirkung bei externen APIs. Provider-Aufruf kann erfolgreich sein, bevor DB-Bestätigung ausfällt. Outbox/Inbox, externe Idempotenz oder Reconciliation und Zustand outcome_unknown spezifizieren.",
+      "status": "open"
+    },
+    {
+      "id": "GPT-07",
+      "severity": "major",
+      "file": "docs/ai-business/02_ZIELARCHITEKTUR.md",
+      "summary": "model_calls ist best effort, verschluckt Speicherfehler und hat keine task_id/department. Kostenbuch daraus ist weder vollständig noch ein harter Budgetwächter. Reservierung vor Aufruf, unabhängiges Settlement und Rechnungsabgleich nötig.",
+      "status": "open"
+    },
+    {
+      "id": "GPT-08",
+      "severity": "major",
+      "file": "docs/ai-business/01_BESTANDSAUFNAHME.md",
+      "summary": "Besitz-/Migrationsstand und Cron-Bestandsaufnahme sind veraltet (038, #78/#79). Vor B/E/H aktuelle Basis und Claims abgleichen; PR #80 berücksichtigen.",
+      "status": "open"
+    },
+    {
+      "id": "GPT-09",
+      "severity": "major",
+      "file": "docs/ai-business/07_OFFENE_FRAGEN_RISIKEN_ENTSCHEIDUNGEN.md",
+      "summary": "Hobby ist laut offizieller Doku nur nichtkommerziell. Sofern der dokumentierte Tarif noch gilt, Hostingentscheidung vor kommerzieller Nutzung klären; kein eigenständiger Tarifwechsel.",
+      "status": "open"
+    },
+    {
+      "id": "GPT-10",
+      "severity": "minor",
+      "file": "docs/ai-business/02_ZIELARCHITEKTUR.md",
+      "summary": "L3 erfasst jede WhatsApp-Nachricht und verlangt Freigabe, obwohl dieselbe Nachricht die Freigabe erst anfordern soll. Vorab autorisierte Benachrichtigung von Veröffentlichung/Ausgabe unterscheiden; Kanal- und Kostenregeln beibehalten.",
+      "status": "open"
+    },
+    {
+      "id": "GPT-11",
+      "severity": "minor",
+      "file": "docs/ai-business/03_ARCHITEKTURKRITIK.md",
+      "summary": "Null Euro-Zusatzkosten für DB/Controlling/Command Center sind nicht belegt; zusätzliche Nutzung und Entwicklung haben Grenz-/Opportunitätskosten. Als ungemessen ausweisen.",
+      "status": "open"
+    },
+    {
+      "id": "GPT-12",
+      "severity": "minor",
+      "file": "docs/ai-business/04_ROADMAP.md",
+      "summary": "Kalender und Betreiberfenster dominieren 04/05 trotz Ergänzung 08; M1 ist im Abhängigkeitsbild einmal Wirtschaftlichkeit, in Tabelle Koordination. Auf DAG und eindeutige Gates umstellen.",
+      "status": "open"
+    }
+  ],
+  "tests_run": [
+    "Vollständige Dokumenten-/Koordinationslektüre; gezielter Quellcodeabgleich gegen main 77f048981c25b6fde419fb4cf95b0edf93cf02bc.",
+    "Keine App-Testausführung; Schema-/Diff-Prüfung im A-02-Checkpoint nachgewiesen."
+  ],
+  "created_at": "2026-10-18T18:45:05.680794Z"
+}

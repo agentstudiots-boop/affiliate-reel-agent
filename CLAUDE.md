@@ -4,6 +4,8 @@
 (verbindliche Projektvorgaben, hat Vorrang) und bei Drehbuch/Produkt-Themen `docs/SCRIPT_WRITER_MANIFEST.md`.
 Diese Datei beschreibt nur die tatsächliche Architektur und verbindliche Regeln. Laufender Stand, offene PRs,
 Blocker und Übergabe stehen in `docs/PROJECT_STATUS.md`; Soll-Ist-Matrix des Audits in `docs/PRODUCTION_AUDIT_FINAL_2026-10-15.md`.
+AI-Business-Ausbau (Executive, Controlling, Opportunity Scout): Architektur, Roadmap, Übergabedateien in `docs/ai-business/`;
+maßgeblicher Stand je Aufgabe in `docs/ai-business/11_UMSETZUNGSSTAND.md`.
 
 ## 1. Projekt und Betrieb
 

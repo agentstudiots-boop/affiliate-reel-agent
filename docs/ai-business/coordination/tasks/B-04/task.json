@@ -1,0 +1,205 @@
+{
+  "schema_version": 1,
+  "task_id": "B-04",
+  "title": "Abteilungsvertrag: Task-Envelope, Ergebnis, Health, begrenzte Lesefähigkeiten (reine Funktionen)",
+  "module": "enterprise-kernel",
+  "phase": "B",
+  "status": "deployed",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "operator",
+  "base_commit": "87e665f",
+  "branch": "claude/B-04-department-contract",
+  "depends_on": [
+    "B-01"
+  ],
+  "claims": {
+    "paths": [
+      "lib/enterprise/contract.ts",
+      "tests/enterprise-contract.test.cjs"
+    ],
+    "hot_files": [
+      "tsconfig.test.json"
+    ],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "envelopeFromStep erzeugt Task-Envelopes nur aus ausführbaren Schritten (L0–L2); Stufe und Handler stammen aus dem Register; Entscheidungsvorlagen und veränderte Schritte werden abgelehnt",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "checkEnvelope prüft empfangene Envelopes erneut: Schema, Register-Bindung, Handler, Stufe, maxLevel, Laufzeitabteilung",
+      "verification": "Negativtests je Fall",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "checkResult: Ergebnis-Schema (succeeded/failed inkl. outcome_unknown), Budget für Kosten und Modellaufrufe, Fakten nur mit Quelle",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-4",
+      "criterion": "checkHealth: richtige Abteilung, Status ok nur mit Nachweis",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-5",
+      "criterion": "Abteilungen erhalten nur benannte Lesesichten (createReadCapability), keinen DB-Handle; unbekannte Sichten werden abgelehnt",
+      "verification": "Tests inkl. toString/__proto__",
+      "met": true
+    },
+    {
+      "id": "AC-6",
+      "criterion": "Nur zod und Kernmodule importiert, kein Import in App-Code, keine DB/Route/Cron/Modellaufrufe",
+      "verification": "Isolationstest",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 350,
+    "notes": "Solo-Betrieb, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "lib/enterprise/contract.ts",
+    "tests/enterprise-contract.test.cjs",
+    "tsconfig.test.json"
+  ],
+  "implemented": [
+    "Zod-Verträge Task-Envelope/Ergebnis/Health",
+    "envelopeFromStep, checkEnvelope, checkResult, checkHealth",
+    "createReadCapability (benannte Lesesichten statt DB-Handle)"
+  ],
+  "tests": [
+    {
+      "command": "node --test tests/enterprise-contract.test.cjs tests/enterprise-kernel.test.cjs",
+      "result": "passed",
+      "detail": "15/15",
+      "commit": "cb74eb9",
+      "at": "2026-10-19T06:25:00Z"
+    },
+    {
+      "command": "npm run typecheck / lint / test / build",
+      "result": "passed",
+      "detail": "alle vier Exit 0 im Hauptcheckout",
+      "commit": "cb74eb9",
+      "at": "2026-10-19T06:33:00Z"
+    },
+    {
+      "command": "node --test tests/enterprise-contract.test.cjs tests/enterprise-kernel.test.cjs",
+      "result": "passed",
+      "detail": "18/18 nach Fixes",
+      "commit": "19890a4",
+      "at": "2026-10-19T06:59:00Z"
+    },
+    {
+      "command": "npm run typecheck / lint / test / build (auf G-01-Stapel fd4b1f7, enthält B-01 81aa6ce und B-04 19890a4)",
+      "result": "passed",
+      "detail": "alle vier Exit 0, 702/702",
+      "commit": "19890a4",
+      "at": "2026-10-19T07:11:00Z"
+    }
+  ],
+  "known_issues": [
+    "Baut auf B-01 (#84) auf; PR enthält dessen Commit, Merge erst nach #84",
+    "tsconfig.test.json: Include direkt vor lib/product-resolver.ts – F-01 (zweite Sitzung) fügt direkt danach ein, trivialer Konflikt möglich"
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/86",
+    "state": "merged",
+    "merge_commit": "90f3737",
+    "ci": "green"
+  },
+  "approval": {
+    "reviewer": "approved",
+    "operator": "approved",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "CI auf #86 abwarten"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-19T06:59:00Z",
+    "checkpoint_reason": "other",
+    "last_commit": "19890a4",
+    "active_branch": "claude/B-04-department-contract",
+    "state_summary": "PR #86 gemergt (90f3737) und deployed",
+    "decisions_made": [
+      "Planung, Implementierung und Kriterien im Solo-Betrieb durch Claude"
+    ],
+    "test_status": "volle Prüfungen grün",
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
+  },
+  "revision": 7,
+  "based_on_commit": "af7f39b",
+  "updated_at": "2026-10-23T14:00:00Z",
+  "log": [
+    {
+      "at": "2026-10-19T06:25:00Z",
+      "actor": "claude-code",
+      "action": "created",
+      "summary": "B-04 geplant und implementiert (Solo-Betrieb), Commit cb74eb9",
+      "commit": "cb74eb9"
+    },
+    {
+      "at": "2026-10-19T06:33:00Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Volle Prüfungen grün, Draft-PR #86 (gestapelt auf #84)",
+      "commit": "cb74eb9"
+    },
+    {
+      "at": "2026-10-19T06:59:00Z",
+      "actor": "claude-code",
+      "action": "review_received",
+      "summary": "Review zweite Sitzung (PR #86 Kommentar): approve mit 2 minor, 5 nit",
+      "commit": "cb74eb9"
+    },
+    {
+      "at": "2026-10-19T06:59:00Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "Alle Befunde behoben; B-01-Fixes per Merge 40a6b27",
+      "commit": "19890a4"
+    },
+    {
+      "at": "2026-10-19T11:34:00Z",
+      "actor": "claude-code",
+      "action": "review_received",
+      "summary": "Review zweite Sitzung (PR #86): approve nach Nachprüfung; alle Befunde geschlossen",
+      "commit": "19890a4"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #86 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
+    },
+    {
+      "at": "2026-10-23T14:00:00Z",
+      "actor": "claude-code",
+      "action": "deployed",
+      "summary": "Deployed: Merge 90f3737 (über #112) im READY-Production-Deployment dpl_2wjFdr1HMy64ccezERnSJpS76Mtn; D-05-Nachweis in docs/PROJECT_STATUS.md §2. Nicht live geprüft; Schalter unverändert.",
+      "commit": "90f3737"
+    }
+  ]
+}

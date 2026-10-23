@@ -1,0 +1,232 @@
+{
+  "schema_version": 1,
+  "task_id": "B-05",
+  "title": "Budgetwächter: Reservierung vor dem Aufruf, Abrechnung danach, unklarer Status hält die Reservierung",
+  "module": "enterprise-ledger",
+  "phase": "B",
+  "status": "deployed",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "operator",
+  "base_commit": "a8aef79",
+  "branch": "claude/B-05-budget-guard",
+  "depends_on": [
+    "B-03"
+  ],
+  "claims": {
+    "paths": [
+      "lib/enterprise/tasks/budget.ts",
+      "tests/enterprise-budget-guard.test.cjs",
+      "lib/enterprise/tasks/repository.ts"
+    ],
+    "hot_files": [
+      "tsconfig.test.json"
+    ],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Budgetperiode = Kalendermonat Europe/Berlin",
+      "verification": "Tests an Monatsgrenzen",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Reservierung nur für laufende Aufgaben (Zeilensperre), Abteilung aus dem Aufgabenbuch, gegen Aufgaben- und Monatsbudget (Advisory-Lock); ungültige Eingaben/Grenzen ⇒ keine Reservierung",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Abgerechnet zählt der echte Betrag (Überschreitung sichtbar), freigegeben zählt nicht; nur einmal abrechenbar",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-4",
+      "criterion": "outcome_unknown ⇒ disputed; disputed zählt weiter, wird nie freigegeben, nur mit echtem Betrag aufgelöst; Freigabe bei outcome_unknown-Aufgabe gesperrt",
+      "verification": "Tests + Gegentest",
+      "met": true
+    },
+    {
+      "id": "AC-5",
+      "criterion": "completeTask rechnet offene Reservierungen in derselben Transaktion ab; reclaimExpired setzt sie auf disputed; Rollback lässt sie unverändert",
+      "verification": "Tests + Gegentest",
+      "met": true
+    },
+    {
+      "id": "AC-6",
+      "criterion": "Nicht eingebunden; keine Umgebungsvariablen/Netz",
+      "verification": "Isolationstest",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 300,
+    "notes": "Solo-Betrieb, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "lib/enterprise/tasks/budget.ts",
+    "tests/enterprise-budget-guard.test.cjs",
+    "lib/enterprise/tasks/repository.ts",
+    "tests/enterprise-task-repository.test.cjs",
+    "tsconfig.test.json"
+  ],
+  "implemented": [
+    "periodOf",
+    "reserveBudget",
+    "settleReservation",
+    "releaseReservation",
+    "disputeReservation",
+    "resolveDispute",
+    "settleTaskReservations",
+    "disputeTaskReservations",
+    "committedBudget"
+  ],
+  "tests": [
+    {
+      "command": "node --test tests/enterprise-*.test.cjs tests/migration-upgrade.test.cjs",
+      "result": "passed",
+      "detail": "39/39; zwei Gegentests bestätigt",
+      "commit": "5d55d13",
+      "at": "2026-10-19T07:31:00Z"
+    },
+    {
+      "command": "npm run typecheck / lint / test / build",
+      "result": "passed",
+      "detail": "alle vier Exit 0, 713/713",
+      "commit": "5d55d13",
+      "at": "2026-10-19T07:44:00Z"
+    },
+    {
+      "command": "npm run typecheck / lint / test / build (nach B-03-Fixes)",
+      "result": "passed",
+      "detail": "alle vier Exit 0, 714/714",
+      "commit": "2f0e572",
+      "at": "2026-10-19T11:50:00Z"
+    },
+    {
+      "command": "node --test tests/enterprise-*.test.cjs",
+      "result": "passed",
+      "detail": "39/39; Gegentests rot",
+      "commit": "6fd5837",
+      "at": "2026-10-19T17:08:15Z"
+    },
+    {
+      "command": "npm run lint && npm test && npm run build && npm run typecheck (Stapelspitze H-01)",
+      "result": "passed",
+      "detail": "775/775, enthält diesen Stand per Merge",
+      "commit": "7b92194",
+      "at": "2026-10-19T17:08:15Z"
+    }
+  ],
+  "known_issues": [
+    "Gestapelt auf B-03 (#90) und damit auf #84, #86, #89",
+    "Monatsgrenzen kommen vom Aufrufer, bis E-01 (budgets) existiert; Standard muss fail-closed sein (Grenze 0)",
+    "Abrechnung je Aufgabe: Gesamtverbrauch auf die älteste offene Reservierung, weitere mit 0",
+    "Nach einem Lease-Ablauf und Neuversuch zählen die Reservierungen des verlorenen Versuchs als disputed weiter (bewusst konservativ)",
+    "Nach approve gefunden (J-03): Aufgabenbudget zählte reservierte statt abgerechnete Beträge bei Wiederholungen; behoben 4fd38be"
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/91",
+    "state": "merged",
+    "merge_commit": "90f3737",
+    "ci": "green"
+  },
+  "approval": {
+    "reviewer": "pending",
+    "operator": "approved",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Keiner im Code; eine Aktivierung (Schalter, Cron-Eintrag) entscheidet nur der Betreiber"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-20T06:01:52Z",
+    "checkpoint_reason": "other",
+    "last_commit": "4fd38be",
+    "active_branch": "claude/B-05-budget-guard",
+    "state_summary": "PR #91 gemergt (90f3737) und deployed",
+    "decisions_made": [
+      "Abrechnung im Repository in derselben Transaktion wie das Ergebnis",
+      "Verlorene Worker ⇒ disputed"
+    ],
+    "test_status": "39/39 gezielt",
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
+  },
+  "revision": 9,
+  "based_on_commit": "7502b48",
+  "updated_at": "2026-10-23T14:00:00Z",
+  "log": [
+    {
+      "at": "2026-10-19T07:31:00Z",
+      "actor": "claude-code",
+      "action": "created",
+      "summary": "B-05 geplant und implementiert (Solo-Betrieb), Commit 5d55d13",
+      "commit": "5d55d13"
+    },
+    {
+      "at": "2026-10-19T07:44:00Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Volle Prüfung grün (713/713), Draft-PR #91",
+      "commit": "5d55d13"
+    },
+    {
+      "at": "2026-10-19T11:34:00Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "B-03-Fixes per Merge; budget.ts auf DB-Uhr, Reservierung nur bei gültiger Lease",
+      "commit": "2f0e572"
+    },
+    {
+      "at": "2026-10-19T17:08:15Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "Review #91 (2 major) behoben: Reservierung an Lease (Halter+Fencing) gebunden, Monat aus DB-Uhr; Nachprüfung offen",
+      "commit": "6fd5837"
+    },
+    {
+      "at": "2026-10-19T18:45:08Z",
+      "actor": "claude-code",
+      "action": "approved",
+      "summary": "Nachprüfung zweite Sitzung: approve",
+      "commit": "6fd5837"
+    },
+    {
+      "at": "2026-10-20T06:01:52Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "Aufgabenbudget zählt abgerechnete Versuche zum echten Betrag (gefunden durch J-03)",
+      "commit": "4fd38be"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #91 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
+    },
+    {
+      "at": "2026-10-23T14:00:00Z",
+      "actor": "claude-code",
+      "action": "deployed",
+      "summary": "Deployed: Merge 90f3737 (über #112) im READY-Production-Deployment dpl_2wjFdr1HMy64ccezERnSJpS76Mtn; D-05-Nachweis in docs/PROJECT_STATUS.md §2. Nicht live geprüft; Schalter unverändert.",
+      "commit": "90f3737"
+    }
+  ]
+}

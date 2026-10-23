@@ -1,0 +1,205 @@
+{
+  "schema_version": 1,
+  "task_id": "E-07",
+  "title": "ControllingSnapshot (lesender Datenvertrag) und Anzeige in der 2D-Betriebsübersicht",
+  "module": "controlling-snapshot",
+  "phase": "E",
+  "status": "deployed",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "operator",
+  "base_commit": "a398e5a",
+  "branch": "claude/E-07-controlling-snapshot",
+  "depends_on": [
+    "E-03",
+    "E-06"
+  ],
+  "claims": {
+    "paths": [
+      "lib/enterprise/controlling/snapshot.ts",
+      "tests/controlling-snapshot.test.cjs"
+    ],
+    "hot_files": [
+      "lib/reporting/operations.ts",
+      "app/operations-panel.tsx",
+      "tsconfig.test.json"
+    ],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Berliner Kalendermonat als Periode",
+      "verification": "Test",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Leeres Kostenbuch: alle Abteilungen sichtbar, keine erfundenen Zahlen (null statt 0)",
+      "verification": "PGlite-Test",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Summen je Abteilung und Art; unbekannte Beträge machen die Summe zur Untergrenze; nicht zugeordnete Agenten/Kosten getrennt",
+      "verification": "PGlite-Test",
+      "met": true
+    },
+    {
+      "id": "AC-4",
+      "criterion": "Fehlende Tabellen ⇒ Teil unavailable; nur SELECT in READ-ONLY-Transaktion",
+      "verification": "Test mit Fake-DB",
+      "met": true
+    },
+    {
+      "id": "AC-5",
+      "criterion": "Nur die Betriebsübersicht nutzt den Vertrag",
+      "verification": "Isolationstest",
+      "met": true
+    },
+    {
+      "id": "AC-6",
+      "criterion": "Betriebsübersicht liefert controlling; Anzeige mit keine Daten / unbekannt / mind. / nicht verfügbar",
+      "verification": "Test",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 300,
+    "notes": "Solo-Betrieb, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "lib/enterprise/controlling/snapshot.ts",
+    "tests/controlling-snapshot.test.cjs",
+    "lib/reporting/operations.ts",
+    "app/operations-panel.tsx",
+    "tsconfig.test.json"
+  ],
+  "implemented": [
+    "readControllingSnapshot",
+    "controllingSnapshotSchema",
+    "berlinMonth",
+    "Anzeige Controlling in der Betriebsübersicht"
+  ],
+  "tests": [
+    {
+      "command": "node --test tests/controlling-snapshot.test.cjs tests/operations.test.cjs tests/admin-session.test.cjs tests/architecture.test.cjs",
+      "result": "passed",
+      "detail": "42/42 gezielt",
+      "commit": "e37d656",
+      "at": "2026-10-19T12:19:00Z"
+    },
+    {
+      "command": "npm run typecheck && npm run lint && npm test && npm run build",
+      "result": "passed",
+      "detail": "volle Prüfung im Hauptcheckout, 715/715; erster Typecheck rot nur wegen veralteter .next/types (B-07-Build), nach Build grün",
+      "commit": "c339877",
+      "at": "2026-10-19T16:13:02Z"
+    },
+    {
+      "command": "node --test tests/controlling-snapshot.test.cjs",
+      "result": "passed",
+      "detail": "6/6",
+      "commit": "098f427",
+      "at": "2026-10-19T17:08:15Z"
+    },
+    {
+      "command": "npm run lint && npm test && npm run build && npm run typecheck (Stapelspitze H-01)",
+      "result": "passed",
+      "detail": "775/775, enthält diesen Stand per Merge",
+      "commit": "7b92194",
+      "at": "2026-10-19T17:08:15Z"
+    }
+  ],
+  "known_issues": [
+    "Gestapelt auf E-03 (#93) mit E-06 (#88) per Merge",
+    "Liest model_calls im laufenden Monat bei jedem Aufruf der Betriebsübersicht (lesend, begrenzt)",
+    "Deckungsbeitrag (E-05) noch nicht angezeigt"
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/100",
+    "state": "merged",
+    "merge_commit": "90f3737",
+    "ci": "green"
+  },
+  "approval": {
+    "reviewer": "approved",
+    "operator": "approved",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Volle Prüfung, Draft-PR"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-19T18:45:08Z",
+    "checkpoint_reason": "other",
+    "last_commit": "43873e3",
+    "active_branch": "claude/E-07-controlling-snapshot",
+    "state_summary": "PR #100 gemergt (90f3737) und deployed",
+    "decisions_made": [
+      "Keine erfundene Null: null/unbekannt/mind./nicht verfügbar"
+    ],
+    "test_status": "voll 715/715",
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
+  },
+  "revision": 6,
+  "based_on_commit": "77c26e8",
+  "updated_at": "2026-10-23T14:00:00Z",
+  "log": [
+    {
+      "at": "2026-10-19T12:19:00Z",
+      "actor": "claude-code",
+      "action": "created",
+      "summary": "E-07 geplant und implementiert, Commits 8910edb, e37d656",
+      "commit": "e37d656"
+    },
+    {
+      "at": "2026-10-19T16:13:02Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Draft-PR #100 nach voller Prüfung (715/715)",
+      "commit": "c339877"
+    },
+    {
+      "at": "2026-10-19T17:08:15Z",
+      "actor": "claude-code",
+      "action": "pushed",
+      "summary": "an Mikro-Beträge angepasst (Summen einmal auf Cent, nur EUR), Test folgt Registerzuordnung executive_planner",
+      "commit": "098f427"
+    },
+    {
+      "at": "2026-10-19T18:45:08Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "Review approve; minor unassigned.revenue umgesetzt",
+      "commit": "43873e3"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #100 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
+    },
+    {
+      "at": "2026-10-23T14:00:00Z",
+      "actor": "claude-code",
+      "action": "deployed",
+      "summary": "Deployed: Merge 90f3737 (über #112) im READY-Production-Deployment dpl_2wjFdr1HMy64ccezERnSJpS76Mtn; D-05-Nachweis in docs/PROJECT_STATUS.md §2. Nicht live geprüft; Schalter unverändert.",
+      "commit": "90f3737"
+    }
+  ]
+}

@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "task_id": "B-11",
+  "title": "WhatsApp-Befehl „Executive“ (nur lesend, Schalter EXECUTIVE_WHATSAPP, Standard aus)",
+  "module": "enterprise-ledger",
+  "phase": "B",
+  "status": "deployed",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "claude-code",
+  "base_commit": "b1f492d",
+  "branch": "claude/B-11-executive-whatsapp",
+  "depends_on": [
+    "B-10"
+  ],
+  "claims": {
+    "paths": [
+      "lib/whatsapp/executive-status.ts",
+      "tests/executive-whatsapp.test.cjs"
+    ],
+    "hot_files": [
+      "app/api/whatsapp/webhook/route.ts",
+      "lib/enterprise/executive-weekly.ts",
+      "CLAUDE.md"
+    ],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Nur der genaue Befehl von der Betreibernummer, idempotent",
+      "verification": "tests/executive-whatsapp.test.cjs",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Ohne Schalter nie erreicht; mit Schalter vor Bildstopp und Router",
+      "verification": "echte Webhook-Route",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 300,
+    "notes": "Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "lib/whatsapp/executive-status.ts",
+    "app/api/whatsapp/webhook/route.ts",
+    "lib/enterprise/executive-weekly.ts",
+    "CLAUDE.md",
+    "tests/executive-whatsapp.test.cjs",
+    "tests/enterprise-executive-weekly.test.cjs"
+  ],
+  "implemented": [
+    "Fester Befehl statt Modell-Absicht (kein Modellaufruf)"
+  ],
+  "tests": [
+    {
+      "command": "npm run lint && npm test && npm run build && npm run typecheck",
+      "result": "passed",
+      "detail": "808/808",
+      "commit": "fbd5b1e",
+      "at": "2026-10-21T12:00:00Z"
+    }
+  ],
+  "known_issues": [
+    "Roadmap nannte Router-Absicht executive.*; bewusst fester Befehl"
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/117",
+    "state": "merged",
+    "merge_commit": "4c976e7",
+    "ci": "green"
+  },
+  "approval": {
+    "reviewer": "pending",
+    "operator": "approved",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Keiner im Code; eine Aktivierung (Schalter, Cron-Eintrag) entscheidet nur der Betreiber"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-21T12:00:00Z",
+    "checkpoint_reason": "other",
+    "last_commit": "fbd5b1e",
+    "active_branch": "claude/B-11-executive-whatsapp",
+    "state_summary": "PR #117 gemergt (4c976e7) und deployed",
+    "decisions_made": [],
+    "test_status": "808/808",
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
+  },
+  "revision": 3,
+  "based_on_commit": "ca0cf80",
+  "updated_at": "2026-10-23T14:00:00Z",
+  "log": [
+    {
+      "at": "2026-10-21T12:00:00Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Draft-PR #117 offen (Freigabe Betreiber 21.10.)",
+      "commit": "fbd5b1e"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #117 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert.",
+      "commit": "4c976e7"
+    },
+    {
+      "at": "2026-10-23T14:00:00Z",
+      "actor": "claude-code",
+      "action": "deployed",
+      "summary": "Deployed: Merge 4c976e7 (über #117) im READY-Production-Deployment dpl_HZfbFtz7if4ou7xgfuXxhfH2RjTC; D-05-Nachweis in docs/PROJECT_STATUS.md §2. Nicht live geprüft; Schalter unverändert.",
+      "commit": "4c976e7"
+    }
+  ]
+}

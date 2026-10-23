@@ -1,0 +1,223 @@
+{
+  "schema_version": 1,
+  "task_id": "F-04",
+  "title": "Wirtschaftlichkeitsrechnung: F-01-Bewertung mit E-05-Kennzahlen verbinden (reine Funktionen)",
+  "module": "opportunity",
+  "phase": "F",
+  "status": "deployed",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "operator",
+  "base_commit": "d421f2b",
+  "based_on_commit": "c56711e",
+  "branch": "claude/F-04-opportunity-economics",
+  "depends_on": [
+    "F-01",
+    "E-05"
+  ],
+  "claims": {
+    "paths": [
+      "lib/enterprise/opportunity/economics.ts",
+      "tests/enterprise-opportunity-economics.test.cjs"
+    ],
+    "hot_files": [
+      "tsconfig.test.json"
+    ],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Reine Funktion assessEconomics, deterministisch, Eingaben unverändert; gemessene Kennzahlen nur über E-05 (contributionMargin, simpleRoi, simplePayback)",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Prognose der Amortisation immer als Spanne aus Investitionsbedarf und Gewinnspanne mit offengelegter Formel; niedrigster Gewinn <= 0 => highMonths null; höchster Gewinn <= 0 => unknown",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Fehlende/ungültige Rasterkriterien, falsche Einheiten (Währungscode bzw. <Währung>/Monat), Währungsmix, Bruchteile von Cent => unknown mit Grund, nie geschätzt",
+      "verification": "Tabellentests",
+      "met": true
+    },
+    {
+      "id": "AC-4",
+      "criterion": "Schätzungen nie in ROI/Amortisation, Prognosen nie in gemessene Werte",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-5",
+      "criterion": "Urteil nur gegen versionierte Betreibergrenze maxPaybackMonths (Q-07); ohne Grenze no_operator_limit; Messung vor Prognose; Prognose nach ungünstigem Ende",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-6",
+      "criterion": "testRecommended nur wenn F-01 recommend_test und Urteil within_limit; nie eine Freigabe",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-7",
+      "criterion": "Nur ../controlling/metrics und ./scoring importiert, keine Uhr/Env/Netz/DB, nicht in App-Code eingebunden",
+      "verification": "Isolationstest",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 350,
+    "notes": "Solo-Betrieb, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "lib/enterprise/opportunity/economics.ts",
+    "tests/enterprise-opportunity-economics.test.cjs",
+    "tsconfig.test.json"
+  ],
+  "implemented": [
+    "assessEconomics: getrennte Spalten gemessen/prognostiziert/Bewertung, Urteil gegen Betreibergrenze, testRecommended"
+  ],
+  "tests": [
+    {
+      "command": "npm test",
+      "result": "passed",
+      "detail": "705/705",
+      "commit": "8e1f61f",
+      "at": "2026-10-19T12:25:00Z"
+    },
+    {
+      "command": "npm run typecheck",
+      "result": "passed",
+      "commit": "8e1f61f",
+      "at": "2026-10-19T12:25:00Z"
+    },
+    {
+      "command": "npm run lint",
+      "result": "passed",
+      "commit": "8e1f61f",
+      "at": "2026-10-19T12:25:00Z"
+    },
+    {
+      "command": "npm run build",
+      "result": "passed",
+      "commit": "8e1f61f",
+      "at": "2026-10-19T12:25:00Z"
+    },
+    {
+      "command": "npm test (zweite Sitzung)",
+      "result": "passed",
+      "detail": "707/707, Build grün",
+      "commit": "22a68a2",
+      "at": "2026-10-19T17:08:15Z"
+    },
+    {
+      "command": "npm run lint && npm test && npm run build && npm run typecheck (Stapelspitze H-01)",
+      "result": "passed",
+      "detail": "775/775, enthält diesen Stand per Merge",
+      "commit": "7b92194",
+      "at": "2026-10-19T17:08:15Z"
+    }
+  ],
+  "known_issues": [
+    "Gestapelt auf #85 (F-01) und #83 (E-05); Merge erst danach",
+    "runningCosts gehen nicht in die Prognose ein (Gewinnspanne laut 02 §6 bereits Gewinn)",
+    "Ohne Q-07-Werte immer no_operator_limit / testRecommended=false",
+    "Review erste Sitzung (Kommentar #97): major – verdictFor fällt bei gemessenem Verlust/geschätzten Kosten auf die Prognose zurück ⇒ testRecommended true; 2 minor"
+  ],
+  "open_decisions": [
+    {
+      "id": "Q-07",
+      "question": "Maximale Amortisationsdauer, Gewichte und Schwellen des Bewertungsrasters festlegen",
+      "owner": "operator"
+    }
+  ],
+  "pr": {
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/97",
+    "state": "merged",
+    "merge_commit": "c29815c",
+    "ci": "green"
+  },
+  "approval": {
+    "reviewer": "approved",
+    "operator": "approved",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Nachprüfung"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-19T18:45:08Z",
+    "checkpoint_reason": "work_package_done",
+    "last_commit": "22a68a2",
+    "active_branch": "claude/F-04-opportunity-economics",
+    "state_summary": "PR #97 gemergt (c29815c) und deployed",
+    "decisions_made": [
+      "Messung schlägt Prognose; Prognose nach ungünstigem Ende beurteilt",
+      "Amortisation gemessen = Investition*Monate/Deckungsbeitrag (keine Rundung des Monatszuflusses)"
+    ],
+    "test_status": "707/707",
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
+  },
+  "revision": 6,
+  "updated_at": "2026-10-23T14:00:00Z",
+  "log": [
+    {
+      "at": "2026-10-19T12:25:00Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "F-04 implementiert, Draft-PR #97",
+      "commit": "8e1f61f"
+    },
+    {
+      "at": "2026-10-19T16:13:02Z",
+      "actor": "claude-code",
+      "action": "review_received",
+      "summary": "Review erste Sitzung: changes_requested (1 major, 2 minor); eingetragen von der ersten Sitzung",
+      "commit": "8e1f61f"
+    },
+    {
+      "at": "2026-10-19T17:08:15Z",
+      "actor": "claude-code",
+      "action": "approved",
+      "summary": "major aus Review #97 behoben (zweite Sitzung, 707/707, Build grün); Nachprüfung erste Sitzung: approve",
+      "commit": "22a68a2"
+    },
+    {
+      "at": "2026-10-19T18:45:08Z",
+      "actor": "claude-code",
+      "action": "note",
+      "summary": "unverändert approve",
+      "commit": "22a68a2"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #97 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
+    },
+    {
+      "at": "2026-10-23T14:00:00Z",
+      "actor": "claude-code",
+      "action": "deployed",
+      "summary": "Deployed: Merge c29815c (über #97) im READY-Production-Deployment dpl_5pNZgRd8tZeGnNDtbYRNL6bs1QVX; D-05-Nachweis in docs/PROJECT_STATUS.md §2. Nicht live geprüft; Schalter unverändert.",
+      "commit": "c29815c"
+    }
+  ]
+}

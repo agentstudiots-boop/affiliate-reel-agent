@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "task_id": "E-06",
+  "title": "Abteilungszuordnung der Modellaufrufe über das Register (ohne Schemaänderung)",
+  "module": "controlling-metrics",
+  "phase": "E",
+  "status": "deployed",
+  "planner": "claude-code",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "operator",
+  "base_commit": "87e665f",
+  "branch": "claude/E-06-model-call-departments",
+  "depends_on": [
+    "B-01"
+  ],
+  "claims": {
+    "paths": [
+      "lib/enterprise/controlling/agent-departments.ts",
+      "tests/enterprise-agent-departments.test.cjs"
+    ],
+    "hot_files": [
+      "tsconfig.test.json"
+    ],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Nur exakte Agentennamen werden zugeordnet (eigene Eigenschaften, kein Präfix-Raten); unbekannte Namen und toString/__proto__ ⇒ null",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "Jeder Agentenname, den der Code in model_calls aufzeichnet, ist zugeordnet; keine verwaisten Einträge",
+      "verification": "Drift-Test über app/ und lib/ inkl. Gegentest (Eintrag entfernt ⇒ Test rot)",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "allocateModelUsage summiert je Abteilung, zeigt jede Abteilung (auch mit 0) und listet nicht zugeordnete Agenten namentlich",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-4",
+      "criterion": "Fehlende Token-/Rechenzeitwerte ⇒ usageComplete=false (Summen sind Untergrenzen), keine erfundenen Werte; Rundung erst am Ende",
+      "verification": "Tests",
+      "met": true
+    },
+    {
+      "id": "AC-5",
+      "criterion": "Reines Modul: nur Register importiert, keine DB/Env/Netz, nicht in App-Code eingebunden",
+      "verification": "Isolationstest",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "npm run typecheck",
+    "npm run lint",
+    "npm test",
+    "npm run build"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": 1,
+    "target_changed_lines": 200,
+    "notes": "Solo-Betrieb, Abo-Kontingent"
+  },
+  "lease": null,
+  "waiting": null,
+  "changed_files": [
+    "lib/enterprise/controlling/agent-departments.ts",
+    "tests/enterprise-agent-departments.test.cjs",
+    "tsconfig.test.json"
+  ],
+  "implemented": [
+    "MODEL_AGENT_DEPARTMENTS (13 Agenten → affiliate)",
+    "departmentForAgent",
+    "allocateModelUsage"
+  ],
+  "tests": [
+    {
+      "command": "node --test tests/enterprise-agent-departments.test.cjs",
+      "result": "passed",
+      "detail": "5/5",
+      "commit": "18561b0",
+      "at": "2026-10-19T06:44:00Z"
+    },
+    {
+      "command": "npm run typecheck / lint / test / build",
+      "result": "passed",
+      "detail": "alle vier Exit 0, 690/690 (auf 18561b0, vor Merge der B-01-Fixes)",
+      "commit": "18561b0",
+      "at": "2026-10-19T06:59:00Z"
+    }
+  ],
+  "known_issues": [
+    "Baut auf B-01 (#84) auf; PR enthält dessen Commit, Merge erst nach #84",
+    "Alle heutigen Agenten gehören zum Affiliate-Studio, auch der WhatsApp-Router; künftige Executive-Agenten zeichnen eigene Namen auf (B-08/B-09)",
+    "Der Drift-Test kennt die Aufzeichnungsstellen namentlich; eine neue Stelle mit recordModelCall lässt ihn bewusst fehlschlagen, bis Zuordnung und Liste ergänzt sind",
+    "Gleiches Verzeichnis lib/enterprise/controlling/ wie E-05 (#83), aber andere Datei; tsconfig-Include an anderer Stelle",
+    "lib/whatsapp/video-revision.ts ruft Replicate ohne recordModelCall auf (Bestandscode, eigener PR vorgeschlagen)",
+    "Merge-Abhängigkeit zu #94 (video-revision, zweite Sitzung): der zuletzt gemergte PR bekommt den Eintrag whatsapp_video_revision: affiliate (Drift-Test prüft beide Richtungen)"
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/88",
+    "state": "merged",
+    "merge_commit": "90f3737",
+    "ci": "green"
+  },
+  "approval": {
+    "reviewer": "approved",
+    "operator": "approved",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "CI auf #88"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-19T11:34:00Z",
+    "checkpoint_reason": "other",
+    "last_commit": "c4c8f02",
+    "active_branch": "claude/E-06-model-call-departments",
+    "state_summary": "PR #88 gemergt (90f3737) und deployed",
+    "decisions_made": [
+      "Empfehlung aus 04 §E umgesetzt: Register statt Spalte department, keine Migration"
+    ],
+    "test_status": "5/5 gezielt",
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
+  },
+  "revision": 6,
+  "based_on_commit": "5dcbf75",
+  "updated_at": "2026-10-23T14:00:00Z",
+  "log": [
+    {
+      "at": "2026-10-19T06:44:00Z",
+      "actor": "claude-code",
+      "action": "created",
+      "summary": "E-06 geplant und implementiert (Solo-Betrieb), Commit 18561b0",
+      "commit": "18561b0"
+    },
+    {
+      "at": "2026-10-19T06:59:00Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Draft-PR #88 (gestapelt auf #84), B-01-Fixes per Merge 61278f4",
+      "commit": "61278f4"
+    },
+    {
+      "at": "2026-10-19T11:34:00Z",
+      "actor": "claude-code",
+      "action": "review_received",
+      "summary": "Review zweite Sitzung (PR #88): approve mit minor; Drift-Suche zu eng, mehrzeilige Aufrufe; Hinweis video-revision.ts ohne recordModelCall",
+      "commit": "61278f4"
+    },
+    {
+      "at": "2026-10-19T11:34:00Z",
+      "actor": "claude-code",
+      "action": "fixed",
+      "summary": "Suche überall, mehrzeilige routerModelCall, ungültige Zähler",
+      "commit": "c4c8f02"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #88 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
+    },
+    {
+      "at": "2026-10-23T14:00:00Z",
+      "actor": "claude-code",
+      "action": "deployed",
+      "summary": "Deployed: Merge 90f3737 (über #112) im READY-Production-Deployment dpl_2wjFdr1HMy64ccezERnSJpS76Mtn; D-05-Nachweis in docs/PROJECT_STATUS.md §2. Nicht live geprüft; Schalter unverändert.",
+      "commit": "90f3737"
+    }
+  ]
+}

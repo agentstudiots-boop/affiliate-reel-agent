@@ -1,0 +1,224 @@
+{
+  "schema_version": 1,
+  "task_id": "E-05",
+  "title": "Reine Kennzahlenfunktionen: Deckungsbeitrag, einfacher ROI und Amortisation",
+  "module": "controlling",
+  "phase": "E",
+  "status": "deployed",
+  "planner": "gpt-work",
+  "responsible": "claude-code",
+  "implementer": "claude-code",
+  "reviewer": "gpt-work",
+  "base_commit": "c56711e",
+  "branch": "claude/E-05-controlling-metrics",
+  "depends_on": [],
+  "claims": {
+    "paths": [
+      "lib/enterprise/controlling/metrics.ts",
+      "tests/enterprise-controlling-metrics.test.cjs"
+    ],
+    "hot_files": [
+      "tsconfig.test.json"
+    ],
+    "migration_numbers": []
+  },
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "criterion": "Nur reine Funktionen in metrics.ts, ohne DB, Netzwerk, Modellaufruf, Uhrzeit oder Änderungen an Eingaben. Exportierte Typen MetricResult<T> = {status:'known',value:T} | {status:'unknown',reason:string} und MoneyInput = {amountCents:number|null,currency:string,kind:'measured'|'estimated'|'forecast'}.",
+      "verification": "Tests prüfen unveränderte Eingaben und deterministische Ergebnisse; Diff auf Imports und Seiteneffekte prüfen.",
+      "met": true
+    },
+    {
+      "id": "AC-2",
+      "criterion": "contributionMargin(revenue, directCosts): Beträge nichtnegative sichere Integer-Cents; Erlös muss measured sein. Kosten einzeln measured oder estimated. Ergebnis enthält measuredRevenueCents, measuredDirectCostsCents, estimatedDirectCostsCents, contributionCents und includesEstimates; Beitrag = Erlös minus beide Kostensummen, darf negativ sein. forecast führt zu unknown, nicht stillschweigend zu Null.",
+      "verification": "10000 Erlös, 2000 measured + 1000 estimated Kosten ergibt 7000 Beitrag mit includesEstimates=true; reine Messwerte ebenfalls testen.",
+      "met": true
+    },
+    {
+      "id": "AC-3",
+      "criterion": "Fehlende Beträge, NaN/Infinity, Bruchteile von Cents, negative Eingabebeträge, Summen außerhalb safe integer und leere/abweichende Währungen liefern unknown mit verständlichem Grund. Leere Kostenliste bedeutet bestätigte Nullkosten; fehlende Kostenliste bedeutet unknown. Keine Währungsumrechnung.",
+      "verification": "Tabellentests für jeden Fehlerfall; 0 wird von null unterschieden, gemischte Währungen abgelehnt.",
+      "met": true
+    },
+    {
+      "id": "AC-4",
+      "criterion": "simpleRoi(netReturn, investment): explizit einfacher Perioden-ROI = netReturn/investment*100; netReturn ist Nettogewinn nach den zugehörigen Kosten, darf negativ sein. Beide Inputs measured, gleiche Währung, investment >0; sonst unknown. Kein annualisierter ROI und keine doppelte Subtraktion des Investments.",
+      "verification": "netReturn 2000, investment 10000 ergibt 20; -2000 ergibt -20; Nullinvestment und nicht gemessene Werte unknown. Dokumentiert gleiche Bezugsperiode als Aufruferpflicht.",
+      "met": true
+    },
+    {
+      "id": "AC-5",
+      "criterion": "simplePayback(investment, monthlyNetInflow): einfache statische Amortisation in Monaten = investment/monthlyNetInflow, beide measured, investment >=0, monthlyNetInflow >0, gleiche Währung. Bei <=0 Monatszufluss unknown, auch bei investment=0; sonst investment=0 ergibt 0 Monate. Kein Zinseszins, keine Renditeprognose.",
+      "verification": "120000/10000 ergibt 12 Monate; Null/negative Zuflüsse unknown; Grenzfall Nullinvestment prüfen.",
+      "met": true
+    },
+    {
+      "id": "AC-6",
+      "criterion": "ROI/Amortisation liefern ungerundete endliche number-Werte; Anzeige-Rundung ist nicht Teil dieses Moduls. Geld-Cents bleiben sichere Integer. Kein Resultat wird als umfassender Unternehmensgewinn dargestellt; Deckungsbeitrag enthält nur übergebene direkte Kosten.",
+      "verification": "Bruchwerte mit Toleranz testen; overflow und nichtendliche Resultate unknown.",
+      "met": true
+    },
+    {
+      "id": "AC-7",
+      "criterion": "Nur metrics.ts und Testdatei sowie genau der eigene Include-Eintrag lib/enterprise/controlling/metrics.ts in tsconfig.test.json. Kein Import in App/Produktionspfade. Nicht B-01-Dateien bearbeiten. Wenn lib/enterprise/**/*.ts bereits enthalten ist, keinen redundanten Include hinzufügen.",
+      "verification": "Diff und vorhandene parallele PRs prüfen; Include mit B-01 abgleichen.",
+      "met": true
+    },
+    {
+      "id": "AC-8",
+      "criterion": "Tests laden die echte kompilierte Implementierung; keine nachgebauten Formeln im Test statt Funktionsaufruf. Keine echten Anbieteraufrufe. Draft-PR, kein Merge und keine Aktivierung.",
+      "verification": "Gezielte Tests, dann Projektprüfungen vor PR; GPT prüft den Commit unabhängig.",
+      "met": true
+    }
+  ],
+  "test_requirements": [
+    "Gezielte Tests für reale metrics.ts-Funktionen und alle AC-Grenzfälle",
+    "Vor Code-PR: npm run typecheck, npm run lint, npm test, npm run build gemäß Projektregeln"
+  ],
+  "budget": {
+    "paid_runtime_calls_allowed": false,
+    "max_cost_cents": 0,
+    "max_sessions": null,
+    "target_changed_lines": 300,
+    "notes": "Nur bestehende Abo-Kontingente; keine zusätzlichen Credits."
+  },
+  "lease": null,
+  "changed_files": [
+    "lib/enterprise/controlling/metrics.ts",
+    "tests/enterprise-controlling-metrics.test.cjs",
+    "tsconfig.test.json"
+  ],
+  "implemented": [
+    "contributionMargin: Deckungsbeitrag mit getrennt ausgewiesenen gemessenen/geschätzten direkten Kosten",
+    "simpleRoi: einfacher Perioden-ROI in Prozent",
+    "simplePayback: statische Amortisation in Monaten",
+    "MetricResult known/unknown mit Grund; Validierung von Betrag, Währung, Werteart, sicherem Zahlenbereich"
+  ],
+  "tests": [
+    {
+      "command": "node --test tests/enterprise-controlling-metrics.test.cjs",
+      "result": "passed",
+      "detail": "9/9",
+      "commit": "b2eef4c",
+      "at": "2026-10-19T06:10:00Z"
+    },
+    {
+      "command": "npm run typecheck",
+      "result": "passed",
+      "commit": "b2eef4c",
+      "at": "2026-10-19T06:10:00Z"
+    },
+    {
+      "command": "npm run lint",
+      "result": "passed",
+      "commit": "b2eef4c",
+      "at": "2026-10-19T06:10:00Z"
+    },
+    {
+      "command": "npm test",
+      "result": "passed",
+      "detail": "685/685",
+      "commit": "b2eef4c",
+      "at": "2026-10-19T06:10:00Z"
+    },
+    {
+      "command": "npm run build",
+      "result": "passed",
+      "commit": "b2eef4c",
+      "at": "2026-10-19T06:10:00Z"
+    },
+    {
+      "command": "Review zweite Claude-Sitzung (PR-Kommentar) + Nachbesserung",
+      "result": "passed",
+      "detail": "approve, 1 minor + 3 nits in 074546a umgesetzt; E-05-Tests 10/10",
+      "commit": "074546a",
+      "at": "2026-10-19T06:25:00Z"
+    }
+  ],
+  "known_issues": [
+    "tsconfig.test.json: späterer B-01-PR ergänzt dieselbe Stelle (trivialer Konflikt)",
+    "Solo-Betrieb: kein unabhängiges Zweitmodell-Review; GPT darf optional nachprüfen"
+  ],
+  "open_decisions": [],
+  "pr": {
+    "url": "https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/83",
+    "state": "merged",
+    "merge_commit": "c29815c",
+    "ci": "green"
+  },
+  "approval": {
+    "reviewer": "approved",
+    "operator": "approved",
+    "latest_review_file": null
+  },
+  "next_steps": [
+    "Keiner im Code; eine Aktivierung (Schalter, Cron-Eintrag) entscheidet nur der Betreiber"
+  ],
+  "session": {
+    "system": "claude-code",
+    "last_checkpoint_at": "2026-10-19T06:10:00Z",
+    "checkpoint_reason": "work_package_done",
+    "last_commit": "b2eef4c",
+    "active_branch": "claude/E-05-controlling-metrics",
+    "state_summary": "PR #83 gemergt (c29815c) und deployed",
+    "decisions_made": [
+      "MoneyInput erlaubt negative Beträge; Domänenprüfung je Funktion"
+    ],
+    "test_status": "685/685, typecheck/lint/build ok",
+    "next_action": "keine (Aktivierung nur durch Betreiber)"
+  },
+  "revision": 7,
+  "updated_at": "2026-10-23T14:00:00Z",
+  "log": [
+    {
+      "at": "2026-10-19T05:40:52.550Z",
+      "actor": "gpt-work",
+      "action": "created",
+      "summary": "E-05 als konkreten Programmierauftrag mit Schnittstellen und Grenzfalltests geplant."
+    },
+    {
+      "at": "2026-10-19T05:48:57Z",
+      "actor": "claude-code",
+      "action": "lease_acquired",
+      "summary": "Lease generation 1 (kooperatives Protokoll 05 §6) nach ausdrücklicher Betreiberfreigabe zur isolierten Programmierarbeit an E-05",
+      "commit": "3cd4ce8"
+    },
+    {
+      "at": "2026-10-19T06:10:00Z",
+      "actor": "claude-code",
+      "action": "pr_opened",
+      "summary": "Implementierung b2eef4c, Draft-PR #83 gegen main, alle Prüfungen grün",
+      "commit": "b2eef4c"
+    },
+    {
+      "at": "2026-10-19T06:15:00Z",
+      "actor": "claude-code",
+      "action": "note",
+      "summary": "Solo-Betrieb: Lease entfällt; Prüfung durch Betreiber-Merge und CI, GPT optional",
+      "commit": null
+    },
+    {
+      "at": "2026-10-19T06:25:00Z",
+      "actor": "claude-code",
+      "action": "review_received",
+      "summary": "Review zweite Claude-Sitzung (gleiches Modell, kein Zweitmodell): approve; Befunde in 074546a umgesetzt",
+      "commit": "074546a"
+    },
+    {
+      "at": "2026-10-22T15:20:00Z",
+      "actor": "claude-code",
+      "action": "merged",
+      "summary": "PR #83 auf main gemergt (Betreiberfreigabe 21.10.2026, Merge durch Session 1). Schalter bleiben aus; deployed laut D-05 der zweiten Sitzung, nicht live verifiziert."
+    },
+    {
+      "at": "2026-10-23T14:00:00Z",
+      "actor": "claude-code",
+      "action": "deployed",
+      "summary": "Deployed: Merge c29815c (über #97) im READY-Production-Deployment dpl_5pNZgRd8tZeGnNDtbYRNL6bs1QVX; D-05-Nachweis in docs/PROJECT_STATUS.md §2. Nicht live geprüft; Schalter unverändert.",
+      "commit": "c29815c"
+    }
+  ],
+  "based_on_commit": "f8dbcba",
+  "waiting": null
+}
