@@ -110,8 +110,9 @@ Deployment-IDs je Merge stehen in `docs/PROJECT_STATUS.md` §2.
 
 ## 3. Nachweis der Migrationen 039–042
 
-- **039–041:** waren vor dem 22.10. bereits in `schema_migrations` eingetragen. Ein Aufruf durch den Betreiber meldete sie als
-  vorhanden.
+- **039–041:** waren am 22.10. vor 15:50:56 UTC bereits in `schema_migrations` eingetragen. Der Aufruf des Betreibers meldete sie
+  als vorhanden (Log `alreadyApplied`). Der genaue Zeitpunkt ihrer Anwendung ist nicht belegt; wahrscheinlich war es der erste
+  Cron- oder Webhook-Aufruf nach dem Merge am 21.10.
 - **042:** am **22.10.2026 um 15:50:56 UTC** angewendet. Der Betreiber hat sie angemeldet über `/api/admin/migrate` ausgelöst; der
   Production-Laufzeitlog `database_migration` meldet `applied: ["042_opportunities.sql"]`. Die zweite Sitzung hat den Log
   ausgelesen, nur lesend.
