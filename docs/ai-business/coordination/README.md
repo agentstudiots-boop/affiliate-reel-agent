@@ -110,6 +110,17 @@ Mit Freigabe des Betreibers (21.10.: „Claude merged“) hat Session 1 alle Roa
 - **Aufgabenstand:** Die 31 Aufgaben mit gemergtem PR stehen in `tasks/<ID>/task.json` auf `merged`. Für I-01 und J-05 gibt es keine eigene
   Übergabedatei; ihr Stand steht in den PRs #115 und #116.
 
+## Stand 23.10.2026: DIAG-MODEL Stufe B
+
+- **Erste Diagnosedaten** (daily-draft 07 UTC): Zwei Antworten waren gültiges JSON, aber je ein Freitextfeld war zu lang.
+  - Strategie-`reason`: too_big, Grenze 600
+  - `imageSpec.composition`: too_big, Grenze 240
+- **#125** (Freigabe des Betreibers am 23.10.), gemergt als `07f3987`:
+  - Felder, die ein Schema als weich markiert, werden an der Wortgrenze auf die Schema-eigene Grenze gekürzt. Das gilt nur, wenn jeder Fehler der Antwort „zu lang“ in einem markierten Feld ist; sonst wird die Antwort wie bisher verworfen.
+  - Markiert sind nur `reason` und `imageSpec.composition`. Veröffentlichte Texte werden nie gekürzt.
+  - Die zweite Sitzung hat reviewt (approve). Optionaler Nit „…“ wird nicht übernommen.
+- **Weiter:** Die zweite Sitzung zählt ab dem daily-draft 16 UTC, wie oft gekürzt wird und welche Fehler bleiben. Weitere Felder kommen nur nach Einzelprüfung dazu.
+
 ## Stand 22.10.2026, abends: Nachzüge, Sicherheitsupdate, Diagnose
 
 - **#121** Doku-Nachzug (`CLAUDE.md`, `docs/PROJECT_STATUS.md`), gemergt als `c677759`.
