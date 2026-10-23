@@ -4,6 +4,7 @@ import type { Generator } from "./agent";
 import { editorialPolicy } from "./agent";
 import { predictionText } from "../whatsapp/instruction";
 import { jsonShape, providerState, schemaIssues, schemaKeys } from "./model-diagnostics";
+import { trimSoftLimits } from "./soft-limits";
 
 const MODEL = "openai/gpt-4.1";
 export const EDITORIAL_MODEL_ERROR = "Der KI-Entwurf konnte nicht sicher geprüft werden. Keine automatische Freigabe oder Veröffentlichung.";
@@ -103,7 +104,17 @@ export function createGenerator(options: { mode: "reference" | "ai"; signal?: Ab
       answer=output;
       let json:unknown;
       try{json=JSON.parse(output.trim().replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,""));}catch{throw new OutputJsonError("Modellantwort ist kein JSON.");}
-      const parsed=schema.parse(json);
+      let checked=schema.safeParse(json);
+      if(!checked.success){
+        // Only too-long free text in fields the schema names as soft is cut to the schema's own limit (soft-limits.ts).
+        const trimmed=trimSoftLimits(schema,json,checked.error);
+        if(trimmed){
+          checked=schema.safeParse(trimmed.value);
+          if(checked.success)console.info(JSON.stringify({event:"editorial_model_soft_trim",agent,model:MODEL,paths:trimmed.paths}));
+        }
+        if(!checked.success)throw checked.error;
+      }
+      const parsed=checked.data;
       await recordModelCall({agent:`content_${agent}`,model:MODEL,ok:true,latencyMs:Date.now()-started,...predictionMetrics(prediction)});
       return parsed;
     }catch(error){
