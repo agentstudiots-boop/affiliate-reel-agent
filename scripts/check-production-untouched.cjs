@@ -49,7 +49,7 @@ function diffSnapshots(before, after) {
 
 async function readOnly(url, fn) {
   const { Pool } = require('pg');
-  const pool = new Pool({ connectionString: url, max: 1, connectionTimeoutMillis: 10000, statement_timeout: 10000 });
+  const pool = new Pool({ connectionString: require('./connection-string.cjs').strictSslConnectionString(url), max: 1, connectionTimeoutMillis: 10000, statement_timeout: 10000 });
   const client = await pool.connect();
   try {
     await client.query('BEGIN READ ONLY');
