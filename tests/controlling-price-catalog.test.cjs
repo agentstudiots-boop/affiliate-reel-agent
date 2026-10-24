@@ -119,7 +119,7 @@ test('listPrices at a moment selects exactly the price the importer uses (PRICE_
   await db.close();
 });
 
-test('module is isolated: writes only price_catalog, reads no clock or network, not used by app code (AC-6)',()=>{
+test('module is isolated: writes only price_catalog, reads no clock or network, used only by the operator price route (AC-6)',()=>{
   const source=fs.readFileSync('lib/enterprise/controlling/price-catalog.ts','utf8');
   assert.deepEqual([...source.matchAll(/from\s+"([^"]+)"/g)].map(m=>m[1]).sort(),['../../memory/db','./manual-entries','node:crypto']);
   assert.deepEqual([...new Set([...source.matchAll(/(?:INSERT INTO|UPDATE|DELETE FROM)\s+(\w+)/g)].map(m=>m[1]))],['price_catalog']);
@@ -134,7 +134,7 @@ test('module is isolated: writes only price_catalog, reads no clock or network, 
   }};
   walk('app');walk('lib');walk('scripts');
   for(const file of fs.readdirSync('.'))if(/\.(ts|tsx)$/.test(file))scan(file);
-  assert.deepEqual(users,[]);
+  assert.deepEqual(users,[path.join('app','api','controlling','prices','route.ts')]);
   // The pattern sees imports in every form, but not a mention in a comment.
   for(const used of ['import { addPrice } from "./price-catalog";',"const P=require('../lib/enterprise/controlling/price-catalog');",'await import("@/lib/enterprise/controlling/price-catalog.ts")'])
     assert.match(used,USE,used);

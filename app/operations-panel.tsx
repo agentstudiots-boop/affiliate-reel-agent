@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PriceCatalogPanel } from "./price-catalog-panel";
 
 type Snapshot = {
   environment: "production" | "preview_or_local";
@@ -101,6 +102,7 @@ export function OperationsPanel() {
             <td>{ledgerAmount(row.revenue?.measured, data.controlling?.parts.revenue)}</td></tr>)}
         </tbody></table></div>}
       <p className="muted">Controlling: nur erfasste Einträge mit Quelle. „unbekannt“ = Einträge ohne bekannten Betrag; „mind.“ = Summe ohne die unbekannten Beträge.</p>
+      <PriceCatalogPanel />
       {data.latestReport && <details><summary>Letzte Wochenbilanz · {data.latestReport.weekStart} · {data.latestReport.status}</summary><pre style={{whiteSpace:"pre-wrap"}}>{data.latestReport.text || "Bericht noch nicht erstellt."}</pre></details>}
       <p className="muted">Klicks, Verkäufe und Provisionen stammen aus erfassten Messständen. Zum Eintragen: „Gespeicherten Verlauf laden“, den Job wählen und dessen Leistungsformular öffnen. Ohne PartnerNet-Daten sind diese Werte unbekannt. Die Werte einer Beitragszeile sind der letzte Messstand dieses Beitrags, keine Tageswerte.</p>
     </>}
