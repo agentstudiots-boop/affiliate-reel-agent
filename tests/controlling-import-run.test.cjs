@@ -59,9 +59,10 @@ test('a price entered later fills only the unknown amounts',async()=>{
   await db.close();
 });
 
-test('rollout switch: off by default, environment wins in both directions',()=>{
-  assert.equal(ROLLOUT.CONTROLLING_IMPORT_ENABLED,'false');
-  assert.equal(switchOn('CONTROLLING_IMPORT_ENABLED',{}),false);
+test('rollout switch: on by rollout (27.10.2026), environment wins in both directions („false“ is the emergency stop)',()=>{
+  assert.equal(ROLLOUT.CONTROLLING_IMPORT_ENABLED,'true');
+  assert.equal(switchOn('CONTROLLING_IMPORT_ENABLED',{}),true);
+  assert.equal(switchOn('CONTROLLING_IMPORT_ENABLED',{CONTROLLING_IMPORT_ENABLED:'false'}),false,'emergency stop without a code deployment');
   assert.equal(switchOn('CONTROLLING_IMPORT_ENABLED',{CONTROLLING_IMPORT_ENABLED:'true'}),true);
   assert.equal(switchSource('CONTROLLING_IMPORT_ENABLED',{}),'rollout');
   assert.equal(switchSource('CONTROLLING_IMPORT_ENABLED',{CONTROLLING_IMPORT_ENABLED:'false'}),'env');
@@ -74,4 +75,53 @@ test('the cron route checks the secret first, then the switch, then the environm
   assert.ok(order.every((pos,i)=>pos>0&&(i===0||pos>order[i-1])),String(order));
   const crons=JSON.parse(fs.readFileSync('vercel.json','utf8')).crons.filter(c=>c.path==='/api/cron/controlling-import');
   assert.equal(crons.length,1);
+});
+
+// Rollout 27.10.2026: the real cron and price routes with only their I/O replaced.
+const loadRoute=require('./helpers/load-route.cjs');
+const withEnv=async(env,fn)=>{const saved={};for(const k of Object.keys(env)){saved[k]=process.env[k];if(env[k]===undefined)delete process.env[k];else process.env[k]=env[k];}
+  try{return await fn();}finally{for(const k of Object.keys(saved)){if(saved[k]===undefined)delete process.env[k];else process.env[k]=saved[k];}}};
+function cronRoute(db,guard){
+  const calls={db:0};
+  const mod=loadRoute('app/api/cron/controlling-import/route.ts',{'@/lib/memory/db':{getDatabase:()=>{calls.db++;return db;}},
+    ...(guard?{'@/lib/security/runtime-guard':{effectDecision:()=>({ok:true})}}:{})});
+  const get=(secret='s3cret')=>mod.GET(new Request('https://example.test/api/cron/controlling-import',{headers:{authorization:`Bearer ${secret}`}}));
+  return {get,calls};
+}
+
+test('cron route after the rollout: imports in production; "false" in the environment stops it without database access; preview never runs',async()=>{
+  const db=await pgliteDatabase();
+  await call(db,{});
+  const info=console.info;console.info=()=>{};
+  try{
+    await withEnv({CRON_SECRET:'s3cret',CONTROLLING_IMPORT_ENABLED:'false'},async()=>{
+      const {get,calls}=cronRoute(db,true);
+      assert.equal((await get('wrong')).status,401);
+      assert.deepEqual(await (await get()).json(),{status:'disabled'});
+      assert.equal(calls.db,0);
+    });
+    await withEnv({CRON_SECRET:'s3cret',CONTROLLING_IMPORT_ENABLED:undefined,VERCEL_ENV:'preview'},async()=>{
+      const {get,calls}=cronRoute(db,false);
+      assert.deepEqual(await (await get()).json(),{status:'skipped_non_production_environment'});
+      assert.equal(calls.db,0);
+    });
+    await withEnv({CRON_SECRET:'s3cret',CONTROLLING_IMPORT_ENABLED:undefined},async()=>{
+      const {get}=cronRoute(db,true);
+      const body=await (await get()).json();
+      assert.equal(body.inserted,2,'rollout value on: one line per token unit');
+      assert.equal((await (await get()).json()).inserted,0,'idempotent on the next run');
+    });
+  }finally{console.info=info;}
+  assert.equal(await lines(db),2);
+  await db.close();
+});
+
+test('price route: JSON that is not an object is a bad request (400), not a catalogue failure',async()=>{
+  const db=await pgliteDatabase();
+  const mod=loadRoute('app/api/controlling/prices/route.ts',{'@/lib/memory/auth':{authorized:()=>true,unauthorizedResponse:()=>new Response('',{status:401})},
+    '@/lib/memory/db':{databaseConfigured:()=>true,getDatabase:()=>db}});
+  for(const raw of ['null','42','"add"','[]'])
+    assert.equal((await mod.POST(new Request('https://example.test/api/controlling/prices',{method:'POST',body:raw}))).status,400,raw);
+  assert.equal((await mod.POST(new Request('https://example.test/api/controlling/prices',{method:'POST',body:'{"action":"nope"}'}))).status,400);
+  await db.close();
 });

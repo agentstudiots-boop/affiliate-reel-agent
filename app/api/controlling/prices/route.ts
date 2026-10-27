@@ -29,6 +29,8 @@ export async function POST(request: Request) {
     if (raw.length > 4000) return Response.json({ error: "Anfrage zu groß." }, { status: 413, headers });
     input = JSON.parse(raw);
   } catch { return Response.json({ error: "Ungültige Anfrage." }, { status: 400, headers }); }
+  // Valid JSON that is not an object (null, a number, a list) is a bad request as well, not a catalogue failure.
+  if (!input || typeof input !== "object" || Array.isArray(input)) return Response.json({ error: "Ungültige Anfrage." }, { status: 400, headers });
   try {
     const db = getDatabase();
     await ensureAutomationSchema(db);

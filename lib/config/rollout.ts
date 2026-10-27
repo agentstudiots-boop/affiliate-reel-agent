@@ -8,8 +8,9 @@
 // Only switches listed here are read through this module; every other switch keeps reading process.env directly.
 
 export const ROLLOUT = {
-  // Controlling: model_calls → cost ledger import and repricing (cron /api/cron/controlling-import).
-  CONTROLLING_IMPORT_ENABLED: "false",
+  // Controlling: model_calls → cost ledger import and repricing (cron /api/cron/controlling-import). On since the rollout of
+  // 27.10.2026 (operator order of 24.10.2026, docs/PROJECT_STATUS.md); no provider call, no message, no assumed price.
+  CONTROLLING_IMPORT_ENABLED: "true",
   // Executive: daily cycle (status report, prioritisation, health; cron /api/cron/executive-cycle), read-only.
   EXECUTIVE_ENABLED: "false",
   // Executive section in the Monday weekly report (read-only).
