@@ -4,7 +4,8 @@ import { CONTENT_FORMATS } from "../formats/catalog";
 export const TREND_TYPES = ["BREAKING_NEWS", "SOCIAL_HYPE", "ENTERTAINMENT", "SEASONAL", "EVERGREEN", "SEARCH_TREND", "EVENT", "CURIOSITY", "PRACTICAL_LIFE", "PRODUCT_ADJACENT"] as const;
 export type TrendType = (typeof TREND_TYPES)[number];
 
-export const SOURCE_IDS = ["tavily_news", "google_news_rss", "google_trends_rss", "wikipedia_pageviews", "calendar", "evergreen"] as const;
+// operator_request: a topic the operator ordered over WhatsApp (topic-pipeline/topic-order.ts); kind "evergreen", no external claim.
+export const SOURCE_IDS = ["tavily_news", "google_news_rss", "google_trends_rss", "wikipedia_pageviews", "calendar", "evergreen", "operator_request"] as const;
 export type SourceId = (typeof SOURCE_IDS)[number];
 // news: reports an event; search/attention: only says that people look for something (no facts);
 // calendar/evergreen: computed locally, no external claim.

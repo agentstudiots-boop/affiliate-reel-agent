@@ -99,7 +99,7 @@ Kein Modellwechsel ohne nachvollziehbare Daten; kostenpflichtige Vergleiche nur 
 ## 5. Kommunikationsprotokoll WhatsApp
 
 - Webhook-Reihenfolge (`app/api/whatsapp/webhook/route.ts`): Zustellstatus speichern → „Status“/„Weiter“ → „Executive“ (nur mit `EXECUTIVE_WHATSAPP=true`, nur lesend, B-11) → „Geschäftsidee prüfen: …“ (nur mit `OPPORTUNITY_SCOUT_ENABLED=true`, F-05) → Bildstopp-Antworten →
-  manuelle Aufträge → Themen-Pipeline (wenn aktiv) → semantischer Router → Schlüsselwortkette → Freigabe-Gate.
+  manuelle Aufträge → Themen-Pipeline (wenn aktiv; davor Themenauftrag „Mach etwas über X“/„Thema: X“ nur mit `TOPIC_ORDERS_ENABLED=true`, `lib/topic-pipeline/topic-order.ts`, Tageslimit `TOPIC_ORDERS_PER_DAY`) → semantischer Router → Schlüsselwortkette → Freigabe-Gate.
 - Idempotenz: jede eingehende Nachricht wird über `whatsapp_events.message_id` genau einmal beansprucht.
 - Aktiver Kontext: `whatsapp_active_context` (+ Log `whatsapp_context_log`, auch Bildentscheidungen `image:*`).
 - 24-h-Servicefenster: proaktive Nachrichten nur innerhalb des Fensters; außerhalb nur genehmigte Vorlage

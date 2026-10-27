@@ -39,7 +39,7 @@ export function proposalText(input: { candidate: TopicCandidate; decision: Forma
     input.production?.fallbacks.length ? `Ausweichformat: ${input.production.fallbacks.map(item => `${FORMAT_LABEL[item.from]} → ${FORMAT_LABEL[item.to]} (${item.reason})`).join("; ")}` : null,
     `Plan: ${planLine(format, input.production)}`,
     `Text: ${copy.origin === "model" ? "KI-Modus (ein Modellaufruf, auf unbelegte Aussagen geprüft)" : "Referenzmodus (Regelvorlage aus den Scout-Daten, keine freie KI-Analyse)"}`,
-    `Faktenlage: ${candidate.fact_status === "not_applicable" ? "keine externe Behauptung (Kalender/kuratiert)" : candidate.fact_status === "multi_source" ? "mehrere Quellen" : "eine etablierte Quelle"}`,
+    `Faktenlage: ${candidate.fact_status === "not_applicable" ? (candidate.source_signals.some(signal => signal.source === "operator_request") ? "keine externe Behauptung (dein Themenauftrag)" : "keine externe Behauptung (Kalender/kuratiert)") : candidate.fact_status === "multi_source" ? "mehrere Quellen" : "eine etablierte Quelle"}`,
     sources.length ? `Quellen:\n${sources.join("\n")}` : null,
     input.product.status === "selected" ? `Produkt: ${input.product.name} (mit Affiliate-Link, Kennzeichnung „Werbung“)` : "Produkt: keins, kein Affiliate-Link",
     input.note ? `\n${input.note}` : null,
