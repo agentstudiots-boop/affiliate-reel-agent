@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { Generator } from "../content/agent";
 import { UNSUPPORTED_CLAIM_PATTERN } from "../content/trend";
 import type { FormatOverride } from "../formats/override";
+import { PATTERN_GUIDANCE, PATTERN_QUESTION } from "../topics/editorial";
 import { tokens } from "../topics/lexicon";
 import type { TopicCandidate } from "../topics/schema";
 import type { ProductionCopy } from "../visual/renderers";
@@ -39,7 +40,8 @@ function referencePoints(candidate: TopicCandidate) {
 
 export function referenceCopy(candidate: TopicCandidate, override?: FormatOverride | null): TopicCopy {
   const points = referencePoints(candidate);
-  const question = candidate.trend_type === "ENTERTAINMENT" ? "Wie siehst du das?" : "Wie machst du das bei dir zuhause?";
+  const question = candidate.editorial_pattern ? PATTERN_QUESTION[candidate.editorial_pattern]
+    : candidate.trend_type === "ENTERTAINMENT" ? "Wie siehst du das?" : "Wie machst du das bei dir zuhause?";
   const cta = override?.tone.includes("less_promotional") ? "Speichern für später" : "Speichern und mit jemandem teilen, dem es hilft";
   const tags = hashtags(candidate);
   const body = `${candidate.audience_problem}\n\n${candidate.core_message}`;
@@ -60,10 +62,12 @@ export async function writeTopicCopy(candidate: TopicCandidate, options: { gener
   const reference = referenceCopy(candidate, options.override);
   if (!options.generate) return { copy: reference, modelCalls: 0 };
   const input = { title: candidate.title, trend_type: candidate.trend_type, problem: candidate.audience_problem, why_now: candidate.why_now, angle: candidate.angle,
-    core_message: candidate.core_message, hook: candidate.hook, tone: options.override?.tone ?? [],
+    core_message: candidate.core_message, hook: candidate.hook, tone: options.override?.tone ?? [], ...(candidate.editorial_pattern ? { editorial_pattern: candidate.editorial_pattern } : {}),
     sources: candidate.source_signals.filter(signal => signal.kind === "news").slice(0, 4).map(signal => ({ publisher: signal.publisher, title: signal.title })) };
   try {
-    const result = await options.generate("text", INSTRUCTION, input, topicCopySchema, () => ({ hook: reference.hook, body: reference.body, caption: reference.caption,
+    // The editorial pattern (if any) sets voice and structure; the no-invention rules above stay binding.
+    const instruction = candidate.editorial_pattern ? `${INSTRUCTION}\n${PATTERN_GUIDANCE[candidate.editorial_pattern]}` : INSTRUCTION;
+    const result = await options.generate("text", instruction, input, topicCopySchema, () => ({ hook: reference.hook, body: reference.body, caption: reference.caption,
       cta: reference.cta, question: reference.question, points: reference.points.slice(0, 5), video_script: reference.videoScript }));
     const text = JSON.stringify(result);
     if (UNSUPPORTED_CLAIM_PATTERN.test(text) || /https?:\/\/|www\./i.test(text)) return { copy: reference, modelCalls: 1, fallbackReason: "unbelegte Aussage oder Link im Modelltext" };

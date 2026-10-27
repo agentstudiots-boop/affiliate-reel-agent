@@ -3,6 +3,7 @@ import type { FormatDecision } from "../formats/router";
 import type { PlatformVariant } from "../distribution/platforms/adapters";
 import type { PublishPlanEntry } from "../distribution/publish";
 import type { MasterContent } from "../distribution/master-content";
+import { EDITORIAL_LABEL } from "../topics/editorial";
 import type { TopicCandidate } from "../topics/schema";
 import type { ProductionResult } from "../visual/types";
 import type { ProductSuggestion } from "./product-coupling";
@@ -38,6 +39,7 @@ export function proposalText(input: { candidate: TopicCandidate; decision: Forma
     decision.manualNotHonoured ? `Hinweis: dein Formatwunsch ist gerade nicht umsetzbar (${decision.manualNotHonoured}).` : null,
     input.production?.fallbacks.length ? `Ausweichformat: ${input.production.fallbacks.map(item => `${FORMAT_LABEL[item.from]} → ${FORMAT_LABEL[item.to]} (${item.reason})`).join("; ")}` : null,
     `Plan: ${planLine(format, input.production)}`,
+    candidate.editorial_pattern ? `Erzählweise: ${EDITORIAL_LABEL[candidate.editorial_pattern]}` : null,
     `Text: ${copy.origin === "model" ? "KI-Modus (ein Modellaufruf, auf unbelegte Aussagen geprüft)" : "Referenzmodus (Regelvorlage aus den Scout-Daten, keine freie KI-Analyse)"}`,
     `Faktenlage: ${candidate.fact_status === "not_applicable" ? (candidate.source_signals.some(signal => signal.source === "operator_request") ? "keine externe Behauptung (dein Themenauftrag)" : "keine externe Behauptung (Kalender/kuratiert)") : candidate.fact_status === "multi_source" ? "mehrere Quellen" : "eine etablierte Quelle"}`,
     sources.length ? `Quellen:\n${sources.join("\n")}` : null,

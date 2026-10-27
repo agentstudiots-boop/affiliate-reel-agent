@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { emitEvent } from "../observability/events";
 import { topicTexts } from "./angles";
+import { choosePattern, editorialStyleEnabled } from "./editorial";
 import { evaluateHistory, type TopicHistoryEntry } from "./history";
 import { jaccard, sharedCount, tokens } from "./lexicon";
 import { runSource, type RetryPolicy, type TopicSource } from "./resilience";
@@ -70,8 +71,10 @@ export function clusterSignals(signals: RawSignal[]): Cluster[] {
 export function buildCandidate(cluster: Cluster, now: Date, variant = 0): TopicCandidate | { error: string } {
   const { type } = classifyTrend(cluster, now);
   const scored = scoreCluster(cluster, type, now);
-  const texts = topicTexts(cluster, type, scored, now, variant);
   const concept = clusterConcept(cluster);
+  const pattern = editorialStyleEnabled() ? choosePattern({ type, topicId: topicIdFor(concept), variant, sensitive: scored.sensitive, gossip: scored.gossip,
+    hasNewsSource: cluster.signals.some(signal => signal.kind === "news" && !!signal.publisher) }) : null;
+  const texts = topicTexts(cluster, type, scored, now, variant, pattern);
   const signals = cluster.signals.slice().sort((a, b) => b.strength - a.strength).slice(0, 12);
   const candidate = {
     topic_id: topicIdFor(concept), concept_key: concept, title: cluster.title.slice(0, 200), trend_type: type,
@@ -85,7 +88,7 @@ export function buildCandidate(cluster: Cluster, now: Date, variant = 0): TopicC
     core_message: texts.coreMessage.slice(0, 400), suggested_format: scored.suggestedFormat, suitable_for_video: scored.suitableForVideo,
     suitable_for_avatar: scored.suitableForAvatar, visual_potential: scored.scores.visual.score,
     product_optional: !scored.gossip && !scored.scores.risk.factors.some(factor => factor.startsWith("Hochrisiko")), possible_product_category: scored.category,
-    confidence: scored.confidence, text_origin: "rule_template" as const,
+    confidence: scored.confidence, text_origin: "rule_template" as const, ...(texts.pattern ? { editorial_pattern: texts.pattern } : {}),
   };
   const parsed = topicCandidateSchema.safeParse(candidate);
   return parsed.success ? parsed.data : { error: `Schema: ${parsed.error.issues[0]?.path.join(".")}` };

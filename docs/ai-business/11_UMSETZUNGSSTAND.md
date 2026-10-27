@@ -155,11 +155,17 @@ stammt aus den Laufzeitlogs der zweiten Sitzung.
 
 Stand 27.10.:
 
-- **P1a „eigene WhatsApp-Themenvorschläge“: implementiert und getestet, nicht gemergt.** Der Betreiber schreibt „Mach etwas über X“,
+- **P1a „eigene WhatsApp-Themenvorschläge“: gemergt (#130) und deployed, nicht aktiviert.** Der Betreiber schreibt „Mach etwas über X“,
   „Thema: X“ oder „Erstelle einen Beitrag zum Thema X“. Daraus entsteht ein normaler Themenvorschlag mit doppelter Freigabe
   (`lib/topic-pipeline/topic-order.ts`, `requestTopicOrder`).
   - Übergangen werden nur redaktionelle Schwellen; sie werden im Vorschlag genannt.
   - Schutzprüfungen gelten weiter: Fakten, Risiko, Klatsch, unbelegte Aussagen. Sensible Themen ohne Quelle werden abgelehnt.
   - Eigener Schalter `TOPIC_ORDERS_ENABLED`, Standard aus. Tageslimit `TOPIC_ORDERS_PER_DAY`, Standard 5, höchstens 10.
   - Die Aktivierung kommt als eigener PR.
-- **P1b (redaktionelle Ausrichtung): offen.**
+- **P1b (redaktionelle Ausrichtung): implementiert und getestet, nicht gemergt.** `lib/topics/editorial.ts` gibt jedem Thema eine
+  Erzählweise: Mini-Geschichte, Aha-Moment, Humor, Gefühl oder Alltagskniff.
+  - Die Auswahl hängt vom Thementyp ab und ist je Thema stabil; eine neue Variante wechselt die Erzählweise.
+  - Kein Humor und kein Kniff bei sensiblen Themen oder Klatsch. Ein Aha-Moment nur mit Quelle, der Publisher wird genannt.
+  - Referenzmodus: passender Hook, Winkel und Abschlussfrage. KI-Modus: eine Leitlinie zusätzlich zu den unveränderten Regeln gegen Erfindungen.
+  - Im Vorschlag steht „Erzählweise: …“.
+  - Schalter `TOPIC_EDITORIAL_STYLE=on`, Standard aus. Ohne Schalter sind alle Texte unverändert.
