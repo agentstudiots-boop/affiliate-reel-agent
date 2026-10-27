@@ -13,6 +13,9 @@ export type RuntimeSnapshot = {
   topic: { byStage: Record<string, number>; recent: { contentId: string; title: string; stage: string; format: string; at: string; error: string | null }[];
     lastRun: { outcome: string; at: string; failure: string | null } | null } | null;
   affiliate: { runningJobs: number; pendingContentApprovals: number; pendingPublications: number } | null;
+  // Separate sections: an unreadable table leaves only its own count unknown (null), never a 0.
+  pendingCostApprovals?: number | null;
+  pendingDecisions?: number | null;
   publications: { platform: string; status: string; url: string | null; at: string; origin: string }[] | null;
   chances: { recent: { chanceId: string; title: string; recommendation: string; suitability: number; at: string }[]; openRoutes: number; last24h: number } | null;
   vision: { checked: number; lastStatus: string | null; lastAt: string | null } | null;
@@ -32,6 +35,9 @@ export type Activity = {
   topicRun: { lastOkAt: string | null; lastAt: string | null; lastOutcome: string | null } | null;
   // Affiliate posts (product pipeline): publication_requests (Facebook) and instagram_image_posts (Instagram feed).
   affiliatePublished: { facebook: string | null; instagram: string | null } | null;
+  // Rollout 24.10.2026: last booked model_calls line (controlling import) and last finished executive task (enterprise_tasks).
+  controllingImportAt?: string | null;
+  executive?: { lastOkAt: string | null; lastAt: string | null; lastFailedKind: string | null } | null;
 };
 
 const iso = (value: unknown) => value ? new Date(String(value)).toISOString() : new Date(0).toISOString();
@@ -72,6 +78,9 @@ export async function readSnapshot(now = new Date(), open: () => Readable = getD
     const publications = (await db.query("SELECT count(*)::int AS n FROM publication_requests WHERE status='pending'")).rows[0];
     return { runningJobs: Number(jobs?.n ?? 0), pendingContentApprovals: Number(approvals?.n ?? 0), pendingPublications: Number(publications?.n ?? 0) };
   });
+  const pendingCostApprovals = await section(handle, async db => Number((await db.query("SELECT count(*)::int AS n FROM approval_requests WHERE status='pending'")).rows[0]?.n ?? 0));
+  const pendingDecisions = await section(handle, async db => Number((await db.query(
+    "SELECT count(*)::int AS n FROM enterprise_decisions WHERE status='pending' AND expires_at > now()")).rows[0]?.n ?? 0));
   const publications = await section(handle, async db => (await db.query(`SELECT platform, status, url, origin, updated_at FROM publish_attempts
       WHERE status IN ('published','processing','failed','unknown') ORDER BY updated_at DESC LIMIT 12`)).rows
     .map(row => ({ platform: String(row.platform), status: String(row.status), url: reliablePostUrl(String(row.platform), row.url ? String(row.url) : null), origin: String(row.origin), at: iso(row.updated_at) })));
@@ -92,7 +101,8 @@ export async function readSnapshot(now = new Date(), open: () => Readable = getD
     .map(row => ({ kind: String(row.kind), status: String(row.status), at: iso(row.updated_at) })));
   const activity = await readActivity(handle);
   const any = [topic, affiliate, publications, chances, vision, visualJobs, activity].some(item => item !== null);
-  return { available: any, reason: any ? null : "Keine erfolgreiche Datenbankabfrage; Verbindung oder Tabellen unbekannt", generatedAt: now.toISOString(), topic, affiliate, publications, chances, vision, visualJobs, activity };
+  return { available: any, reason: any ? null : "Keine erfolgreiche Datenbankabfrage; Verbindung oder Tabellen unbekannt", generatedAt: now.toISOString(), topic, affiliate, publications, chances, vision, visualJobs, activity,
+    pendingCostApprovals, pendingDecisions };
 }
 
 const at = (value: unknown) => value ? new Date(String(value)).toISOString() : null;
@@ -127,7 +137,15 @@ async function readActivity(handle: Readable): Promise<Activity | null> {
       (SELECT max(updated_at) FROM instagram_image_posts WHERE status='published') AS instagram`)).rows[0];
     return { facebook: at(row?.facebook), instagram: at(row?.instagram) };
   });
-  const parts = [models, cron, whatsapp, drafts, product, approved, chances, topicRun, affiliatePublished];
+  const controllingImportAt = await section(handle, async db => at((await db.query("SELECT max(created_at) AS last FROM cost_entries WHERE source='model_calls'")).rows[0]?.last));
+  const executive = await section(handle, async db => {
+    const row = (await db.query(`SELECT max(updated_at) FILTER (WHERE status='succeeded') AS last_ok_at, max(updated_at) AS last_at,
+      (array_agg(task_kind ORDER BY updated_at DESC) FILTER (WHERE status IN ('failed','outcome_unknown','dead')))[1] AS last_failed_kind
+      FROM enterprise_tasks WHERE status IN ('succeeded','failed','outcome_unknown','dead')`)).rows[0];
+    return row ? { lastOkAt: at(row.last_ok_at), lastAt: at(row.last_at), lastFailedKind: row.last_failed_kind ? String(row.last_failed_kind) : null } : null;
+  });
+  const parts = [models, cron, whatsapp, drafts, product, approved, chances, topicRun, affiliatePublished, controllingImportAt, executive];
   if (parts.every(item => item === null)) return null;
-  return { models: models ?? {}, cron, whatsappInboundAt: whatsapp, drafts, productVerifiedAt: product, contentApprovedAt: approved, chancesSeenAt: chances, topicRun, affiliatePublished };
+  return { models: models ?? {}, cron, whatsappInboundAt: whatsapp, drafts, productVerifiedAt: product, contentApprovedAt: approved, chancesSeenAt: chances, topicRun, affiliatePublished,
+    controllingImportAt, executive };
 }

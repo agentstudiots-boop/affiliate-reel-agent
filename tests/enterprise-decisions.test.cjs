@@ -183,5 +183,6 @@ test('module is isolated: no WhatsApp sending, no publishing, not wired into app
   }};
   walk('app');walk('lib');
   // H-01 only counts open requests (SELECT in a READ ONLY transaction); nothing outside lib/enterprise records or answers them.
-  assert.deepEqual(users.sort(),[path.join('lib','architecture','enterprise-snapshot.ts'),path.join('lib','memory','ensure-automation-schema.ts'),path.join('lib','memory','migrations.ts')].sort());
+  // The Command Center snapshot counts open requests the same way (READ ONLY).
+  assert.deepEqual(users.sort(),[path.join('lib','architecture','enterprise-snapshot.ts'),path.join('lib','architecture','snapshot.ts'),path.join('lib','memory','ensure-automation-schema.ts'),path.join('lib','memory','migrations.ts')].sort());
 });

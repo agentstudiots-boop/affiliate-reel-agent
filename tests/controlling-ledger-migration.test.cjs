@@ -95,5 +95,6 @@ test('application code reaches the controlling ledger only through the reviewed 
     else if(/\.(ts|tsx)$/.test(entry.name)&&/\b(price_catalog|cost_entries|revenue_entries)\b|\b(FROM|INTO|UPDATE|JOIN|TABLE)\s+budgets\b/i.test(fs.readFileSync(full,'utf8')))users.push(full);
   }};
   walk('app');walk('lib');
-  assert.deepEqual(users,[path.join('app','api','cron','controlling-import','route.ts'),path.join('lib','memory','ensure-automation-schema.ts')]);
+  // The Command Center reads the ledger in READ ONLY transactions (snapshot.ts); model.ts only names it as text.
+  assert.deepEqual(users,[path.join('app','api','cron','controlling-import','route.ts'),path.join('lib','architecture','model.ts'),path.join('lib','architecture','snapshot.ts'),path.join('lib','memory','ensure-automation-schema.ts')]);
 });
