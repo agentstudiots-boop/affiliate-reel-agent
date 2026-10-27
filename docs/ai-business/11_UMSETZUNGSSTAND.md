@@ -139,7 +139,7 @@ Deployment-IDs je Merge stehen in `docs/PROJECT_STATUS.md` §2.
   beim Betreiber liegt.
 - Alle abgeschalteten Funktionen: erst nach Aktivierung durch den Betreiber.
 
-## 6. Nächster Arbeitsauftrag (vom Betreiber am 23.10. festgelegt, noch nicht begonnen)
+## 6. Nächster Arbeitsauftrag (vom Betreiber am 23.10. festgelegt, am 24.10. gestartet)
 
 Die **Themen-Pipeline** für „Alltäglich leichter“ wird ausgerichtet auf:
 
@@ -152,3 +152,14 @@ Die **Themen-Pipeline** für „Alltäglich leichter“ wird ausgerichtet auf:
 Ausgangslage: Die Themen-Pipeline ist in Production aktiv. Am 23.10. um 07:15 UTC erzeugte der Cron einen Vorschlag
 (`topic_cron_completed status=proposed`); er wurde gehalten, weil das WhatsApp-Servicefenster geschlossen war. Die Beobachtung
 stammt aus den Laufzeitlogs der zweiten Sitzung.
+
+Stand 27.10.:
+
+- **P1a „eigene WhatsApp-Themenvorschläge“: implementiert und getestet, nicht gemergt.** Der Betreiber schreibt „Mach etwas über X“,
+  „Thema: X“ oder „Erstelle einen Beitrag zum Thema X“. Daraus entsteht ein normaler Themenvorschlag mit doppelter Freigabe
+  (`lib/topic-pipeline/topic-order.ts`, `requestTopicOrder`).
+  - Übergangen werden nur redaktionelle Schwellen; sie werden im Vorschlag genannt.
+  - Schutzprüfungen gelten weiter: Fakten, Risiko, Klatsch, unbelegte Aussagen. Sensible Themen ohne Quelle werden abgelehnt.
+  - Eigener Schalter `TOPIC_ORDERS_ENABLED`, Standard aus. Tageslimit `TOPIC_ORDERS_PER_DAY`, Standard 5, höchstens 10.
+  - Die Aktivierung kommt als eigener PR.
+- **P1b (redaktionelle Ausrichtung): offen.**

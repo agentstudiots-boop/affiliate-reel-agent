@@ -4,7 +4,7 @@ const L = '../.test-build/lib';
 const { buildMasterContent, AFFILIATE_DISCLOSURE } = require(`${L}/distribution/master-content`);
 const { renderForPlatform, PLATFORM_ADAPTERS } = require(`${L}/distribution/platforms/adapters`);
 const { publishAll, publishableContent, PlatformPublishError } = require(`${L}/distribution/publish`);
-const { runTopicPipeline, handleTopicReply, routeTopicMessage } = require(`${L}/topic-pipeline/orchestrator`);
+const { runTopicPipeline, handleTopicReply, routeTopicMessage, requestTopicOrder } = require(`${L}/topic-pipeline/orchestrator`);
 const { topicPipelineStatus } = require(`${L}/topic-pipeline/status`);
 const { productCouplingBlocked, suggestProducts, productListCommand, productSelection } = require(`${L}/topic-pipeline/product-coupling`);
 const { referenceCopy } = require(`${L}/topic-pipeline/copy`);
@@ -588,4 +588,123 @@ test('invariant: a second "Freigeben" after publishing publishes nothing again',
     assert.match(h.sent.at(-1), /nicht mehr aktuell oder bereits entschieden/);
     assert.equal(calls(), before);
   } finally { await db.close(); }
+});
+
+// ---------- P1a: explicit topic orders over WhatsApp ----------
+const order = (h, body, id, from = OPERATOR) => requestTopicOrder(h.deps, { id: id ?? `wamid.order.${Math.random()}`, from, body, replyToMessageId: null });
+
+test('topic order: "Mach etwas über X" proposes exactly that topic; approval flow unchanged; replay and strangers are ignored', async () => {
+  const db = await pgliteDatabase();
+  try {
+    const h = harness(db);
+    assert.equal(await order(h, 'Mach etwas über Laub im Garten', 'wamid.order.1'), true);
+    assert.equal(h.sent.length, 1);
+    assert.match(h.sent[0], /^Themenvorschlag · Themen-Post/);
+    assert.match(h.sent[0], /Laub im Garten/);
+    assert.match(h.sent[0], /Dein Themenauftrag: „Laub im Garten“/);
+    assert.match(h.sent[0], /Faktenlage: keine externe Behauptung \(dein Themenauftrag\)/);
+    assert.match(h.sent[0], /Antworte auf DIESE Nachricht mit „Freigeben“/);
+    const rows = (await db.query('SELECT content_id, stage, run_id FROM topic_contents')).rows;
+    assert.equal(rows.length, 1); assert.equal(rows[0].stage, 'proposed'); assert.equal(rows[0].run_id, null);
+    assert.deepEqual((await db.query('SELECT content_id, action FROM topic_inbound')).rows, [{ content_id: rows[0].content_id, action: 'topic_order' }]);
+    assert.equal(h.imageCalls.length, 0, 'a proposal produces nothing');
+
+    assert.equal(await order(h, 'Mach etwas über Laub im Garten', 'wamid.order.1'), true, 'Meta redelivery');
+    assert.equal(h.sent.length, 1);
+    assert.equal(await order(h, 'Mach etwas über Laub im Garten', 'wamid.order.2', '4900000'), false, 'not the operator');
+    assert.equal(await order(h, 'Erstelle einen Beitrag zum Roborock S8'), false, 'product order is left to manual-order');
+    assert.equal(h.sent.length, 1);
+
+    // Same two-step approval as every topic proposal: the first „Freigeben“ only produces.
+    await h.reply('Freigeben', 'wamid.out.1');
+    assert.match(h.sent.at(-1), /^Veröffentlichungsfreigabe · Themen-Post/);
+    assert.ok(h.publishers.every(publisher => publisher.calls.length === 0), 'nothing published before the publish approval');
+  } finally { await db.close(); }
+});
+
+test('topic order: protective checks refuse with reasons and create nothing; refused orders do not count against the limit', async () => {
+  const db = await pgliteDatabase();
+  try {
+    const h = harness(db);
+    assert.equal(await order(h, 'Mach etwas über Wundermittel gegen Krebs'), true);
+    assert.match(h.sent.at(-1), /^Zum Thema „Wundermittel gegen Krebs“ lege ich keinen Vorschlag an: Sensibles Thema/);
+    assert.match(h.sent.at(-1), /Es wurde nichts erstellt oder veröffentlicht\.$/);
+    assert.equal(await order(h, 'Thema: Promi-Hochzeit von Helene Fischer'), true);
+    assert.match(h.sent.at(-1), /Klatsch/);
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM topic_contents')).rows[0].n, 0);
+    assert.deepEqual((await db.query("SELECT DISTINCT action FROM topic_inbound")).rows, [{ action: 'topic_order_rejected' }]);
+  } finally { await db.close(); }
+});
+
+test('topic order: daily limit per Berlin day; the next day orders work again', async () => {
+  const db = await pgliteDatabase();
+  const restore = withEnv({ TOPIC_ORDERS_PER_DAY: '2' });
+  try {
+    let at = new Date('2026-10-05T21:30:00Z'); // 23:30 Berlin
+    const h = harness(db, { deps: { now: () => at } });
+    assert.equal(await order(h, 'Mach etwas über Laub im Garten'), true);
+    assert.equal(await order(h, 'Thema: Fenster putzen ohne Schlieren'), true);
+    const proposals = h.sent.length;
+    assert.equal(await order(h, 'Thema: Brotdosen packen'), true);
+    assert.equal(h.sent.length, proposals + 1);
+    assert.match(h.sent.at(-1), /^Heute sind schon 2 Themenaufträge angelegt \(Tageslimit 2\)\. .*„Brotdosen packen“.*Es wurde nichts erstellt/);
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM topic_contents')).rows[0].n, 2);
+    at = new Date('2026-10-05T22:30:00Z'); // 00:30 Berlin, next day
+    assert.equal(await order(h, 'Thema: Brotdosen packen'), true);
+    assert.match(h.sent.at(-1), /^Themenvorschlag · /);
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM topic_contents')).rows[0].n, 3);
+  } finally { restore(); await db.close(); }
+});
+
+function orderWebhook(db, h, env, body, id) {
+  const { createHmac } = require('node:crypto');
+  const loadRoute = require('./helpers/load-route.cjs');
+  const restore = withEnv({ META_APP_SECRET: 'topic-order-signature', WHATSAPP_PHONE_NUMBER_ID: '123456', WHATSAPP_APPROVER_WA_ID: OPERATOR, WHATSAPP_ROUTER_ENABLED: 'true', ...env });
+  const reached = [];
+  const fail = name => async () => { reached.push(name); throw new Error(`${name} must not run`); };
+  const handler = loadRoute('app/api/whatsapp/webhook/route.ts', {
+    'next/server': { after: () => {} }, '@/lib/memory/db': { getDatabase: () => db },
+    '@/lib/production/repository': { productionRepository: () => ({ applyIncomingWhatsApp: fail('keyword chain') }) },
+    '@/lib/whatsapp/router': { routeOperatorMessage: async () => { reached.push('product router'); return { handled: true }; } },
+    '@/lib/whatsapp/start-image-post': { startImagePostFromWhatsApp: fail('image post'), startProductSearch: fail('product search') },
+    '@/lib/daily/draft': { createDailyDraft: fail('daily draft'), sendDailyApproval: async () => true, sendPendingDailyApprovals: async () => 0 },
+    '@/lib/whatsapp/client': { sendWhatsAppText: async () => 'wamid.x' },
+    '@/lib/agents/topic-runtime': { topicPipelineDeps: () => { reached.push('topic pipeline'); return h.deps; } },
+  });
+  const payload = JSON.stringify({ object: 'whatsapp_business_account', entry: [{ changes: [{ value: { metadata: { phone_number_id: '123456' },
+    messages: [{ id, from: OPERATOR, type: 'text', text: { body } }] } }] }] });
+  const post = () => handler.POST(new Request('https://local.test/api/whatsapp/webhook', { method: 'POST',
+    headers: { 'x-hub-signature-256': `sha256=${createHmac('sha256', 'topic-order-signature').update(payload).digest('hex')}` }, body: payload }));
+  return { post, reached, restore };
+}
+
+test('signed webhook: a topic order reaches the topic pipeline before the product router; without either switch it never does', async t => {
+  const db = await pgliteDatabase();
+  t.after(() => db.close());
+  const h = harness(db);
+  const on = orderWebhook(db, h, { TOPIC_PIPELINE_ENABLED: 'true', TOPIC_ORDERS_ENABLED: 'true' }, 'Mach etwas über Laub im Garten', 'wamid.webhook.order');
+  try {
+    assert.equal((await on.post()).status, 200);
+    assert.match(h.sent.at(-1), /Dein Themenauftrag: „Laub im Garten“/);
+    assert.ok(!on.reached.includes('product router'));
+    const count = h.sent.length;
+    assert.equal((await on.post()).status, 200, 'Meta redelivery');
+    assert.equal(h.sent.length, count);
+  } finally { on.restore(); }
+  // Own switch off (default): the pipeline stays on, but the order is not recognised. With no open topic draft the message
+  // goes to the product router as before; no topic draft is created from it.
+  await db.query("UPDATE topic_contents SET stage='discarded'");
+  const own = orderWebhook(db, h, { TOPIC_PIPELINE_ENABLED: 'true', TOPIC_ORDERS_ENABLED: undefined }, 'Mach etwas über Fenster putzen', 'wamid.webhook.order.own');
+  try {
+    assert.equal((await own.post()).status, 200);
+    assert.ok(own.reached.includes('product router'));
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM topic_contents')).rows[0].n, 1);
+  } finally { own.restore(); }
+  // Kill switch: without TOPIC_PIPELINE_ENABLED the message goes the old way (product router), the topic pipeline is not loaded.
+  const off = orderWebhook(db, h, { TOPIC_PIPELINE_ENABLED: undefined, TOPIC_ORDERS_ENABLED: 'true' }, 'Mach etwas über Fenster putzen', 'wamid.webhook.order.off');
+  try {
+    assert.equal((await off.post()).status, 200);
+    assert.deepEqual(off.reached, ['product router']);
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM topic_contents')).rows[0].n, 1);
+  } finally { off.restore(); }
 });
