@@ -108,6 +108,7 @@ export const AI_MODELS: Record<string, string> = {
   "topic-orchestrator": "Kein eigenes Modell; WhatsApp-Antworten zu Themen: openai/gpt-5.6-terra (über Replicate)",
   "product-scout": "Kein KI-Modell – Amazon-Produktsuche und Seiten-Prüfung",
   "product-reviewer": "Kein KI-Modell – regelbasiert gegen die Amazon-Detailseite",
+  "executive-agent": "Kein KI-Modell – regelbasierte Priorisierung aus vorhandenen Nachweisen",
   "creative-agent": "Referenzmodus: regelbasiert · KI-Modus: openai/gpt-4.1 (über Replicate)",
   "video-agent": "Referenzmodus: regelbasiert · KI-Modus: openai/gpt-4.1 (über Replicate)",
   "image-agent": "Referenzmodus: regelbasiert · KI-Modus: openai/gpt-4.1 (über Replicate)",
@@ -417,6 +418,7 @@ export const EDGES: ArchEdge[] = [
   { id: "i-obs-jarvis", from: "observability", to: "jarvis", kind: "data", label: "Ereignisse" },
   { id: "i-jarvis-pg", from: "jarvis", to: "postgres", kind: "data", label: "Aufträge" },
   { id: "i-topic-pg", from: "topic-orchestrator", to: "postgres", kind: "data", label: "Läufe/Versionen" },
+  { id: "i-controlling-pg", from: "controlling-import", to: "postgres", kind: "data", label: "model_calls → Kostenbuch" },
   { id: "i-vercel-blob", from: "vercel", to: "blob", kind: "data", label: "Blob-Token" },
 ];
 

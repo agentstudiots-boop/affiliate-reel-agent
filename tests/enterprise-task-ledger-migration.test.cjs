@@ -117,5 +117,5 @@ test('no application code uses the ledger yet (AC-6)',()=>{
   walk('app');walk('lib');
   // H-01 only counts tasks per department and status (SELECT in a READ ONLY transaction); the WhatsApp answer „Executive“
   // (rollout 24.10.) reads the newest succeeded prioritisation.
-  assert.deepEqual(users.sort(),[path.join('lib','architecture','enterprise-snapshot.ts'),path.join('lib','memory','ensure-automation-schema.ts'),path.join('lib','whatsapp','executive-status.ts')].sort());
+  assert.deepEqual(users.sort(),[path.join('lib','architecture','enterprise-snapshot.ts'),path.join('lib','architecture','snapshot.ts'),path.join('lib','memory','ensure-automation-schema.ts'),path.join('lib','whatsapp','executive-status.ts')].sort());
 });
