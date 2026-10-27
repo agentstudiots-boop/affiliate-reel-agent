@@ -9,7 +9,7 @@ const TABLES_034 = ['image_generation_attempts', 'image_quality_notices', 'image
 (async () => {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL fehlt.');
   const expected = fs.readdirSync('db/migrations').filter(n => n.endsWith('.sql')).sort();
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1, connectionTimeoutMillis: 10000, statement_timeout: 10000 });
+  const pool = new Pool({ connectionString: require('./connection-string.cjs').strictSslConnectionString(process.env.DATABASE_URL), max: 1, connectionTimeoutMillis: 10000, statement_timeout: 10000 });
   const client = await pool.connect();
   try {
     await client.query('BEGIN READ ONLY');                       // the database itself rejects any write in this transaction

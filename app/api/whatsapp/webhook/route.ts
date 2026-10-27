@@ -31,7 +31,8 @@ import { deliverWeeklyReport } from "@/lib/reporting/weekly";
 import { latestImagePostsStatus } from "@/lib/reporting/whatsapp-status";
 import { formatPublishReport } from "@/lib/publishing/report";
 import { publishApprovedAffiliateImage } from "@/lib/distribution/affiliate";
-import { deliverHeldProposals, handleTopicReply, reconcileTopicPublications, resumeTopicProductions, routeTopicMessage } from "@/lib/topic-pipeline/orchestrator";
+import { topicOrdersEnabled } from "@/lib/topic-pipeline/topic-order";
+import { deliverHeldProposals, handleTopicReply, reconcileTopicPublications, requestTopicOrder, resumeTopicProductions, routeTopicMessage } from "@/lib/topic-pipeline/orchestrator";
 import { topicPipelineStatus } from "@/lib/topic-pipeline/status";
 import { extractIncomingWhatsAppMessages, extractWhatsAppDeliveryStatuses, verifyMetaWebhookSignature, verifyWhatsAppChallenge } from "@/lib/whatsapp/security";
 import { recordDeliveryStatuses, slotEvidenceLines } from "@/lib/daily/evidence";
@@ -155,11 +156,13 @@ export async function POST(request: Request) {
       if (await handleManualOrder({ ...message, payload }, { database: getDatabase, start: createDailyDraft, send: sendWhatsAppText })) continue;
       // Topic pipeline first (only when enabled): replies quoting a topic message belong to it; free messages without a
       // quote are assigned semantically to a topic draft or left to the product router. Any failure falls back to the
-      // existing chain, which ignores unknown reply targets.
+      // existing chain, which ignores unknown reply targets. An explicit topic order („Mach etwas über X“, „Thema: X“; only with
+      // TOPIC_ORDERS_ENABLED=true) starts an ordinary topic proposal; it is checked before the semantic assignment.
       if (process.env.TOPIC_PIPELINE_ENABLED === "true") {
         const inbound = { id: message.id, from: message.from, body: message.body, replyToMessageId: message.replyToMessageId, payload };
         const handledTopic = await import("@/lib/agents/topic-runtime")
-          .then(({ topicPipelineDeps }) => message.replyToMessageId ? handleTopicReply(topicPipelineDeps(), inbound) : routeTopicMessage(topicPipelineDeps(), inbound))
+          .then(async ({ topicPipelineDeps }) => message.replyToMessageId ? handleTopicReply(topicPipelineDeps(), inbound)
+            : topicOrdersEnabled() && await requestTopicOrder(topicPipelineDeps(), inbound) || routeTopicMessage(topicPipelineDeps(), inbound))
           .catch(() => { console.error(JSON.stringify({ event: "topic_reply_unavailable", messageId: message.id })); return false; });
         if (handledTopic) continue;
       }

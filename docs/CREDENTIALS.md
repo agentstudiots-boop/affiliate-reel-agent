@@ -21,6 +21,8 @@ gegen den echten Anbieter geprüft.
 | `TOPIC_SOURCE_GOOGLE_NEWS`, `TOPIC_SOURCE_GOOGLE_TRENDS`, `TOPIC_SOURCE_WIKIPEDIA` | `false` schaltet die Quelle ab | an |
 | `TOPIC_LINK_POLICY`, `TOPIC_BRAND_PALETTE` | Linkregeln / Farben | Standardwerte |
 | `TOPIC_POSTS_PER_DAY` | geplante Themenvorschläge je Kalendertag (Europe/Berlin), 1–4 | 1 |
+| `TOPIC_ORDERS_ENABLED` | `true`: Themenauftrag per WhatsApp („Mach etwas über X“, „Thema: X“) erzeugt einen normalen Themenvorschlag (beide Freigaben, Schutzprüfungen bleiben); wirkt nur mit `TOPIC_PIPELINE_ENABLED=true` | aus |
+| `TOPIC_ORDERS_PER_DAY` | Themenaufträge je Kalendertag (Europe/Berlin), 1–10; abgelehnte zählen nicht | 5 |
 | `TRENDSETTER_AFFILIATE` | `record`: Trend-Agent-Chancen als gemeinsame Ergebnisse speichern; `route`: zusätzlich nur von Jarvis zugewiesene Chancen zur Produktsuche | aus (Affiliate-Pipeline unverändert) |
 | `TRENDSCOUT_TOPICS` | `on`: Trend-Agent recherchiert im selben Lauf zusätzlich allgemeine Themen (Haushaltstipps, Alltagstricks, Wissen/Kurioses); Themen-Chancen werden als gemeinsame Ergebnisse gespeichert, nichts wird produziert oder veröffentlicht | aus (Recherche unverändert) |
 | `PRODUCT_MIX` | `balance`: Jarvis ordnet bereits freigegebene Produktchancen leicht (max. ein Rang) Richtung unterrepräsentierter Preissegmente; dazu optional `PRODUCT_PRICE_TIER_LIMITS` (z. B. `30,150` €), `PRODUCT_MIX_TARGET` (z. B. `low:40,mid:35,high:25`), `PRODUCT_MIX_WINDOW` (4–50, Standard 12) | aus (Reihenfolge unverändert) |
