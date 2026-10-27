@@ -103,6 +103,8 @@ test('route: secret required; switch off by default ⇒ no database access; prev
 
 test('route: enabled in production queues the day\'s tasks once, runs them and reports health (AC-4, rollout 24.10.)',async()=>{
   const db=await pgliteDatabase();
+  // An undelivered draft must reach the prioritisation through the stored status report (repository format { output, … }).
+  await db.query("INSERT INTO daily_slot_runs(id,invoked_at,outcome,whatsapp) VALUES($1,now() - interval '2 hours','awaiting_approval','template_required')",[crypto.randomUUID()]);
   await withEnv({CRON_SECRET:'s3cret',EXECUTIVE_ENABLED:'true'},async()=>{
     const {GET}=route({db,guard:true});
     const body=await (await call(GET)).json();
@@ -114,9 +116,15 @@ test('route: enabled in production queues the day\'s tasks once, runs them and r
     assert.deepEqual(again.daily.created,[],'idempotent per Berlin day');
     assert.equal(again.ran.length,0);
   });
-  const prioritized=(await db.query("SELECT output FROM enterprise_tasks WHERE task_kind='executive.prioritize'")).rows[0].output;
+  const prioritized=(await db.query("SELECT output->'output' AS output FROM enterprise_tasks WHERE task_kind='executive.prioritize'")).rows[0].output;
   assert.ok(Array.isArray(prioritized.priorities));
   assert.ok(prioritized.statusReportAt,'the prioritisation saw the status report of the same cycle');
+  assert.ok(prioritized.priorities.some(p=>/1 Entwürfe nicht beim Betreiber angekommen/.test(p.finding)&&p.operatorAction),'figures of the status report are read, not the storage wrapper');
+  // The WhatsApp answer „Executive“ reads the same stored prioritisation.
+  const sent=[];
+  await withEnv({WHATSAPP_APPROVER_WA_ID:'4915100000000'},async()=>assert.equal(await require('../.test-build/lib/whatsapp/executive-status').handleExecutiveStatus(
+    {id:'wamid.exec-prio',from:'4915100000000',body:'Executive'},{database:()=>db,send:async text=>{sent.push(text);return 'wamid.out';}}),true));
+  assert.match(sent[0],/^Executive-Status[^\n]*\n\nPrioritäten \([^)]+\):\n1\. .*nicht beim Betreiber angekommen.*\(deine Aktion\)/s);
   await db.close();
 });
 

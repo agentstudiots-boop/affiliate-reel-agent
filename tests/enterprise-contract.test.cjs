@@ -106,6 +106,7 @@ test('contract module is isolated: only zod and kernel modules, not used by app 
   }};
   walk('app');walk('lib');if(fs.existsSync('scripts'))walk('scripts');
   for(const file of ['proxy.ts','instrumentation.ts','next.config.ts'])if(fs.existsSync(file)&&/enterprise\/contract/.test(fs.readFileSync(file,'utf8')))users.push(file);
-  // Only the read-only enterprise level of the Command Center (H-01): health report schema and checkHealth.
-  assert.deepEqual(users.sort(),[path.join('lib','architecture','enterprise-snapshot.ts'),path.join('lib','architecture','enterprise.ts')].sort());
+  // The read-only enterprise level of the Command Center (H-01) and the executive cycle route (rollout 24.10.: health of
+  // every department after the cycle) use only the health report schema and checkHealth.
+  assert.deepEqual(users.sort(),[path.join('app','api','cron','executive-cycle','route.ts'),path.join('lib','architecture','enterprise-snapshot.ts'),path.join('lib','architecture','enterprise.ts')].sort());
 });

@@ -17,7 +17,8 @@ async function readOnly(db: Database, work: (sql: Sql) => Promise<Record<string,
 
 export function executiveReadViews(db: Database): Record<string, ReadView> {
   return {
-    latest_status_report: () => readOnly(db, async sql => (await sql.query(`SELECT output, updated_at FROM enterprise_tasks
+    // The repository stores { output, evidence, usage } per task; the department's own result is the inner output.
+    latest_status_report: () => readOnly(db, async sql => (await sql.query(`SELECT output->'output' AS output, updated_at FROM enterprise_tasks
       WHERE department='affiliate' AND task_kind='affiliate.status_report' AND status='succeeded'
       ORDER BY updated_at DESC LIMIT 1`)).rows),
     open_items: params => readOnly(db, async sql => (await sql.query(`SELECT

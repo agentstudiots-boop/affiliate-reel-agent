@@ -38,7 +38,8 @@ export async function handleExecutiveStatus(message: ExecutiveStatusMessage, dep
 // or an unreadable result gives an empty string – the status answer never fails because of it.
 async function latestPriorities(db: Database): Promise<string> {
   try {
-    const row = (await db.query(`SELECT output, updated_at FROM enterprise_tasks WHERE task_kind='executive.prioritize' AND status='succeeded'
+    // Stored as { output, evidence, usage } by the task repository; the priorities sit in the inner output.
+    const row = (await db.query(`SELECT output->'output' AS output, updated_at FROM enterprise_tasks WHERE task_kind='executive.prioritize' AND status='succeeded'
       ORDER BY updated_at DESC LIMIT 1`)).rows[0];
     const list = (row?.output as { priorities?: unknown } | null | undefined)?.priorities;
     const items = Array.isArray(list) ? list as { rank: number; finding: string; action: string; operatorAction: boolean }[] : null;
