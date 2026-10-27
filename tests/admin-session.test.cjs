@@ -75,7 +75,7 @@ test('access policy: internal pages and APIs are protected; webhooks, cron, land
   for (const path of ['/api/admin/migrate', '/api/content', '/api/content/jobs', '/api/operations', '/api/architecture', '/api/publication', '/api/production', '/api/trends', '/api/verify',
     '/api/meta/connection', '/api/whatsapp/connection', '/api/assets/upload', '/api/video/status', '/api/instagram/reel', '/api/generate'])
     assert.equal(classifyPath(path), 'internal_api', path);
-  for (const path of ['/login', '/produkte', '/produkte/abc', '/impressum', '/datenschutz', '/api/whatsapp/webhook', '/api/cron/daily-draft', '/api/cron/topic-scout', '/api/cron/topic-video', '/api/cron/executive-cycle',
+  for (const path of ['/login', '/produkte', '/produkte/abc', '/impressum', '/datenschutz', '/api/whatsapp/webhook', '/api/cron/daily-draft', '/api/cron/topic-scout', '/api/cron/topic-video', '/api/cron/executive-cycle', '/api/cron/controlling-import',
     '/api/cron/continue', '/api/cron/weekly-report', '/api/landing/click', '/api/auth/login', '/api/auth/logout', '/api/auth/session', '/_next/static/x.js', '/favicon.ico'])
     assert.equal(classifyPath(path), 'public', path);
   // Every API route in the repo is classified deliberately: new public routes need an explicit decision here.
@@ -83,8 +83,9 @@ test('access policy: internal pages and APIs are protected; webhooks, cron, land
   const walk = dir => { for (const entry of fs.readdirSync(dir, { withFileTypes: true })) { const p = `${dir}/${entry.name}`; if (entry.isDirectory()) walk(p); else if (entry.name === 'route.ts') routes.push(p); } };
   walk('app/api');
   const publicRoutes = routes.map(p => p.slice(3, -'/route.ts'.length)).filter(p => classifyPath(p) === 'public').sort();
+  // /api/cron/controlling-import (rollout 24.10.2026): public like every cron route, protected by CRON_SECRET and CONTROLLING_IMPORT_ENABLED.
   // /api/cron/executive-cycle (B-07): public like every cron route, protected by CRON_SECRET; additionally EXECUTIVE_ENABLED (default off) and not scheduled.
-  assert.deepEqual(publicRoutes, ['/api/auth/login', '/api/auth/logout', '/api/auth/session', '/api/cron/continue', '/api/cron/daily-draft', '/api/cron/executive-cycle', '/api/cron/topic-scout',
+  assert.deepEqual(publicRoutes, ['/api/auth/login', '/api/auth/logout', '/api/auth/session', '/api/cron/continue', '/api/cron/controlling-import', '/api/cron/daily-draft', '/api/cron/executive-cycle', '/api/cron/topic-scout',
     '/api/cron/topic-video', '/api/cron/weekly-report', '/api/landing/click', '/api/whatsapp/webhook']);
   // Each public route keeps its own server-side protection.
   for (const file of fs.readdirSync('app/api/cron')) assert.match(fs.readFileSync(`app/api/cron/${file}/route.ts`, 'utf8'), /CRON_SECRET[\s\S]*timingSafeEqual/);

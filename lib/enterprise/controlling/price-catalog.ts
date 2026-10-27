@@ -1,4 +1,5 @@
-// Price catalogue maintenance (task E-02) on table price_catalog of migration 040. Not wired into the app.
+// Price catalogue maintenance (task E-02) on table price_catalog of migration 040. Used by the operator route
+// app/api/controlling/prices (login required) and its form in the operations panel.
 //
 // The operator enters prices by hand from the provider's public price page; nothing is fetched or assumed. A price is parsed
 // exactly from its text (decimal comma, up to 6 decimals = micro currency units per unit) or rejected with a reason. Validity
