@@ -1,5 +1,6 @@
 import type { ServiceCapability } from "../capabilities";
 import { effectDecision, runtimeEnvironment, type EffectKind } from "../security/runtime-guard";
+import { switchOn, switchSource } from "../config/rollout";
 import { NODES, PROCESS_STEPS, type ArchNode, type OperationalStatus } from "./model";
 import type { Activity, ActivityEntry, RuntimeSnapshot } from "./snapshot";
 
@@ -51,7 +52,7 @@ function base(node: ArchNode, env: Env, caps: Map<string, ServiceCapability>, sn
     case "planned": return { status: "not_applicable", reason: "Geplant – kein Code, der laufen könnte", source: "Repo-Analyse", details: [] };
     case "code": return ok("Code im Deployment, keine eigene Konfiguration nötig", "Repo-Analyse");
     case "policy": return { status: rule.status, reason: rule.reason, source: "Betreiberentscheidung", details: [] };
-    case "flag": return env[rule.flag] === "true" ? ok(`${rule.label} eingeschaltet (${rule.flag})`)
+    case "flag": return switchOn(rule.flag, env) ? ok(`${rule.label} eingeschaltet (${rule.flag}${switchSource(rule.flag, env) === "rollout" ? ", Rollout-Wert im Repo" : ""})`)
       : { status: "disabled", reason: `${rule.label} ausgeschaltet (${rule.flag} ist nicht "true")`, source: "Konfiguration", details: [] };
     case "env": {
       const present = rule.anyOf.some(group => group.every(name => set(env, name)));
@@ -169,6 +170,9 @@ export function lastRunOf(id: string, snapshot: RuntimeSnapshot): LastRun | null
     case "postgres": return snapshot.available ? okOnly(snapshot.generatedAt, "Lesender Zugriff in dieser Anfrage") : null;
     case "instagram": case "facebook": return newest(published(id), okOnly(a?.affiliatePublished?.[id], "Letzter veröffentlichter Produktbeitrag (Affiliate)"));
     case "youtube": case "tiktok": case "x": case "pinterest": return published(id);
+    case "executive-agent": return a?.executive ? { okAt: a.executive.lastOkAt, failedAt: a.executive.lastFailedKind ? a.executive.lastAt : null,
+      error: a.executive.lastFailedKind ? `Aufgabe ${a.executive.lastFailedKind} nicht erfolgreich` : null, label: "Letzte abgeschlossene Executive-Aufgabe" } : null;
+    case "controlling-import": return okOnly(a?.controllingImportAt, "Letzte gebuchte Kostenzeile aus model_calls");
     default: return null;
   }
 }
@@ -233,6 +237,8 @@ export function computeRuntime(input: { capabilities: ServiceCapability[]; snaps
     { label: "Themen: Veröffentlichungsfreigaben", count: s.topic ? (s.topic.byStage.awaiting_publish_approval ?? 0) : null },
     { label: "Produkt-Pipeline: Inhaltsfreigaben", count: s.affiliate?.pendingContentApprovals ?? null },
     { label: "Produkt-Pipeline: Veröffentlichungsfreigaben", count: s.affiliate?.pendingPublications ?? null },
+    { label: "Videoproduktion: Kostenfreigaben", count: s.pendingCostApprovals ?? null },
+    { label: "Executive: Entscheidungsvorlagen", count: s.pendingDecisions ?? null },
   ];
   return { generatedAt: now.toISOString(), environment, sandbox, flags, nodes, steps, evidence: { available: s.available, reason: s.reason, generatedAt: s.generatedAt },
     pending: s.available ? pending : [], publications: s.publications ?? [], recentTopics: s.topic?.recent ?? [], recentChances: s.chances?.recent ?? [] };

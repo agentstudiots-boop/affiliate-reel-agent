@@ -53,6 +53,8 @@ export async function getOperationsSnapshot(db: Database = getDatabase()) {
   return {
     modelUsage,
     controlling,
+    // Waiting operator decisions with a delivered WhatsApp request (counts only, no content).
+    pending: { productionCostApprovals: Number(pending.rows[0]?.production ?? 0), publicationApprovals: Number(pending.rows[0]?.publications ?? 0) },
     environment: process.env.VERCEL_ENV === "production" ? "production" : "preview_or_local",
     readiness: {
       cronSecretConfigured: !!process.env.CRON_SECRET,
