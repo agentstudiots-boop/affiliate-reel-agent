@@ -51,6 +51,14 @@
     {
       "path": "/api/cron/topic-video",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/controlling-import",
+      "schedule": "40 5 * * *"
+    },
+    {
+      "path": "/api/cron/executive-cycle",
+      "schedule": "20 6 * * *"
     }
   ]
 }

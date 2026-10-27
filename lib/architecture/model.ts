@@ -108,6 +108,7 @@ export const AI_MODELS: Record<string, string> = {
   "topic-orchestrator": "Kein eigenes Modell; WhatsApp-Antworten zu Themen: openai/gpt-5.6-terra (über Replicate)",
   "product-scout": "Kein KI-Modell – Amazon-Produktsuche und Seiten-Prüfung",
   "product-reviewer": "Kein KI-Modell – regelbasiert gegen die Amazon-Detailseite",
+  "executive-agent": "Kein KI-Modell – regelbasierte Priorisierung aus vorhandenen Nachweisen",
   "creative-agent": "Referenzmodus: regelbasiert · KI-Modus: openai/gpt-4.1 (über Replicate)",
   "video-agent": "Referenzmodus: regelbasiert · KI-Modus: openai/gpt-4.1 (über Replicate)",
   "image-agent": "Referenzmodus: regelbasiert · KI-Modus: openai/gpt-4.1 (über Replicate)",
@@ -281,9 +282,20 @@ export const NODES: ArchNode[] = [
     responsibilities: ["Fingerprint/Version", "Einmal-Claim", "Widerruf bei Änderung"], code: ["lib/publishing/approval-gate.ts", "lib/publishing/authority.ts", "lib/meta/publication-gate.ts"],
     tests: ["tests/publish-approval-gate.test.cjs", "tests/instagram-approval-recheck.test.cjs", "tests/runtime-guard.test.cjs"], gaps: ["Themen-Pfad nicht live geprüft"],
     operation: { type: "services", ids: ["database"] } }),
-  n({ id: "executive-agent", label: "Executive-Agent", short: "Executive-Agent", kind: "agent", cluster: "approval", since: "none", effects: false,
-    plain: "Geplant, nicht gebaut. Freigaben erteilst ausschließlich du.", summary: "Nur als Schnittstelle vorgesehen (ApprovalAuthorityKind). Darf ohne geprüfte Codeänderung nichts freigeben. Kein Bestandteil des Go-live.",
-    responsibilities: ["Spätere Freigabeinstanz"], code: ["lib/publishing/authority.ts"], tests: [], gaps: ["Kein Agentencode vorhanden"], operation: { type: "planned" } }),
+  n({ id: "executive-agent", label: "Executive-Agent", short: "Executive", kind: "agent", cluster: "approval", since: "main", effects: false,
+    plain: "Wertet täglich den Stand aus (Statusbericht, offene Freigaben, Kosten) und ordnet Prioritäten – nur lesend. Freigaben erteilst ausschließlich du.",
+    summary: "Täglicher Zyklus (Cron 06:20 UTC): Statusbericht (L0) und Priorisierung (L2) je Berliner Tag, Health je Abteilung; keine Nachricht, keine Veröffentlichung, keine Ausgabe, kein Modellaufruf. Darf nie freigeben.",
+    responsibilities: ["Statusauswertung", "Priorisierung", "Health je Abteilung", "WhatsApp „Executive“ und Wochenbericht (eigene Schalter)"],
+    code: ["app/api/cron/executive-cycle/route.ts", "lib/enterprise/cycle.ts", "lib/enterprise/daily-tasks.ts", "lib/enterprise/departments/executive.ts", "lib/enterprise/departments/affiliate.ts"],
+    tests: ["tests/enterprise-cycle.test.cjs", "tests/executive-department.test.cjs"], gaps: ["Keine eigenen Entscheidungsvorlagen", "KI-Planer (B-08) nicht eingebunden"],
+    operation: { type: "flag", flag: "EXECUTIVE_ENABLED", label: "Executive-Zyklus" } }),
+  n({ id: "controlling-import", label: "Kostenbuch (Controlling)", short: "Kostenbuch", kind: "module", cluster: "infra", since: "main", effects: false,
+    plain: "Bucht jeden Modellaufruf ins Kostenbuch. Ohne gepflegten Preis bleibt der Betrag „unbekannt“, nie 0 €.",
+    summary: "Cron 05:40 UTC: model_calls → cost_entries (idempotent, Sperre gegen parallele Läufe), danach Nachbepreisung; Preise pflegst du mit Quelle im Betriebsbereich.",
+    responsibilities: ["Kostenzeilen je Einheit", "Abteilungszuordnung", "Nachbepreisung"],
+    code: ["app/api/cron/controlling-import/route.ts", "lib/enterprise/controlling/import-run.ts", "lib/enterprise/controlling/import-model-calls.ts", "app/api/controlling/prices/route.ts"],
+    tests: ["tests/controlling-import-run.test.cjs", "tests/controlling-model-call-import.test.cjs"], gaps: ["Preise noch nicht gepflegt", "Keine Euro-Umrechnung ohne belegten Kurs"],
+    operation: { type: "flag", flag: "CONTROLLING_IMPORT_ENABLED", label: "Kostenimport" } }),
 
   // ---- Multichannel-Publishing ----
   n({ id: "publisher", label: "Multichannel-Publisher", short: "Publisher", kind: "module", cluster: "publishing", since: "main", effects: true,
@@ -385,7 +397,7 @@ export const EDGES: ArchEdge[] = [
   { id: "a-content-whatsapp", from: "content-approval", to: "whatsapp", kind: "approval", label: "Nachricht" },
   { id: "a-whatsapp-prod", from: "whatsapp", to: "production-gate", kind: "approval", label: "Kostenfreigabe" },
   { id: "a-whatsapp-publish", from: "whatsapp", to: "publish-gate", kind: "approval", label: "„Freigeben“" },
-  { id: "a-exec-publish", from: "executive-agent", to: "publish-gate", kind: "approval", label: "geplant", planned: true },
+  { id: "a-exec-publish", from: "executive-agent", to: "publish-gate", kind: "approval", label: "keine Freigabebefugnis", planned: true },
   { id: "e-whatsapp-meta", from: "whatsapp", to: "meta-api", kind: "external", label: "Cloud API" },
   // Publishing
   { id: "p-gate-publisher", from: "publish-gate", to: "publisher", kind: "approval", label: "Permit je Fassung" },
@@ -406,6 +418,7 @@ export const EDGES: ArchEdge[] = [
   { id: "i-obs-jarvis", from: "observability", to: "jarvis", kind: "data", label: "Ereignisse" },
   { id: "i-jarvis-pg", from: "jarvis", to: "postgres", kind: "data", label: "Aufträge" },
   { id: "i-topic-pg", from: "topic-orchestrator", to: "postgres", kind: "data", label: "Läufe/Versionen" },
+  { id: "i-controlling-pg", from: "controlling-import", to: "postgres", kind: "data", label: "model_calls → Kostenbuch" },
   { id: "i-vercel-blob", from: "vercel", to: "blob", kind: "data", label: "Blob-Token" },
 ];
 

@@ -86,7 +86,8 @@ test('budgets: one per department, month and kind; approval stays explicit (AC-5
 });
 
 // Kernel modules in lib/enterprise (importer E-03) may use the ledger; their own isolation tests make sure they are not wired in.
-test('no application code uses the controlling ledger yet (AC-6)',()=>{
+// Since the rollout of 24.10.2026 the import cron is the one reviewed application entry point (writes via import-run.ts).
+test('application code reaches the controlling ledger only through the reviewed entry points (AC-6)',()=>{
   const users=[];
   const walk=dir=>{for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
     const full=path.join(dir,entry.name);
@@ -94,5 +95,6 @@ test('no application code uses the controlling ledger yet (AC-6)',()=>{
     else if(/\.(ts|tsx)$/.test(entry.name)&&/\b(price_catalog|cost_entries|revenue_entries)\b|\b(FROM|INTO|UPDATE|JOIN|TABLE)\s+budgets\b/i.test(fs.readFileSync(full,'utf8')))users.push(full);
   }};
   walk('app');walk('lib');
-  assert.deepEqual(users,[path.join('lib','memory','ensure-automation-schema.ts')]);
+  // The Command Center reads the ledger in READ ONLY transactions (snapshot.ts); model.ts only names it as text.
+  assert.deepEqual(users,[path.join('app','api','cron','controlling-import','route.ts'),path.join('lib','architecture','model.ts'),path.join('lib','architecture','snapshot.ts'),path.join('lib','memory','ensure-automation-schema.ts')]);
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PriceCatalogPanel } from "./price-catalog-panel";
 
 type Snapshot = {
   environment: "production" | "preview_or_local";
@@ -12,6 +13,7 @@ type Snapshot = {
   posts: Array<{ jobId: string; platform: string; product: string; url: string; publishedAt: string;
     measurement: null | { observedAt: string; clicks: number; conversions: number; revenueCents: number; costCents: number | null; source: string } }>;
   latestReport: null | { weekStart: string; status: string; text: string };
+  pending?: { productionCostApprovals: number; publicationApprovals: number };
   modelUsage?: null | Array<{ agent: string; model: string; calls: number; failures: number; failureRate: number; avgLatencyMs: number; p95LatencyMs: number;
     inputTokens: number | null; outputTokens: number | null; predictTimeS: number | null; lastCallAt: string | null }>;
   controlling?: null | {
@@ -71,6 +73,7 @@ export function OperationsPanel() {
     {data && <>
       <p><strong>Umgebung:</strong> {data.environment === "production" ? "Production" : "Preview / lokal – kein automatischer Vercel-Cronlauf"}</p>
       <p><strong>Konfiguration:</strong> Cron-Zugang {data.readiness.cronSecretConfigured ? "vorhanden" : "fehlt"} · Tavily {data.readiness.tavilyConfigured ? "bereit" : "fehlt"} · WhatsApp {data.readiness.whatsappConfigured ? "bereit" : "unvollständig"} · Tagesvorlage {data.readiness.dailyTemplateConfigured ? "aktiv" : "fehlt"} · Bildprovider {data.readiness.imageProviderConfigured ? "bereit" : data.readiness.imageProviderReason} · Blob {data.readiness.blobConfigured ? "bereit" : "fehlt"}.</p>
+      {data.pending && <p><strong>Offene Freigaben (WhatsApp gesendet):</strong> Kostenfreigaben Produktion {data.pending.productionCostApprovals} · Veröffentlichungsfreigaben {data.pending.publicationApprovals}</p>}
       <h4>Letzte Tagesläufe</h4>
       {data.days.length ? <div style={{overflowX:"auto"}}><table><thead><tr><th>Tag</th><th>Produkt</th><th>Planung</th><th>WhatsApp</th><th>Beitrag</th></tr></thead><tbody>
         {data.days.map(day => <tr key={day.jobId}><td>{day.day} · {day.slot === "morning" ? "Vormittag" : day.slot === "afternoon" ? "Nachmittag" : "auf Anfrage"}</td><td>{day.product}</td><td>{dailyLabels[day.status] || day.status}{day.format ? ` · ${day.format}` : ""}</td>
@@ -101,6 +104,7 @@ export function OperationsPanel() {
             <td>{ledgerAmount(row.revenue?.measured, data.controlling?.parts.revenue)}</td></tr>)}
         </tbody></table></div>}
       <p className="muted">Controlling: nur erfasste Einträge mit Quelle. „unbekannt“ = Einträge ohne bekannten Betrag; „mind.“ = Summe ohne die unbekannten Beträge.</p>
+      <PriceCatalogPanel />
       {data.latestReport && <details><summary>Letzte Wochenbilanz · {data.latestReport.weekStart} · {data.latestReport.status}</summary><pre style={{whiteSpace:"pre-wrap"}}>{data.latestReport.text || "Bericht noch nicht erstellt."}</pre></details>}
       <p className="muted">Klicks, Verkäufe und Provisionen stammen aus erfassten Messständen. Zum Eintragen: „Gespeicherten Verlauf laden“, den Job wählen und dessen Leistungsformular öffnen. Ohne PartnerNet-Daten sind diese Werte unbekannt. Die Werte einer Beitragszeile sind der letzte Messstand dieses Beitrags, keine Tageswerte.</p>
     </>}

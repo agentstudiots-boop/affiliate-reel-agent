@@ -9,13 +9,18 @@
 // only fills lines whose amount is still unknown. Calls younger than a minute are left for the next run, so a call whose
 // insert committed late (lower id, parallel instances) is not skipped by the cursor. The department is supplied by the
 // caller (e.g. the register mapping of E-06); without it the line stays unassigned. Reads model_calls and price_catalog,
-// writes only cost_entries; not wired into the app.
+// writes only cost_entries. Run by the cron /api/cron/controlling-import through import-run.ts (CONTROLLING_IMPORT_ENABLED).
 
 import { randomUUID } from "node:crypto";
 import type { Database, Sql } from "../../memory/db";
 
 export type DepartmentOf = (agent: string) => string | null;
-export type ImportResult = { calls: number; inserted: number; priced: number; unpriced: number; lastCallId: number | null };
+export type ImportResult = { calls: number; inserted: number; priced: number; unpriced: number; lastCallId: number | null; skipped?: true };
+
+// One import or repricing at a time: a second, concurrent run (overlapping cron, manual call) skips instead of doing the same
+// work twice. The unique (source, source_ref) key already prevents double counting; this lock prevents the duplicate work.
+export const IMPORT_LOCK_KEY = "controlling-import:model_calls";
+const exclusive = async (sql: Sql) => (await sql.query("SELECT pg_try_advisory_xact_lock(hashtext($1)) AS ok", [IMPORT_LOCK_KEY])).rows[0]?.ok === true;
 
 const UNITS = [
   { unit: "input_token", column: "input_tokens" },
@@ -50,10 +55,11 @@ async function lockPrices(sql: Sql, pairs: Iterable<[string, string]>) {
 
 // Imports calls with id > afterId (oldest first, at most `limit`). The caller keeps the returned lastCallId as cursor;
 // re-importing an id range is harmless because existing lines are skipped.
-export async function importModelCalls(db: Database, options: { afterId?: number; limit?: number; departmentOf?: DepartmentOf } = {}): Promise<ImportResult> {
+export async function importModelCalls(db: Database, options: { afterId?: number; limit?: number; departmentOf?: DepartmentOf; exclusive?: boolean } = {}): Promise<ImportResult> {
   const afterId = Number.isSafeInteger(options.afterId) && (options.afterId ?? 0) >= 0 ? options.afterId! : 0;
   const limit = Math.min(Math.max(Number.isSafeInteger(options.limit) ? options.limit! : MAX_BATCH, 1), MAX_BATCH);
   return db.transaction(async sql => {
+    if (options.exclusive && !(await exclusive(sql))) return { calls: 0, inserted: 0, priced: 0, unpriced: 0, lastCallId: null, skipped: true };
     const calls = (await sql.query(`SELECT id, agent, model, provider, input_tokens, output_tokens, predict_time_s, created_at
       FROM model_calls WHERE id > $1 AND created_at < now() - interval '1 minute' ORDER BY id LIMIT $2`, [afterId, limit])).rows;
     const result: ImportResult = { calls: calls.length, inserted: 0, priced: 0, unpriced: 0, lastCallId: null };
@@ -87,9 +93,10 @@ export async function importModelCalls(db: Database, options: { afterId?: number
 
 // Applies prices entered after the import to model_calls lines whose amount is still unknown (oldest first, at most
 // `limit`). A known amount is never changed. Returns how many lines got an amount.
-export async function repriceModelCallEntries(db: Database, options: { limit?: number } = {}): Promise<{ checked: number; repriced: number }> {
+export async function repriceModelCallEntries(db: Database, options: { limit?: number; exclusive?: boolean } = {}): Promise<{ checked: number; repriced: number; skipped?: true }> {
   const limit = Math.min(Math.max(Number.isSafeInteger(options.limit) ? options.limit! : MAX_BATCH, 1), MAX_BATCH);
   return db.transaction(async sql => {
+    if (options.exclusive && !(await exclusive(sql))) return { checked: 0, repriced: 0, skipped: true };
     // Only lines for which a price now exists: lines that can never be priced must not block the batch forever.
     const open = (await sql.query(`SELECT c.id, c.provider, c.item, c.unit, c.quantity::float8 AS quantity, c.occurred_at FROM cost_entries c
       WHERE c.source='model_calls' AND c.amount_micros IS NULL AND c.item IS NOT NULL
