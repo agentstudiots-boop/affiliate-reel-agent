@@ -8,7 +8,7 @@
 // Only switches listed here are read through this module; every other switch keeps reading process.env directly.
 
 export const ROLLOUT = {
-  // Controlling: model_calls → cost_entries import and repricing (cron /api/cron/controlling-import).
+  // Controlling: model_calls → cost ledger import and repricing (cron /api/cron/controlling-import).
   CONTROLLING_IMPORT_ENABLED: "false",
 } as const satisfies Record<string, "true" | "false">;
 

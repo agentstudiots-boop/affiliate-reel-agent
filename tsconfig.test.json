@@ -59,6 +59,8 @@
     "lib/capabilities/**/*.ts",
     "lib/security/**/*.ts",
     "lib/enterprise/controlling/import-model-calls.ts",
+    "lib/enterprise/controlling/import-run.ts",
+    "lib/config/rollout.ts",
     "lib/enterprise/controlling/agent-departments.ts",
     "lib/enterprise/controlling/snapshot.ts",
     "lib/enterprise/controlling/manual-entries.ts",
