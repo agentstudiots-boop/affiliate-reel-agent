@@ -73,7 +73,7 @@ export function buildCandidate(cluster: Cluster, now: Date, variant = 0): TopicC
   const scored = scoreCluster(cluster, type, now);
   const concept = clusterConcept(cluster);
   const pattern = editorialStyleEnabled() ? choosePattern({ type, topicId: topicIdFor(concept), variant, sensitive: scored.sensitive, gossip: scored.gossip,
-    hasNewsSource: cluster.signals.some(signal => signal.kind === "news" && !!signal.publisher) }) : null;
+    hasNewsSource: cluster.signals.some(signal => signal.kind === "news" && !!signal.publisher), aiCopy: process.env.TOPIC_COPY_MODE === "ai" && !!process.env.REPLICATE_API_TOKEN?.trim() }) : null;
   const texts = topicTexts(cluster, type, scored, now, variant, pattern);
   const signals = cluster.signals.slice().sort((a, b) => b.strength - a.strength).slice(0, 12);
   const candidate = {

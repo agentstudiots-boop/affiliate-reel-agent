@@ -165,7 +165,10 @@ Stand 27.10.:
 - **P1b (redaktionelle Ausrichtung): implementiert und getestet, nicht gemergt.** `lib/topics/editorial.ts` gibt jedem Thema eine
   Erzählweise: Mini-Geschichte, Aha-Moment, Humor, Gefühl oder Alltagskniff.
   - Die Auswahl hängt vom Thementyp ab und ist je Thema stabil; eine neue Variante wechselt die Erzählweise.
-  - Kein Humor und kein Kniff bei sensiblen Themen oder Klatsch. Ein Aha-Moment nur mit Quelle, der Publisher wird genannt.
+  - Kein Humor und kein Kniff bei sensiblen Themen oder Klatsch, kein Gefühl bei sensiblen Themen.
+  - Ein Aha-Moment nur mit Quelle: der Publisher wird genannt, und es steht nur, was wörtlich im Quellentitel steht.
+  - Geschichte und Kniff nur, wenn der Text vom Modell kommt (`TOPIC_COPY_MODE=ai`), weil der Regeltext sie nicht einlösen kann.
+  - Ein Kniff-Text mit Risikobezug (Chemie, Strom, Gas, Feuer, Lebensmittel, Schimmel, Medikamente) fällt auf den Regeltext zurück.
   - Referenzmodus: passender Hook, Winkel und Abschlussfrage. KI-Modus: eine Leitlinie zusätzlich zu den unveränderten Regeln gegen Erfindungen.
   - Im Vorschlag steht „Erzählweise: …“.
   - Schalter `TOPIC_EDITORIAL_STYLE=on`, Standard aus. Ohne Schalter sind alle Texte unverändert.

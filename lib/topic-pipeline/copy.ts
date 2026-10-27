@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Generator } from "../content/agent";
 import { UNSUPPORTED_CLAIM_PATTERN } from "../content/trend";
 import type { FormatOverride } from "../formats/override";
-import { PATTERN_GUIDANCE, PATTERN_QUESTION } from "../topics/editorial";
+import { PATTERN_GUIDANCE, PATTERN_QUESTION, RISKY_HACK_PATTERN } from "../topics/editorial";
 import { tokens } from "../topics/lexicon";
 import type { TopicCandidate } from "../topics/schema";
 import type { ProductionCopy } from "../visual/renderers";
@@ -71,6 +71,7 @@ export async function writeTopicCopy(candidate: TopicCandidate, options: { gener
       cta: reference.cta, question: reference.question, points: reference.points.slice(0, 5), video_script: reference.videoScript }));
     const text = JSON.stringify(result);
     if (UNSUPPORTED_CLAIM_PATTERN.test(text) || /https?:\/\/|www\./i.test(text)) return { copy: reference, modelCalls: 1, fallbackReason: "unbelegte Aussage oder Link im Modelltext" };
+    if (candidate.editorial_pattern === "hack" && RISKY_HACK_PATTERN.test(text)) return { copy: reference, modelCalls: 1, fallbackReason: "Kniff mit Risikobezug (Chemie, Strom, Gas, Feuer, Lebensmittel, Schimmel, Medikamente)" };
     const tags = hashtags(candidate);
     return { modelCalls: 1, copy: { ...reference, hook: result.hook, body: result.body, caption: `${result.caption}\n\n${tags.join(" ")}`, cta: result.cta, question: result.question,
       points: result.points, videoScript: result.video_script, hashtags: tags, origin: "model" } };

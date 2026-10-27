@@ -15,8 +15,10 @@ export const EDITORIAL_LABEL: Record<EditorialPattern, string> = {
 
 export const editorialStyleEnabled = (env: Record<string, string | undefined> = process.env) => env.TOPIC_EDITORIAL_STYLE === "on";
 
-// Which patterns suit which kind of topic. Humour and hacks never on sensitive topics or plain news; an aha moment needs an
-// attributed source (a news signal), because without one there is nothing surprising we could truthfully say.
+// Which patterns suit which kind of topic. Humour, hacks and emotion never on sensitive topics (an implied relief would be an
+// effect claim; Gossip excludes humour and hacks too); an aha moment needs an attributed source (a news signal), because
+// without one there is nothing surprising we could truthfully say. Story and hack promise content the rule template cannot
+// deliver (a scene, a concrete handgrip), so they are only chosen when the copy is written by the model (TOPIC_COPY_MODE=ai).
 const BY_TYPE: Record<TrendType, EditorialPattern[]> = {
   PRACTICAL_LIFE: ["hack", "story", "humor", "emotion"],
   EVERGREEN: ["hack", "humor", "story", "emotion"],
@@ -30,12 +32,14 @@ const BY_TYPE: Record<TrendType, EditorialPattern[]> = {
   BREAKING_NEWS: ["aha", "story"],
 };
 
-export type PatternContext = { type: TrendType; topicId: string; variant: number; sensitive: boolean; gossip: boolean; hasNewsSource: boolean };
+export type PatternContext = { type: TrendType; topicId: string; variant: number; sensitive: boolean; gossip: boolean; hasNewsSource: boolean; aiCopy: boolean };
 
 export function allowedPatterns(context: Omit<PatternContext, "topicId" | "variant">): EditorialPattern[] {
   return BY_TYPE[context.type].filter(pattern =>
     !(pattern === "aha" && !context.hasNewsSource) &&
-    !((pattern === "humor" || pattern === "hack") && (context.sensitive || context.gossip)));
+    !((pattern === "humor" || pattern === "hack") && (context.sensitive || context.gossip)) &&
+    !(pattern === "emotion" && context.sensitive) &&
+    !((pattern === "story" || pattern === "hack") && !context.aiCopy));
 }
 
 // Deterministic per topic (same topic → same pattern, so a revision keeps its voice); a new variant moves to the next
@@ -75,13 +79,15 @@ export function patternTexts(pattern: EditorialPattern, short: string, publisher
 export const PATTERN_GUIDANCE: Record<EditorialPattern, string> = {
   story: "Erzählweise Mini-Geschichte: Beginne mit einer konkreten, alltäglichen Szene in der Du-Form (ohne erfundene Personen oder Erlebnisse als Tatsachen), "
     + "baue einen kleinen Wendepunkt ein und löse ihn mit einer nachvollziehbaren Handlung auf.",
-  aha: "Erzählweise Aha-Moment: Stelle die überraschende Information aus den gelieferten Quellen an den Anfang, immer mit Nennung des Publishers, "
-    + "und erkläre dann, was sie im Alltag bedeutet. Ohne Quelle keine überraschende Behauptung.",
+  aha: "Erzählweise Aha-Moment: Stelle die Information aus einem gelieferten Quellentitel an den Anfang, immer mit Nennung des Publishers, "
+    + "und erkläre dann, was sie im Alltag bedeutet. Nur was wörtlich im Quellentitel steht; keine Zahlen, Details oder Hintergründe, die dort nicht stehen.",
   humor: "Erzählweise Humor: leichter, selbstironischer Ton über die Alltagssituation, die viele kennen; nie über Personen, Gruppen oder Missgeschicke anderer. "
     + "Nach dem Schmunzeln folgt ein ernst gemeinter, einfacher Schritt.",
   emotion: "Erzählweise Gefühl: Benenne das Gefühl der Situation (z. B. Stress, Zeitdruck, Erleichterung, Gemütlichkeit) ehrlich und ohne Angstmache, "
     + "und zeige einen machbaren Schritt hin zu mehr Leichtigkeit.",
-  hack: "Erzählweise Alltagskniff: Ein einfacher Handgriff mit Dingen, die man zuhause hat und den jeder ohne Spezialwissen nachvollziehen kann. "
+  hack: "Erzählweise Alltagskniff: Nur ein Handgriff, der sich direkt aus Thema und Kernaussage ergibt und den jeder ohne Spezialwissen nachvollziehen kann. "
+    + "Keine Reinigungs- oder Chemikalienmischungen, nichts mit Strom, Gas, offener Flamme, Lebensmittelhaltbarkeit, Schimmel oder Medikamenten; "
+    + "im Zweifel ein organisatorischer Kniff (Reihenfolge, Ort, Zeitpunkt) statt eines stofflichen. "
     + "Formuliere ihn als Vorschlag zum Ausprobieren, nie als garantierte Wirkung; keine Wirk-, Spar- oder Gesundheitsversprechen.",
 };
 
@@ -90,3 +96,9 @@ export const PATTERN_QUESTION: Record<EditorialPattern, string> = {
   story: "Wie war das zuletzt bei dir?", aha: "Hättest du das gewusst?", humor: "Wer kennt's? Erzähl gern in den Kommentaren.",
   emotion: "Was macht deinen Alltag gerade leichter?", hack: "Probierst du das aus?",
 };
+
+// Model texts in the hack voice that touch these areas fall back to the reference text (like unsupported claims): a wrong
+// household tip with chemicals, electricity, gas, fire, food safety, mould or medicine can do real harm.
+// Long stems match inside compounds („Verschimmeltes“, „Chlorreiniger“), short ones at a word start („Gasherd“). Harmless
+// words like „Gasse“ also fall back – the safe direction.
+export const RISKY_HACK_PATTERN = /(?:misch|chlor|essig|natron|backpulver|zitronensäure|bleich|ammoniak|spiritus|lösungsmittel|terpentin|steckdose|flamme|schimmel|haltbar|verdorben|medikament|tablette|arznei)|\b(?:gas|strom|feuer|kerze|kabel)/i;

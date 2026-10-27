@@ -49,10 +49,12 @@ test('switch off (default): no pattern and the exact previous hook/angle', async
   assert.equal(E.editorialStyleEnabled({}), false);
 });
 
-test('pattern choice: humour and hacks never on sensitive or gossip topics, aha only with an attributed source, deterministic per topic', () => {
-  const base = { type: 'PRACTICAL_LIFE', sensitive: false, gossip: false, hasNewsSource: false };
+test('pattern choice: no humour, hack or emotion on sensitive topics, aha only with a source, story/hack only with model copy, deterministic', () => {
+  const base = { type: 'PRACTICAL_LIFE', sensitive: false, gossip: false, hasNewsSource: false, aiCopy: true };
   assert.deepEqual(E.allowedPatterns(base), ['hack', 'story', 'humor', 'emotion']);
-  assert.deepEqual(E.allowedPatterns({ ...base, sensitive: true }), ['story', 'emotion']);
+  assert.deepEqual(E.allowedPatterns({ ...base, sensitive: true }), ['story']);
+  assert.deepEqual(E.allowedPatterns({ ...base, sensitive: true, aiCopy: false }), [], 'sensitive in reference mode: no pattern, previous texts');
+  assert.deepEqual(E.allowedPatterns({ ...base, aiCopy: false }), ['humor', 'emotion'], 'the rule template cannot deliver a scene or a handgrip');
   assert.deepEqual(E.allowedPatterns({ ...base, type: 'ENTERTAINMENT', gossip: true }), ['story']);
   assert.deepEqual(E.allowedPatterns({ ...base, type: 'BREAKING_NEWS' }), ['story']);
   assert.deepEqual(E.allowedPatterns({ ...base, type: 'BREAKING_NEWS', hasNewsSource: true }), ['aha', 'story']);
@@ -63,7 +65,7 @@ test('pattern choice: humour and hacks never on sensitive or gossip topics, aha 
 });
 
 test('switch on: every offline topic gets a pattern, all patterns pass the gate (no claims, no sensational tone, hook quality)', async () => {
-  const restore = withEnv({ TOPIC_EDITORIAL_STYLE: 'on' });
+  const restore = withEnv({ TOPIC_EDITORIAL_STYLE: 'on', TOPIC_COPY_MODE: 'ai', REPLICATE_API_TOKEN: 'test-token' });
   try {
     const used = new Set();
     for (const now of DATES) for (const cluster of await offlineClusters(now)) for (const variant of [0, 1, 2]) {
@@ -82,7 +84,7 @@ test('switch on: every offline topic gets a pattern, all patterns pass the gate 
 });
 
 test('switch on: a news topic may become an aha moment, always attributed to its publisher', () => {
-  const restore = withEnv({ TOPIC_EDITORIAL_STYLE: 'on' });
+  const restore = withEnv({ TOPIC_EDITORIAL_STYLE: 'on', TOPIC_COPY_MODE: 'ai', REPLICATE_API_TOKEN: 'test-token' });
   try {
     const patterns = [0, 1, 2, 3].map(variant => buildCandidate(newsCluster, NOW, variant));
     const aha = patterns.filter(candidate => candidate.editorial_pattern === 'aha');
@@ -93,7 +95,7 @@ test('switch on: a news topic may become an aha moment, always attributed to its
 });
 
 test('copy: the reference question follows the pattern; the model gets the pattern guidance on top of the unchanged rules', async () => {
-  const restore = withEnv({ TOPIC_EDITORIAL_STYLE: 'on' });
+  const restore = withEnv({ TOPIC_EDITORIAL_STYLE: 'on', TOPIC_COPY_MODE: 'ai', REPLICATE_API_TOKEN: 'test-token' });
   let candidate;
   try { candidate = buildCandidate((await offlineClusters(NOW))[0], NOW, 0); } finally { restore(); }
   const pattern = candidate.editorial_pattern;
@@ -123,4 +125,42 @@ test('schema: stored candidates without a pattern stay valid; unknown patterns a
   assert.equal(topicCandidateSchema.safeParse(candidate).success, true);
   assert.equal(topicCandidateSchema.safeParse({ ...candidate, editorial_pattern: 'story' }).success, true);
   assert.equal(topicCandidateSchema.safeParse({ ...candidate, editorial_pattern: 'clickbait' }).success, false);
+});
+
+test('reference mode (no model copy): only humour and emotion, never a story or hack the template cannot deliver', async () => {
+  for (const env of [{ TOPIC_COPY_MODE: undefined }, { TOPIC_COPY_MODE: 'ai', REPLICATE_API_TOKEN: undefined }]) {
+    const restore = withEnv({ TOPIC_EDITORIAL_STYLE: 'on', ...env });
+    try {
+      for (const now of DATES) for (const cluster of await offlineClusters(now)) for (const variant of [0, 1, 2]) {
+        const built = buildCandidate(cluster, now, variant);
+        assert.ok([undefined, 'humor', 'emotion'].includes(built.editorial_pattern), `${built.editorial_pattern}: ${built.hook}`);
+      }
+    } finally { restore(); }
+  }
+});
+
+test('hack guard: the model guidance rules out risky tips, and a risky hack text falls back to the reference copy', async () => {
+  assert.match(E.PATTERN_GUIDANCE.hack, /Keine Reinigungs- oder Chemikalienmischungen, nichts mit Strom, Gas, offener Flamme, Lebensmittelhaltbarkeit, Schimmel oder Medikamenten/);
+  assert.match(E.PATTERN_GUIDANCE.aha, /Nur was wörtlich im Quellentitel steht/);
+  const restore = withEnv({ TOPIC_EDITORIAL_STYLE: 'on', TOPIC_COPY_MODE: 'ai', REPLICATE_API_TOKEN: 'test-token' });
+  let hack;
+  try {
+    for (const now of DATES) for (const cluster of await offlineClusters(now)) for (const variant of [0, 1, 2]) {
+      const built = buildCandidate(cluster, now, variant);
+      if (!hack && built.editorial_pattern === 'hack') hack = built;
+    }
+  } finally { restore(); }
+  assert.ok(hack, 'an offline topic gets the hack voice');
+  const answer = text => async (agent, instruction, input, schema, fallback) => ({ ...fallback(), body: text, caption: `${text} Mehr dazu im Beitrag.` });
+  for (const risky of ['Einfach Essig und Chlorreiniger mischen, dann glänzt alles.', 'Die Steckdose kurz mit einem feuchten Tuch abwischen.',
+    'Verschimmeltes Brot einfach großzügig abschneiden.', 'Eine Kerze ins Regal stellen, das trocknet die Luft.']) {
+    const result = await writeTopicCopy(hack, { generate: answer(risky) });
+    assert.equal(result.copy.origin, 'reference_template', risky);
+    assert.match(result.fallbackReason, /Kniff mit Risikobezug/);
+  }
+  const safe = await writeTopicCopy(hack, { generate: answer('Leg die Dinge, die du morgens brauchst, schon abends an einen festen Platz neben die Tür.') });
+  assert.equal(safe.copy.origin, 'model');
+  // Only the hack voice is guarded this way; other voices and the switch-off path keep their previous checks.
+  const story = { ...hack, editorial_pattern: 'story' };
+  assert.equal((await writeTopicCopy(story, { generate: answer('Abends noch eine Kerze, dann wird es gemütlich auf dem Sofa.') })).copy.origin, 'model');
 });
