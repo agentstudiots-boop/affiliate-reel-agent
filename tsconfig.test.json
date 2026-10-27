@@ -28,6 +28,8 @@
     "lib/enterprise/tasks/budget.ts",
     "lib/enterprise/decisions.ts",
     "lib/enterprise/departments/affiliate.ts",
+    "lib/enterprise/departments/executive.ts",
+    "lib/enterprise/daily-tasks.ts",
     "lib/enterprise/cycle.ts",
     "lib/enterprise/planner.ts",
     "lib/enterprise/executive-weekly.ts",
