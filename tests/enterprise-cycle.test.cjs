@@ -101,21 +101,28 @@ test('route: secret required; switch off by default ⇒ no database access; prev
   });
 });
 
-test('route: enabled in production runs one cycle (AC-4)',async()=>{
+test('route: enabled in production queues the day\'s tasks once, runs them and reports health (AC-4, rollout 24.10.)',async()=>{
   const db=await pgliteDatabase();
-  await enqueue(db,'affiliate','affiliate.status_report');
   await withEnv({CRON_SECRET:'s3cret',EXECUTIVE_ENABLED:'true'},async()=>{
     const {GET}=route({db,guard:true});
     const body=await (await call(GET)).json();
     assert.equal(body.status,'ok');
-    assert.deepEqual(body.ran.map(r=>r.outcome),['succeeded']);
+    assert.deepEqual(body.daily.created,['affiliate.status_report','executive.prioritize']);
+    assert.deepEqual(body.ran.map(r=>`${r.taskKind}:${r.outcome}`),['affiliate.status_report:succeeded','executive.prioritize:succeeded'],'status report first, then prioritisation');
+    assert.deepEqual(body.health.map(h=>h.department),['affiliate','executive']);
+    const again=await (await call(GET)).json();
+    assert.deepEqual(again.daily.created,[],'idempotent per Berlin day');
+    assert.equal(again.ran.length,0);
   });
+  const prioritized=(await db.query("SELECT output FROM enterprise_tasks WHERE task_kind='executive.prioritize'")).rows[0].output;
+  assert.ok(Array.isArray(prioritized.priorities));
+  assert.ok(prioritized.statusReportAt,'the prioritisation saw the status report of the same cycle');
   await db.close();
 });
 
-test('the route is not scheduled and nothing else calls the cycle (AC-5)',()=>{
-  const crons=JSON.parse(fs.readFileSync('vercel.json','utf8')).crons.map(c=>c.path);
-  assert.ok(!crons.includes('/api/cron/executive-cycle'),'scheduling is a separate operator decision');
+test('the route is scheduled once a day (rollout 24.10.) and nothing else calls the cycle (AC-5)',()=>{
+  const crons=JSON.parse(fs.readFileSync('vercel.json','utf8')).crons.filter(c=>c.path==='/api/cron/executive-cycle');
+  assert.deepEqual(crons.map(c=>c.schedule),['20 6 * * *']);
   const source=fs.readFileSync('lib/enterprise/cycle.ts','utf8');
   assert.doesNotMatch(source,/process\.env|fetch\(|getDatabase|sendWhatsApp|publish\(/);
   const users=[];

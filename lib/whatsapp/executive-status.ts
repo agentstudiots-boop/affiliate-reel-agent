@@ -29,6 +29,22 @@ export async function handleExecutiveStatus(message: ExecutiveStatusMessage, dep
   if (!claimed.rows.length) return true;
   const now = (deps.now ?? (() => new Date()))();
   const section = await readExecutiveWeekly(db, new Date(now.getTime() - WINDOW_MS), now, now);
-  await deps.send(`Executive-Status (letzte 7 Tage)\n\n${formatExecutiveWeekly(section, "in den letzten 7 Tagen")}`.slice(0, 4000));
+  const priorities = await latestPriorities(db);
+  await deps.send(`Executive-Status (letzte 7 Tage)\n\n${priorities}${formatExecutiveWeekly(section, "in den letzten 7 Tagen")}`.slice(0, 4000));
   return true;
+}
+
+// The newest prioritisation of the daily executive cycle (executive.prioritize), as a short list. Missing table, no task yet
+// or an unreadable result gives an empty string – the status answer never fails because of it.
+async function latestPriorities(db: Database): Promise<string> {
+  try {
+    const row = (await db.query(`SELECT output, updated_at FROM enterprise_tasks WHERE task_kind='executive.prioritize' AND status='succeeded'
+      ORDER BY updated_at DESC LIMIT 1`)).rows[0];
+    const list = (row?.output as { priorities?: unknown } | null | undefined)?.priorities;
+    const items = Array.isArray(list) ? list as { rank: number; finding: string; action: string; operatorAction: boolean }[] : null;
+    if (!row || !items) return "";
+    const at = new Date(String(row.updated_at)).toLocaleString("de-DE", { timeZone: "Europe/Berlin", dateStyle: "short", timeStyle: "short" });
+    if (!items.length) return `Prioritäten (${at}): nichts Offenes.\n\n`;
+    return `Prioritäten (${at}):\n${items.slice(0, 6).map(item => `${item.rank}. ${String(item.finding).slice(0, 140)} → ${String(item.action).slice(0, 100)}${item.operatorAction ? " (deine Aktion)" : ""}`).join("\n")}\n\n`;
+  } catch { return ""; }
 }

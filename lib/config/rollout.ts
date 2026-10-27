@@ -10,6 +10,12 @@
 export const ROLLOUT = {
   // Controlling: model_calls → cost ledger import and repricing (cron /api/cron/controlling-import).
   CONTROLLING_IMPORT_ENABLED: "false",
+  // Executive: daily cycle (status report, prioritisation, health; cron /api/cron/executive-cycle), read-only.
+  EXECUTIVE_ENABLED: "false",
+  // Executive section in the Monday weekly report (read-only).
+  EXECUTIVE_WEEKLY_REPORT: "false",
+  // WhatsApp command „Executive“ from the approver number (read-only, no model call).
+  EXECUTIVE_WHATSAPP: "false",
 } as const satisfies Record<string, "true" | "false">;
 
 export type RolloutSwitch = keyof typeof ROLLOUT;
