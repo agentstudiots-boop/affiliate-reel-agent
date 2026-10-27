@@ -37,6 +37,7 @@ import { spokenText, videoProviderPrompt, writeVideoBriefing, type VideoBriefing
 import { approvedVideoSpendThisMonth, maxCostPerVideo, monthlyVideoBudget, planTopicVideo, type VideoPlan } from "./video-plan";
 import { VIDEO_REVIEW_CHECKLIST, videoCostText, videoProposalText } from "./video-messages";
 import { jarvisSelectTopic } from "../trendsetter/topic";
+import { dailyTopicOrderLimit, operatorTopicCandidate, topicOrderCommand } from "./topic-order";
 import { productCouplingBlocked, productListCommand, productSelection, suggestProducts, type ProductState, type ProductSuggester } from "./product-coupling";
 
 // The only module that connects topic scout, Jarvis gate, format router, visual engine, master content, platform
@@ -440,6 +441,54 @@ export async function routeTopicMessage(deps: TopicPipelineDeps, message: Inboun
   const row = await load(deps.db, target.content_id);
   if (!row) return true;
   await guarded(deps, row, () => applyRoute(deps, row, route, message, row.stage === "proposed" ? "proposal" : "publish"));
+  return true;
+}
+
+// Explicit topic orders without a quoted message („Mach etwas über Herbstmüdigkeit“, „Thema: Laub im Garten“). Only the
+// trusted operator; each message is claimed once (topic_inbound). The order replaces the scout's discovery, never the
+// protective checks or an approval: the result is an ordinary proposal that needs „Freigeben“ (production) and a second
+// „Freigeben“ (publication). Orders per Berlin day are limited (dailyTopicOrderLimit), refused orders do not count.
+export async function requestTopicOrder(deps: TopicPipelineDeps, message: Inbound): Promise<boolean> {
+  if (message.replyToMessageId) return false;
+  const order = topicOrderCommand(message.body);
+  if (!order) return false;
+  const trusted = deps.trustedWaId.replace(/\D/g, "");
+  if (!trusted || message.from.replace(/\D/g, "") !== trusted) return false;
+  const db = deps.db;
+  await ensureAutomationSchema(db);
+  if ((await db.query("SELECT 1 FROM topic_inbound WHERE message_id=$1", [message.id])).rows.length) return true; // webhook replay
+  const at = now(deps).toISOString();
+  const taken = Number((await db.query(`SELECT count(*)::int AS n FROM topic_inbound WHERE action='topic_order'
+    AND created_at >= (date_trunc('day', $1::timestamptz AT TIME ZONE 'Europe/Berlin') AT TIME ZONE 'Europe/Berlin')`, [at])).rows[0]?.n ?? 0);
+  const limit = dailyTopicOrderLimit();
+  const action = taken >= limit ? "topic_order_limit" : "topic_order";
+  const claimed = await db.query("INSERT INTO topic_inbound(message_id,content_id,action,created_at) VALUES($1,NULL,$2,$3) ON CONFLICT DO NOTHING RETURNING message_id", [message.id, action, at]);
+  if (!claimed.rows.length) return true;
+  if (action === "topic_order_limit") {
+    emitEvent("topic_order_refused", { reason: "daily_limit", taken, limit });
+    await deps.send(`Heute sind schon ${taken} Themenaufträge angelegt (Tageslimit ${limit}). Schick das Thema „${order.topic}“ bitte morgen noch einmal. Es wurde nichts erstellt oder veröffentlicht.`);
+    return true;
+  }
+  const history = await loadTopicHistory(db).catch(() => []);
+  const productHistory = await loadSelectionHistory(db).catch(() => undefined);
+  const result = operatorTopicCandidate(order.topic, { now: now(deps), history, productHistory });
+  if (result.status === "rejected") {
+    await db.query("UPDATE topic_inbound SET action='topic_order_rejected' WHERE message_id=$1", [message.id]);
+    emitEvent("topic_order_refused", { reason: "protective_check", checks: result.reasons.length });
+    await deps.send(`Zum Thema „${order.topic}“ lege ich keinen Vorschlag an: ${result.reasons.join("; ")}. Diese Prüfungen gelten auch für Themenaufträge. Es wurde nichts erstellt oder veröffentlicht.`);
+    return true;
+  }
+  const row = newRow(result.candidate, result.cluster, null);
+  await db.query("UPDATE topic_inbound SET content_id=$2 WHERE message_id=$1", [message.id, row.content_id]);
+  const note = [`Dein Themenauftrag: „${order.topic}“.`,
+    result.waived.length ? `Auf deinen Wunsch übergangen (nur redaktionelle Auswahl, keine Schutzprüfung): ${result.waived.join("; ")}.` : null].filter(Boolean).join("\n");
+  try {
+    const proposed = await propose(deps, row, note);
+    emitEvent("topic_order_proposed", { contentId: proposed.content_id, format: proposed.format, waived: result.waived.length });
+  } catch (error) {
+    emitEvent("topic_pipeline_failed", { stage: "topic_order", contentId: row.content_id, failure: error instanceof Error ? error.name : "unknown" }, "error");
+    await deps.send(`Der Themenauftrag „${order.topic}“ konnte nicht vollständig vorbereitet werden. Es wurde nichts veröffentlicht. „Status“ zeigt Details.`).catch(() => undefined);
+  }
   return true;
 }
 

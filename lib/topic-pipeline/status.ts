@@ -13,7 +13,7 @@ import type { RenderContext } from "../visual/renderers";
 // Human-readable health summary for the WhatsApp "Status" command. No raw logs, no secrets, no IDs beyond what helps.
 
 const SOURCE_LABEL: Record<string, string> = { tavily_news: "Tavily News", google_news_rss: "Google News", google_trends_rss: "Google Trends", wikipedia_pageviews: "Wikipedia",
-  calendar: "Kalender", evergreen: "Evergreen" };
+  calendar: "Kalender", evergreen: "Evergreen", operator_request: "Betreiberauftrag" };
 const ERROR_LABEL: Record<string, string> = { timeout: "Zeitüberschreitung", rate_limited: "Limit erreicht", auth: "Zugang abgelehnt", unavailable: "nicht erreichbar",
   invalid_response: "unerwartete Antwort", not_configured: "nicht eingerichtet", unknown: "Fehler" };
 const time = (value: unknown) => value ? new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(String(value))) : "–";
