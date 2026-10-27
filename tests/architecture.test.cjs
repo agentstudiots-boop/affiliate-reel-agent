@@ -104,7 +104,10 @@ test('runtime: switches off = deactivated, missing names = not configured, plann
   // Rollout switches (lib/config/rollout.ts): off by default, the environment wins – also as emergency stop.
   assert.equal(state.nodes['executive-agent'].status, 'disabled');
   assert.match(state.nodes['executive-agent'].reason, /EXECUTIVE_ENABLED/);
-  assert.equal(state.nodes['controlling-import'].status, 'disabled');
+  // CONTROLLING_IMPORT_ENABLED is on by rollout since 27.10.2026; "false" in the environment switches it off again.
+  assert.equal(state.nodes['controlling-import'].status, 'ready');
+  assert.match(state.nodes['controlling-import'].reason, /Rollout/);
+  assert.equal(runtimeFor({ ...PROD, CONTROLLING_IMPORT_ENABLED: 'false' }).nodes['controlling-import'].status, 'disabled');
   assert.equal(runtimeFor({ ...PROD, EXECUTIVE_ENABLED: 'true' }).nodes['executive-agent'].status, 'ready');
   assert.equal(state.nodes.pinterest.status, 'disabled');
   assert.equal(state.nodes.faceless.source, 'Betreiberentscheidung');
