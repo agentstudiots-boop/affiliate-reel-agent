@@ -10,6 +10,7 @@ import { FacebookPublishFailure, publishFacebookPhoto } from "@/lib/meta/publish
 import { alreadyNotified, requestFacebookApproval } from "@/lib/meta/request-publication";
 import { publicationPreparationFailureText, resumeApprovedDailyPublications } from "@/lib/meta/resume-publication";
 import { requestVideoCostApproval } from "@/lib/production/request-cost-approval";
+import { switchOn } from "@/lib/config/rollout";
 import { getDatabase } from "@/lib/memory/db";
 import { ensureAutomationSchema } from "@/lib/memory/ensure-automation-schema";
 import { parseJob } from "@/lib/content/history";
@@ -143,7 +144,7 @@ export async function POST(request: Request) {
         continue;
       }
       // „Executive“ (B-11, only with EXECUTIVE_WHATSAPP=true): read-only executive status, deterministic, no model call.
-      if (process.env.EXECUTIVE_WHATSAPP === "true" && await handleExecutiveStatus({ ...message, payload }, { database: getDatabase, send: sendWhatsAppText })) continue;
+      if (switchOn("EXECUTIVE_WHATSAPP") && await handleExecutiveStatus({ ...message, payload }, { database: getDatabase, send: sendWhatsAppText })) continue;
       // „Geschäftsidee prüfen: …“ (F-05, only with OPPORTUNITY_SCOUT_ENABLED=true): bounded research after the reply, result as a
       // recommendation only. Without the switch the message continues through the unchanged chain.
       if (process.env.OPPORTUNITY_SCOUT_ENABLED === "true" && await handleOpportunityCheck({ ...message, payload },
