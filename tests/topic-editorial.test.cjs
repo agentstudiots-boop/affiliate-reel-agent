@@ -99,7 +99,8 @@ test('copy: the reference question follows the pattern; the model gets the patte
   let candidate;
   try { candidate = buildCandidate((await offlineClusters(NOW))[0], NOW, 0); } finally { restore(); }
   const pattern = candidate.editorial_pattern;
-  assert.equal(referenceCopy(candidate).question, E.PATTERN_QUESTION[pattern]);
+  // The reference question follows the pattern only where the rule template can carry it (humour, emotion, aha).
+  for (const voice of ['humor', 'emotion', 'aha']) assert.equal(referenceCopy({ ...candidate, editorial_pattern: voice }).question, E.PATTERN_QUESTION[voice]);
   const calls = [];
   const generate = async (agent, instruction, input, schema, fallback) => { calls.push({ instruction, input }); return fallback(); };
   await writeTopicCopy(candidate, { generate });
@@ -112,8 +113,8 @@ test('copy: the reference question follows the pattern; the model gets the patte
   assert.ok(!E.EDITORIAL_PATTERNS.some(item => calls[1].instruction.includes(E.PATTERN_GUIDANCE[item])));
   assert.equal(calls[1].input.editorial_pattern, undefined);
   assert.equal(referenceCopy(plain).question, 'Wie machst du das bei dir zuhause?');
-  // The proposal names the pattern so the operator sees the voice before approving.
-  const text = proposalText({ candidate, decision: { format: 'CAROUSEL', reason: 'Test', alternatives: [], slides: 6 }, copy: referenceCopy(candidate), production: null, revision: 1,
+  // The proposal names the pattern so the operator sees the voice before approving (model copy here).
+  const text = proposalText({ candidate, decision: { format: 'CAROUSEL', reason: 'Test', alternatives: [], slides: 6 }, copy: { ...referenceCopy(candidate), origin: 'model' }, production: null, revision: 1,
     product: { status: 'none' } });
   assert.match(text, new RegExp(`Erzählweise: ${E.EDITORIAL_LABEL[pattern]}`));
   assert.doesNotMatch(proposalText({ candidate: plain, decision: { format: 'CAROUSEL', reason: 'Test', alternatives: [], slides: 6 }, copy: referenceCopy(plain), production: null,
@@ -163,4 +164,34 @@ test('hack guard: the model guidance rules out risky tips, and a risky hack text
   // Only the hack voice is guarded this way; other voices and the switch-off path keep their previous checks.
   const story = { ...hack, editorial_pattern: 'story' };
   assert.equal((await writeTopicCopy(story, { generate: answer('Abends noch eine Kerze, dann wird es gemütlich auf dem Sofa.') })).copy.origin, 'model');
+});
+
+test('story/hack falling back to the rule template: previous hook and question, no claimed voice (review 27.10.)', async () => {
+  const restore = withEnv({ TOPIC_EDITORIAL_STYLE: 'on', TOPIC_COPY_MODE: 'ai', REPLICATE_API_TOKEN: 'test-token' });
+  const found = {};
+  try {
+    for (const now of DATES) for (const cluster of await offlineClusters(now)) for (const variant of [0, 1, 2]) {
+      const built = buildCandidate(cluster, now, variant);
+      if (!found[built.editorial_pattern]) found[built.editorial_pattern] = { built, base: buildCandidate(cluster, now, variant) };
+    }
+  } finally { restore(); }
+  const decision = { format: 'CAROUSEL', reason: 'Test', alternatives: [], slides: 6 };
+  for (const voice of ['story', 'hack']) {
+    const candidate = found[voice].built;
+    assert.ok(candidate.reference_hook && candidate.reference_hook !== candidate.hook, voice);
+    // The model is unavailable → rule template: the pattern hook (a scene / a handgrip) would be an unkept promise.
+    const fallback = await writeTopicCopy(candidate, { generate: async () => { throw new Error('down'); } });
+    assert.equal(fallback.copy.origin, 'reference_template');
+    assert.equal(fallback.copy.hook, candidate.reference_hook);
+    assert.ok(fallback.copy.caption.startsWith(candidate.reference_hook));
+    assert.ok(!fallback.copy.caption.includes(candidate.hook));
+    assert.equal(fallback.copy.question, 'Wie machst du das bei dir zuhause?');
+    assert.doesNotMatch(proposalText({ candidate, decision, copy: fallback.copy, production: null, revision: 1, product: { status: 'none' } }), /Erzählweise/);
+    // The model delivered: the voice stays and is shown.
+    const model = await writeTopicCopy(candidate, { generate: async (a, i, input, schema, fb) => ({ ...fb(), hook: 'Ein Morgen, an dem alles schon bereitliegt' }) });
+    assert.equal(model.copy.origin, 'model');
+    assert.match(proposalText({ candidate, decision, copy: model.copy, production: null, revision: 1, product: { status: 'none' } }), new RegExp(`Erzählweise: ${E.EDITORIAL_LABEL[voice]}`));
+  }
+  // Humour and emotion are carried by the rule template itself: their hook stays.
+  for (const voice of ['humor', 'emotion']) if (found[voice]) assert.equal(referenceCopy(found[voice].built).hook, found[voice].built.hook);
 });

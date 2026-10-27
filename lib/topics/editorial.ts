@@ -9,6 +9,10 @@ import type { TrendType } from "./schema";
 export const EDITORIAL_PATTERNS = ["story", "aha", "humor", "emotion", "hack"] as const;
 export type EditorialPattern = (typeof EDITORIAL_PATTERNS)[number];
 
+// Patterns whose hook only the model copy can deliver (a scene, a concrete handgrip). When the copy falls back to the rule
+// template, the previous hook and question are used instead (reference_hook on the candidate).
+export const MODEL_ONLY_PATTERNS: readonly EditorialPattern[] = ["story", "hack"];
+
 export const EDITORIAL_LABEL: Record<EditorialPattern, string> = {
   story: "Mini-Geschichte", aha: "Aha-Moment", humor: "Humor", emotion: "Gefühl", hack: "Alltagskniff",
 };

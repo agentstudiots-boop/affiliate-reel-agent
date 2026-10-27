@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { Generator } from "../content/agent";
 import { UNSUPPORTED_CLAIM_PATTERN } from "../content/trend";
 import type { FormatOverride } from "../formats/override";
-import { PATTERN_GUIDANCE, PATTERN_QUESTION, RISKY_HACK_PATTERN } from "../topics/editorial";
+import { MODEL_ONLY_PATTERNS, PATTERN_GUIDANCE, PATTERN_QUESTION, RISKY_HACK_PATTERN } from "../topics/editorial";
 import { tokens } from "../topics/lexicon";
 import type { TopicCandidate } from "../topics/schema";
 import type { ProductionCopy } from "../visual/renderers";
@@ -38,16 +38,21 @@ function referencePoints(candidate: TopicCandidate) {
   ].filter(point => point.text.length >= 3);
 }
 
+// True when the candidate's pattern hook needs the model copy; the rule template then uses the previous hook and question.
+export const patternNeedsModel = (candidate: TopicCandidate) => !!candidate.editorial_pattern && MODEL_ONLY_PATTERNS.includes(candidate.editorial_pattern);
+
 export function referenceCopy(candidate: TopicCandidate, override?: FormatOverride | null): TopicCopy {
   const points = referencePoints(candidate);
-  const question = candidate.editorial_pattern ? PATTERN_QUESTION[candidate.editorial_pattern]
+  const plain = patternNeedsModel(candidate);
+  const hook = plain ? candidate.reference_hook ?? candidate.hook : candidate.hook;
+  const question = candidate.editorial_pattern && !plain ? PATTERN_QUESTION[candidate.editorial_pattern]
     : candidate.trend_type === "ENTERTAINMENT" ? "Wie siehst du das?" : "Wie machst du das bei dir zuhause?";
   const cta = override?.tone.includes("less_promotional") ? "Speichern für später" : "Speichern und mit jemandem teilen, dem es hilft";
   const tags = hashtags(candidate);
   const body = `${candidate.audience_problem}\n\n${candidate.core_message}`;
-  const caption = [candidate.hook, "", candidate.core_message, "", question, "", tags.join(" ")].join("\n");
-  const videoScript = [candidate.hook, candidate.audience_problem, ...points.map(point => `${point.headline}: ${point.text}`), cta].join(" ").slice(0, 1400);
-  return { title: candidate.title, hook: candidate.hook, problem: candidate.audience_problem, coreMessage: candidate.core_message, body, caption, cta, question,
+  const caption = [hook, "", candidate.core_message, "", question, "", tags.join(" ")].join("\n");
+  const videoScript = [hook, candidate.audience_problem, ...points.map(point => `${point.headline}: ${point.text}`), cta].join(" ").slice(0, 1400);
+  return { title: candidate.title, hook, problem: candidate.audience_problem, coreMessage: candidate.core_message, body, caption, cta, question,
     points, imageMotif: `Alltagsszene in einer deutschen Wohnung zum Thema „${candidate.title}“`, videoScript, hashtags: tags, origin: "reference_template" };
 }
 

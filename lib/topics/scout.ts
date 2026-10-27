@@ -88,7 +88,7 @@ export function buildCandidate(cluster: Cluster, now: Date, variant = 0): TopicC
     core_message: texts.coreMessage.slice(0, 400), suggested_format: scored.suggestedFormat, suitable_for_video: scored.suitableForVideo,
     suitable_for_avatar: scored.suitableForAvatar, visual_potential: scored.scores.visual.score,
     product_optional: !scored.gossip && !scored.scores.risk.factors.some(factor => factor.startsWith("Hochrisiko")), possible_product_category: scored.category,
-    confidence: scored.confidence, text_origin: "rule_template" as const, ...(texts.pattern ? { editorial_pattern: texts.pattern } : {}),
+    confidence: scored.confidence, text_origin: "rule_template" as const, ...(texts.pattern ? { editorial_pattern: texts.pattern, reference_hook: (texts.baseHook ?? texts.hook).slice(0, 200) } : {}),
   };
   const parsed = topicCandidateSchema.safeParse(candidate);
   return parsed.success ? parsed.data : { error: `Schema: ${parsed.error.issues[0]?.path.join(".")}` };
