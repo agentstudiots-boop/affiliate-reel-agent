@@ -23,8 +23,9 @@ export const ROLLOUT = {
   // Topic order over WhatsApp („Mach etwas über X“, lib/topic-pipeline/topic-order.ts); only with TOPIC_PIPELINE_ENABLED. On since
   // the rollout of 28.10.2026 (operator: „Schalte beide Themenschalter ein“): an ordinary proposal with both approvals.
   TOPIC_ORDERS_ENABLED: "true",
-  // Editorial voice per topic (story, aha, humour, emotion, hack; lib/topics/editorial.ts).
-  TOPIC_EDITORIAL_STYLE: "false",
+  // Editorial voice per topic (story, aha, humour, emotion, hack; lib/topics/editorial.ts). On since the rollout of 28.10.2026
+  // (operator: „Schalte beide Themenschalter ein“); shapes hook, angle and model guidance only, never adds facts.
+  TOPIC_EDITORIAL_STYLE: "true",
 } as const satisfies Record<string, "true" | "false">;
 
 export type RolloutSwitch = keyof typeof ROLLOUT;
