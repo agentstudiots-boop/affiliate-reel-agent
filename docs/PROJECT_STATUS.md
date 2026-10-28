@@ -68,8 +68,8 @@ Damit ist der Vermerk in §8 („Aktivierung bleibt Betreibersache in Vercel“)
 
 | Schritt | Schalter | Code (PR, Merge) | Rollout (PR, Merge) | Deployment | Funktionsnachweis |
 |---|---|---|---|---|---|
-| 1 | `CONTROLLING_IMPORT_ENABLED` (Kostenimport `model_calls` → `cost_entries`, Cron 05:40 UTC; kein Anbieteraufruf, keine Nachricht, keine Kosten) | #132, `fe779ff` | dieser PR | offen | offen: Log `controlling_import` nach 05:40 UTC, Zeilen in `cost_entries` |
-| 2 | `EXECUTIVE_ENABLED` | #133, `eee2a3c` | offen | – | – |
+| 1 | `CONTROLLING_IMPORT_ENABLED` (Kostenimport `model_calls` → `cost_entries`, Cron 05:40 UTC; kein Anbieteraufruf, keine Nachricht, keine Kosten) | #132, `fe779ff` | #135, `1b96cf6` (27.10., 21:43 UTC) | `dpl_343fB9AkPRXZV7LQCEhr6Xzdvx5W` READY, keine Laufzeitfehler | **live verifiziert:** 28.10. 05:53:56 UTC, Log `controlling_import` `status ok`, 177 Modellaufrufe → 498 Kostenzeilen (`inserted 498`), `priced 0`/`unpriced 498` (noch keine Preise gepflegt, Betrag „unbekannt“, nie 0) |
+| 2 | `EXECUTIVE_ENABLED` (Executive-Zyklus 06:20 UTC: Statusbericht, Priorisierung, Health; schreibt nur das eigene Aufgabenbuch, keine Nachricht, kein Modellaufruf) | #133, `eee2a3c` | dieser PR | offen | offen: Log `executive_cycle` nach 06:20 UTC, Aufgaben `affiliate.status_report`/`executive.prioritize` `succeeded` |
 | 3 | `EXECUTIVE_WHATSAPP` | #133 | offen | – | – |
 | 4 | `EXECUTIVE_WEEKLY_REPORT` | #133 | offen | – | – |
 

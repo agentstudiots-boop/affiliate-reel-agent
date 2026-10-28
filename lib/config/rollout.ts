@@ -11,8 +11,9 @@ export const ROLLOUT = {
   // Controlling: model_calls → cost ledger import and repricing (cron /api/cron/controlling-import). On since the rollout of
   // 27.10.2026 (operator order of 24.10.2026, docs/PROJECT_STATUS.md); no provider call, no message, no assumed price.
   CONTROLLING_IMPORT_ENABLED: "true",
-  // Executive: daily cycle (status report, prioritisation, health; cron /api/cron/executive-cycle), read-only.
-  EXECUTIVE_ENABLED: "false",
+  // Executive: daily cycle (status report, prioritisation, health; cron /api/cron/executive-cycle), read-only. On since the
+  // rollout of 28.10.2026 (step 2 after the verified cost import); writes only its own task ledger, no message, no model call.
+  EXECUTIVE_ENABLED: "true",
   // Executive section in the Monday weekly report (read-only).
   EXECUTIVE_WEEKLY_REPORT: "false",
   // WhatsApp command „Executive“ from the approver number (read-only, no model call).

@@ -102,8 +102,10 @@ test('runtime: switches off = deactivated, missing names = not configured, plann
   assert.match(state.nodes['topic-orchestrator'].reason, /TOPIC_PIPELINE_ENABLED/);
   assert.equal(state.nodes.trendsetter.status, 'disabled');
   // Rollout switches (lib/config/rollout.ts): off by default, the environment wins – also as emergency stop.
-  assert.equal(state.nodes['executive-agent'].status, 'disabled');
-  assert.match(state.nodes['executive-agent'].reason, /EXECUTIVE_ENABLED/);
+  // EXECUTIVE_ENABLED is on by rollout since 28.10.2026; "false" in the environment is the emergency stop.
+  assert.equal(state.nodes['executive-agent'].status, 'ready');
+  assert.match(state.nodes['executive-agent'].reason, /EXECUTIVE_ENABLED.*Rollout/);
+  assert.equal(runtimeFor({ ...PROD, EXECUTIVE_ENABLED: 'false' }).nodes['executive-agent'].status, 'disabled');
   // CONTROLLING_IMPORT_ENABLED is on by rollout since 27.10.2026; "false" in the environment switches it off again.
   assert.equal(state.nodes['controlling-import'].status, 'ready');
   assert.match(state.nodes['controlling-import'].reason, /Rollout/);

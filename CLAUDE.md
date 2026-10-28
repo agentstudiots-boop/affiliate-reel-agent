@@ -113,7 +113,7 @@ Kein Modellwechsel ohne nachvollziehbare Daten; kostenpflichtige Vergleiche nur 
   Neue Migration ⇒ Liste in `migrations.ts`, Prüfung in `ensure-automation-schema.ts`, `tests/migration-upgrade.test.cjs`,
   Anzeige in `lib/architecture/model.ts` anpassen. Aktuell: 001–042 (037 = `model_calls`, 038 = Zustellstatus/Themenvideo, 039 = Executive-Aufgabenbuch, 040 = Kosten-/Erlösbuch, 041 = Executive-Entscheidungsvorlagen, 042 = Opportunity-Scout). 039/041 liest das Command Center (Unternehmensebene), 040 lesen Command Center und `/api/operations` (Controlling);
   042 liest noch keine Oberfläche; `budget_reservations` liest nur der Wochenbericht-Abschnitt (Schalter). Geschrieben wird nur hinter Schaltern
-  (Executive-Zyklus, „Geschäftsidee prüfen“); Preiskatalog/Kostenimport (`lib/enterprise/controlling/`) sind nicht eingebunden.
+  (Executive-Zyklus, „Geschäftsidee prüfen“, Kostenimport `cost_entries` per Cron); Preise trägt der Betreiber im Betriebsbereich ein (`/api/controlling/prices`).
 
 ## 7. Cron-Jobs (`vercel.json`, UTC)
 
@@ -121,8 +121,9 @@ Kein Modellwechsel ohne nachvollziehbare Daten; kostenpflichtige Vergleiche nur 
 - `/api/cron/topic-scout` 07/08 UTC → ein Themenvorschlag im Fenster 08–11 Uhr Berlin (Tageslimit); `/api/cron/topic-video` 10/11/12 UTC →
   höchstens ein Themenvideo-Vorschlag je Berliner Tag (Fenster 12–14 Uhr, Claim `topic_video_days`). Beide wirken nur mit `TOPIC_PIPELINE_ENABLED=true`
   (Video zusätzlich `TOPIC_DAILY_VIDEO=true`). Außerhalb des 24-h-Fensters werden Themenvorschläge gehalten und mit der nächsten Betreiber-Nachricht nachgeliefert.
-- `/api/cron/weekly-report` Mo 08:15 UTC. `/api/cron/continue` und `/api/cron/executive-cycle` (B-07, ohne `EXECUTIVE_ENABLED=true` → `disabled`)
-  existieren, sind aber nicht geplant.
+- `/api/cron/weekly-report` Mo 08:15 UTC. `/api/cron/controlling-import` 05:40 UTC (`CONTROLLING_IMPORT_ENABLED`, `model_calls` → `cost_entries`,
+  ohne Preis „unbekannt“). `/api/cron/executive-cycle` 06:20 UTC (`EXECUTIVE_ENABLED`: Statusbericht, Priorisierung, Health; nur lesend außer
+  eigenem Aufgabenbuch). `/api/cron/continue` existiert, ist aber nicht geplant.
 - Hobby-Plan: Ausführungszeit innerhalb der Stunde unscharf, Runtime-Logs nur 1 h → Nachweise in der DB.
 
 ## 8. Entwicklungs-, Test- und Deployment-Regeln
@@ -132,9 +133,12 @@ Kein Modellwechsel ohne nachvollziehbare Daten; kostenpflichtige Vergleiche nur 
   Netzaufrufe), `npm run build`. Tests für Regressionen mit realem Code, nur I/O wird ersetzt (`tests/helpers/`).
 - Keine kostenpflichtigen Aufrufe (Bild, Video, Modellvergleich) und keine Live-Posts ohne ausdrückliche Freigabe.
 - Neue Funktionen hinter Schaltern mit Standard „aus“ (Rollback = Variable entfernen); Schalter nie eigenmächtig aktivieren.
-- Executive-/Opportunity-Schalter (alle in Production nicht gesetzt = aus): `EXECUTIVE_ENABLED` (Executive-Zyklus), `EXECUTIVE_WEEKLY_REPORT`
-  (Abschnitt im Wochenbericht), `EXECUTIVE_WHATSAPP` (Befehl „Executive“, nur lesend), `OPPORTUNITY_SCOUT_ENABLED` („Geschäftsidee prüfen: …“,
-  Tavily + Modell, kostenpflichtig) mit Tageslimit `OPPORTUNITY_DAILY_LIMIT`.
+- **Rollout-Schalter (`lib/config/rollout.ts`):** versionierter Wert je Schalter, aktiviert nur per eigenem, reviewtem PR mit Betreiberfreigabe
+  (Protokoll `docs/PROJECT_STATUS.md` §2b); die Umgebungsvariable hat immer Vorrang, `false` ist der Notaus ohne Code-Deployment.
+  Eingeschaltet: `CONTROLLING_IMPORT_ENABLED` (27.10.), `EXECUTIVE_ENABLED` (28.10., Executive-Zyklus). Aus: `EXECUTIVE_WHATSAPP` (Befehl
+  „Executive“, nur lesend), `EXECUTIVE_WEEKLY_REPORT` (Abschnitt im Wochenbericht), `TOPIC_ORDERS_ENABLED`, `TOPIC_EDITORIAL_STYLE`.
+- Opportunity-Scout (`OPPORTUNITY_SCOUT_ENABLED`, „Geschäftsidee prüfen: …“, Tavily + Modell, kostenpflichtig, Tageslimit `OPPORTUNITY_DAILY_LIMIT`)
+  liest weiter nur `process.env` und bleibt aus, solange Q-07 (Budget) offen ist.
 - Cloud-Sitzungen: nicht in einem Git-Worktree mit verlinktem `node_modules` bauen (Turbopack-Fehler), sondern im Hauptcheckout.
 - Nach Deployment: Production-Status mit echtem Aufruf prüfen (Build allein ist kein Nachweis). Begriffe strikt trennen:
   implementiert · getestet · gemergt · deployed · aktiviert · live verifiziert.
