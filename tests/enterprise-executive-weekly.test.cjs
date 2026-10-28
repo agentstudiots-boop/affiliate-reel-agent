@@ -133,9 +133,10 @@ const weeklyWith=(db,sent)=>loadRoute('lib/reporting/weekly.ts',{
 async function withEnv(values,fn){const old={};for(const k of Object.keys(values)){old[k]=process.env[k];if(values[k]===undefined)delete process.env[k];else process.env[k]=values[k];}
   try{return await fn();}finally{for(const k of Object.keys(old)){if(old[k]===undefined)delete process.env[k];else process.env[k]=old[k];}}}
 
-test('switch EXECUTIVE_WEEKLY_REPORT: off (default) leaves the weekly report unchanged, only exactly "true" adds the section (AC-5)',async()=>{
+test('switch EXECUTIVE_WEEKLY_REPORT: on by rollout (28.10.2026); emergency stop "false" (or "1"/"TRUE") leaves the report unchanged (AC-5)',async()=>{
+  assert.equal(require('../.test-build/lib/config/rollout').ROLLOUT.EXECUTIVE_WEEKLY_REPORT,'true');
   const reference=new Date('2026-10-19T08:15:00Z');
-  for(const [value,expected] of [[undefined,false],['1',false],['TRUE',false],['true',true]]){
+  for(const [value,expected] of [[undefined,true],['false',false],['1',false],['TRUE',false],['true',true]]){
     const db=await scenario();const sent=[];
     await withEnv({EXECUTIVE_WEEKLY_REPORT:value,WHATSAPP_APPROVER_WA_ID:undefined},async()=>{
       const result=await weeklyWith(db,sent).createWeeklyReport(reference,db);

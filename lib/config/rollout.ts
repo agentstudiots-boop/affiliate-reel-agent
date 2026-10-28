@@ -15,8 +15,9 @@ export const ROLLOUT = {
   // rollout of 28.10.2026 (step 2 after the verified cost import); writes only its task ledger and marks expired decision requests as expired
   // (expireDecisions in the enterprise decision module); no message, no model call, no approval.
   EXECUTIVE_ENABLED: "true",
-  // Executive section in the Monday weekly report (read-only).
-  EXECUTIVE_WEEKLY_REPORT: "false",
+  // Executive section in the Monday weekly report (read-only). On since the rollout of 28.10.2026 (step 4): adds a text
+  // section to the existing report, no extra message; a broken executive level never breaks the report.
+  EXECUTIVE_WEEKLY_REPORT: "true",
   // WhatsApp command „Executive“ from the approver number (read-only, no model call). On since the rollout of 28.10.2026
   // (step 3): answers only the operator's own command, starts nothing, approves nothing.
   EXECUTIVE_WHATSAPP: "true",

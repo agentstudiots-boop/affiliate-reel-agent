@@ -2,7 +2,7 @@
 // the decision requests (041) and the cost ledger (040). Nothing here sends, decides or approves: open decision requests are
 // only listed as a reminder – they can be approved solely as a reply to their own request message (lib/enterprise/decisions.ts),
 // never as a reply to the weekly report. Missing tables or a database error give an "unreadable" section, never an exception,
-// so the weekly report itself never fails because of the executive level. Used only with EXECUTIVE_WEEKLY_REPORT=true.
+// so the weekly report itself never fails because of the executive level. Used only while EXECUTIVE_WEEKLY_REPORT is on (lib/config/rollout.ts; "false" in the environment stops it).
 //
 // Requests past their expiry count as expired even while still 'pending': expireDecisions runs only in the executive cycle
 // (B-07, off by default), and an expired request can never be approved (same rule as lib/architecture/enterprise-snapshot.ts).
