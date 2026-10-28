@@ -74,14 +74,14 @@ test('own switch TOPIC_ORDERS_ENABLED: on by rollout (28.10.2026), environment w
   assert.equal(topicOrdersEnabled({ TOPIC_ORDERS_ENABLED: 'true' }), true);
 });
 
-test('rollout: TOPIC_ORDERS_ENABLED on (28.10.2026), TOPIC_EDITORIAL_STYLE still off; both read through lib/config/rollout.ts', () => {
+test('rollout: TOPIC_ORDERS_ENABLED and TOPIC_EDITORIAL_STYLE on (28.10.2026), both read through lib/config/rollout.ts, env "false" stops each', () => {
   const { ROLLOUT, switchSource } = require(`${L}/config/rollout`);
   const { editorialStyleEnabled } = require(`${L}/topics/editorial`);
   assert.equal(ROLLOUT.TOPIC_ORDERS_ENABLED, 'true');
-  assert.equal(ROLLOUT.TOPIC_EDITORIAL_STYLE, 'false');
+  assert.equal(ROLLOUT.TOPIC_EDITORIAL_STYLE, 'true');
   assert.equal(switchSource('TOPIC_ORDERS_ENABLED', {}), 'rollout');
   assert.equal(topicOrdersEnabled({}), true);
   assert.equal(topicOrdersEnabled({ TOPIC_ORDERS_ENABLED: 'false' }), false, 'emergency stop without a code deployment');
-  assert.equal(editorialStyleEnabled({}), false);
-  assert.equal(editorialStyleEnabled({ TOPIC_EDITORIAL_STYLE: 'true' }), true, 'environment switches on early');
+  assert.equal(editorialStyleEnabled({}), true);
+  assert.equal(editorialStyleEnabled({ TOPIC_EDITORIAL_STYLE: 'false' }), false, 'emergency stop without a code deployment');
 });

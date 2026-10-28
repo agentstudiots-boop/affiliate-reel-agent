@@ -32,8 +32,8 @@ async function offlineClusters(now) {
   return result.candidates.map(candidate => result.clusters[candidate.topic_id]);
 }
 
-test('switch off (default): no pattern and the exact previous hook/angle', async () => {
-  for (const env of [{ TOPIC_EDITORIAL_STYLE: undefined }, { TOPIC_EDITORIAL_STYLE: 'false' }, { TOPIC_EDITORIAL_STYLE: 'on' }]) {
+test('switch off (emergency stop "false" in the environment, or a value other than "true"): no pattern and the exact previous hook/angle', async () => {
+  for (const env of [{ TOPIC_EDITORIAL_STYLE: 'false' }, { TOPIC_EDITORIAL_STYLE: 'on' }, { TOPIC_EDITORIAL_STYLE: '1' }]) {
     const restore = withEnv(env);
     try {
       for (const cluster of await offlineClusters(NOW)) for (const variant of [0, 1, 2]) {
@@ -46,7 +46,7 @@ test('switch off (default): no pattern and the exact previous hook/angle', async
     } finally { restore(); }
   }
   assert.equal(E.editorialStyleEnabled({ TOPIC_EDITORIAL_STYLE: 'true' }), true);
-  assert.equal(E.editorialStyleEnabled({}), false, 'rollout value is "false"');
+  assert.equal(E.editorialStyleEnabled({}), true, 'rollout value "true" since 28.10.2026');
   assert.equal(E.editorialStyleEnabled({ TOPIC_EDITORIAL_STYLE: 'false' }), false);
 });
 
