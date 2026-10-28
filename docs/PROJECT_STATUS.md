@@ -53,6 +53,26 @@ nicht möglich; Laufzeitfehler seit den Merges nur der bekannte `pg`-SSL-Hinweis
 
 #81, #82 und #111 (Architektur-, Roadmap- und Koordinationsdoku): am 23.10. per Betreiberfreigabe als konsolidierter Doku-PR #126 nach `main` übernommen (`docs/ai-business/`), danach als ersetzt geschlossen.
 
+## 2b. Rollout-Protokoll (kontrollierte Liveschaltung ab 27.10.)
+
+**Freigabe des Betreibers (wörtlich, Auftrag vom 2026-10-24, 04:08 UTC, Abschnitt 2 „Freigabe für Umsetzung und Liveschaltung“):**
+> „Dieser Auftrag autorisiert notwendige Codekorrekturen, Integration, Tests, PRs, Merge und Production-Deployment sowie die gezielte Aktivierung der hier beschriebenen Funktionen nach erfolgreicher Prüfung.“
+> „Die frühere Anweisung, Executive und Opportunity Scout zunächst ausgeschaltet zu lassen, wird für diesen kontrollierten Rollout aufgehoben.“
+> „Schalte Funktionen schrittweise live. Dokumentiere je Schritt Commit, Deployment, Aktivierung und tatsächlichen Funktionsnachweis. Bei Regressionen den betroffenen Schritt zurücknehmen.“
+
+Damit ist der Vermerk in §8 („Aktivierung bleibt Betreibersache in Vercel“) für die dort genannten Funktionen abgelöst.
+
+**Mechanismus:** Die Sitzungen können keine Vercel-Variablen setzen. Ein Schalter wird deshalb in `lib/config/rollout.ts` per eigenem, reviewtem PR auf `"true"` gesetzt, je Schalter ein PR. Eine Umgebungsvariable hat immer Vorrang. **Notaus ohne Code-Deployment:** Variable in Vercel auf `false` setzen (danach Redeploy). Rückbau: den Rollout-Commit zurücknehmen.
+
+**Reihenfolge** (mit Sitzung 1 abgestimmt): `CONTROLLING_IMPORT_ENABLED` → `EXECUTIVE_ENABLED` → `EXECUTIVE_WHATSAPP` → `EXECUTIVE_WEEKLY_REPORT`. Opportunity Scout bleibt aus, solange Q-07 (Budget) offen ist.
+
+| Schritt | Schalter | Code (PR, Merge) | Rollout (PR, Merge) | Deployment | Funktionsnachweis |
+|---|---|---|---|---|---|
+| 1 | `CONTROLLING_IMPORT_ENABLED` (Kostenimport `model_calls` → `cost_entries`, Cron 05:40 UTC; kein Anbieteraufruf, keine Nachricht, keine Kosten) | #132, `fe779ff` | dieser PR | offen | offen: Log `controlling_import` nach 05:40 UTC, Zeilen in `cost_entries` |
+| 2 | `EXECUTIVE_ENABLED` | #133, `eee2a3c` | offen | – | – |
+| 3 | `EXECUTIVE_WHATSAPP` | #133 | offen | – | – |
+| 4 | `EXECUTIVE_WEEKLY_REPORT` | #133 | offen | – | – |
+
 ## 2a. Gemergte PRs bis 18.10. (Historie)
 
 | PR | Inhalt | Merge | Deployment | live verifiziert |
