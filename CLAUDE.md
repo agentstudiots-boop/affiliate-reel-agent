@@ -136,7 +136,7 @@ Kein Modellwechsel ohne nachvollziehbare Daten; kostenpflichtige Vergleiche nur 
 - **Rollout-Schalter (`lib/config/rollout.ts`):** versionierter Wert je Schalter, aktiviert nur per eigenem, reviewtem PR mit Betreiberfreigabe
   (Protokoll `docs/PROJECT_STATUS.md` §2b); die Umgebungsvariable hat immer Vorrang, `false` ist der Notaus ohne Code-Deployment.
   Eingeschaltet: `CONTROLLING_IMPORT_ENABLED` (27.10.), `EXECUTIVE_ENABLED` (28.10., Executive-Zyklus), `EXECUTIVE_WHATSAPP` (28.10., Befehl
-  „Executive“, nur lesend). Aus: `EXECUTIVE_WEEKLY_REPORT` (Abschnitt im Wochenbericht), `TOPIC_ORDERS_ENABLED`, `TOPIC_EDITORIAL_STYLE`.
+  „Executive“, nur lesend), `TOPIC_ORDERS_ENABLED` (28.10., Themenauftrag per WhatsApp). Aus: `EXECUTIVE_WEEKLY_REPORT` (Abschnitt im Wochenbericht), `TOPIC_EDITORIAL_STYLE`.
 - Opportunity-Scout (`OPPORTUNITY_SCOUT_ENABLED`, „Geschäftsidee prüfen: …“, Tavily + Modell, kostenpflichtig, Tageslimit `OPPORTUNITY_DAILY_LIMIT`)
   liest weiter nur `process.env` und bleibt aus, solange Q-07 (Budget) offen ist.
 - Cloud-Sitzungen: nicht in einem Git-Worktree mit verlinktem `node_modules` bauen (Turbopack-Fehler), sondern im Hauptcheckout.

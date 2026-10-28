@@ -67,20 +67,21 @@ test('daily order limit: default 5, bounded to 1..10', () => {
   assert.equal(dailyTopicOrderLimit({ TOPIC_ORDERS_PER_DAY: 'viel' }), 5);
 });
 
-test('own switch TOPIC_ORDERS_ENABLED: off unless exactly "true"', () => {
-  assert.equal(topicOrdersEnabled({}), false);
+test('own switch TOPIC_ORDERS_ENABLED: on by rollout (28.10.2026), environment wins; only exactly "true" switches on', () => {
+  assert.equal(topicOrdersEnabled({}), true, 'rollout value "true"');
   assert.equal(topicOrdersEnabled({ TOPIC_ORDERS_ENABLED: '1' }), false);
   assert.equal(topicOrdersEnabled({ TOPIC_ORDERS_ENABLED: 'false' }), false);
   assert.equal(topicOrdersEnabled({ TOPIC_ORDERS_ENABLED: 'true' }), true);
 });
 
-test('rollout: TOPIC_ORDERS_ENABLED and TOPIC_EDITORIAL_STYLE are read through lib/config/rollout.ts, both off', () => {
+test('rollout: TOPIC_ORDERS_ENABLED on (28.10.2026), TOPIC_EDITORIAL_STYLE still off; both read through lib/config/rollout.ts', () => {
   const { ROLLOUT, switchSource } = require(`${L}/config/rollout`);
   const { editorialStyleEnabled } = require(`${L}/topics/editorial`);
-  assert.equal(ROLLOUT.TOPIC_ORDERS_ENABLED, 'false');
+  assert.equal(ROLLOUT.TOPIC_ORDERS_ENABLED, 'true');
   assert.equal(ROLLOUT.TOPIC_EDITORIAL_STYLE, 'false');
   assert.equal(switchSource('TOPIC_ORDERS_ENABLED', {}), 'rollout');
-  assert.equal(topicOrdersEnabled({}), false);
+  assert.equal(topicOrdersEnabled({}), true);
+  assert.equal(topicOrdersEnabled({ TOPIC_ORDERS_ENABLED: 'false' }), false, 'emergency stop without a code deployment');
   assert.equal(editorialStyleEnabled({}), false);
   assert.equal(editorialStyleEnabled({ TOPIC_EDITORIAL_STYLE: 'true' }), true, 'environment switches on early');
 });
