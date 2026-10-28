@@ -12,7 +12,7 @@ const strip = (value: string) => value.replace(/\s+am \d{1,2}\. \p{L}+$/u, "").r
 
 export type TopicTexts = { audienceProblem: string; whyNow: string; hook: string; angle: string; coreMessage: string; variant: number; pattern?: EditorialPattern; baseHook?: string };
 
-// With an editorial pattern (TOPIC_EDITORIAL_STYLE=on, see editorial.ts) hook and angle follow the pattern; problem, timing
+// With an editorial pattern (TOPIC_EDITORIAL_STYLE, see editorial.ts) hook and angle follow the pattern; problem, timing
 // and core message stay the same rule texts.
 export function topicTexts(cluster: Cluster, type: TrendType, scored: Scored, now: Date, variant = 0, pattern: EditorialPattern | null = null): TopicTexts {
   const base = baseTexts(cluster, type, scored, now, variant);

@@ -86,7 +86,7 @@ export const topicCandidateSchema = z.object({
   possible_product_category: z.string().max(40).nullable(),
   confidence: z.number().int().min(0).max(100),
   text_origin: z.enum(["rule_template", "model_enriched"]),
-  // Editorial pattern (TOPIC_EDITORIAL_STYLE=on); absent on older candidates and with the switch off.
+  // Editorial pattern (TOPIC_EDITORIAL_STYLE); absent on older candidates and with the switch off.
   editorial_pattern: z.enum(EDITORIAL_PATTERNS).optional(),
   // The previous rule hook, used when a story/hack copy falls back to the rule template (the pattern hook would be unkept).
   reference_hook: z.string().min(10).max(200).optional(),

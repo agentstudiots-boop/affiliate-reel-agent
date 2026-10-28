@@ -73,3 +73,14 @@ test('own switch TOPIC_ORDERS_ENABLED: off unless exactly "true"', () => {
   assert.equal(topicOrdersEnabled({ TOPIC_ORDERS_ENABLED: 'false' }), false);
   assert.equal(topicOrdersEnabled({ TOPIC_ORDERS_ENABLED: 'true' }), true);
 });
+
+test('rollout: TOPIC_ORDERS_ENABLED and TOPIC_EDITORIAL_STYLE are read through lib/config/rollout.ts, both off', () => {
+  const { ROLLOUT, switchSource } = require(`${L}/config/rollout`);
+  const { editorialStyleEnabled } = require(`${L}/topics/editorial`);
+  assert.equal(ROLLOUT.TOPIC_ORDERS_ENABLED, 'false');
+  assert.equal(ROLLOUT.TOPIC_EDITORIAL_STYLE, 'false');
+  assert.equal(switchSource('TOPIC_ORDERS_ENABLED', {}), 'rollout');
+  assert.equal(topicOrdersEnabled({}), false);
+  assert.equal(editorialStyleEnabled({}), false);
+  assert.equal(editorialStyleEnabled({ TOPIC_EDITORIAL_STYLE: 'true' }), true, 'environment switches on early');
+});

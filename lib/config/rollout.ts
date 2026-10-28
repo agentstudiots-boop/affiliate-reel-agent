@@ -17,6 +17,10 @@ export const ROLLOUT = {
   EXECUTIVE_WEEKLY_REPORT: "false",
   // WhatsApp command „Executive“ from the approver number (read-only, no model call).
   EXECUTIVE_WHATSAPP: "false",
+  // Topic order over WhatsApp („Mach etwas über X“, lib/topic-pipeline/topic-order.ts); only with TOPIC_PIPELINE_ENABLED.
+  TOPIC_ORDERS_ENABLED: "false",
+  // Editorial voice per topic (story, aha, humour, emotion, hack; lib/topics/editorial.ts).
+  TOPIC_EDITORIAL_STYLE: "false",
 } as const satisfies Record<string, "true" | "false">;
 
 export type RolloutSwitch = keyof typeof ROLLOUT;

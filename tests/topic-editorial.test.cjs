@@ -1,5 +1,5 @@
 // P1b: editorial patterns (story, aha, humour, emotion, hack) shape hook, angle, question and the model guidance of topic
-// posts. Own switch TOPIC_EDITORIAL_STYLE=on; without it every text stays exactly as before. Real scout, gate and copy.
+// posts. Own switch TOPIC_EDITORIAL_STYLE (lib/config/rollout.ts, "true"); without it every text stays exactly as before. Real scout, gate and copy.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const L = '../.test-build/lib';
@@ -33,7 +33,7 @@ async function offlineClusters(now) {
 }
 
 test('switch off (default): no pattern and the exact previous hook/angle', async () => {
-  for (const env of [{ TOPIC_EDITORIAL_STYLE: undefined }, { TOPIC_EDITORIAL_STYLE: 'true' }]) {
+  for (const env of [{ TOPIC_EDITORIAL_STYLE: undefined }, { TOPIC_EDITORIAL_STYLE: 'false' }, { TOPIC_EDITORIAL_STYLE: 'on' }]) {
     const restore = withEnv(env);
     try {
       for (const cluster of await offlineClusters(NOW)) for (const variant of [0, 1, 2]) {
@@ -45,8 +45,9 @@ test('switch off (default): no pattern and the exact previous hook/angle', async
       }
     } finally { restore(); }
   }
-  assert.equal(E.editorialStyleEnabled({ TOPIC_EDITORIAL_STYLE: 'on' }), true);
-  assert.equal(E.editorialStyleEnabled({}), false);
+  assert.equal(E.editorialStyleEnabled({ TOPIC_EDITORIAL_STYLE: 'true' }), true);
+  assert.equal(E.editorialStyleEnabled({}), false, 'rollout value is "false"');
+  assert.equal(E.editorialStyleEnabled({ TOPIC_EDITORIAL_STYLE: 'false' }), false);
 });
 
 test('pattern choice: no humour, hack or emotion on sensitive topics, aha only with a source, story/hack only with model copy, deterministic', () => {
@@ -65,7 +66,7 @@ test('pattern choice: no humour, hack or emotion on sensitive topics, aha only w
 });
 
 test('switch on: every offline topic gets a pattern, all patterns pass the gate (no claims, no sensational tone, hook quality)', async () => {
-  const restore = withEnv({ TOPIC_EDITORIAL_STYLE: 'on', TOPIC_COPY_MODE: 'ai', REPLICATE_API_TOKEN: 'test-token' });
+  const restore = withEnv({ TOPIC_EDITORIAL_STYLE: 'true', TOPIC_COPY_MODE: 'ai', REPLICATE_API_TOKEN: 'test-token' });
   try {
     const used = new Set();
     for (const now of DATES) for (const cluster of await offlineClusters(now)) for (const variant of [0, 1, 2]) {
@@ -84,7 +85,7 @@ test('switch on: every offline topic gets a pattern, all patterns pass the gate 
 });
 
 test('switch on: a news topic may become an aha moment, always attributed to its publisher', () => {
-  const restore = withEnv({ TOPIC_EDITORIAL_STYLE: 'on', TOPIC_COPY_MODE: 'ai', REPLICATE_API_TOKEN: 'test-token' });
+  const restore = withEnv({ TOPIC_EDITORIAL_STYLE: 'true', TOPIC_COPY_MODE: 'ai', REPLICATE_API_TOKEN: 'test-token' });
   try {
     const patterns = [0, 1, 2, 3].map(variant => buildCandidate(newsCluster, NOW, variant));
     const aha = patterns.filter(candidate => candidate.editorial_pattern === 'aha');
@@ -95,7 +96,7 @@ test('switch on: a news topic may become an aha moment, always attributed to its
 });
 
 test('copy: the reference question follows the pattern; the model gets the pattern guidance on top of the unchanged rules', async () => {
-  const restore = withEnv({ TOPIC_EDITORIAL_STYLE: 'on', TOPIC_COPY_MODE: 'ai', REPLICATE_API_TOKEN: 'test-token' });
+  const restore = withEnv({ TOPIC_EDITORIAL_STYLE: 'true', TOPIC_COPY_MODE: 'ai', REPLICATE_API_TOKEN: 'test-token' });
   let candidate;
   try { candidate = buildCandidate((await offlineClusters(NOW))[0], NOW, 0); } finally { restore(); }
   const pattern = candidate.editorial_pattern;
@@ -130,7 +131,7 @@ test('schema: stored candidates without a pattern stay valid; unknown patterns a
 
 test('reference mode (no model copy): only humour and emotion, never a story or hack the template cannot deliver', async () => {
   for (const env of [{ TOPIC_COPY_MODE: undefined }, { TOPIC_COPY_MODE: 'ai', REPLICATE_API_TOKEN: undefined }]) {
-    const restore = withEnv({ TOPIC_EDITORIAL_STYLE: 'on', ...env });
+    const restore = withEnv({ TOPIC_EDITORIAL_STYLE: 'true', ...env });
     try {
       for (const now of DATES) for (const cluster of await offlineClusters(now)) for (const variant of [0, 1, 2]) {
         const built = buildCandidate(cluster, now, variant);
@@ -143,7 +144,7 @@ test('reference mode (no model copy): only humour and emotion, never a story or 
 test('hack guard: the model guidance rules out risky tips, and a risky hack text falls back to the reference copy', async () => {
   assert.match(E.PATTERN_GUIDANCE.hack, /Keine Reinigungs- oder Chemikalienmischungen, nichts mit Strom, Gas, offener Flamme, Lebensmittelhaltbarkeit, Schimmel oder Medikamenten/);
   assert.match(E.PATTERN_GUIDANCE.aha, /Nur was wörtlich im Quellentitel steht/);
-  const restore = withEnv({ TOPIC_EDITORIAL_STYLE: 'on', TOPIC_COPY_MODE: 'ai', REPLICATE_API_TOKEN: 'test-token' });
+  const restore = withEnv({ TOPIC_EDITORIAL_STYLE: 'true', TOPIC_COPY_MODE: 'ai', REPLICATE_API_TOKEN: 'test-token' });
   let hack;
   try {
     for (const now of DATES) for (const cluster of await offlineClusters(now)) for (const variant of [0, 1, 2]) {
@@ -167,7 +168,7 @@ test('hack guard: the model guidance rules out risky tips, and a risky hack text
 });
 
 test('story/hack falling back to the rule template: previous hook and question, no claimed voice (review 27.10.)', async () => {
-  const restore = withEnv({ TOPIC_EDITORIAL_STYLE: 'on', TOPIC_COPY_MODE: 'ai', REPLICATE_API_TOKEN: 'test-token' });
+  const restore = withEnv({ TOPIC_EDITORIAL_STYLE: 'true', TOPIC_COPY_MODE: 'ai', REPLICATE_API_TOKEN: 'test-token' });
   const found = {};
   try {
     for (const now of DATES) for (const cluster of await offlineClusters(now)) for (const variant of [0, 1, 2]) {

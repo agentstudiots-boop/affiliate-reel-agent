@@ -160,7 +160,7 @@ Stand 27.10.:
   (`lib/topic-pipeline/topic-order.ts`, `requestTopicOrder`).
   - Übergangen werden nur redaktionelle Schwellen; sie werden im Vorschlag genannt.
   - Schutzprüfungen gelten weiter: Fakten, Risiko, Klatsch, unbelegte Aussagen. Sensible Themen ohne Quelle werden abgelehnt.
-  - Eigener Schalter `TOPIC_ORDERS_ENABLED`, Standard aus. Tageslimit `TOPIC_ORDERS_PER_DAY`, Standard 5, höchstens 10.
+  - Eigener Schalter `TOPIC_ORDERS_ENABLED` (Rollout-Wert in `lib/config/rollout.ts`), Standard aus. Tageslimit `TOPIC_ORDERS_PER_DAY`, Standard 5, höchstens 10.
   - Die Aktivierung kommt als eigener PR.
 - **P1b (redaktionelle Ausrichtung): implementiert und getestet, nicht gemergt.** `lib/topics/editorial.ts` gibt jedem Thema eine
   Erzählweise: Mini-Geschichte, Aha-Moment, Humor, Gefühl oder Alltagskniff.
@@ -171,4 +171,4 @@ Stand 27.10.:
   - Ein Kniff-Text mit Risikobezug (Chemie, Strom, Gas, Feuer, Lebensmittel, Schimmel, Medikamente) fällt auf den Regeltext zurück.
   - Referenzmodus: passender Hook, Winkel und Abschlussfrage. KI-Modus: eine Leitlinie zusätzlich zu den unveränderten Regeln gegen Erfindungen.
   - Im Vorschlag steht „Erzählweise: …“.
-  - Schalter `TOPIC_EDITORIAL_STYLE=on`, Standard aus. Ohne Schalter sind alle Texte unverändert.
+  - Schalter `TOPIC_EDITORIAL_STYLE` (Rollout-Wert in `lib/config/rollout.ts`, Standard aus). Ohne Schalter sind alle Texte unverändert.

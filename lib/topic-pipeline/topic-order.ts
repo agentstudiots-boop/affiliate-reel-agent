@@ -1,3 +1,4 @@
+import { switchOn } from "../config/rollout";
 import type { SelectionHistory } from "../content/strategy";
 import { UNSUPPORTED_CLAIM_PATTERN } from "../content/trend";
 import { applyRevision, topicGate, type GateCheck, type TopicGateVerdict } from "../topics/gate";
@@ -81,8 +82,9 @@ export function operatorTopicCandidate(topic: string, context: { now: Date; hist
   return { status: "rejected", reasons: last ? PROTECTIVE.filter(check => !last!.checks[check].passed).map(check => last!.checks[check].note) : ["Thema nicht verarbeitbar"] };
 }
 
-// Own switch (default off; rollback = remove the variable). Only effective together with TOPIC_PIPELINE_ENABLED=true.
-export const topicOrdersEnabled = (env: Record<string, string | undefined> = process.env) => env.TOPIC_ORDERS_ENABLED === "true";
+// Own switch through lib/config/rollout.ts (rollout value, the environment wins; "false" is the emergency stop). Only effective
+// together with TOPIC_PIPELINE_ENABLED=true.
+export const topicOrdersEnabled = (env: Record<string, string | undefined> = process.env) => switchOn("TOPIC_ORDERS_ENABLED", env);
 
 // Explicit topic orders per Berlin calendar day (default 5, at most 10): every order can cost up to four model calls.
 export const dailyTopicOrderLimit = (env: Record<string, string | undefined> = process.env) => {

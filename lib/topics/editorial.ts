@@ -1,10 +1,12 @@
+import { switchOn } from "../config/rollout";
 import type { TrendType } from "./schema";
 
 // Editorial patterns for topic posts (P1b, operator order 23.10.): everyday storytelling, aha moments, humour, emotion and
 // helpful hacks instead of one neutral „Problem → Schritte“ template. A pattern only shapes HOW a topic is told; it never
 // adds facts. Reference mode uses short rule templates (no invented tips, numbers or results); AI mode passes the
 // pattern's guidance to the one bounded model call, whose output is checked for unsupported claims as before.
-// Own switch TOPIC_EDITORIAL_STYLE=on (default off; without it the texts are exactly the previous ones).
+// Own switch TOPIC_EDITORIAL_STYLE through lib/config/rollout.ts ("true"; the environment wins, "false" is the emergency stop).
+// Without it the texts are exactly the previous ones.
 
 export const EDITORIAL_PATTERNS = ["story", "aha", "humor", "emotion", "hack"] as const;
 export type EditorialPattern = (typeof EDITORIAL_PATTERNS)[number];
@@ -17,7 +19,7 @@ export const EDITORIAL_LABEL: Record<EditorialPattern, string> = {
   story: "Mini-Geschichte", aha: "Aha-Moment", humor: "Humor", emotion: "Gefühl", hack: "Alltagskniff",
 };
 
-export const editorialStyleEnabled = (env: Record<string, string | undefined> = process.env) => env.TOPIC_EDITORIAL_STYLE === "on";
+export const editorialStyleEnabled = (env: Record<string, string | undefined> = process.env) => switchOn("TOPIC_EDITORIAL_STYLE", env);
 
 // Which patterns suit which kind of topic. Humour, hacks and emotion never on sensitive topics (an implied relief would be an
 // effect claim; Gossip excludes humour and hacks too); an aha moment needs an attributed source (a news signal), because
