@@ -17,8 +17,9 @@ export const ROLLOUT = {
   EXECUTIVE_ENABLED: "true",
   // Executive section in the Monday weekly report (read-only).
   EXECUTIVE_WEEKLY_REPORT: "false",
-  // WhatsApp command „Executive“ from the approver number (read-only, no model call).
-  EXECUTIVE_WHATSAPP: "false",
+  // WhatsApp command „Executive“ from the approver number (read-only, no model call). On since the rollout of 28.10.2026
+  // (step 3): answers only the operator's own command, starts nothing, approves nothing.
+  EXECUTIVE_WHATSAPP: "true",
   // Topic order over WhatsApp („Mach etwas über X“, lib/topic-pipeline/topic-order.ts); only with TOPIC_PIPELINE_ENABLED.
   TOPIC_ORDERS_ENABLED: "false",
   // Editorial voice per topic (story, aha, humour, emotion, hack; lib/topics/editorial.ts).

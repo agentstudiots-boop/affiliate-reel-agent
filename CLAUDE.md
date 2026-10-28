@@ -98,7 +98,7 @@ Kein Modellwechsel ohne nachvollziehbare Daten; kostenpflichtige Vergleiche nur 
 
 ## 5. Kommunikationsprotokoll WhatsApp
 
-- Webhook-Reihenfolge (`app/api/whatsapp/webhook/route.ts`): Zustellstatus speichern → „Status“/„Weiter“ → „Executive“ (nur mit `EXECUTIVE_WHATSAPP=true`, nur lesend, B-11) → „Geschäftsidee prüfen: …“ (nur mit `OPPORTUNITY_SCOUT_ENABLED=true`, F-05) → Bildstopp-Antworten →
+- Webhook-Reihenfolge (`app/api/whatsapp/webhook/route.ts`): Zustellstatus speichern → „Status“/„Weiter“ → „Executive“ (`EXECUTIVE_WHATSAPP`, Rollout-Wert an seit 28.10., nur lesend, nur die Betreibernummer, B-11) → „Geschäftsidee prüfen: …“ (nur mit `OPPORTUNITY_SCOUT_ENABLED=true`, F-05) → Bildstopp-Antworten →
   manuelle Aufträge → Themen-Pipeline (wenn aktiv; davor Themenauftrag „Mach etwas über X“/„Thema: X“ nur mit `TOPIC_ORDERS_ENABLED` (Rollout-Wert `lib/config/rollout.ts`, env hat Vorrang), `lib/topic-pipeline/topic-order.ts`, Tageslimit `TOPIC_ORDERS_PER_DAY`) → semantischer Router → Schlüsselwortkette → Freigabe-Gate.
 - Idempotenz: jede eingehende Nachricht wird über `whatsapp_events.message_id` genau einmal beansprucht.
 - Aktiver Kontext: `whatsapp_active_context` (+ Log `whatsapp_context_log`, auch Bildentscheidungen `image:*`).
@@ -135,8 +135,8 @@ Kein Modellwechsel ohne nachvollziehbare Daten; kostenpflichtige Vergleiche nur 
 - Neue Funktionen hinter Schaltern mit Standard „aus“ (Rollback = Variable entfernen); Schalter nie eigenmächtig aktivieren.
 - **Rollout-Schalter (`lib/config/rollout.ts`):** versionierter Wert je Schalter, aktiviert nur per eigenem, reviewtem PR mit Betreiberfreigabe
   (Protokoll `docs/PROJECT_STATUS.md` §2b); die Umgebungsvariable hat immer Vorrang, `false` ist der Notaus ohne Code-Deployment.
-  Eingeschaltet: `CONTROLLING_IMPORT_ENABLED` (27.10.), `EXECUTIVE_ENABLED` (28.10., Executive-Zyklus). Aus: `EXECUTIVE_WHATSAPP` (Befehl
-  „Executive“, nur lesend), `EXECUTIVE_WEEKLY_REPORT` (Abschnitt im Wochenbericht), `TOPIC_ORDERS_ENABLED`, `TOPIC_EDITORIAL_STYLE`.
+  Eingeschaltet: `CONTROLLING_IMPORT_ENABLED` (27.10.), `EXECUTIVE_ENABLED` (28.10., Executive-Zyklus), `EXECUTIVE_WHATSAPP` (28.10., Befehl
+  „Executive“, nur lesend). Aus: `EXECUTIVE_WEEKLY_REPORT` (Abschnitt im Wochenbericht), `TOPIC_ORDERS_ENABLED`, `TOPIC_EDITORIAL_STYLE`.
 - Opportunity-Scout (`OPPORTUNITY_SCOUT_ENABLED`, „Geschäftsidee prüfen: …“, Tavily + Modell, kostenpflichtig, Tageslimit `OPPORTUNITY_DAILY_LIMIT`)
   liest weiter nur `process.env` und bleibt aus, solange Q-07 (Budget) offen ist.
 - Cloud-Sitzungen: nicht in einem Git-Worktree mit verlinktem `node_modules` bauen (Turbopack-Fehler), sondern im Hauptcheckout.

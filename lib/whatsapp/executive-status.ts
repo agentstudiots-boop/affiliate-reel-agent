@@ -2,7 +2,7 @@
 // read-only section as the weekly report (B-10), over the last 7 days. Deterministic, no model call: only the exact
 // command from the configured approver number is answered, everything else is left to the existing chain. The reply is a
 // status text – it starts nothing, and replying to it approves nothing (B-06 binds every decision to its own request
-// message). Used by the webhook only with EXECUTIVE_WHATSAPP=true.
+// message). Used by the webhook only while EXECUTIVE_WHATSAPP is on (lib/config/rollout.ts; "false" in the environment stops it).
 
 import type { Database } from "../memory/db";
 import { formatExecutiveWeekly, readExecutiveWeekly } from "../enterprise/executive-weekly";
