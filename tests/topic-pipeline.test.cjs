@@ -691,10 +691,10 @@ test('signed webhook: a topic order reaches the topic pipeline before the produc
     assert.equal((await on.post()).status, 200, 'Meta redelivery');
     assert.equal(h.sent.length, count);
   } finally { on.restore(); }
-  // Own switch off (default): the pipeline stays on, but the order is not recognised. With no open topic draft the message
-  // goes to the product router as before; no topic draft is created from it.
+  // Own switch off (emergency stop "false" in the environment): the pipeline stays on, but the order is not recognised. With
+  // no open topic draft the message goes to the product router as before; no topic draft is created from it.
   await db.query("UPDATE topic_contents SET stage='discarded'");
-  const own = orderWebhook(db, h, { TOPIC_PIPELINE_ENABLED: 'true', TOPIC_ORDERS_ENABLED: undefined }, 'Mach etwas über Fenster putzen', 'wamid.webhook.order.own');
+  const own = orderWebhook(db, h, { TOPIC_PIPELINE_ENABLED: 'true', TOPIC_ORDERS_ENABLED: 'false' }, 'Mach etwas über Fenster putzen', 'wamid.webhook.order.own');
   try {
     assert.equal((await own.post()).status, 200);
     assert.ok(own.reached.includes('product router'));
