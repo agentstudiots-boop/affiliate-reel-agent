@@ -84,7 +84,7 @@ test('access policy: internal pages and APIs are protected; webhooks, cron, land
   walk('app/api');
   const publicRoutes = routes.map(p => p.slice(3, -'/route.ts'.length)).filter(p => classifyPath(p) === 'public').sort();
   // /api/cron/controlling-import (rollout 24.10.2026): public like every cron route, protected by CRON_SECRET and CONTROLLING_IMPORT_ENABLED.
-  // /api/cron/executive-cycle (B-07): public like every cron route, protected by CRON_SECRET; additionally EXECUTIVE_ENABLED (default off) and not scheduled.
+  // /api/cron/executive-cycle (B-07): public like every cron route, protected by CRON_SECRET; additionally EXECUTIVE_ENABLED (lib/config/rollout.ts, on since 28.10.2026; "false" in the environment stops it).
   assert.deepEqual(publicRoutes, ['/api/auth/login', '/api/auth/logout', '/api/auth/session', '/api/cron/continue', '/api/cron/controlling-import', '/api/cron/daily-draft', '/api/cron/executive-cycle', '/api/cron/topic-scout',
     '/api/cron/topic-video', '/api/cron/weekly-report', '/api/landing/click', '/api/whatsapp/webhook']);
   // Each public route keeps its own server-side protection.

@@ -82,11 +82,17 @@ const withEnv=async(env,fn)=>{const saved={};for(const k of Object.keys(env)){sa
   try{return await fn();}finally{for(const k of Object.keys(saved)){if(saved[k]===undefined)delete process.env[k];else process.env[k]=saved[k];}}};
 const call=(GET,secret='s3cret')=>GET(new Request('https://example.test/api/cron/executive-cycle',{headers:{authorization:`Bearer ${secret}`}}));
 
-test('route: secret required; switch off by default ⇒ no database access; preview never runs (AC-4)',async()=>{
-  await withEnv({CRON_SECRET:'s3cret',EXECUTIVE_ENABLED:undefined},async()=>{
+test('route: secret required; emergency stop "false" ⇒ no database access; preview never runs (AC-4, rollout 28.10.2026)',async()=>{
+  assert.equal(require('../.test-build/lib/config/rollout').ROLLOUT.EXECUTIVE_ENABLED,'true','on by rollout since 28.10.2026');
+  await withEnv({CRON_SECRET:'s3cret',EXECUTIVE_ENABLED:'false'},async()=>{
     const {GET,calls}=route();
     assert.equal((await call(GET,'wrong')).status,401);
-    assert.deepEqual(await (await call(GET)).json(),{status:'disabled'});
+    assert.deepEqual(await (await call(GET)).json(),{status:'disabled'},'the environment value "false" stops the cycle without a code deployment');
+    assert.equal(calls.db,0);
+  });
+  await withEnv({CRON_SECRET:'s3cret',EXECUTIVE_ENABLED:undefined,VERCEL_ENV:'preview'},async()=>{
+    const {GET,calls}=route();
+    assert.deepEqual(await (await call(GET)).json(),{status:'skipped_non_production_environment'},'rollout value on, but never in preview');
     assert.equal(calls.db,0);
   });
   await withEnv({CRON_SECRET:'s3cret',EXECUTIVE_ENABLED:'1'},async()=>{

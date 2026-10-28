@@ -174,7 +174,7 @@ test('adapter changes nothing in the studio and is not wired into app code (AC-7
     else if(/\.(ts|tsx)$/.test(entry.name)&&/enterprise\/departments\/affiliate/.test(fs.readFileSync(full,'utf8')))users.push(full);
   }};
   walk('app');walk('lib');
-  // Only the executive cycle route (B-07, switch EXECUTIVE_ENABLED off by default, not scheduled) and the read-only enterprise
+  // Only the executive cycle route (B-07, switch EXECUTIVE_ENABLED, daily 06:20 UTC) and the read-only enterprise
   // level of the Command Center (H-01: health() only, never handle()) may use the adapter.
   // lib/architecture/model.ts only names the files as text (static inventory of the Command Center), it imports nothing.
   assert.deepEqual(users,[path.join('app','api','cron','executive-cycle','route.ts'),path.join('lib','architecture','enterprise-snapshot.ts'),path.join('lib','architecture','model.ts')]);
