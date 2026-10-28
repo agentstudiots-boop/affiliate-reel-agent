@@ -90,8 +90,13 @@ async function webhook(t,switchValue){
   return calls;
 }
 
-test('webhook: without the switch (or with any value other than "true") the command path is never reached (AC-5)',async t=>{
-  for(const value of [undefined,'1','TRUE'])assert.deepEqual(await webhook(t,value),{executive:0,imageReply:1},String(value));
+test('webhook: emergency stop "false" (or any environment value other than "true") never reaches the command path (AC-5)',async t=>{
+  for(const value of ['false','1','TRUE'])assert.deepEqual(await webhook(t,value),{executive:0,imageReply:1},String(value));
+});
+
+test('webhook: on by rollout since 28.10.2026 – without an environment value the command answers (AC-6)',async t=>{
+  assert.equal(require('../.test-build/lib/config/rollout').ROLLOUT.EXECUTIVE_WHATSAPP,'true');
+  assert.deepEqual(await webhook(t,undefined),{executive:1,imageReply:0});
 });
 
 test('webhook: with EXECUTIVE_WHATSAPP=true the command answers before the image-stop replies and the router (AC-6)',async t=>{

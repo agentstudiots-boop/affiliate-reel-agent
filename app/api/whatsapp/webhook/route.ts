@@ -143,7 +143,7 @@ export async function POST(request: Request) {
         }
         continue;
       }
-      // „Executive“ (B-11, only with EXECUTIVE_WHATSAPP=true): read-only executive status, deterministic, no model call.
+      // „Executive“ (B-11, EXECUTIVE_WHATSAPP via lib/config/rollout.ts): read-only executive status, deterministic, no model call.
       if (switchOn("EXECUTIVE_WHATSAPP") && await handleExecutiveStatus({ ...message, payload }, { database: getDatabase, send: sendWhatsAppText })) continue;
       // „Geschäftsidee prüfen: …“ (F-05, only with OPPORTUNITY_SCOUT_ENABLED=true): bounded research after the reply, result as a
       // recommendation only. Without the switch the message continues through the unchanged chain.
