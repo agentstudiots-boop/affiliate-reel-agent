@@ -13,7 +13,7 @@ export const ROLLOUT = {
   CONTROLLING_IMPORT_ENABLED: "true",
   // Executive: daily cycle (status report, prioritisation, health; cron /api/cron/executive-cycle). On since the
   // rollout of 28.10.2026 (step 2 after the verified cost import); writes only its task ledger and marks expired decision requests as expired
-  // (lib/enterprise/decisions.ts); no message, no model call, no approval.
+  // (expireDecisions in the enterprise decision module); no message, no model call, no approval.
   EXECUTIVE_ENABLED: "true",
   // Executive section in the Monday weekly report (read-only).
   EXECUTIVE_WEEKLY_REPORT: "false",
