@@ -122,8 +122,8 @@ Kein Modellwechsel ohne nachvollziehbare Daten; kostenpflichtige Vergleiche nur 
   höchstens ein Themenvideo-Vorschlag je Berliner Tag (Fenster 12–14 Uhr, Claim `topic_video_days`). Beide wirken nur mit `TOPIC_PIPELINE_ENABLED=true`
   (Video zusätzlich `TOPIC_DAILY_VIDEO=true`). Außerhalb des 24-h-Fensters werden Themenvorschläge gehalten und mit der nächsten Betreiber-Nachricht nachgeliefert.
 - `/api/cron/weekly-report` Mo 08:15 UTC. `/api/cron/controlling-import` 05:40 UTC (`CONTROLLING_IMPORT_ENABLED`, `model_calls` → `cost_entries`,
-  ohne Preis „unbekannt“). `/api/cron/executive-cycle` 06:20 UTC (`EXECUTIVE_ENABLED`: Statusbericht, Priorisierung, Health; nur lesend außer
-  eigenem Aufgabenbuch). `/api/cron/continue` existiert, ist aber nicht geplant.
+  ohne Preis „unbekannt“). `/api/cron/executive-cycle` 06:20 UTC (`EXECUTIVE_ENABLED`: Statusbericht, Priorisierung, Health; schreibt nur das eigene
+  Aufgabenbuch und setzt abgelaufene Entscheidungsvorlagen auf „abgelaufen“). `/api/cron/continue` existiert, ist aber nicht geplant.
 - Hobby-Plan: Ausführungszeit innerhalb der Stunde unscharf, Runtime-Logs nur 1 h → Nachweise in der DB.
 
 ## 8. Entwicklungs-, Test- und Deployment-Regeln
