@@ -1,5 +1,6 @@
 import type { Cluster, Scored } from "./scoring";
 import type { TrendType } from "./schema";
+import { patternTexts, type EditorialPattern } from "./editorial";
 
 // Rule-based text templates (text_origin = "rule_template"). They only rephrase the source title and the
 // computed timing; they never add facts, numbers, tests or promises. A model may later enrich them
@@ -9,9 +10,18 @@ const MONTHS = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "A
 const clip = (value: string, length: number) => value.length > length ? `${value.slice(0, length - 1).replace(/\s+\S*$/, "")}…` : value;
 const strip = (value: string) => value.replace(/\s+am \d{1,2}\. \p{L}+$/u, "").replace(/[„“"]/g, "").trim();
 
-export type TopicTexts = { audienceProblem: string; whyNow: string; hook: string; angle: string; coreMessage: string; variant: number };
+export type TopicTexts = { audienceProblem: string; whyNow: string; hook: string; angle: string; coreMessage: string; variant: number; pattern?: EditorialPattern; baseHook?: string };
 
-export function topicTexts(cluster: Cluster, type: TrendType, scored: Scored, now: Date, variant = 0): TopicTexts {
+// With an editorial pattern (TOPIC_EDITORIAL_STYLE=on, see editorial.ts) hook and angle follow the pattern; problem, timing
+// and core message stay the same rule texts.
+export function topicTexts(cluster: Cluster, type: TrendType, scored: Scored, now: Date, variant = 0, pattern: EditorialPattern | null = null): TopicTexts {
+  const base = baseTexts(cluster, type, scored, now, variant);
+  if (!pattern) return base;
+  const publisher = cluster.signals.find(signal => signal.kind === "news" && signal.publisher)?.publisher ?? null;
+  return { ...base, ...patternTexts(pattern, clip(strip(cluster.title), 90), publisher, variant), pattern, baseHook: base.hook };
+}
+
+function baseTexts(cluster: Cluster, type: TrendType, scored: Scored, now: Date, variant: number): TopicTexts {
   const title = strip(cluster.title);
   const short = clip(title, 90);
   const snippet = cluster.signals.find(signal => signal.snippet && (signal.kind === "evergreen" || signal.kind === "calendar"))?.snippet ?? "";

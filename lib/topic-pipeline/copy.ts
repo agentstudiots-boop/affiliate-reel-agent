@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { Generator } from "../content/agent";
 import { UNSUPPORTED_CLAIM_PATTERN } from "../content/trend";
 import type { FormatOverride } from "../formats/override";
+import { MODEL_ONLY_PATTERNS, PATTERN_GUIDANCE, PATTERN_QUESTION, RISKY_HACK_PATTERN } from "../topics/editorial";
 import { tokens } from "../topics/lexicon";
 import type { TopicCandidate } from "../topics/schema";
 import type { ProductionCopy } from "../visual/renderers";
@@ -37,15 +38,21 @@ function referencePoints(candidate: TopicCandidate) {
   ].filter(point => point.text.length >= 3);
 }
 
+// True when the candidate's pattern hook needs the model copy; the rule template then uses the previous hook and question.
+export const patternNeedsModel = (candidate: TopicCandidate) => !!candidate.editorial_pattern && MODEL_ONLY_PATTERNS.includes(candidate.editorial_pattern);
+
 export function referenceCopy(candidate: TopicCandidate, override?: FormatOverride | null): TopicCopy {
   const points = referencePoints(candidate);
-  const question = candidate.trend_type === "ENTERTAINMENT" ? "Wie siehst du das?" : "Wie machst du das bei dir zuhause?";
+  const plain = patternNeedsModel(candidate);
+  const hook = plain ? candidate.reference_hook ?? candidate.hook : candidate.hook;
+  const question = candidate.editorial_pattern && !plain ? PATTERN_QUESTION[candidate.editorial_pattern]
+    : candidate.trend_type === "ENTERTAINMENT" ? "Wie siehst du das?" : "Wie machst du das bei dir zuhause?";
   const cta = override?.tone.includes("less_promotional") ? "Speichern für später" : "Speichern und mit jemandem teilen, dem es hilft";
   const tags = hashtags(candidate);
   const body = `${candidate.audience_problem}\n\n${candidate.core_message}`;
-  const caption = [candidate.hook, "", candidate.core_message, "", question, "", tags.join(" ")].join("\n");
-  const videoScript = [candidate.hook, candidate.audience_problem, ...points.map(point => `${point.headline}: ${point.text}`), cta].join(" ").slice(0, 1400);
-  return { title: candidate.title, hook: candidate.hook, problem: candidate.audience_problem, coreMessage: candidate.core_message, body, caption, cta, question,
+  const caption = [hook, "", candidate.core_message, "", question, "", tags.join(" ")].join("\n");
+  const videoScript = [hook, candidate.audience_problem, ...points.map(point => `${point.headline}: ${point.text}`), cta].join(" ").slice(0, 1400);
+  return { title: candidate.title, hook, problem: candidate.audience_problem, coreMessage: candidate.core_message, body, caption, cta, question,
     points, imageMotif: `Alltagsszene in einer deutschen Wohnung zum Thema „${candidate.title}“`, videoScript, hashtags: tags, origin: "reference_template" };
 }
 
@@ -60,13 +67,16 @@ export async function writeTopicCopy(candidate: TopicCandidate, options: { gener
   const reference = referenceCopy(candidate, options.override);
   if (!options.generate) return { copy: reference, modelCalls: 0 };
   const input = { title: candidate.title, trend_type: candidate.trend_type, problem: candidate.audience_problem, why_now: candidate.why_now, angle: candidate.angle,
-    core_message: candidate.core_message, hook: candidate.hook, tone: options.override?.tone ?? [],
+    core_message: candidate.core_message, hook: candidate.hook, tone: options.override?.tone ?? [], ...(candidate.editorial_pattern ? { editorial_pattern: candidate.editorial_pattern } : {}),
     sources: candidate.source_signals.filter(signal => signal.kind === "news").slice(0, 4).map(signal => ({ publisher: signal.publisher, title: signal.title })) };
   try {
-    const result = await options.generate("text", INSTRUCTION, input, topicCopySchema, () => ({ hook: reference.hook, body: reference.body, caption: reference.caption,
+    // The editorial pattern (if any) sets voice and structure; the no-invention rules above stay binding.
+    const instruction = candidate.editorial_pattern ? `${INSTRUCTION}\n${PATTERN_GUIDANCE[candidate.editorial_pattern]}` : INSTRUCTION;
+    const result = await options.generate("text", instruction, input, topicCopySchema, () => ({ hook: reference.hook, body: reference.body, caption: reference.caption,
       cta: reference.cta, question: reference.question, points: reference.points.slice(0, 5), video_script: reference.videoScript }));
     const text = JSON.stringify(result);
     if (UNSUPPORTED_CLAIM_PATTERN.test(text) || /https?:\/\/|www\./i.test(text)) return { copy: reference, modelCalls: 1, fallbackReason: "unbelegte Aussage oder Link im Modelltext" };
+    if (candidate.editorial_pattern === "hack" && RISKY_HACK_PATTERN.test(text)) return { copy: reference, modelCalls: 1, fallbackReason: "Kniff mit Risikobezug (Chemie, Strom, Gas, Feuer, Lebensmittel, Schimmel, Medikamente)" };
     const tags = hashtags(candidate);
     return { modelCalls: 1, copy: { ...reference, hook: result.hook, body: result.body, caption: `${result.caption}\n\n${tags.join(" ")}`, cta: result.cta, question: result.question,
       points: result.points, videoScript: result.video_script, hashtags: tags, origin: "model" } };
