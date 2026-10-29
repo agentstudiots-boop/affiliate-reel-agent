@@ -124,7 +124,8 @@ Kein Modellwechsel ohne nachvollziehbare Daten; kostenpflichtige Vergleiche nur 
 - `/api/cron/weekly-report` Mo 08:15 UTC. `/api/cron/controlling-import` 05:40 UTC (`CONTROLLING_IMPORT_ENABLED`, `model_calls` → `cost_entries`,
   ohne Preis „unbekannt“). `/api/cron/executive-cycle` 06:20 UTC (`EXECUTIVE_ENABLED`: Statusbericht, Priorisierung, Health; schreibt nur das eigene
   Aufgabenbuch und setzt abgelaufene Entscheidungsvorlagen auf „abgelaufen“). `/api/cron/continue` existiert, ist aber nicht geplant.
-- Hobby-Plan: Ausführungszeit innerhalb der Stunde unscharf, Runtime-Logs nur 1 h → Nachweise in der DB.
+- Hobby-Plan: Ausführungszeit unscharf, auch über die geplante Stunde hinaus (beobachtet: `executive-cycle` geplant 06:20, gelaufen 07:10 UTC am 29.10.;
+  `topic-scout` 08-Uhr-Slot um 07:15 UTC), Runtime-Logs nur 1 h → Nachweise in der DB.
 
 ## 8. Entwicklungs-, Test- und Deployment-Regeln
 
