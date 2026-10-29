@@ -1,0 +1,31 @@
+{
+  "status": "Entwurf – nicht wirksam, Betreiberentscheidung Q-07 offen",
+  "scoring": {
+    "version": "q07-entwurf-2026-10-29",
+    "weights": {
+      "marketPotential": 10,
+      "targetAudience": 4,
+      "competition": 7,
+      "entryBarriers": 5,
+      "investmentNeed": 10,
+      "runningCosts": 8,
+      "revenueProfitPotential": 12,
+      "scalability": 6,
+      "payback": 10,
+      "technicalFeasibility": 6,
+      "automationLevel": 8,
+      "legalRisks": 8,
+      "thirdPartyDependency": 3,
+      "trendDuration": 3
+    },
+    "minimumTotalScore": 3.5,
+    "minimumConfidence": 0.5
+  },
+  "economics": {
+    "version": "q07-entwurf-2026-10-29",
+    "maxPaybackMonths": 12
+  },
+  "budget": {
+    "dailyLimit": 2
+  }
+}
