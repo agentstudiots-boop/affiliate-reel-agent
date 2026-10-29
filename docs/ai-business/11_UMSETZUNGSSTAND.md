@@ -123,7 +123,7 @@ Deployment-IDs je Merge stehen in `docs/PROJECT_STATUS.md` §2.
 
 | Punkt | Wirkung, solange offen | Fundstelle |
 |---|---|---|
-| **Q-07** Gewichte, Schwellen und Ausschlusskriterien des Bewertungsrasters, Amortisationsgrenze | Jede Bewertung ist „blocked“; kein Test wird empfohlen (`lib/enterprise/opportunity/operator-config.ts` = `null`) | 07, I-01 |
+| **Q-07** Gewichte, Schwellen und Ausschlusskriterien des Bewertungsrasters, Amortisationsgrenze | Jede Bewertung ist „blocked“; kein Test wird empfohlen (`lib/enterprise/opportunity/operator-config.ts` = `null`). Entwurf zur Entscheidung: `Q07_VORSCHLAG_BEWERTUNGSRASTER.md` (29.10., nicht wirksam) | 07, I-01, Q07 |
 | **I-03** Ausbau Immobilienanalyse | Nicht gebaut. Voraussetzung: Go auf I-01, Zuschnitt, Recherchebudget, rechtliche Prüfung (K.O.-Fragen aus I-02) | I-01, 10 |
 | Aktivierung der Schalter (Executive, Opportunity Scout) und Planung `executive-cycle` | Funktionen bleiben aus. Der Betreiber hat am 21.10. „erst mal aus lassen“ entschieden | `CLAUDE.md` §8 |
 | **BF-16** (ADR-01, ADR-13 … ADR-16) als Teil von Gate G0 | **Formal nicht als entschieden dokumentiert.** Der Code wurde mit Betreiberfreigaben vom 19. und 21.10. gebaut und gemergt. Die Doku-Übernahme vom 23.10. ist ausdrücklich keine Architekturfreigabe | 04 §1, 07 |
