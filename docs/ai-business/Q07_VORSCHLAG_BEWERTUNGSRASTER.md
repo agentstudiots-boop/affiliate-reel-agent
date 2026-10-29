@@ -53,7 +53,8 @@ Gewicht 0 trotzdem bewertet sein muss (siehe §5).
 - **Amortisation höchstens 12 Monate**, gemessen am ungünstigen Ende der Prognosespanne:
   - Investition 300 EUR und Gewinn 50–150 EUR/Monat ergeben 2–6 Monate: *innerhalb*.
   - Investition 300 EUR und Gewinn 20–100 EUR/Monat ergeben 3–15 Monate: *außerhalb*.
-  - Ist der niedrigste Gewinn ≤ 0, ist das Ergebnis immer *außerhalb*.
+  - Ist nur der niedrigste Gewinn ≤ 0 (der höchste aber positiv), ist das Ergebnis immer *außerhalb*.
+  - Ist schon der höchste Gewinn ≤ 0, gibt es keine Amortisationsprognose: Ergebnis *unzureichende Daten*, ebenfalls kein Test.
 
   Sobald eine Testphase Messwerte hat, entscheiden nur diese.
 

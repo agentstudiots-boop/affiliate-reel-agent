@@ -64,6 +64,15 @@ test('payback limit: 300 EUR at 20–100 EUR/Monat is 3–15 months, outside 12;
   assert.equal(economics.testRecommended,false);
 });
 
+test('profit range: lowest ≤ 0 is outside the limit, highest ≤ 0 is insufficient data; no test either way',()=>{
+  for(const [profit,status] of [[[-10,100],'outside_limit'],[[-50,0],'insufficient_data']]){
+    const assessments=grid({profit});
+    const economics=assessEconomics({evaluation:evaluateOpportunity(assessments,proposal.scoring),assessments,limits:proposal.economics});
+    assert.equal(economics.verdict.status,status,JSON.stringify(profit));
+    assert.equal(economics.testRecommended,false);
+  }
+});
+
 test('confidence example: 6 sourced at 0.8 and 8 unsourced at 0.3 gives 0.51 (passes 0.5); 8 sourced fail 0.6',()=>{
   const mixed=sourced=>grid().map((item,index)=>index<sourced?item:{...item,kind:item.kind==='fact'?'assumption':item.kind,sources:[],confidence:0.3});
   const six=evaluateOpportunity(mixed(6),proposal.scoring);
