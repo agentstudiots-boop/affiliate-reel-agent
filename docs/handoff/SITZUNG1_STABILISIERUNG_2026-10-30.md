@@ -11,7 +11,9 @@ Anbieterdiagnose und die Betriebsansicht im Command Center und schreibt ihre Üb
 |---|---|
 | Branch | `claude/nice-ptolemy-k4p1c3` |
 | PR | [#144](https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/144) „Themenweg: Entwurfsreife prüfen, KI-Drehbuch gezielt korrigieren, keine dünnen Fallbacks“ (offen, nicht gemergt) |
-| Commits | `6cedc66` Code und Tests; `f7e3c47` `ours`-Merge der alten Branch-Historie von #82 (Inhalt unverändert); danach dieser Übergabe-Commit |
+| Commits | `6cedc66` Code und Tests; `f7e3c47` `ours`-Merge der alten Branch-Historie von #82 (Inhalt unverändert); `4b8507a` Übergabe; `16dc595` Review-Punkte von Sitzung 2 (Pfeil, Antworttext); danach dieser Nachtrag |
+| Review | Sitzung 2 hat reviewt (Kommentar in #144), Punkte 1 und 3 sind beantwortet bzw. behoben. Offen: ihr Einverständnis und die CI |
+| Sitzung 2 | PR [#145](https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/145), Branch `claude/betrieb-diagnose`, Head `b4fc566` (Sicherung bestätigt), Übergabe `docs/handoff/SITZUNG2_BETRIEB_2026-10-30.md` |
 | `main` | `48d4137` (#143), Production `dpl_86Be7XWk2jaR2J4rV15Vcs1pa5fC` READY |
 
 ## Erledigt (implementiert und getestet, nicht gemergt)
@@ -32,7 +34,7 @@ Der Affiliate-Produktpost wurde geprüft und nicht geändert: Der Referenzentwur
 - Gezielt: `tests/topic-draft-quality.test.cjs` (8 Tests) sowie `topic-pipeline`, `topic-video`, `topic-order`, `topic-editorial`, `topic-scout`, `topic-cron`, `topic-activation` und `topic-daily-limit`: alle grün.
 - Gegenprobe (Mutation): ohne Reifeprüfung 3 Fehlschläge, ohne Korrekturaufruf 2.
 - `npm run typecheck` 0, `npm run lint` 0 Fehler (1 bekannte Warnung).
-- Vollständiges `npm test` lief beim Schreiben noch. Ergebnis und `npm run build` stehen als Kommentar in #144 bzw. sind dort nachzutragen, falls die Sitzung vorher endete.
+- `npm test` vollständig: 957 Tests, 953 bestanden, 4 übersprungen, 0 fehlgeschlagen; `npm run build` 0; `npm audit --omit=dev --audit-level=high` 0 (Kommentar in #144). Nach `16dc595` sind die Themen-Tests erneut gelaufen: 66/66 grün.
 - CI auf GitHub für #144: siehe PR.
 
 ## Produktionsänderungen
