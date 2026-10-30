@@ -115,3 +115,27 @@ WhatsApp erlaubt Freitext nur innerhalb von 24 h nach der letzten Nachricht des 
    2. Dann Runway konfigurieren (Punkt 3 oben), ein Themenvorschlag mit Video, Inhaltsfreigabe, Kostenfreigabe für genau einen Clip, Rendering.
    3. Abnahme durch Sitzung 1, dann Veröffentlichungsfreigabe. Live erst nach den Entscheidungen aus Punkt 5. Bis dahin Dry-Run.
    4. **Nachweis:** `visual_jobs` mit Status `succeeded`, `publish_attempts` mit Status `published` und externer ID.
+
+## 9. Meta-Seitensuche: was heute belegt ist
+
+Welche Facebook-Seite und welches Instagram-Konto die Seitensuche heute findet, ist **ohne Live-Aufruf nicht belegbar**. `/api/meta/connection` gibt bewusst keine IDs aus, und diese Sitzung hat weder Admin-Session noch Meta-Token.
+- **Belegt ist nur, was der Code erwartet:** Seitenname `META_PAGE_NAME` (Standard „Alltäglich leichter“), Instagram-Benutzername `META_INSTAGRAM_USERNAME` (Standard `alltaeglich.leichter`), Systemnutzer `affiliatecontentsystem` (`lib/meta/connection.ts`, `metaConfig`). Weicht die gefundene Seite oder das Konto davon ab, bricht die Prüfung mit `identity_mismatch` ab.
+- **Indirekter Beleg:** Veröffentlicht der Affiliate-Weg erfolgreich (Plattform-ID in der Betriebsansicht), dann hat die Seitensuche genau diese Seite und dieses Konto gefunden. Die IDs kann der Betreiber danach aus dem Post-Link oder der Meta Business Suite ablesen.
+- **Vereinbart:** `lib/capabilities` bleibt unverändert, bis der Affiliate-Bildpost abgenommen ist. Danach entscheidet Sitzung 1.
+
+## 10. Sicherungsstand (30.10.2026, ca. 19:50 UTC)
+
+- **Branch und PR:** `claude/betrieb-diagnose`, PR #145. Der letzte geprüfte Code-Commit ist `57a26a40` (volle SHA in der PR-Ansicht); danach folgt nur dieser Doku-Nachtrag.
+- **Fertig:**
+  - Betriebsansicht mit Tests
+  - Anbieter- und Konfigurationsdiagnose (§2–§5)
+- **Offen:**
+  - CI `check` auf dem Head
+  - Review durch Sitzung 1
+  - Merge, den Sitzung 1 koordiniert. Reihenfolge: #144 → #145 → Executive-Zahlen-PR.
+- **Tests:** lokal 957 Tests (953 bestanden, 4 übersprungen, 0 fehlgeschlagen), Typecheck, Lint (2 bekannte Warnungen), Build und `npm audit` grün.
+- **Produktionsänderungen:** **keine**. Keine Variable gesetzt, kein Schalter aktiviert, kein Anbieteraufruf, keine Nachricht.
+- **Nächster Schritt:**
+  1. Review von #144 (Sitzung 1, Schwerpunkte readiness.ts, Korrekturbudget, `applyWish`)
+  2. Danach eigener kleiner PR „Executive-Zahlen“ (`lib/enterprise/departments/affiliate.ts` und `executive.ts`, nur Zählung und Text): eindeutige Entwürfe neben Cron-Aufrufen, Zeitfenster und Stand der Kostenzeilen
+- **Fortsetzung:** Weckruf am 03.11. um 08:20 UTC (`trig_01DHjjNYeVP8cSskuaUuPxtg`, von Sitzung 1). Zuerst beide Übergaben lesen, auch `docs/handoff/SITZUNG1_STABILISIERUNG_2026-10-30.md` auf `claude/nice-ptolemy-k4p1c3`.
