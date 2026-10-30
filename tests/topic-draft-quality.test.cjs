@@ -191,6 +191,14 @@ test('held proposals from before the readiness check: a thin one is not delivere
   } finally { await db.close(); }
 });
 
+test('an arrow in audience text is fine; only the scout\'s structure lines count as internal notes', () => {
+  const candidate = operatorTopicCandidate('Fenster putzen ohne Schlieren', { now: NOW }).candidate;
+  const base = { ...referenceCopy(candidate), origin: 'model', points: [{ headline: 'Reihenfolge', text: 'Erst Rahmen, dann Glas → so tropft nichts auf die frisch geputzte Scheibe.' }] };
+  assert.equal(draftReadiness(candidate, base).reasons.some(reason => /interne Redaktionsnotiz/.test(reason)), false);
+  const leaked = { ...base, body: 'Problem → einfache Lösungsschritte' };
+  assert.ok(draftReadiness(candidate, leaked).reasons.some(reason => /Text: interne Redaktionsnotiz/.test(reason)));
+});
+
 test('the bounded word limit matches the validator (one rule for model and reference)', () => {
   const { spokenWordLimit } = require(`${L}/topic-pipeline/video-briefing`);
   assert.equal(spokenWordLimit(3), 9);

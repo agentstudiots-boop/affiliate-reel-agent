@@ -209,7 +209,8 @@ async function notReady(deps: TopicPipelineDeps, row: TopicContentRow, planned: 
     briefingOrigin: planned.video?.briefing?.origin ?? null, modelCalls: planned.model_calls }, "warn");
   if (row.proposal_message_id) {
     await deps.db.query("UPDATE topic_contents SET model_calls=$2, last_error=$3, updated_at=now() WHERE content_id=$1", [row.content_id, planned.model_calls, reason]);
-    await deps.send(`Die Überarbeitung von „${row.candidate.candidate.title}“ ergab keinen brauchbaren Entwurf (${reasons.slice(0, 2).join("; ")}). Der bisherige Vorschlag bleibt unverändert gültig. Es wurde nichts produziert oder veröffentlicht.`);
+    // Accurate for every revision path (proposal or rendered video): nothing new was created; the operator may send another wish.
+    await deps.send(`Die Überarbeitung von „${row.candidate.candidate.title}“ ergab keinen brauchbaren Entwurf (${reasons.slice(0, 2).join("; ")}). Es wurde nichts Neues angelegt, produziert oder veröffentlicht; schick bei Bedarf einen anderen Wunsch als Antwort auf die letzte Nachricht dazu.`);
     return (await load(deps.db, row.content_id)) ?? row;
   }
   const discarded: TopicContentRow = { ...planned, stage: "discarded", proposal_message_id: null, last_error: reason };

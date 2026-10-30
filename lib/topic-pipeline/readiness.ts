@@ -10,8 +10,9 @@ import { MISSING_SPOKEN, type VideoBriefing } from "./video-briefing";
 
 export type DraftReadiness = { ready: boolean; reasons: string[] };
 
-// Internal briefs and pipeline notes of the scout and the router. They steer the model; an audience must never read them.
-const INTERNAL_NOTE = /produkte nur optional|ohne erfundene|ohne werbeversprechen|dein themenauftrag|nur belegte (?:fakten|hintergründe)|keine fremden bilder|ohne quelle keine behauptung|→/i;
+// Internal briefs and pipeline notes of the scout and the router (angles.ts, editorial.ts). They steer the model; an
+// audience must never read them. An arrow alone is not a note („Vorher → Nachher“ is fine); only the scout's structure lines.
+const INTERNAL_NOTE = /produkte nur optional|ohne erfundene|ohne werbeversprechen|dein themenauftrag|nur belegte (?:fakten|hintergründe)|keine fremden bilder|ohne quelle keine behauptung|(?:problem|fehler|alltagssituation|anwendungssituation|nachricht|überraschung|alltagsszene|belegte meldung mit quelle) → |(?:mini-geschichte|aha-moment|alltagskniff|mit augenzwinkern):/i;
 // A sentence may not end on a word that needs a continuation („Produkte nur optional und ohne.“).
 // Only words that never close a German sentence: separable particles („Wie gehst du das an?“) and pronouns („Wer kennt das?“) can.
 const DANGLING_END = /(?:^|\s)(?:und|oder|ohne|für|zum|zur|den|dem|des|ein|eine|einen|einem|eines|aber|weil|dass|wenn|sowie|vom|im|beim)\s*[.…!?]*$/i;
