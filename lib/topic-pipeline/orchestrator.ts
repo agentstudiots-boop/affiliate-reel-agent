@@ -33,6 +33,7 @@ import type { ProductionResult } from "../visual/types";
 import { writeTopicCopy, type TopicCopy } from "./copy";
 import { productSuggestionsText, proposalText, publishApprovalText } from "./messages";
 import { closeRoute } from "../trendsetter/repository";
+import { draftReadiness } from "./readiness";
 import { spokenText, videoProviderPrompt, writeVideoBriefing, type VideoBriefing } from "./video-briefing";
 import { approvedVideoSpendThisMonth, maxCostPerVideo, monthlyVideoBudget, planTopicVideo, type VideoPlan } from "./video-plan";
 import { VIDEO_REVIEW_CHECKLIST, videoCostText, videoProposalText } from "./video-messages";
@@ -158,14 +159,19 @@ const proposalFor = (row: TopicContentRow & { decision: FormatDecision; copy: To
 
 // Video rows: (re)write the production briefing when the copy changed, plan provider and cost (no provider call), and put
 // the exact spoken text and storyboard prompt into the production copy the renderer hands to the provider.
-async function planVideo(deps: TopicPipelineDeps, row: TopicContentRow & { decision: FormatDecision; copy: TopicCopy }, copyChanged: boolean) {
+// A correction call of the model briefing is only started while the run has time left (cron routes: maxDuration 300 s;
+// scout ≤ 45 s, each model call ≤ 115 s): never later than 120 s after the proposal work began.
+const CORRECTION_TIME_BUDGET_MS = 120_000;
+async function planVideo(deps: TopicPipelineDeps, row: TopicContentRow & { decision: FormatDecision; copy: TopicCopy }, copyChanged: boolean, startedAt = Date.now()) {
   if (!row.video) return row;
   let video = row.video;
   let modelCalls = row.model_calls;
   if (!video.briefing || copyChanged) {
-    const written = await writeVideoBriefing(row.candidate.candidate, row.copy, { generate: modelCalls < MAX_MODEL_CALLS_PER_CONTENT ? deps.generate ?? null : null });
+    const written = await writeVideoBriefing(row.candidate.candidate, row.copy, { generate: modelCalls < MAX_MODEL_CALLS_PER_CONTENT ? deps.generate ?? null : null,
+      maxCalls: MAX_MODEL_CALLS_PER_CONTENT - modelCalls, allowCorrection: () => Date.now() - startedAt < CORRECTION_TIME_BUDGET_MS });
     modelCalls += written.modelCalls;
-    video = { ...video, briefing: written.briefing, briefingNote: written.fallbackReason ? `Hinweis: KI-Drehbuch nicht verwendet (${written.fallbackReason}); Referenzvorlage.` : null };
+    video = { ...video, briefing: written.briefing, briefingNote: written.fallbackReason ? `Hinweis: KI-Drehbuch nicht verwendet (${written.fallbackReason}); Referenzvorlage.`
+      : written.corrected ? "Hinweis: KI-Drehbuch nach einer gezielten Korrektur (Zeitplan/Regeln) verwendet." : null };
   }
   const spent = await approvedVideoSpendThisMonth(deps.db, now(deps)).catch(() => 0);
   const videoPlan = await planTopicVideo(deps.render, video.briefing!.durationSeconds, { spentThisMonth: spent, now: now(deps) });
@@ -175,8 +181,11 @@ async function planVideo(deps: TopicPipelineDeps, row: TopicContentRow & { decis
 }
 
 async function propose(deps: TopicPipelineDeps, row: TopicContentRow, note: string | null = null): Promise<TopicContentRow> {
-  const planned = await planVideo(deps, await plan(deps, row), row.copy === null);
+  const startedAt = Date.now();
+  const planned = await planVideo(deps, await plan(deps, row), row.copy === null, startedAt);
   const candidate = planned.candidate.candidate;
+  const readiness = draftReadiness(candidate, planned.copy, planned.video?.briefing ?? null);
+  if (!readiness.ready) return notReady(deps, row, planned, readiness.reasons);
   // Outside the 24 h window a free-form text is accepted by Meta but never delivered. The proposal is stored and held;
   // the operator's next message delivers it (deliverHeldProposals). The topic counts as proposed for today.
   if (deps.serviceWindowOpen && !(await deps.serviceWindowOpen())) return hold(deps, planned);
@@ -188,6 +197,25 @@ async function propose(deps: TopicPipelineDeps, row: TopicContentRow, note: stri
   await recordTopicHistory(deps.db, candidate, "proposed", `${row.content_id}:${row.revision}`);
   emitEvent("topic_approval_requested", { contentId: row.content_id, stage: "proposal", revision: row.revision, format: updated.format });
   return updated;
+}
+
+// A draft that is not production-ready (readiness.ts) is never proposed. A new content is kept as "discarded" with the
+// reasons (visible in „Status“ and the Command Center); the caller decides what the operator is told. A revision of an
+// existing proposal leaves that proposal valid and tells the operator why the change was not usable.
+export const notReadyReason = (row: Pick<TopicContentRow, "last_error">) => row.last_error?.startsWith("draft_not_ready: ") ? row.last_error.slice("draft_not_ready: ".length) : null;
+async function notReady(deps: TopicPipelineDeps, row: TopicContentRow, planned: TopicContentRow & { copy: TopicCopy }, reasons: string[]): Promise<TopicContentRow> {
+  const reason = `draft_not_ready: ${reasons.slice(0, 3).join("; ")}`.slice(0, 300);
+  emitEvent("topic_draft_not_ready", { contentId: row.content_id, revision: row.revision, reasons: reasons.length, copyOrigin: planned.copy.origin,
+    briefingOrigin: planned.video?.briefing?.origin ?? null, modelCalls: planned.model_calls }, "warn");
+  if (row.proposal_message_id) {
+    await deps.db.query("UPDATE topic_contents SET model_calls=$2, last_error=$3, updated_at=now() WHERE content_id=$1", [row.content_id, planned.model_calls, reason]);
+    await deps.send(`Die Überarbeitung von „${row.candidate.candidate.title}“ ergab keinen brauchbaren Entwurf (${reasons.slice(0, 2).join("; ")}). Der bisherige Vorschlag bleibt unverändert gültig. Es wurde nichts produziert oder veröffentlicht.`);
+    return (await load(deps.db, row.content_id)) ?? row;
+  }
+  const discarded: TopicContentRow = { ...planned, stage: "discarded", proposal_message_id: null, last_error: reason };
+  await save(deps.db, discarded);
+  if (discarded.video) await saveVideo(deps.db, discarded.content_id, discarded.video);
+  return discarded;
 }
 
 async function hold(deps: TopicPipelineDeps, planned: TopicContentRow): Promise<TopicContentRow> {
@@ -223,6 +251,14 @@ export async function deliverHeldProposals(deps: TopicPipelineDeps) {
     if (!claimed.rows.length) continue;
     const row = await load(deps.db, contentId);
     if (!row?.decision || !row.copy) { await deps.db.query("UPDATE topic_contents SET delivery='unknown' WHERE content_id=$1", [contentId]); continue; }
+    // Held before the readiness check existed: a thin draft is not delivered late either; it stays visible in „Status“.
+    const readiness = draftReadiness(row.candidate.candidate, row.copy, row.video?.briefing ?? null);
+    if (!readiness.ready) {
+      await deps.db.query("UPDATE topic_contents SET delivery='not_ready', stage='discarded', last_error=$2, updated_at=now() WHERE content_id=$1",
+        [contentId, `draft_not_ready: ${readiness.reasons.slice(0, 3).join("; ")}`.slice(0, 300)]);
+      emitEvent("topic_draft_not_ready", { contentId, revision: row.revision, reasons: readiness.reasons.length, copyOrigin: row.copy.origin, stage: "deliver_held" }, "warn");
+      continue;
+    }
     let messageId: string;
     try { messageId = await deps.send(proposalFor(row as TopicContentRow & { decision: FormatDecision; copy: TopicCopy }, "Nachgeliefert: Dieser Vorschlag wartete auf dein WhatsApp-Fenster (24 Stunden).")); }
     catch (error) {
@@ -287,6 +323,13 @@ export async function runTopicPipeline(deps: TopicPipelineDeps, input: { slotKey
     await saveTopicRun(deps.db, runId, selection.scout, selection.verdicts, selection.candidates, pick?.candidate ?? null, pick ? null : failure);
     if (!pick) return { status: "no_topic" as const, runId, failure };
     const row = await propose(deps, newRow(pick.candidate, pick.cluster, runId, pick.contentId, pick.chanceId, input.videoDay ?? null));
+    const unusable = notReadyReason(row);
+    if (unusable) {
+      // Not a proposal: the slot stays free for the next scheduled call (daily limit counts proposed topics only).
+      await deps.db.query("UPDATE topic_runs SET selected_topic_id=NULL, failure=$2 WHERE id=$1", [runId, `draft_not_ready: ${pick.candidate.topic_id}`.slice(0, 200)]);
+      if (pick.chanceId) await closeTopicRoute(deps, row, "rejected");
+      return { status: "not_ready" as const, runId, contentId: row.content_id, failure: `draft_not_ready: ${unusable}`.slice(0, 200) };
+    }
     return { status: "proposed" as const, runId, contentId: row.content_id, format: row.format };
   } catch (error) {
     emitEvent("topic_pipeline_failed", { stage: "run", failure: error instanceof Error ? error.name : "unknown" }, "error");
@@ -484,6 +527,12 @@ export async function requestTopicOrder(deps: TopicPipelineDeps, message: Inboun
     result.waived.length ? `Auf deinen Wunsch übergangen (nur redaktionelle Auswahl, keine Schutzprüfung): ${result.waived.join("; ")}.` : null].filter(Boolean).join("\n");
   try {
     const proposed = await propose(deps, row, note);
+    const unusable = notReadyReason(proposed);
+    if (unusable) {
+      emitEvent("topic_order_refused", { reason: "draft_not_ready", contentId: proposed.content_id });
+      await deps.send(`Zum Themenauftrag „${order.topic}“ ist kein brauchbarer Entwurf entstanden (${unusable}). Ich lege keinen unfertigen Vorschlag vor. Es wurde nichts produziert oder veröffentlicht; schick das Thema gern später noch einmal oder etwas genauer.`);
+      return true;
+    }
     emitEvent("topic_order_proposed", { contentId: proposed.content_id, format: proposed.format, waived: result.waived.length });
   } catch (error) {
     emitEvent("topic_pipeline_failed", { stage: "topic_order", contentId: row.content_id, failure: error instanceof Error ? error.name : "unknown" }, "error");
@@ -558,18 +607,7 @@ async function applyRoute(deps: TopicPipelineDeps, row: TopicContentRow, route: 
 }
 
 async function applyWish(deps: TopicPipelineDeps, row: TopicContentRow, wish: FormatOverride, message: { id: string }, stage: "proposal" | "publish") {
-  // Any accepted change voids every open or granted publish approval of this content right away.
-  const voided = await invalidateApprovals(deps.db, row.content_id, "operator_change");
-  if (voided.length) emitEvent("platform_publish_skipped", { contentId: row.content_id, reason: "approval_invalidated_by_operator_change", versions: voided });
-  if (wish.newTopic) {
-    await save(deps.db, { ...row, stage: "discarded" });
-    await recordTopicHistory(deps.db, row.candidate.candidate, "discarded", message.id);
-    await closeTopicRoute(deps, row, "rejected");
-    const next = await runTopicPipeline(deps, { slotKey: null, exclude: [row.topic_id] });
-    if (next.status !== "proposed") await deps.send("Ich habe gerade kein weiteres Thema, das Jarvis' Prüfung besteht. Es wird nichts produziert.");
-    return;
-  }
-  if (wish.noProduct && row.product.status !== "none") row = { ...row, product: { status: "declined", by: message.id } };
+  const declined = wish.noProduct && row.product.status !== "none" ? { ...row, product: { status: "declined" as const, by: message.id } } : row;
   let candidate = row.candidate;
   if (wish.newHook && candidate.cluster) {
     const variant = candidate.variant + 1;
@@ -578,13 +616,39 @@ async function applyWish(deps: TopicPipelineDeps, row: TopicContentRow, wish: Fo
   }
   const override = mergeOverrides(row.override, wish);
   const changedCopy = wish.newHook || wish.tone.length > 0;
+  // A text change after production is written and checked BEFORE anything is voided or produced: an unusable rewrite
+  // (readiness.ts) creates no new version. The change request itself has already answered the approval request
+  // (onPublishReply), so nothing can be published until the operator sends another wish.
+  let replanned: (TopicContentRow & { decision: FormatDecision; copy: TopicCopy }) | null = null;
+  if (stage === "publish" && !row.video && !wish.newTopic && changedCopy) {
+    replanned = await plan(deps, { ...declined, candidate, override, revision: row.revision + 1, copy: null });
+    const readiness = draftReadiness(replanned.candidate.candidate, replanned.copy);
+    if (!readiness.ready) {
+      emitEvent("topic_draft_not_ready", { contentId: row.content_id, revision: row.revision + 1, reasons: readiness.reasons.length, copyOrigin: replanned.copy.origin, stage }, "warn");
+      await deps.db.query("UPDATE topic_contents SET model_calls=$2 WHERE content_id=$1", [row.content_id, replanned.model_calls]);
+      await deps.send(`Die Änderung an „${row.candidate.candidate.title}“ ergab keinen brauchbaren Text (${readiness.reasons.slice(0, 2).join("; ")}). Es wurde nichts neu produziert oder veröffentlicht. Schick bei Bedarf einen anderen Änderungswunsch als Antwort auf die Freigabenachricht; ohne weitere Antwort bleibt der Beitrag unveröffentlicht.`);
+      return;
+    }
+  }
+  // Any accepted change voids every open or granted publish approval of this content right away.
+  const voided = await invalidateApprovals(deps.db, row.content_id, "operator_change");
+  if (voided.length) emitEvent("platform_publish_skipped", { contentId: row.content_id, reason: "approval_invalidated_by_operator_change", versions: voided });
+  if (wish.newTopic) {
+    await save(deps.db, { ...row, stage: "discarded" });
+    await recordTopicHistory(deps.db, row.candidate.candidate, "discarded", message.id);
+    await closeTopicRoute(deps, row, "rejected");
+    const next = await runTopicPipeline(deps, { slotKey: null, exclude: [row.topic_id] });
+    if (next.status === "not_ready") await deps.send(`Zum nächsten Thema ist kein brauchbarer Entwurf entstanden (${next.failure.replace(/^draft_not_ready: /, "")}). Es wird nichts produziert.`);
+    else if (next.status !== "proposed") await deps.send("Ich habe gerade kein weiteres Thema, das Jarvis' Prüfung besteht. Es wird nichts produziert.");
+    return;
+  }
   // A change voids the content approval of a topic video and its open cost approval (new version, new decisions).
-  const video = row.video ? { ...row.video, contentApprovedAt: null, contentApprovalMessageId: null } : row.video;
+  const video = declined.video ? { ...declined.video, contentApprovedAt: null, contentApprovalMessageId: null } : declined.video;
   if (row.video && row.cost_message_id) {
     await rememberOutdated(deps.db, row.content_id, row.cost_message_id);
     await deps.db.query("UPDATE topic_contents SET cost_message_id=NULL WHERE content_id=$1", [row.content_id]);
   }
-  const updated: TopicContentRow = { ...row, video, cost_message_id: null, candidate, override, revision: row.revision + 1, copy: changedCopy ? null : row.copy };
+  const updated: TopicContentRow = { ...declined, video, cost_message_id: null, candidate, override, revision: row.revision + 1, copy: changedCopy ? null : row.copy };
   emitEvent("topic_instruction_applied", { contentId: row.content_id, stage, matched: wish.matched });
   if (stage === "proposal") { await propose(deps, updated, `Übernommen: ${wish.matched.join(", ")}`); return; }
   // A rendered topic video is never re-rendered on a change without new decisions: back to the proposal, which needs a
@@ -596,7 +660,7 @@ async function applyWish(deps: TopicPipelineDeps, row: TopicContentRow, wish: Fo
   }
   // After production: re-plan (format/slides), produce again (finished slides/images are reused via the job ledger),
   // then a new version and a new approval request.
-  await produce(deps, await plan(deps, updated));
+  await produce(deps, replanned ?? await plan(deps, updated));
 }
 
 async function onProductReply(deps: TopicPipelineDeps, row: TopicContentRow, message: { id: string; body: string }) {

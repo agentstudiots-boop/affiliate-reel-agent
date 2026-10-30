@@ -53,7 +53,8 @@ export async function runTopicVideoCron(input: { enabled: boolean; now?: Date; d
     if (!claim.ok) return done(claim.reason, day, steps);
     const run = await runTopicPipeline(deps, { slotKey: null, videoDay: day });
     steps.video = run.status;
-    const status = run.status === "proposed" ? "proposed" : run.status === "no_topic" ? "no_topic" : "failed";
+    // A draft that is not production-ready counts like "no topic": the next call of the day may try again.
+    const status = run.status === "proposed" ? "proposed" : run.status === "no_topic" || run.status === "not_ready" ? "no_topic" : "failed";
     await deps.db.query("UPDATE topic_video_days SET status=$2, content_id=$3, reason=$4, updated_at=now() WHERE day=$1",
       [day, status, run.status === "proposed" ? run.contentId : null, "failure" in run && run.failure ? String(run.failure).slice(0, 160) : null]);
     if (status === "proposed") emitEvent("topic_video_proposed", { day, contentId: run.status === "proposed" ? run.contentId : null });

@@ -15,6 +15,7 @@ const { runTopicScout } = require(`${L}/topics/scout`);
 const { setEventSink } = require(`${L}/observability/events`);
 const pgliteDatabase = require('./helpers/pglite-db.cjs');
 const { liveEnv, withEnv } = require('./helpers/live-env.cjs');
+const { fakeTopicGenerator } = require('./helpers/fake-topic-generator.cjs');
 const restoreEnv = liveEnv();
 process.on('exit', restoreEnv);
 
@@ -596,7 +597,7 @@ const order = (h, body, id, from = OPERATOR) => requestTopicOrder(h.deps, { id: 
 test('topic order: "Mach etwas über X" proposes exactly that topic; approval flow unchanged; replay and strangers are ignored', async () => {
   const db = await pgliteDatabase();
   try {
-    const h = harness(db);
+    const h = harness(db, { deps: { generate: fakeTopicGenerator().generate } });
     assert.equal(await order(h, 'Mach etwas über Laub im Garten', 'wamid.order.1'), true);
     assert.equal(h.sent.length, 1);
     assert.match(h.sent[0], /^Themenvorschlag · Themen-Post/);
@@ -622,6 +623,33 @@ test('topic order: "Mach etwas über X" proposes exactly that topic; approval fl
   } finally { await db.close(); }
 });
 
+test('publish stage: an unusable text change produces no new version and publishes nothing; another wish still works', async () => {
+  const db = await pgliteDatabase();
+  try {
+    let modelUp = true;
+    const fake = fakeTopicGenerator();
+    const generate = async (...args) => { if (!modelUp && args[0] === 'text') throw new Error('model down'); return fake.generate(...args); };
+    const h = harness(db, { deps: { generate } });
+    assert.equal(await order(h, 'Thema: Brotdosen packen'), true);
+    await h.reply('Freigeben', h.lastId());
+    const approval = h.lastId();
+    assert.match(h.sent.at(-1), /^Veröffentlichungsfreigabe · Themen-Post/);
+    // The rewrite falls back to the bare reference (an order has no source) → not usable → no new version, nothing produced.
+    modelUp = false;
+    await h.reply('Weniger werblich', approval);
+    assert.match(h.sent.at(-1), /ergab keinen brauchbaren Text \(Referenzvorlage ohne konkrete Inhalte/);
+    assert.match(h.sent.at(-1), /ohne weitere Antwort bleibt der Beitrag unveröffentlicht/);
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM content_versions')).rows[0].n, 1, 'no new version from an unusable text');
+    assert.equal((await db.query('SELECT stage FROM topic_contents')).rows[0].stage, 'awaiting_publish_approval');
+    assert.ok(h.publishers.every(publisher => publisher.calls.length === 0));
+    // Another wish with a working model creates the next version and a new approval request as usual.
+    modelUp = true;
+    await h.reply('Weniger werblich', approval);
+    assert.match(h.sent.at(-1), /^Veröffentlichungsfreigabe · Themen-Post.*Fassung 2/);
+    assert.ok(h.publishers.every(publisher => publisher.calls.length === 0));
+  } finally { await db.close(); }
+});
+
 test('topic order: protective checks refuse with reasons and create nothing; refused orders do not count against the limit', async () => {
   const db = await pgliteDatabase();
   try {
@@ -641,7 +669,7 @@ test('topic order: daily limit per Berlin day; the next day orders work again', 
   const restore = withEnv({ TOPIC_ORDERS_PER_DAY: '2' });
   try {
     let at = new Date('2026-10-05T21:30:00Z'); // 23:30 Berlin
-    const h = harness(db, { deps: { now: () => at } });
+    const h = harness(db, { deps: { now: () => at, generate: fakeTopicGenerator().generate } });
     assert.equal(await order(h, 'Mach etwas über Laub im Garten'), true);
     assert.equal(await order(h, 'Thema: Fenster putzen ohne Schlieren'), true);
     const proposals = h.sent.length;
@@ -681,7 +709,7 @@ function orderWebhook(db, h, env, body, id) {
 test('signed webhook: a topic order reaches the topic pipeline before the product router; without either switch it never does', async t => {
   const db = await pgliteDatabase();
   t.after(() => db.close());
-  const h = harness(db);
+  const h = harness(db, { deps: { generate: fakeTopicGenerator().generate } });
   const on = orderWebhook(db, h, { TOPIC_PIPELINE_ENABLED: 'true', TOPIC_ORDERS_ENABLED: 'true' }, 'Mach etwas über Laub im Garten', 'wamid.webhook.order');
   try {
     assert.equal((await on.post()).status, 200);
