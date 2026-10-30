@@ -2,6 +2,7 @@ import type { ArchEdge, ArchNode, ClusterId, ComponentKind, DeploymentStatus, Ed
 import type { RuntimeState } from "@/lib/architecture/runtime";
 import type { EnterpriseView } from "@/lib/architecture/enterprise";
 import type { DevelopmentView } from "@/lib/architecture/development";
+import type { PipelineView } from "@/lib/architecture/pipeline-snapshot";
 
 // Shape of GET /api/architecture as the browser receives it (types only; no server code is bundled).
 export type ClientNode = Omit<ArchNode, "operation"> & { implementation: ImplementationStatus; deployment: DeploymentStatus };
@@ -16,6 +17,8 @@ export type Payload = {
   enterprise?: EnterpriseView;
   // Development status from the hand-over files (D-06); optional for older server responses.
   development?: DevelopmentView;
+  // Operations view per content path; optional for older server responses.
+  pipeline?: PipelineView;
   missing: { id: string; label: string; state: string; missing: string[] }[];
   labels: {
     implementation: Record<ImplementationStatus, { label: string; description: string }>;

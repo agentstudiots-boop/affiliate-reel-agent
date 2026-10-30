@@ -181,3 +181,14 @@ select { width: 100%; min-height: 44px; padding: 12px; border: 1px solid #4c5549
 .ccChain ol{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));padding-left:18px}
 .studioNav{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:0 0 18px}
 .studioNav form{margin:0}
+
+/* Command Center: operations view (mobile first) */
+.pvRoot{display:grid;gap:10px;padding:0 12px 12px}.pvNote{background:#0d131c;border:1px solid #232c3a;border-radius:10px;padding:8px 10px;margin:0}.pvWarn{border-color:#d9a441}
+.pvTrack h4{margin:6px 0 2px}.pvStations{list-style:none;margin:0;padding:0;display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+.pvStation{background:#0d131c;border:1px solid #232c3a;border-left-width:4px;border-radius:10px;padding:10px;min-width:0;overflow-wrap:anywhere}.pvStation p{margin:4px 0}
+.pvHead{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.pvBadge{font-size:12px;border-radius:999px;padding:2px 8px;border:1px solid currentColor;white-space:nowrap}
+.pvStation dl{display:grid;grid-template-columns:auto 1fr;gap:2px 8px;margin:6px 0 0;font-size:13px}.pvStation dt{color:#9aa6b6}.pvStation dd{margin:0;min-width:0}
+.pvPubs{margin:6px 0 0;padding-left:18px;font-size:13px}
+.pvOk{border-left-color:#3ccf8e}.pvOk .pvBadge{color:#3ccf8e}.pvWait{border-left-color:#d9a441}.pvWait .pvBadge{color:#d9a441}
+.pvBad{border-left-color:#ff6b6b}.pvBad .pvBadge{color:#ff6b6b}.pvOff{border-left-color:#5b6677}.pvOff .pvBadge{color:#9aa6b6}
+@media (max-width:520px){.pvStations{grid-template-columns:1fr}.pvStation dl{grid-template-columns:1fr}}

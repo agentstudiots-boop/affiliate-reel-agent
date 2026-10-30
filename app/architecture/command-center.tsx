@@ -6,6 +6,7 @@ import type { ClusterId } from "@/lib/architecture/model";
 import type { SceneProps } from "@/app/architecture/scene";
 import { ClusterPanel, GroupedView, NodePanel, OverviewPanel, ProcessRibbon, ProfilesView } from "@/app/architecture/panels";
 import { DETAIL_HINT, DepartmentDetail, EnterprisePanel, EnterpriseSummary } from "@/app/architecture/enterprise-panel";
+import { PipelinePanel } from "@/app/architecture/pipeline-panel";
 import type { DepartmentId } from "@/app/architecture/enterprise-planets";
 import type { Hover, Payload, Selection } from "@/app/architecture/types";
 import { webglAvailable } from "@/lib/architecture/webgl";
@@ -31,7 +32,8 @@ export function CommandCenter({ standalone = false }: { standalone?: boolean } =
   // Enterprise level (H-03/H-04): shared by the 2D cards and the 3D planets, so switching views keeps the department.
   const [department, setDepartment] = useState<DepartmentId | null>(null);
   const [query, setQuery] = useState("");
-  const [mode, setMode] = useState<"architecture" | "process" | "profiles" | "enterprise">(standalone ? "profiles" : "architecture");
+  // The standalone page (often opened on the phone) starts with the operations view.
+  const [mode, setMode] = useState<"operations" | "architecture" | "process" | "profiles" | "enterprise">(standalone ? "operations" : "architecture");
   const [resetToken, setResetToken] = useState(0);
   const [use3d, setUse3d] = useState(true);
   const [webglSupported, setWebglSupported] = useState(false);
@@ -152,7 +154,7 @@ export function CommandCenter({ standalone = false }: { standalone?: boolean } =
   // The enterprise planets use the same canvas; without enterprise data the 2D panel explains why.
   const enterprise3d = mode === "enterprise" && !!data?.enterprise;
   const sceneProps: SceneProps | null = data ? { data, selection, expanded, mode: mode === "process" ? "process" : enterprise3d ? "enterprise" : "architecture", highlightIds: highlight,
-    reducedMotion: reduced, active: open && use3d && !sceneError && mode !== "profiles" && (mode !== "enterprise" || enterprise3d), resetToken,
+    reducedMotion: reduced, active: open && use3d && !sceneError && mode !== "operations" && mode !== "profiles" && (mode !== "enterprise" || enterprise3d), resetToken,
     onSelect: select, onBackground: background, onHover: setHover, department, onSelectDepartment: id => { setHover(null); setDepartment(id); } } : null;
   const showScene = use3d && !sceneError;
   const planetsShown = enterprise3d && showScene;
@@ -176,6 +178,7 @@ export function CommandCenter({ standalone = false }: { standalone?: boolean } =
       <div className="ccToolbar">
         <input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Komponente suchen …" aria-label="Komponente suchen" />
         <div role="group" aria-label="Ansicht" className="ccSegment">
+          <button type="button" className={mode === "operations" ? "primary" : "ghost"} aria-pressed={mode === "operations"} onClick={() => { switchMode("operations"); setSelection(null); }}>Betrieb</button>
           <button type="button" className={mode === "architecture" ? "primary" : "ghost"} aria-pressed={mode === "architecture"} onClick={() => switchMode("architecture")}>Architektur</button>
           <button type="button" className={mode === "process" ? "primary" : "ghost"} aria-pressed={mode === "process"} onClick={() => { switchMode("process"); setSelection(null); }}>Ablauf</button>
           <button type="button" className={mode === "profiles" ? "primary" : "ghost"} aria-pressed={mode === "profiles"} onClick={() => { switchMode("profiles"); setSelection(null); }}>Steckbriefe</button>
@@ -186,13 +189,14 @@ export function CommandCenter({ standalone = false }: { standalone?: boolean } =
         {!use3d && webglSupported && <button type="button" className="ghost" onClick={() => { setSceneError(""); setUse3d(true); setSceneMounted(true); }}>3D-Ansicht</button>}
         <button type="button" className="ghost" onClick={() => void load()} title="Status neu vom Server laden">Aktualisieren</button>
       </div>
-      {mode !== "enterprise" && <nav className="ccChips" aria-label="Hauptbereiche">{clusters.map(id => <button key={id} type="button" aria-pressed={expanded === id} className={`ccChip ${expanded === id ? "ccChipOn" : ""}`}
+      {mode === "operations" && <PipelinePanel view={data.pipeline} />}
+      {mode !== "enterprise" && mode !== "operations" && <nav className="ccChips" aria-label="Hauptbereiche">{clusters.map(id => <button key={id} type="button" aria-pressed={expanded === id} className={`ccChip ${expanded === id ? "ccChipOn" : ""}`}
         style={{ borderColor: data.labels.clusters[id].color }} onClick={() => select({ type: "cluster", id })}>{data.labels.clusters[id].label}</button>)}</nav>}
       {mode === "process" && <ProcessRibbon data={data} onSelect={select} />}
       {mode === "enterprise" && !planetsShown && <EnterprisePanel view={data.enterprise} selected={department} onSelect={setDepartment} development={data.development} />}
       {planetsShown && data.enterprise && <EnterpriseSummary view={data.enterprise} />}
       {mode === "profiles" && <ProfilesView data={data} query={query} onSelect={next => { switchMode("architecture"); select(next); }} />}
-      <div className="ccBody" hidden={mode === "profiles" || (mode === "enterprise" && !planetsShown)}>
+      <div className="ccBody" hidden={mode === "profiles" || mode === "operations" || (mode === "enterprise" && !planetsShown)}>
         <div className="ccStage" data-testid="cc-stage" tabIndex={showScene ? 0 : -1} onKeyDown={showScene ? onStageKey : undefined}
           aria-label={showScene ? mode === "enterprise" ? "3D-Ansicht der Abteilungen. Pfeiltasten wechseln die Abteilung, Pfeil hoch oder Escape geht zurück, Pos1 zeigt alle."
             : "3D-Ansicht. Pfeiltasten wechseln Bereiche und Komponenten, Enter öffnet, Pfeil hoch oder Escape geht zurück, Pos1 zeigt alles." : undefined}>
