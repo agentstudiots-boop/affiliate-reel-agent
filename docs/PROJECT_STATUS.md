@@ -4,17 +4,18 @@
 > Begriffe strikt getrennt: **implementiert** (Code auf Branch) · **getestet** (automatisierte Offline-Tests) · **gemergt** (in `main`)
 > · **deployed** (im READY-Production-Deployment) · **aktiviert** (Schalter/Zugänge in Production gesetzt) · **live verifiziert** (echter Production-Aufruf beobachtet).
 
-Stand: **2026-10-23**, Claude-Code-Cloud-Sitzungen (Ausbau-Roadmap, zwei Sitzungen). AI-Business-Stand je Aufgabe: [`docs/ai-business/11_UMSETZUNGSSTAND.md`](ai-business/11_UMSETZUNGSSTAND.md). Erster Reel-Praxistest: [`docs/FIRST_REEL_TEST.md`](FIRST_REEL_TEST.md).
+Stand: **2026-10-31**, Claude-Code-Cloud-Sitzungen (Stabilisierung Content Studio, zwei Sitzungen; Übergaben `docs/handoff/`). AI-Business-Stand je Aufgabe: [`docs/ai-business/11_UMSETZUNGSSTAND.md`](ai-business/11_UMSETZUNGSSTAND.md). Erster Reel-Praxistest: [`docs/FIRST_REEL_TEST.md`](FIRST_REEL_TEST.md).
 Ausführlicher Abschluss mit Soll-Ist-Matrix: [`docs/PRODUCTION_AUDIT_FINAL_2026-10-15.md`](PRODUCTION_AUDIT_FINAL_2026-10-15.md).
 
 ## 1. Aktueller Stand
 
 | Punkt | Wert |
 |---|---|
-| `main` | `06ae6cc` (Merge PR #116); danach nur dieser Doku-PR |
-| Production-Deployment | je Merge automatisch; letzter geprüfter: `dpl_BedbCi8tuyEVsjWpABs8gCrPfXb4` READY (`06ae6cc`, 22.10.); `vercel.json` unverändert 12 Cron-Einträge |
-| Tests | 892 Tests (888 bestanden, 0 fehlgeschlagen, 4 übersprungen, u. a. J-04 ohne `J04_DATABASE_URL`), Typecheck, Lint (0 Fehler), Build – Stand `main` a736bf4 + #115 + #116 |
+| `main` | `90a49c2` (Merge PR #145), davor `b181efb` (#144) |
+| Production-Deployment | je Merge automatisch; letzter geprüfter: `dpl_FZLsxwMuHqETqsMTnEQ4z9mtFBuQ` READY (`90a49c2`, 31.10.), davor `dpl_98GyzETT5EY3TEUDr4knJ7ZQ9ajJ` READY (`b181efb`); keine Laufzeitfehler (2 h); `/produkte` 200, `/api/architecture` 401 ohne Login |
+| Tests | 957 Tests (953 bestanden, 0 fehlgeschlagen, 4 übersprungen) auf #144; #145 kombiniert mit #144 geprüft (tsc 0, Architektur-/Themen-Tests 77/77); Typecheck, Lint (0 Fehler), Build, `npm audit` 0 |
 | Offene PRs (alt) | #61 (verletzt Importregel), #65 (überholt), #10 (Migrationskonflikt) – schließen oder neu aufsetzen |
+| Hinweis Env | `EXECUTIVE_*` fehlen als Umgebungsvariablen, die Funktionen sind aber über Rollout-Werte (`lib/config/rollout.ts`, §2b) eingeschaltet; „fehlend“ unten heißt nur: keine Variable gesetzt |
 | Migrationen | 001–042, nur additiv (038: Zustellstatus Themenvorschläge, Themenvideo-Felder, `topic_video_days`; 039: Executive-Aufgabenbuch `enterprise_*`/`budget_reservations`; 040: Kosten-/Erlösbuch `price_catalog`, `cost_entries`, `revenue_entries`, `budgets`; 041: Entscheidungsvorlagen `enterprise_decisions`; 042: Opportunity-Scout `opportunities`, `opportunity_assessments`). 039/041 liest das Command Center (Unternehmensebene), 040 lesen Command Center und `/api/operations` (Controlling); 042 liest noch keine Oberfläche; `budget_reservations` liest nur der Wochenbericht-Abschnitt (Schalter). Geschrieben wird nur hinter Schaltern (alle aus). 039–042 in Production angewendet: 039–041 waren bereits vorhanden; 042 hat der Betreiber am 22.10. um 15:50:56 UTC über `/api/admin/migrate` angewendet (Log `database_migration`, `applied: ["042_opportunities.sql"]`), Folgeaufrufe melden „Schema bereits aktuell“ |
 | Production-Env (nur Namen) | vorhanden: `CONTENT_STUDIO_PASSWORD`, `CRON_SECRET`, DB/Blob, WhatsApp (`WHATTSAPP_*`), Meta-System-User, Replicate, Tavily, Runway (+Budget), Faceless, YouTube (3 OAuth), `HEYGEN_API_KEY`, `WHATSAPP_DAILY_TEMPLATE_*` (`ENABLED=false`), seit 18.10. `TOPIC_PIPELINE_ENABLED`, `TOPIC_DAILY_VIDEO`, `TOPIC_COPY_MODE` (Werte nicht gelesen). **Fehlend:** `EXECUTIVE_ENABLED`, `EXECUTIVE_WEEKLY_REPORT`, `EXECUTIVE_WHATSAPP`, `OPPORTUNITY_SCOUT_ENABLED`, `OPPORTUNITY_DAILY_LIMIT` (= aus), `TOPIC_STANDARD_VIDEO_PROVIDER`, `TOPIC_RUNWAY_MONTHLY_VIDEO_LIMIT`, `HEYGEN_AVATAR_ID`, `HEYGEN_VOICE_ID`, `HEYGEN_MONTHLY_VIDEO_LIMIT`, `HEYGEN_ENABLED`, `META_PAGE_ID`, `META_INSTAGRAM_USER_ID`, Pinterest/TikTok/X, `ADMIN_SESSION_SECRET` (optional) |
 
@@ -74,6 +75,40 @@ Damit ist der Vermerk in §8 („Aktivierung bleibt Betreibersache in Vercel“)
 | 4 | `EXECUTIVE_WEEKLY_REPORT` (Abschnitt „Executive-Ebene (nur Bericht, keine Wirkung)“ im bestehenden Montagsbericht; keine zusätzliche Nachricht, kein Modellaufruf; Fehler der Executive-Ebene brechen den Bericht nie) | #114 | #141, `9b3395f` | `dpl_97X65fiivtemZTKnk4Rqo4vnXa1Z` READY, keine Laufzeitfehler | offen: Wochenbericht Mo 02.11. 08:15 UTC enthält den Abschnitt (`weekly_reports.report_text`) |
 | 5 | `TOPIC_ORDERS_ENABLED` (Themenauftrag per WhatsApp „Mach etwas über X“/„Thema: X“ nur von der Betreibernummer; normaler Themenvorschlag mit beiden Freigaben, Schutzprüfungen bleiben, Tageslimit 5; wirkt nur mit `TOPIC_PIPELINE_ENABLED`) | #130, `2d0c401`; #136 | #139, `17236e7` (Betreiberfreigabe 28.10.: „Schalte beide Themenschalter ein“) | `dpl_7xYWFekAMEimrUhSjUQmiJe3GumC` READY, keine Laufzeitfehler | offen: Betreiber schreibt „Mach etwas über …“, Antwort ist ein Themenvorschlag mit „Dein Themenauftrag: …“; `topic_inbound.action='topic_order'` |
 | 6 | `TOPIC_EDITORIAL_STYLE` (Erzählweise je Themenbeitrag: Mini-Geschichte, Aha-Moment nur mit Quelle, Humor, Gefühl, Alltagskniff; nur Hook, Winkel, Frage und Modell-Leitlinie, keine neuen Fakten; kein Humor/Kniff/Gefühl bei sensiblen Themen, Geschichte/Kniff nur mit KI-Text, Risikofilter für Kniffe) | #131, `2290d40`; #136 | #140, `8968229` (Betreiberfreigabe 28.10.: „Schalte beide Themenschalter ein“) | `dpl_GkjXteP1zbDD4pZptmr56J9dn4Z3` READY, keine Laufzeitfehler | **teilweise:** 29.10. 07:15:31 UTC (Deployment von #141, enthält den Rollout-Wert) wurde der erste Themenvorschlag mit eingeschaltetem Schalter erzeugt (`tc_930e6ffe235f4dc7`, Thema `PRACTICAL_LIFE`) und wegen geschlossenem 24-h-Fenster gehalten (`topic_proposal_held`). Offen: Die gewählte Erzählweise steht nicht im Log; sie zeigt sich, wenn der Vorschlag mit der nächsten Betreiber-Nachricht nachgeliefert wird („Erzählweise: …“) |
+
+## 2c. Stabilisierung Content Studio (Betreiberauftrag 30.10.)
+
+Ziel: verlässlich gute, alltagsnahe Inhalte und ein vollständig abgenommener Veröffentlichungsablauf. Weiterer Ausbau (Executive, Opportunity Scout,
+Immobilien) ist nachrangig. Sitzung 1 integriert (Content-Qualität, Merges, Statusdateien), Sitzung 2 liefert Konfiguration, Anbieterdiagnose und
+Betriebsansicht. Übergaben: `docs/handoff/SITZUNG1_STABILISIERUNG_2026-10-30.md`, `docs/handoff/SITZUNG2_BETRIEB_2026-10-30.md`.
+
+| PR | Inhalt | gemergt | deployed | aktiviert | live verifiziert |
+|---|---|---|---|---|---|
+| #144 | Themenweg: Entwurfsreife (`readiness.ts`), Sprechtext nur an Satzgrenzen, keine internen Notizen im Publikumstext, keine Floskel/kein grundloser Monat, ein gezielter Korrekturaufruf für ungültige KI-Drehbücher (≤ 4 Aufrufe je Inhalt, 120 s). Fehlerfall `tc_b738d9c93bfa4de2` | `b181efb` | `dpl_98GyzETT5EY3TEUDr4knJ7ZQ9ajJ` READY | wirkt ohne Schalter im Themenweg | offen: erster Themenvorschlag/-auftrag nach dem Merge |
+| #145 | Command Center „Betrieb“: je Station Zustand, Nachweis, Content-ID, Blocker, nächster Schritt; Plattform-ID/Link; 24-h-Fenster; nicht zugestellte Entwürfe (eindeutig vs. Cron-Aufrufe); nur lesend | `90a49c2` | `dpl_FZLsxwMuHqETqsMTnEQ4z9mtFBuQ` READY | wirkt ohne Schalter (Login nötig) | offen: Betreiber öffnet `/architecture` → „Betrieb“ (Screenshot) |
+
+**Affiliate-Bildpost (bestehender Weg):** geprüft, nicht geändert. Der Referenzentwurf nach einem KI-Fehlschlag muss `inspectContent` bestehen
+(konkrete Situation, keine internen Hinweise, keine Platzhalterbilder, keine Garantien), sonst `needs_input`.
+
+**Abnahmeplan (Live, nur mit den vorgesehenen Betreiberfreigaben):**
+1. Bildpost: Betreiber öffnet das 24-h-Fenster (kurze Nachricht) im Slot (09–14 oder 18–23 Uhr Berlin) → Entwurf → „Freigeben“ (Inhalt, schließt
+   die einmalige Bildgenerierung ein) → Bild + Qualitätsprüfung → Veröffentlichungsfreigabe „Freigeben“ → Post mit Plattform-ID/Link
+   (Betriebsansicht „Veröffentlichung“ oder Screenshot).
+2. Themenweg: „Mach etwas über Laub im Garten“ plus zwei weitere harmlose Alltagsthemen; Vorschlag mit „Erzählweise“, ohne Floskeln/abgebrochene
+   Sätze; Veröffentlichung der Themenposts erst nach Entscheidung `TOPIC_PLATFORMS` (ausdrücklich setzen, sonst alle außer Pinterest) und
+   `TOPIC_LIVE_PUBLISHING`; bis dahin Dry-Run.
+3. Abnahmeziel: drei aufeinanderfolgende Tagesdurchläufe mit brauchbarem Inhalt, Zustellung und nach Freigabe sichtbarer Veröffentlichung.
+
+**Nachweise (Stand 31.10.):**
+
+| Punkt | Stand |
+|---|---|
+| Executive per WhatsApp (§2b Schritt 3) | Betreiber bestätigt eine echte Antwort mit Prioritäten; Zeit/Log nicht belegt (Sitzungen ohne DB-Zugriff) |
+| Themenvideo nachgeliefert | Betreiber bestätigt; Content-ID nicht belegt |
+| Themenauftrag „Laub im Garten“, Erzählweise im echten Vorschlag | nicht belegt |
+| Vollständiger Bildpost seit 30.10. | nicht belegt |
+| Drei Tagesdurchläufe | nicht belegt |
+| Wochenbericht Mo 02.11. (§2b Schritt 4) | offen; Zustellung nur, wenn der Betreiber in den 24 h davor geschrieben hat (Bericht steht sonst nur in `weekly_reports`) |
 
 ## 2a. Gemergte PRs bis 18.10. (Historie)
 

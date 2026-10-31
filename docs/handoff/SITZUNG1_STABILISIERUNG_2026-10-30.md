@@ -10,13 +10,13 @@ Anbieterdiagnose und die Betriebsansicht im Command Center und schreibt ihre Üb
 | Punkt | Wert |
 |---|---|
 | Branch | `claude/nice-ptolemy-k4p1c3` |
-| PR | [#144](https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/144) „Themenweg: Entwurfsreife prüfen, KI-Drehbuch gezielt korrigieren, keine dünnen Fallbacks“ (offen, nicht gemergt) |
+| PR | [#144](https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/144) „Themenweg: Entwurfsreife prüfen, KI-Drehbuch gezielt korrigieren, keine dünnen Fallbacks“ **gemergt 30.10. abends** als `b181efb`, deployed `dpl_98GyzETT5EY3TEUDr4knJ7ZQ9ajJ` READY |
 | Commits | `6cedc66` Code und Tests; `f7e3c47` `ours`-Merge der alten Branch-Historie von #82 (Inhalt unverändert); `4b8507a` Übergabe; `16dc595` Review-Punkte von Sitzung 2 (Pfeil, Antworttext); danach dieser Nachtrag |
 | Review | Sitzung 2 hat reviewt (Kommentar in #144), Punkte 1 und 3 sind beantwortet bzw. behoben. Offen: ihr Einverständnis und die CI |
 | Sitzung 2 | PR [#145](https://github.com/agentstudiots-boop/affiliate-reel-agent/pull/145), Branch `claude/betrieb-diagnose`, Head `b4fc566` (Sicherung bestätigt), Übergabe `docs/handoff/SITZUNG2_BETRIEB_2026-10-30.md` |
 | `main` | `48d4137` (#143), Production `dpl_86Be7XWk2jaR2J4rV15Vcs1pa5fC` READY |
 
-## Erledigt (implementiert und getestet, nicht gemergt)
+## Erledigt (gemergt und deployed; live noch nicht nachgewiesen)
 
 Behoben ist der Fehlerfall `tc_b738d9c93bfa4de2` („überspannung“), die Ursachen stehen im PR #144:
 - **Kürzung:** Sprechtext wird nur noch an ganzen Sätzen gekürzt, nicht mehr mitten im Satz.
@@ -39,7 +39,9 @@ Der Affiliate-Produktpost wurde geprüft und nicht geändert: Der Referenzentwur
 
 ## Produktionsänderungen
 
-Keine. Es gab keinen Merge, keine Umgebungsvariable, keinen Schalter, keinen kostenpflichtigen Aufruf und keinen Livepost.
+- #144 gemergt (`b181efb`), deployed `dpl_98GyzETT5EY3TEUDr4knJ7ZQ9ajJ` READY, keine Laufzeitfehler.
+- #145 (Sitzung 2, Betriebsansicht) nach Review gemergt (`90a49c2`), deployed `dpl_FZLsxwMuHqETqsMTnEQ4z9mtFBuQ` READY; `/produkte` 200, `/api/architecture` 401 ohne Login.
+- Keine Umgebungsvariable, kein Schalter, kein kostenpflichtiger Aufruf, kein Livepost.
 
 ## Nachweise (ehrlich)
 
@@ -61,8 +63,8 @@ Keine. Es gab keinen Merge, keine Umgebungsvariable, keinen Schalter, keinen kos
 
 ## Nächster konkreter Schritt (Dienstag 03.11.)
 
-1. Den Stand von #144 prüfen: CI, Review von Sitzung 2, offene Kommentare. Danach mergen (Squash, volle SHA) und das Production-Deployment READY prüfen (Laufzeitfehler 1 h).
-2. Den PR von Sitzung 2 (Betriebsansicht, Executive-Anzeige) reviewen und nacheinander mergen.
-3. Doku-PR mit `docs/PROJECT_STATUS.md` (Stand 30.10. bis 03.11., Abnahmeplan, Nachweistabelle) und beiden Übergaben.
-4. Live-Abnahme Bildpost nach Plan oben, danach den Themenweg mit „Laub im Garten“ und zwei weiteren harmlosen Themen.
-5. Abnahmeziel: drei aufeinanderfolgende Tagesdurchläufe mit Nachweisen.
+1. Doku-PR „Projektstatus 31.10.“ (Branch `claude/nice-ptolemy-k4p1c3`, §1/§2c in `docs/PROJECT_STATUS.md`) prüfen: CI grün → mergen.
+2. Folge-PRs von Sitzung 2 reviewen und nacheinander mergen: (a) „nicht produktionsreif“ für `draft_not_ready` in der Betriebsansicht, (b) Executive-Zählung (eindeutige Entwürfe, Zeitfenster der Kostenzeilen).
+3. Belege einsammeln: Betriebsansicht-Screenshot des Betreibers bzw. WhatsApp-Verläufe vom Wochenende (Bildpost-Entwurf, Themenvorschlag mit Erzählweise, ggf. `draft_not_ready`-Gründe in „Status“), Wochenbericht Mo 02.11.
+4. Live-Abnahme Bildpost nach §2c Abnahmeplan; dann Themenweg mit „Laub im Garten“ + zwei weiteren harmlosen Themen; Nachweise in §2c eintragen.
+5. Entscheidung Meta-Themenpfad (IDs per Env oder Seitensuche) und `TOPIC_PLATFORMS` vorbereiten – erst nach abgenommenem Bildpost, mit Betreiberfreigabe.
