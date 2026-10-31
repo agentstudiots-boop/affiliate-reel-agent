@@ -20,7 +20,7 @@ export type RuntimeState = {
   generatedAt: string;
   environment: "production" | "preview" | "development" | "local";
   sandbox: boolean;
-  flags: { topicPipeline: boolean; livePublishing: boolean; trendsetterAffiliate: string; topicPostsPerDay: number; qualityGate: string };
+  flags: { topicPipeline: boolean; topicDailyVideo: boolean; livePublishing: boolean; trendsetterAffiliate: string; topicPostsPerDay: number; qualityGate: string };
   nodes: Record<string, NodeRuntime>;
   steps: StepRuntime[];
   evidence: { available: boolean; reason: string | null; generatedAt: string };
@@ -38,6 +38,8 @@ export function readFlags(env: Env = process.env): RuntimeState["flags"] {
   const mode = env.TRENDSETTER_AFFILIATE?.trim();
   return {
     topicPipeline: env.TOPIC_PIPELINE_ENABLED === "true",
+    // Same condition as the topic-video cron: both switches must be "true".
+    topicDailyVideo: env.TOPIC_PIPELINE_ENABLED === "true" && env.TOPIC_DAILY_VIDEO === "true",
     livePublishing: env.TOPIC_LIVE_PUBLISHING === "true",
     trendsetterAffiliate: mode === "record" || mode === "route" ? mode : "off",
     topicPostsPerDay: Math.max(1, Math.min(4, Math.floor(Number(env.TOPIC_POSTS_PER_DAY)) || 1)),

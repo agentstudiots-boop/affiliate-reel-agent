@@ -177,5 +177,10 @@ test('adapter changes nothing in the studio and is not wired into app code (AC-7
   // Only the executive cycle route (B-07, switch EXECUTIVE_ENABLED, daily 06:20 UTC) and the read-only enterprise
   // level of the Command Center (H-01: health() only, never handle()) may use the adapter.
   // lib/architecture/model.ts only names the files as text (static inventory of the Command Center), it imports nothing.
-  assert.deepEqual(users,[path.join('app','api','cron','executive-cycle','route.ts'),path.join('lib','architecture','enterprise-snapshot.ts'),path.join('lib','architecture','model.ts')]);
+  // lib/architecture/pipeline-snapshot.ts (operations view, read-only) imports only the outcome constants DAILY_OUTCOMES
+  // and DELIVERY, so the undelivered count uses exactly the adapter's definition; it calls neither health() nor handle().
+  assert.deepEqual(users,[path.join('app','api','cron','executive-cycle','route.ts'),path.join('lib','architecture','enterprise-snapshot.ts'),path.join('lib','architecture','model.ts'),path.join('lib','architecture','pipeline-snapshot.ts')]);
+  const pipeline=fs.readFileSync('lib/architecture/pipeline-snapshot.ts','utf8');
+  assert.match(pipeline,/^import \{ DAILY_OUTCOMES, DELIVERY \} from "\.\.\/enterprise\/departments\/affiliate";$/m);
+  assert.doesNotMatch(pipeline,/affiliateDepartment|\.handle\(|\.health\(/);
 });

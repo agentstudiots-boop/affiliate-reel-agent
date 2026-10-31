@@ -3,6 +3,7 @@ import { computeRuntime } from "@/lib/architecture/runtime";
 import { readSnapshot } from "@/lib/architecture/snapshot";
 import { readEnterpriseView } from "@/lib/architecture/enterprise-snapshot";
 import { readDevelopmentView } from "@/lib/architecture/development";
+import { readPipelineView } from "@/lib/architecture/pipeline-snapshot";
 import { checkCapabilities } from "@/lib/capabilities";
 import { authorized, unauthorizedResponse } from "@/lib/memory/auth";
 
@@ -14,6 +15,7 @@ export const dynamic = "force-dynamic";
 // evidence (SELECT only; in preview the runtime guard blocks the database and the response says so). `enterprise` is the
 // enterprise level (H-01): departments of the executive register with their own evidence or null, never invented values.
 // `development` (D-06): id, phase and status of the roadmap tasks from the hand-over files of the build, nothing else.
+// `pipeline`: operations view per content path (topic → draft → media → approvals → publication → results), read-only.
 export async function GET(request: Request) {
   if (!authorized(request)) return unauthorizedResponse();
   const capabilities = checkCapabilities();
@@ -21,8 +23,9 @@ export async function GET(request: Request) {
   const nodes = NODES.map(({ operation: _rule, ...node }) => ({ ...node, implementation: implementationOf({ ...node, operation: _rule }), deployment: node.since === "none" ? "not_deployed" : state.environment === "production" ? "production" : "preview" }));
   const enterprise = await readEnterpriseView();
   const development = readDevelopmentView();
+  const pipeline = await readPipelineView({ capabilities, switches: { topicPipeline: state.flags.topicPipeline, topicDailyVideo: state.flags.topicDailyVideo, livePublishing: state.flags.livePublishing } });
   const missing = capabilities.filter(item => item.missing.length).map(item => ({ id: item.id, label: item.label, state: item.state, missing: item.missing }));
-  return Response.json({ meta: ARCHITECTURE_META, nodes, edges: EDGES, process: PROCESS_STEPS, runtime: state, enterprise, development, missing,
+  return Response.json({ meta: ARCHITECTURE_META, nodes, edges: EDGES, process: PROCESS_STEPS, runtime: state, enterprise, development, missing, pipeline,
     labels: { implementation: IMPLEMENTATION_META, deployment: DEPLOYMENT_META, operation: OPERATION_META, clusters: CLUSTER_META, edges: EDGE_META, kinds: KIND_LABEL } },
   { headers: { "Cache-Control": "no-store" } });
 }
