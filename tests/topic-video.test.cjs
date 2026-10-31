@@ -15,6 +15,7 @@ const { calendarSource, evergreenSource } = require(`${L}/topics/sources/offline
 const { setEventSink } = require(`${L}/observability/events`);
 const pgliteDatabase = require('./helpers/pglite-db.cjs');
 const { withEnv } = require('./helpers/live-env.cjs');
+const { fakeTopicGenerator } = require('./helpers/fake-topic-generator.cjs');
 
 setEventSink(() => {});
 const OPERATOR = '491701234567';
@@ -36,6 +37,8 @@ function deps(db, sent, over = {}) {
   return { db, trustedWaId: OPERATOR, now: () => NOON, send: async text => { sent.push(text); return `wamid.video.${++n}.${sent.length}`; },
     render: { ledger: memoryLedger(), imageProvider: null, sleep: async () => {}, videoTiming: { pollIntervalMs: 0 }, ...(over.render ?? {}) },
     scoutOptions: { sources: [calendarSource(), evergreenSource()], sleep: async () => {} }, publishers: [], rasterize: async asset => asset,
+    // Model copy for the post text (offline fake); the video briefing falls back to the reference built from it.
+    generate: fakeTopicGenerator().generate,
     interpret: async () => { throw new Error('no model'); }, ...Object.fromEntries(Object.entries(over).filter(([key]) => key !== 'render')) };
 }
 const reply = (d, id, body, to) => handleTopicReply(d, { id, from: OPERATOR, body, replyToMessageId: to });

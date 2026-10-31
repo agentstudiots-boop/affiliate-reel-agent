@@ -6,6 +6,7 @@ import { MODEL_ONLY_PATTERNS, PATTERN_GUIDANCE, PATTERN_QUESTION, RISKY_HACK_PAT
 import { tokens } from "../topics/lexicon";
 import type { TopicCandidate } from "../topics/schema";
 import type { ProductionCopy } from "../visual/renderers";
+import { splitSentences } from "./video-briefing";
 
 // Copy for a topic post. Two clearly separated modes:
 //  - reference: rule template. Only rephrases what the scout found (title, problem, timing, source headlines with
@@ -28,14 +29,12 @@ function hashtags(candidate: TopicCandidate) {
   return [...topical, ...type, BRAND_TAG].slice(0, 5);
 }
 
+// Audience-facing points only: attributed source headlines, otherwise the curated everyday situation of an offline topic.
+// The scout's why_now/angle are internal editorial notes and never become slide text.
 function referencePoints(candidate: TopicCandidate) {
   const news = candidate.source_signals.filter(signal => signal.kind === "news" && signal.publisher).slice(0, 3);
   if (news.length) return news.map(signal => ({ headline: `Laut ${signal.publisher}`, text: signal.title.slice(0, 200) }));
-  return [
-    { headline: "Worum es geht", text: candidate.audience_problem },
-    { headline: "Warum gerade jetzt", text: candidate.why_now },
-    { headline: "Unser Ansatz", text: candidate.angle },
-  ].filter(point => point.text.length >= 3);
+  return [{ headline: "Worum es geht", text: candidate.audience_problem }].filter(point => point.text.length >= 3);
 }
 
 // True when the candidate's pattern hook needs the model copy; the rule template then uses the previous hook and question.
@@ -49,10 +48,14 @@ export function referenceCopy(candidate: TopicCandidate, override?: FormatOverri
     : candidate.trend_type === "ENTERTAINMENT" ? "Wie siehst du das?" : "Wie machst du das bei dir zuhause?";
   const cta = override?.tone.includes("less_promotional") ? "Speichern für später" : "Speichern und mit jemandem teilen, dem es hilft";
   const tags = hashtags(candidate);
-  const body = `${candidate.audience_problem}\n\n${candidate.core_message}`;
-  const caption = [hook, "", candidate.core_message, "", question, "", tags.join(" ")].join("\n");
-  const videoScript = [hook, candidate.audience_problem, ...points.map(point => `${point.headline}: ${point.text}`), cta].join(" ").slice(0, 1400);
-  return { title: candidate.title, hook, problem: candidate.audience_problem, coreMessage: candidate.core_message, body, caption, cta, question,
+  // core_message is the scout's internal brief for the model ("ohne Werbeversprechen", "Produkte nur optional …"); it is never
+  // published. The reference text only uses what an audience can read: the situation, attributed headlines, the question.
+  const sourcePoints = points.filter(point => point.text !== candidate.audience_problem);
+  const body = [candidate.audience_problem, ...sourcePoints.map(point => `${point.headline}: ${point.text}`)].filter(Boolean).join("\n\n");
+  const summary = sourcePoints[0] ? `${sourcePoints[0].headline}: ${sourcePoints[0].text}` : candidate.audience_problem;
+  const caption = [hook, "", body, "", question, "", tags.join(" ")].join("\n");
+  const videoScript = [hook, candidate.audience_problem, ...sourcePoints.map(point => `${point.headline}: ${point.text}`), cta].join(" ").slice(0, 1400);
+  return { title: candidate.title, hook, problem: candidate.audience_problem, coreMessage: summary, body, caption, cta, question,
     points, imageMotif: `Alltagsszene in einer deutschen Wohnung zum Thema „${candidate.title}“`, videoScript, hashtags: tags, origin: "reference_template" };
 }
 
@@ -78,7 +81,8 @@ export async function writeTopicCopy(candidate: TopicCandidate, options: { gener
     if (UNSUPPORTED_CLAIM_PATTERN.test(text) || /https?:\/\/|www\./i.test(text)) return { copy: reference, modelCalls: 1, fallbackReason: "unbelegte Aussage oder Link im Modelltext" };
     if (candidate.editorial_pattern === "hack" && RISKY_HACK_PATTERN.test(text)) return { copy: reference, modelCalls: 1, fallbackReason: "Kniff mit Risikobezug (Chemie, Strom, Gas, Feuer, Lebensmittel, Schimmel, Medikamente)" };
     const tags = hashtags(candidate);
-    return { modelCalls: 1, copy: { ...reference, hook: result.hook, body: result.body, caption: `${result.caption}\n\n${tags.join(" ")}`, cta: result.cta, question: result.question,
+    const summary = splitSentences(result.body)[0] ?? result.body;
+    return { modelCalls: 1, copy: { ...reference, hook: result.hook, coreMessage: summary.slice(0, 400), body: result.body, caption: `${result.caption}\n\n${tags.join(" ")}`, cta: result.cta, question: result.question,
       points: result.points, videoScript: result.video_script, hashtags: tags, origin: "model" } };
   } catch {
     return { copy: reference, modelCalls: 1, fallbackReason: "Modell nicht verfügbar" };

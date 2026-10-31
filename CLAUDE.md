@@ -95,6 +95,13 @@ Kein Modellwechsel ohne nachvollziehbare Daten; kostenpflichtige Vergleiche nur 
 5. Ablehnung, Änderungswunsch oder fehlende Antwort ⇒ kein Publish. Cron, Retries, Fallbacks veröffentlichen nie selbst.
 6. Ein expliziter WhatsApp-Auftrag (`lib/whatsapp/manual-order.ts`) übersteuert nur die 7-Tage-Sperre des Trendscouts,
    nie Prüfungen/Freigaben; er legt keinen zweiten Entwurf für einen laufenden oder freigegebenen Auftrag an.
+7. **Entwurfsreife Themenweg** (`lib/topic-pipeline/readiness.ts`, seit 30.10.): Vor jedem Themenvorschlag und jeder Nachlieferung
+   wird geprüft, ob der Entwurf brauchbar ist. Gesperrt werden: eine Referenzvorlage ohne Quelle oder kuratierten Alltagsfall,
+   ein KI-Text ohne konkreten Punkt, abgebrochene Sätze, interne Redaktionsnotizen (`core_message`, `why_now`) im Publikumstext
+   und ein Video ohne tragfähigen Lösungsteil. Nicht reif ⇒ kein Vorschlag (`stage='discarded'`, `last_error='draft_not_ready: …'`,
+   Ereignis `topic_draft_not_ready`). Bei Überarbeitungen bleibt die bisherige Fassung gültig. Ein strukturell ungültiges
+   KI-Drehbuch bekommt genau einen Korrekturaufruf innerhalb von `MAX_MODEL_CALLS_PER_CONTENT` (4) und des Zeitbudgets (120 s).
+   Die Prüfregeln (`validBriefing`, Behauptungsfilter) werden dafür nicht gelockert.
 
 ## 5. Kommunikationsprotokoll WhatsApp
 

@@ -1,6 +1,7 @@
 import type { Cluster, Scored } from "./scoring";
 import type { TrendType } from "./schema";
 import { patternTexts, type EditorialPattern } from "./editorial";
+import { hits } from "./lexicon";
 
 // Rule-based text templates (text_origin = "rule_template"). They only rephrase the source title and the
 // computed timing; they never add facts, numbers, tests or promises. A model may later enrich them
@@ -27,6 +28,7 @@ function baseTexts(cluster: Cluster, type: TrendType, scored: Scored, now: Date,
   const snippet = cluster.signals.find(signal => signal.snippet && (signal.kind === "evergreen" || signal.kind === "calendar"))?.snippet ?? "";
   const publishers = [...new Set(cluster.signals.filter(signal => signal.kind === "news" && signal.publisher).map(signal => signal.publisher!))];
   const month = MONTHS[now.getUTCMonth()];
+  const seasonal = cluster.signals.some(signal => signal.source === "evergreen" || signal.source === "calendar") || hits(`${title} ${snippet}`, "weather").length > 0;
   const when = scored.daysUntilEvent !== null ? (scored.daysUntilEvent === 0 ? "heute" : scored.daysUntilEvent === 1 ? "morgen" : `in ${scored.daysUntilEvent} Tagen`) : null;
   const pick = <T,>(options: T[]) => options[variant % options.length];
   switch (type) {
@@ -41,8 +43,13 @@ function baseTexts(cluster: Cluster, type: TrendType, scored: Scored, now: Date,
         hook: pick([`${short}: was das jetzt für deinen Alltag heißt`, `${short} – so stellst du dich darauf ein`]), angle: "Alltagsfolgen und einfache Vorbereitung", coreMessage: `Was man bei ${short} praktisch beachten kann, ohne Panik.` };
     case "PRACTICAL_LIFE": case "EVERGREEN":
       return { variant,
-        audienceProblem: snippet || `${short} kostet im Alltag Zeit und Nerven.`,
-        whyNow: type === "PRACTICAL_LIFE" ? `Passt gerade zur Jahreszeit (${month}).` : "Zeitloses Alltagsproblem, das viele kennen.",
+        // Without a curated situation (snippet) there is nothing true to say about the problem yet: a neutral topic line instead
+        // of a generic claim; draftReadiness then requires the model copy before anything becomes a production draft.
+        audienceProblem: snippet || `Alltagsthema: ${short}.`,
+        // A season is only named when it is the reason: a curated seasonal topic or a weather/season signal of the topic itself.
+        whyNow: type === "EVERGREEN" ? "Zeitloses Alltagsproblem, das viele kennen."
+          : seasonal ? `Passt gerade zur Jahreszeit (${month}).`
+          : publishers.length ? `Aktuell Thema bei ${publishers.slice(0, 2).join(", ")}.` : "Alltagsthema ohne festen Anlass.",
         hook: pick([`${short}? Diese einfachen Schritte helfen im Alltag`, `Kennst du das: ${clip(snippet || short, 70)}?`, `${short} – die häufigsten Fehler und was besser klappt`]),
         angle: pick(["Problem → einfache Lösungsschritte", "Typische Fehler → bessere Alternative", "Vorher/Nachher im Alltag"]),
         coreMessage: `Nachvollziehbare Alltagstipps zu ${short}; Produkte nur optional und ohne erfundene Eigenschaften.` };

@@ -65,50 +65,79 @@ const QUALITY = [
 ];
 
 function words(text: string) { return text.replace(/\s+/g, " ").trim().split(" ").filter(Boolean); }
-// Trims spoken text to the time budget of its scene, preferring a sentence end; never cuts mid-word.
+// Spoken words a scene of this length may carry: the same limit validBriefing applies to the model.
+export const spokenWordLimit = (seconds: number) => Math.ceil(seconds * WORDS_PER_SECOND) + 2;
+// Fits spoken text to the time budget of its scene with WHOLE sentences only (never cut mid-sentence or mid-word). Returns ""
+// when not even the first sentence fits; the reference briefing then reports the gap instead of speaking a fragment.
+// Sentence split that keeps dates and abbreviations together („am 25. Oktober“, „z. B. Kalk“, „ca. 30 Minuten“).
+const ABBREVIATION = /(?:^|\s)(?:\d{1,4}|z|B|ca|bzw|usw|etc|Nr|Dr|St|vgl|ggf|inkl|evtl|u|a|d|h)\.$/;
+export function splitSentences(text: string): string[] {
+  const parts = text.replace(/\s+/g, " ").trim().split(/(?<=[.!?])\s+/).filter(Boolean);
+  const sentences: string[] = [];
+  for (const part of parts) {
+    const last = sentences.at(-1);
+    if (last && ABBREVIATION.test(last)) sentences[sentences.length - 1] = `${last} ${part}`;
+    else sentences.push(part);
+  }
+  return sentences;
+}
 export function fitSpoken(text: string, seconds: number) {
-  const budget = Math.max(4, Math.floor(seconds * WORDS_PER_SECOND));
-  const all = words(text);
-  if (all.length <= budget) return all.join(" ");
-  const cut = all.slice(0, budget).join(" ");
-  const sentence = cut.match(/^(.*[.!?])\s/)?.[1];
-  return sentence && words(sentence).length >= Math.floor(budget / 2) ? sentence : `${cut.replace(/[,;:–-]+$/, "")}.`;
+  const budget = spokenWordLimit(seconds);
+  const sentences = splitSentences(text);
+  let fitted = "";
+  for (const sentence of sentences) {
+    const next = fitted ? `${fitted} ${sentence}` : sentence;
+    if (words(next).length > budget) break;
+    fitted = next;
+  }
+  if (!fitted) return "";
+  return /[.!?…]$/.test(fitted) ? fitted : `${fitted}.`;
 }
 const short = (text: string, max: number) => text.length <= max ? text : `${text.slice(0, max - 1).replace(/\s+\S*$/, "")}…`;
-const firstSentence = (text: string) => text.split(/(?<=[.!?])\s+/)[0] ?? text;
+const sentencesOf = (text: string) => splitSentences(text).filter(sentence => words(sentence).length >= 2);
+// Marker for a scene the reference template could not fill with a complete sentence. draftReadiness (readiness.ts) blocks
+// every briefing that still contains it, so it never reaches the operator as a production draft or a provider.
+export const MISSING_SPOKEN = "(Sprechtext fehlt)";
 
+// Built only from audience-facing text of the copy (hook, body, points, question, CTA) and attributed source headlines.
+// Internal editorial notes of the scout (core_message, why_now, angle) are never spoken: they are instructions, not text.
 export function referenceVideoBriefing(candidate: TopicCandidate, copy: TopicCopy): VideoBriefing {
-  const points = copy.points.slice(0, 2);
-  const solution = points.length ? points.map(point => point.text).join(" ") : candidate.core_message;
-  // 30 seconds: hook 0–3, problem 3–9, tension 9–15, solution 15–24, payoff+CTA 24–30.
+  const body = sentencesOf(copy.body);
+  const news = candidate.source_signals.find(signal => signal.kind === "news" && signal.publisher);
+  const solution = copy.points.slice(0, 2).map(point => point.text.trim()).filter(Boolean).map(text => /[.!?]$/.test(text) ? text : `${text}.`).join(" ");
+  // 30 seconds: hook 0–3, problem 3–9, tension 9–15, solution 15–24, payoff 24–28, CTA 28–30.
+  // The hook must fit 3 seconds: the copy's hook, else its lead clause („Laub im Garten: …“), else the plain topic title.
+  const hook = [copy.hook, copy.hook.split(/\s*[:–—]\s+/)[0], candidate.title.replace(/\s+am \d{1,2}\. \p{L}+$/u, "")]
+    .map(text => fitSpoken(text, 3)).find(text => words(text).length >= 2) ?? "";
   const plan: Array<[VideoScene["purpose"], number, number, string, string, string, string, string]> = [
-    ["hook", 0, 3, copy.hook, `Nahaufnahme, mitten in der Situation: ${copy.imageMotif}`, "schneller Push-in auf das Detail, das das Problem zeigt", "harter Schnitt", short(candidate.title, 40)],
-    ["problem", 3, 9, candidate.audience_problem || copy.problem, "Alltagsszene in einer echten Wohnung, eine Person stößt auf das Problem", "Handkamera, Halbtotale, leichte Bewegung", "Match-Cut auf die Hände", "Kennst du das?"],
-    ["tension", 9, 15, candidate.why_now || firstSentence(candidate.core_message), "Blick auf die Uhr/den Kalender oder die Jahreszeit draußen – warum es gerade jetzt wichtig ist", "langsamer Zoom, kurze Pause im Schnitt", "Wischblende", "Warum gerade jetzt?"],
-    ["solution", 15, 24, solution, "Schritt für Schritt gezeigt: Hände führen die einfache Lösung sichtbar aus", "Draufsicht und Nahaufnahme im Wechsel, ruhige Schnitte", "harter Schnitt auf das Ergebnis", short(points[0]?.headline ?? "So geht's", 40)],
-    ["payoff", 24, 28, candidate.core_message || copy.coreMessage, "Vorher/Nachher oder entspannte Person im aufgeräumten Raum", "langsame Rückfahrt (Pull-out)", "weiche Blende", "Alltäglich leichter"],
+    ["hook", 0, 3, hook, `Nahaufnahme, mitten in der Situation: ${copy.imageMotif}`, "schneller Push-in auf das Detail, das das Problem zeigt", "harter Schnitt", short(candidate.title, 40)],
+    ["problem", 3, 9, body[0] ?? copy.problem, "Alltagsszene in einer echten Wohnung, eine Person stößt auf das Problem", "Handkamera, Halbtotale, leichte Bewegung", "Match-Cut auf die Hände", "Kennst du das?"],
+    ["tension", 9, 15, news ? `Laut ${news.publisher}: ${news.title.replace(/[.!?]*$/, ".")}` : body[1] ?? copy.question, "Perspektivwechsel: dieselbe Situation aus der Nähe, kurz bevor sich etwas ändert", "langsamer Zoom, kurze Pause im Schnitt", "Wischblende", "Und jetzt?"],
+    ["solution", 15, 24, solution, "Schritt für Schritt gezeigt: Hände führen die einfache Lösung sichtbar aus", "Draufsicht und Nahaufnahme im Wechsel, ruhige Schnitte", "harter Schnitt auf das Ergebnis", short(copy.points[0]?.headline ?? "So geht's", 40)],
+    ["payoff", 24, 28, copy.question, "Vorher/Nachher oder entspannte Person im aufgeräumten Raum", "langsame Rückfahrt (Pull-out)", "weiche Blende", "Alltäglich leichter"],
     ["cta", 28, 30, copy.cta, "Schlussbild mit Markenname als Text, keine Buttons", "statisch", "Ende", short(copy.cta, 40)],
   ];
   const scenes = plan.map(([purpose, start, end, spoken, visual, camera, transition, onScreen], index) => ({
-    index: index + 1, start, end, purpose, spokenText: fitSpoken(spoken, end - start), visual: short(visual, 320), camera, transition, onScreenText: short(onScreen, 60),
+    index: index + 1, start, end, purpose, spokenText: fitSpoken(spoken, end - start) || MISSING_SPOKEN, visual: short(visual, 320), camera, transition, onScreenText: short(onScreen, 60),
   }));
   const tags = copy.hashtags.join(" ");
+  const summary = copy.coreMessage;
   return {
-    version: 1, topic: short(candidate.title, 200), audience: short(candidate.audience_problem || "Menschen, die ihren Alltag einfacher organisieren wollen", 240),
+    version: 1, topic: short(candidate.title, 200), audience: short(copy.problem || "Menschen, die ihren Alltag einfacher organisieren wollen", 240),
     goal: "Reichweite und Vertrauen: ein konkreter, sofort umsetzbarer Alltagsnutzen in 30 Sekunden – ohne Produktwerbung",
-    hook: { spoken: short(copy.hook, 160), onScreen: short(candidate.title, 60), visual: short(`Nahaufnahme: ${copy.imageMotif}`, 240),
+    hook: { spoken: short(scenes[0].spokenText, 160), onScreen: short(candidate.title, 60), visual: short(`Nahaufnahme: ${copy.imageMotif}`, 240),
       why: "Startet mitten im Problem statt mit einer Begrüßung; die offene Frage hält bis zur Auflösung" },
-    structure: ["Hook (0–3 s): Problem sofort zeigen", "Problem (3–9 s): Wiedererkennen", "Spannung (9–15 s): Warum jetzt?", "Lösung (15–24 s): sichtbare Schritte", "Auflösung + CTA (24–30 s)"],
-    tension: "Die Frage aus dem Hook wird erst in der Lösungsszene beantwortet; dazwischen ein kurzer Perspektivwechsel (Warum gerade jetzt?)",
+    structure: ["Hook (0–3 s): Problem sofort zeigen", "Problem (3–9 s): Wiedererkennen", "Spannung (9–15 s): Perspektivwechsel", "Lösung (15–24 s): sichtbare Schritte", "Auflösung + CTA (24–30 s)"],
+    tension: "Die Frage aus dem Hook wird erst in der Lösungsszene beantwortet; dazwischen ein kurzer Perspektivwechsel",
     retention: ["offene Frage im Hook, Auflösung erst ab Sekunde 15", "Bildwechsel spätestens alle 3 Sekunden", "Untertitel mit einem Schlüsselwort je Szene"],
     scenes,
     voiceOver: { language: "de-DE", style: "warm, freundlich, wie eine Freundin, die einen Tipp gibt; keine Werbestimme", pace: "ruhig, ca. 2,3 Wörter pro Sekunde, kurze Pause vor der Lösung" },
     music: { use: true, direction: "leiser, lizenzfreier Hintergrund-Beat aus der Plattform-Bibliothek oder vom Anbieter; Sprache hat Vorrang" },
     cta: short(copy.cta, 120), quality: QUALITY,
     platform: {
-      instagram: { caption: short(`${copy.hook}\n\n${candidate.core_message}\n\n${copy.question}\n\n${tags}`, 2000) },
-      facebook: { caption: short(`${copy.hook}\n\n${candidate.core_message}\n\n${copy.question}`, 2000) },
-      youtube: { title: short(`${candidate.title} #shorts`, 100), description: short(`${candidate.core_message}\n\n${tags}`, 1500) },
+      instagram: { caption: short(`${copy.hook}\n\n${summary}\n\n${copy.question}\n\n${tags}`, 2000) },
+      facebook: { caption: short(`${copy.hook}\n\n${summary}\n\n${copy.question}`, 2000) },
+      youtube: { title: short(`${candidate.title} #shorts`, 100), description: short(`${summary}\n\n${tags}`, 1500) },
     },
     durationSeconds: 30, format: { aspect: "9:16", width: 1080, height: 1920 }, origin: "reference_template",
   };
@@ -116,7 +145,8 @@ export function referenceVideoBriefing(candidate: TopicCandidate, copy: TopicCop
 
 const INSTRUCTION = `Du bist Drehbuchautor für kurze, erzählende Hochformat-Videos (Instagram Reels, Facebook Reels, YouTube Shorts) der Marke „Alltäglich leichter“.
 Schreibe ein vollständiges deutsches Produktionsbriefing zu dem gelieferten Thema. Ziel: Reichweite und Vertrauen, keine Produktwerbung, kein Link.
-Hook: Die ersten 1–3 Sekunden entscheiden. Starte mitten im Problem oder mit einer überraschenden, wahren Beobachtung aus dem Alltag – keine Begrüßung,
+Hook: Die ersten 1–3 Sekunden entscheiden. Die erste Szene (purpose "hook") beginnt bei 0 und endet spätestens bei 3 Sekunden (end ≤ 3) mit höchstens
+7 gesprochenen Wörtern. Starte mitten im Problem oder mit einer überraschenden, wahren Beobachtung aus dem Alltag – keine Begrüßung,
 keine Selbstvorstellung, kein „Heute zeige ich euch“. Baue Spannung auf (offene Frage, Auflösung erst nach der Hälfte), wechsle das Bild spätestens alle
 3 Sekunden und ende mit einer klaren Aussage plus Handlungsaufforderung. Länge 20–40 Sekunden (Standard 30), 4–7 Szenen mit lückenlosen Zeitangaben
 (start/end in Sekunden, erste Szene beginnt bei 0, letzte endet bei durationSeconds). Sprechtext je Szene höchstens 2,3 Wörter pro Sekunde.
@@ -142,23 +172,47 @@ export function validBriefing(briefing: VideoBriefing): string | null {
   return null;
 }
 
-export async function writeVideoBriefing(candidate: TopicCandidate, copy: TopicCopy, options: { generate?: Generator | null }):
-  Promise<{ briefing: VideoBriefing; modelCalls: number; fallbackReason?: string }> {
+// One model call; if its briefing breaks a rule of validBriefing (timeline, hook length, spoken text too long, greeting,
+// claim, link), ONE targeted correction call with the rejected draft and the exact problem – only while the content's call
+// budget (maxCalls, MAX_MODEL_CALLS_PER_CONTENT) and the time budget (allowCorrection) allow it. The corrected briefing is
+// validated again in full; otherwise the reference briefing is used (and draftReadiness decides whether it is usable).
+export async function writeVideoBriefing(candidate: TopicCandidate, copy: TopicCopy, options: { generate?: Generator | null; maxCalls?: number; allowCorrection?: () => boolean }):
+  Promise<{ briefing: VideoBriefing; modelCalls: number; corrected?: boolean; fallbackReason?: string }> {
   const reference = referenceVideoBriefing(candidate, copy);
-  if (!options.generate) return { briefing: reference, modelCalls: 0 };
+  const maxCalls = options.maxCalls ?? 1;
+  if (!options.generate || maxCalls < 1) return { briefing: reference, modelCalls: 0 };
   const input = { title: candidate.title, trend_type: candidate.trend_type, problem: candidate.audience_problem, why_now: candidate.why_now, angle: candidate.angle,
     core_message: candidate.core_message, hook_idea: copy.hook, points: copy.points, hashtags: copy.hashtags,
     sources: candidate.source_signals.filter(signal => signal.kind === "news").slice(0, 4).map(signal => ({ publisher: signal.publisher, title: signal.title })) };
+  const sorted = (briefing: VideoBriefing) => ({ ...briefing, scenes: [...briefing.scenes].sort((a, b) => a.start - b.start) });
+  let calls = 0;
+  let first: VideoBriefing;
   try {
-    const result = await options.generate("video", INSTRUCTION, input, videoBriefingSchema, () => reference);
-    if (result.origin !== "model") return { briefing: reference, modelCalls: 1, fallbackReason: "Referenzvorlage vom Generator" };
-    const problem = validBriefing(result);
-    if (problem) return { briefing: reference, modelCalls: 1, fallbackReason: problem };
-    return { briefing: { ...result, scenes: [...result.scenes].sort((a, b) => a.start - b.start) }, modelCalls: 1 };
+    calls++;
+    first = await options.generate("video", INSTRUCTION, input, videoBriefingSchema, () => reference);
   } catch {
-    return { briefing: reference, modelCalls: 1, fallbackReason: "Modell nicht verfügbar" };
+    return { briefing: reference, modelCalls: calls, fallbackReason: "Modell nicht verfügbar" };
+  }
+  if (first.origin !== "model") return { briefing: reference, modelCalls: calls, fallbackReason: "Referenzvorlage vom Generator" };
+  const problem = validBriefing(first);
+  if (!problem) return { briefing: sorted(first), modelCalls: calls };
+  if (calls >= maxCalls || (options.allowCorrection && !options.allowCorrection())) return { briefing: reference, modelCalls: calls, fallbackReason: problem };
+  try {
+    calls++;
+    const corrected = await options.generate("video", `${INSTRUCTION}\n${CORRECTION}`, { ...input, rejected_briefing: first, rejection_reason: problem }, videoBriefingSchema, () => reference);
+    if (corrected.origin !== "model") return { briefing: reference, modelCalls: calls, fallbackReason: `${problem}; Korrektur nicht geliefert` };
+    const still = validBriefing(corrected);
+    if (still) return { briefing: reference, modelCalls: calls, fallbackReason: `${problem}; nach Korrektur: ${still}` };
+    return { briefing: sorted(corrected), modelCalls: calls, corrected: true };
+  } catch {
+    return { briefing: reference, modelCalls: calls, fallbackReason: `${problem}; Korrektur: Modell nicht verfügbar` };
   }
 }
+
+const CORRECTION = `Korrekturauftrag: rejected_briefing ist dein vorheriger Entwurf zu genau diesem Thema; er wurde abgelehnt (rejection_reason).
+Liefere das vollständige Briefing erneut. Behalte Thema, Aussagen und Szenenidee bei und behebe genau diesen Fehler: erste Szene 0 bis höchstens 3 Sekunden,
+Szenen lückenlos (start = end der vorigen Szene), letzte Szene endet bei durationSeconds, Sprechtext je Szene höchstens 2,3 Wörter pro Sekunde,
+keine Begrüßung, keine Preise, Tests, Garantien oder Heilversprechen, kein Link. Neue Fakten sind auch in der Korrektur nicht erlaubt.`;
 
 export const spokenText = (briefing: VideoBriefing) => briefing.scenes.map(scene => scene.spokenText).join(" ");
 

@@ -13,7 +13,7 @@ import { reconcileTopicPublications, resumeTopicProductions, runTopicPipeline, t
 //   failed       an isolated step failed; the other steps still ran
 //   daily_limit  the configured number of topic proposals for today (TOPIC_POSTS_PER_DAY, default 1) is reached
 //   outside_window  the call lies outside the proposal window (Berlin time); running jobs were still continued
-export type CronExit = "disabled" | "locked" | "already_ran" | "daily_limit" | "outside_window" | "proposed" | "no_topic" | "failed";
+export type CronExit = "disabled" | "locked" | "already_ran" | "daily_limit" | "outside_window" | "proposed" | "no_topic" | "not_ready" | "failed";
 
 // Scheduled topic proposals arrive in the morning: Berlin 08:00–11:00. vercel.json calls the cron at 07:00 and 08:00 UTC,
 // which is 09:00/10:00 in summer time and 08:00/09:00 in winter time – both inside the window in both seasons. Together
