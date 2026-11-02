@@ -189,6 +189,18 @@ export async function deliverWeeklyReport(weekStart: string, db: Database = getD
   }
 }
 
+// Delivered later with the operator's next message: a report that could not be sent at creation time because the 24 h
+// window was closed (status 'ready', never sent, no template). Only the newest one of the last 7 days; the send itself is
+// claimed once in deliverWeeklyReport (whatsapp_send_attempted_at), so a webhook retry cannot send it twice.
+export async function deliverPendingWeeklyReport(db: Database = getDatabase()) {
+  const pending = await db.query(
+    `SELECT week_start FROM weekly_reports WHERE status='ready' AND whatsapp_message_id IS NULL AND whatsapp_send_attempted_at IS NULL
+       AND created_at>now()-interval '7 days' ORDER BY week_start DESC LIMIT 1`);
+  if (!pending.rows[0]) return { status: "none" as const };
+  const weekStart = new Date(String(pending.rows[0].week_start)).toISOString().slice(0, 10);
+  return { weekStart, ...(await deliverWeeklyReport(weekStart, db)) };
+}
+
 export async function createWeeklyReport(reference = new Date(), db: Database = getDatabase()) {
   const { start, end, weekStart, weekEnd } = previousWeek(reference);
   const claimed = await db.query(
