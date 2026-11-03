@@ -56,7 +56,7 @@ test('configured provider without a successful job is not "belegt" (configured â
   } finally { await db.close(); }
 });
 
-test('undelivered drafts: distinct drafts and cron calls are counted separately', async () => {
+test('undelivered drafts: distinct never-delivered drafts and cron calls are counted separately', async () => {
   const db = await pgliteDatabase();
   try {
     const a = randomUUID(), b = randomUUID();
@@ -68,7 +68,8 @@ test('undelivered drafts: distinct drafts and cron calls are counted separately'
     await run(b, 'awaiting_approval', 'approval_not_sent', 120);
     await run(b, 'already_claimed', 'approval_sent', 60);
     const view = await readPipelineView({ capabilities: [], switches: OFF, now: NOW, open: () => db });
-    assert.deepEqual({ drafts: view.undelivered.drafts, runs: view.undelivered.runs }, { drafts: 2, runs: 4 });
+    // Draft b was delivered on its second call: its failed first call still counts as a call, but b is no undelivered draft.
+    assert.deepEqual({ drafts: view.undelivered.drafts, runs: view.undelivered.runs }, { drafts: 1, runs: 4 });
   } finally { await db.close(); }
 });
 

@@ -94,13 +94,16 @@ export async function readPipelineView(input: { capabilities: ServiceCapability[
 async function readUndelivered(handle: Readable, now: Date): Promise<UndeliveredCount | null> {
   const since = new Date(now.getTime() - WEEK_MS).toISOString();
   return section(handle, async sql => {
-    const row = await first(sql, `WITH runs AS (SELECT job_id,
+    // Same definition as the affiliate adapter: a draft counts once, and only if no call delivered it.
+    const row = await first(sql, `WITH runs AS (SELECT id, job_id,
+        (whatsapp = ANY($3::text[]) AND outcome IN ($2, 'already_claimed')) AS delivered,
         ((outcome = $2 AND (whatsapp IS NULL OR NOT whatsapp = ANY($3::text[]))) OR (whatsapp IS NOT NULL AND NOT whatsapp = ANY($3::text[]))) AS undelivered
         FROM daily_slot_runs WHERE invoked_at > $1::timestamptz)
-      SELECT count(*) FILTER (WHERE undelivered)::int AS runs, count(DISTINCT job_id) FILTER (WHERE undelivered)::int AS drafts FROM runs`,
+      SELECT count(*) FILTER (WHERE undelivered)::int AS runs, count(DISTINCT coalesce(job_id::text, id::text)) FILTER (WHERE undelivered
+        AND (job_id IS NULL OR job_id NOT IN (SELECT job_id FROM runs WHERE delivered AND job_id IS NOT NULL)))::int AS drafts FROM runs`,
     [since, DAILY_OUTCOMES.draft, [...DELIVERY.delivered]]);
     return { drafts: Number(row?.drafts ?? 0), runs: Number(row?.runs ?? 0), since,
-      basis: "daily_slot_runs, 7 Tage: eindeutige Entwürfe (job_id) und Cron-Aufrufe ohne zugestellte Freigabeanfrage" };
+      basis: "daily_slot_runs, 7 Tage: eindeutige Entwürfe (job_id), die bei keinem Aufruf zugestellt wurden, und Cron-Aufrufe ohne Zustellung" };
   });
 }
 
