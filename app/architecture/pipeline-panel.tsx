@@ -10,6 +10,7 @@ const STATE: Record<StationState, { label: string; className: string }> = {
   belegt: { label: "belegt", className: "pvOk" },
   wartet_betreiber: { label: "wartet auf dich", className: "pvWait" },
   blockiert: { label: "blockiert", className: "pvBad" },
+  nicht_reif: { label: "nicht produktionsreif", className: "pvWait" },
   aus: { label: "aus", className: "pvOff" },
   unbekannt: { label: "unbekannt", className: "pvOff" },
 };
