@@ -54,3 +54,12 @@ test('health and prioritisation run against a real schema without existing evide
   assert.equal(result.status,'succeeded');assert.equal(result.usedModelCalls,0);
   await db.close();
 });
+
+test('findings name their counting basis: drafts vs. delivery attempts, cost window with its time stamp (03.11.)',()=>{
+  const list=prioritize({undeliveredDrafts:2,undeliveredRuns:5},'2026-10-24T06:00:00Z',{cost_entries:299,cost_unknown:299},now);
+  assert.match(list[0].finding,/^2 Entwürfe nicht beim Betreiber angekommen \(7 Tage, 5 Zustellversuche\)$/);
+  assert.match(list.at(-1).finding,/^299 von 299 Kostenzeilen ohne Preis \(7 Tage bis 24\.10\., 08:20; der Wochenbericht zählt die Kalenderwoche\)$/);
+  // Equal counts need no second number; a stored report from before 03.11. (no undeliveredRuns) keeps the plain text.
+  assert.match(prioritize({undeliveredDrafts:1,undeliveredRuns:1},'2026-10-24T06:00:00Z',{cost_entries:1,cost_unknown:0},now)[0].finding,/^1 Entwürfe nicht beim Betreiber angekommen \(7 Tage\)$/);
+  assert.match(prioritize({undeliveredDrafts:3},'2026-10-24T06:00:00Z',{cost_entries:1,cost_unknown:0},now)[0].finding,/^3 Entwürfe nicht beim Betreiber angekommen \(7 Tage\)$/);
+});
