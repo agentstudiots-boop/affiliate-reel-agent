@@ -27,7 +27,7 @@ import { answerWhatsAppConversation } from "@/lib/whatsapp/chat";
 import { sendWhatsAppText } from "@/lib/whatsapp/client";
 import { completeVoice, releaseVoice, resolveVoiceMessage } from "@/lib/whatsapp/voice";
 import { publishInstagramImage, resumeInstagramImages } from "@/lib/meta/instagram-image";
-import { deliverWeeklyReport } from "@/lib/reporting/weekly";
+import { deliverPendingWeeklyReport, deliverWeeklyReport } from "@/lib/reporting/weekly";
 import { latestImagePostsStatus } from "@/lib/reporting/whatsapp-status";
 import { formatPublishReport } from "@/lib/publishing/report";
 import { publishApprovedAffiliateImage } from "@/lib/distribution/affiliate";
@@ -301,6 +301,14 @@ export async function POST(request: Request) {
       const { topicPipelineDeps } = await import("@/lib/agents/topic-runtime");
       await deliverHeldProposals(topicPipelineDeps());
     } catch { console.error(JSON.stringify({ event: "topic_proposal_flush_unavailable" })); }
+  }
+  // Same for a weekly report that was created while the window was closed (newest of the last 7 days, sent once).
+  if (!failed && approverId && typeof deliverPendingWeeklyReport === "function"
+    && messages.some(message => message.from.replace(/\D/g, "") === approverId)) {
+    try {
+      const delivered = await deliverPendingWeeklyReport(getDatabase());
+      if ("weekStart" in delivered) console.info(JSON.stringify({ event: "weekly_report_flush", weekStart: delivered.weekStart, status: delivered.status }));
+    } catch { console.error(JSON.stringify({ event: "weekly_report_flush_unavailable" })); }
   }
   // Successful message IDs deduplicate when Meta redelivers the batch.
   if (failed) return new Response("Storage unavailable", { status: 503, headers: { "Cache-Control": "no-store" } });
