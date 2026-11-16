@@ -127,6 +127,25 @@ test('topic path: a held proposal waits for the operator; live publishing off is
   } finally { await db.close(); }
 });
 
+test('topic path: a draft kept back by the readiness check is "nicht produktionsreif", not an error, and not the last success', async () => {
+  const db = await pgliteDatabase();
+  try {
+    await db.query(`INSERT INTO topic_contents(content_id,topic_id,stage,format,candidate,decision,copy,created_at,updated_at)
+      VALUES('tc_ok','t0','published','image','{}','{}','{"origin":"model"}',now()-interval '2 days',now()-interval '2 days')`);
+    await db.query(`INSERT INTO topic_contents(content_id,topic_id,stage,format,candidate,decision,copy,delivery,last_error)
+      VALUES('tc_thin','t1','discarded','image','{}','{}','{"origin":"reference_template"}','not_ready','draft_not_ready: Punkt 1: abgebrochener Satz')`);
+    const view = await readPipelineView({ capabilities: [], switches: { topicPipeline: true, topicDailyVideo: false, livePublishing: false }, now: NOW, open: () => db });
+    const draft = station(view, 'topic', 'draft');
+    assert.equal(draft.state, 'nicht_reif');
+    assert.match(draft.reason, /^nicht produktionsreif, nicht an dich gesendet: Punkt 1: abgebrochener Satz/);
+    assert.doesNotMatch(draft.reason, /Fehler|draft_not_ready/);
+    assert.equal(draft.current.contentId, 'tc_thin');
+    assert.equal(draft.next.owner, 'System');
+    const okRow = (await db.query("SELECT created_at FROM topic_contents WHERE content_id='tc_ok'")).rows[0];
+    assert.equal(draft.lastOkAt, new Date(okRow.created_at).toISOString(), 'the kept-back draft is not the last successful one');
+  } finally { await db.close(); }
+});
+
 test('a missing table leaves only its station unreadable, the others stay readable', async () => {
   const db = await pgliteDatabase();
   try {

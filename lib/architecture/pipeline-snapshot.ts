@@ -8,7 +8,8 @@ import type { ServiceCapability } from "../capabilities";
 // or messaging calls. A station is "belegt" only with database evidence of a successful run; configuration alone never
 // makes a station green. Missing figures (reach, revenue, prices) are null ("unbekannt"), never 0.
 
-export type StationState = "belegt" | "wartet_betreiber" | "blockiert" | "aus" | "unbekannt";
+// "nicht_reif": the readiness check (topic-pipeline/readiness.ts) kept a thin draft back on purpose – nothing is broken.
+export type StationState = "belegt" | "wartet_betreiber" | "blockiert" | "nicht_reif" | "aus" | "unbekannt";
 export type Owner = "Betreiber" | "System" | "Entwicklung";
 export type StationCurrent = { contentId: string | null; status: string; at: string | null; blocker: string | null };
 export type Publication = { platform: string; status: string; externalId: string | null; url: string | null; at: string | null };
@@ -50,7 +51,8 @@ async function section<T>(db: Readable, work: (sql: Sql) => Promise<T>): Promise
     return await db.transaction(async sql => { await sql.query("SET TRANSACTION READ ONLY"); return work(sql); });
   } catch { return null; }
 }
-const at = (value: unknown) => value ? new Date(String(value)).toISOString() : null;
+// Date objects keep their milliseconds (String(date) would drop them); strings are parsed as ISO.
+const at = (value: unknown) => value instanceof Date ? value.toISOString() : value ? new Date(String(value)).toISOString() : null;
 const text = (value: unknown, max = 140) => value === null || value === undefined || value === "" ? null : String(value).replace(/https?:\/\/\S+/g, "[URL]").slice(0, max);
 const first = async (sql: Sql, query: string, values: unknown[] = []) => ((await sql.query(query, values)).rows[0] ?? null) as Row | null;
 
@@ -62,6 +64,8 @@ const DELIVERY_LABEL: Record<string, string> = { read: "gelesen", delivered: "zu
 
 const station = (id: Station["id"], label: string, input: Omit<Station, "id" | "label">): Station => ({ id, label, ...input });
 const UNREADABLE = "Nachweis nicht lesbar (Tabelle fehlt oder Abfrage fehlgeschlagen)";
+// Prefix of topic_contents.last_error for a draft the readiness check kept back (topic-pipeline/orchestrator.ts).
+const NOT_READY = "draft_not_ready: ";
 // A section that could not be read (missing table, broken query) is "unbekannt" with that reason – never "ok".
 const unreadable = (id: Station["id"], label: string, source: string[]): Station =>
   station(id, label, { state: "unbekannt", reason: UNREADABLE, source, lastOkAt: null, current: null, next: null });
@@ -235,18 +239,21 @@ async function readTopic(handle: Readable, switches: PipelineSwitches, caps: Map
   const draft = await section(handle, async sql => {
     const last = await first(sql, `SELECT content_id, stage, delivery, last_error, updated_at, copy->>'origin' AS origin, ${deliveryOf("t.proposal_message_id")} AS proposal_delivery
       FROM topic_contents t ORDER BY updated_at DESC LIMIT 1`);
-    const ok = await first(sql, "SELECT max(created_at) AS last FROM topic_contents");
+    // A draft kept back by the readiness check is not a usable draft: it does not count as the last successful one.
+    const ok = await first(sql, `SELECT max(created_at) AS last FROM topic_contents WHERE last_error IS NULL OR last_error NOT LIKE '${NOT_READY}%'`);
     const held = last?.delivery === "awaiting_window";
     const unclear = last?.delivery === "unknown";
-    const error = last?.last_error && last.last_error !== "dry_run" ? text(last.last_error, 120) : null;
+    const notReady = typeof last?.last_error === "string" && last.last_error.startsWith(NOT_READY) ? text(last.last_error.slice(NOT_READY.length), 160) : null;
+    const error = !notReady && last?.last_error && last.last_error !== "dry_run" ? text(last.last_error, 120) : null;
     return station("draft", "Entwurf", {
-      state: !last ? pipelineOff ? "aus" : "unbekannt" : held ? "wartet_betreiber" : unclear || error ? "blockiert" : "belegt",
-      reason: !last ? "noch kein Themenentwurf" : held ? "Vorschlag gehalten: 24-h-Fenster geschlossen" : unclear ? "Zustellung des Vorschlags unklar" : error ? `Fehler: ${error}`
-        : `Stufe ${String(last.stage)}${last.origin ? `, Text: ${String(last.origin)}` : ""}`,
+      state: !last ? pipelineOff ? "aus" : "unbekannt" : held ? "wartet_betreiber" : notReady ? "nicht_reif" : unclear || error ? "blockiert" : "belegt",
+      reason: !last ? "noch kein Themenentwurf" : held ? "Vorschlag gehalten: 24-h-Fenster geschlossen" : notReady ? `nicht produktionsreif, nicht an dich gesendet: ${notReady}`
+        : unclear ? "Zustellung des Vorschlags unklar" : error ? `Fehler: ${error}` : `Stufe ${String(last.stage)}${last.origin ? `, Text: ${String(last.origin)}` : ""}`,
       source: ["topic_contents"], lastOkAt: at(ok?.last),
       current: last ? { contentId: String(last.content_id), status: `${String(last.stage)}${last.proposal_delivery ? `, Vorschlag ${DELIVERY_LABEL[String(last.proposal_delivery)] ?? String(last.proposal_delivery)}` : ""}`,
-        at: at(last.updated_at), blocker: held ? "wartet auf deine nächste WhatsApp-Nachricht" : unclear ? "Zustellung unklar" : error } : null,
+        at: at(last.updated_at), blocker: held ? "wartet auf deine nächste WhatsApp-Nachricht" : notReady ? "Entwurfsreife nicht erfüllt" : unclear ? "Zustellung unklar" : error } : null,
       next: held ? { action: "kurze WhatsApp-Nachricht senden – der Vorschlag wird dann nachgeliefert", owner: "Betreiber" }
+        : notReady ? { action: "nichts zu tun – der nächste Themenlauf versucht ein anderes Thema; bei Häufung Inhaltsregeln prüfen", owner: "System" }
         : error ? { action: "Fehler prüfen", owner: "Entwicklung" } : null,
     });
   }) ?? unreadable("draft", "Entwurf", ["topic_contents"]);
