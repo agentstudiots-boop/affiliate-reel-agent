@@ -184,3 +184,22 @@ test('adapter changes nothing in the studio and is not wired into app code (AC-7
   assert.match(pipeline,/^import \{ DAILY_OUTCOMES, DELIVERY \} from "\.\.\/enterprise\/departments\/affiliate";$/m);
   assert.doesNotMatch(pipeline,/affiliateDepartment|\.handle\(|\.health\(/);
 });
+
+test('undelivered drafts count each draft once (one row per cron call), and not at all once a later call delivered it',async()=>{
+  const db=await pgliteDatabase();
+  const call=(at,outcome,whatsapp,jobId)=>db.query('INSERT INTO daily_slot_runs(id,invoked_at,outcome,whatsapp,job_id) VALUES($1,$2,$3,$4,$5)',[crypto.randomUUID(),at,outcome,whatsapp,jobId]);
+  const a=crypto.randomUUID(),b=crypto.randomUUID();
+  // Draft a: three calls, never delivered. Draft b: first call failed, the resend reached the operator.
+  await call(hoursAgo(6),'awaiting_approval','template_required',a);
+  await call(hoursAgo(5),'already_claimed','approval_send_failed',a);
+  await call(hoursAgo(4),'already_claimed','approval_send_failed',a);
+  await call(hoursAgo(3),'awaiting_approval','approval_not_sent',b);
+  await call(hoursAgo(2),'already_claimed','approval_sent',b);
+  const report=await affiliateDepartment.health(affiliateContext(db,()=>NOW));
+  assert.equal(evidence(report,'Entwürfe ohne Zustellung (7 Tage)'),1);
+  assert.equal(evidence(report,'Cron-Aufrufe ohne Zustellung (7 Tage)'),4);
+  const result=await affiliateDepartment.handle({to:'affiliate',taskKind:'affiliate.status_report'},affiliateContext(db,()=>NOW));
+  assert.equal(result.output.undeliveredDrafts,1);
+  assert.equal(result.output.undeliveredRuns,4);
+  await db.close();
+});

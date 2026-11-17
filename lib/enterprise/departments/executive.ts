@@ -37,6 +37,8 @@ export function executiveContext(db: Database, now: () => Date = () => new Date(
 
 export type Priority = { rank: number; area: string; finding: string; action: string; operatorAction: boolean; source: string };
 
+// Time basis of a count, so figures from different moments (this cycle, the weekly report) can be told apart.
+const berlinStamp = (date: Date) => date.toLocaleString("de-DE", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 const num = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : Number(value) || 0);
 
 // The ordering is fixed and reviewable: failures before undelivered drafts before waiting approvals before housekeeping.
@@ -47,14 +49,16 @@ export function prioritize(report: Record<string, unknown> | null, reportAt: str
     items.push({ area: "Affiliate", finding: "kein aktueller Statusbericht (älter als 36 h oder fehlt)", action: "Executive-Zyklus und Tagesentwurf prüfen", operatorAction: false, source: "enterprise_tasks" });
   if (report) {
     if (num(report.errorRuns) > 0) items.push({ area: "Affiliate", finding: `${num(report.errorRuns)} fehlgeschlagene Tagesläufe in 7 Tagen`, action: "Ursache im Laufzeitlog prüfen", operatorAction: false, source: "daily_slot_runs" });
-    if (num(report.undeliveredDrafts) > 0) items.push({ area: "Affiliate", finding: `${num(report.undeliveredDrafts)} Entwürfe nicht beim Betreiber angekommen (7 Tage)`, action: "WhatsApp-Servicefenster öffnen (Nachricht senden) oder Vorlage aktivieren", operatorAction: true, source: "daily_slot_runs" });
+    // undeliveredRuns exists since 03.11.; older reports only carry the call count in undeliveredDrafts.
+    const attempts = report.undeliveredRuns === undefined ? "" : num(report.undeliveredRuns) > num(report.undeliveredDrafts) ? `, ${num(report.undeliveredRuns)} Zustellversuche` : "";
+    if (num(report.undeliveredDrafts) > 0) items.push({ area: "Affiliate", finding: `${num(report.undeliveredDrafts)} Entwürfe nicht beim Betreiber angekommen (7 Tage${attempts})`, action: "WhatsApp-Servicefenster öffnen (Nachricht senden) oder Vorlage aktivieren", operatorAction: true, source: "daily_slot_runs" });
     const approvals = num(report.contentApprovalsPending) + num(report.publicationApprovalsPending);
     if (approvals > 0) items.push({ area: "Affiliate", finding: `${approvals} Freigaben warten (Inhalt ${num(report.contentApprovalsPending)}, Veröffentlichung ${num(report.publicationApprovalsPending)})`, action: "Freigabe per WhatsApp beantworten", operatorAction: true, source: "content_approval_requests, publication_requests" });
   }
   if (num(open.topic_pending) > 0) items.push({ area: "Themen", finding: `${num(open.topic_pending)} Themenbeiträge warten auf Entscheidung`, action: "Vorschlag oder Veröffentlichung per WhatsApp beantworten", operatorAction: true, source: "topic_contents" });
   if (num(open.cost_approvals_pending) > 0) items.push({ area: "Produktion", finding: `${num(open.cost_approvals_pending)} Kostenfreigaben offen`, action: "Kostenfreigabe per WhatsApp beantworten", operatorAction: true, source: "approval_requests" });
   if (num(open.decisions_pending) > 0) items.push({ area: "Executive", finding: `${num(open.decisions_pending)} Entscheidungsvorlagen offen`, action: "Vorlage per WhatsApp beantworten", operatorAction: true, source: "enterprise_decisions" });
-  if (num(open.cost_unknown) > 0) items.push({ area: "Controlling", finding: `${num(open.cost_unknown)} von ${num(open.cost_entries)} Kostenzeilen (7 Tage) ohne Preis`, action: "Preise im Preiskatalog pflegen", operatorAction: true, source: "cost_entries" });
+  if (num(open.cost_unknown) > 0) items.push({ area: "Controlling", finding: `${num(open.cost_unknown)} von ${num(open.cost_entries)} Kostenzeilen ohne Preis (7 Tage bis ${berlinStamp(now)}; der Wochenbericht zählt die Kalenderwoche)`, action: "Preise im Preiskatalog pflegen", operatorAction: true, source: "cost_entries" });
   else if (num(open.cost_entries) === 0) items.push({ area: "Controlling", finding: "keine Kostenzeilen in 7 Tagen", action: "Kostenimport prüfen", operatorAction: false, source: "cost_entries" });
   return items.map((item, index) => ({ rank: index + 1, ...item }));
 }

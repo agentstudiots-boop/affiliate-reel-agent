@@ -36,14 +36,18 @@ export function affiliateReadViews(db: Database): Record<string, ReadView> {
   return {
     // A run counts as a delivered draft only with a delivered WhatsApp value; a draft or resend whose delivery failed or is
     // pending counts as undelivered. Idle cron calls without delivery information are skipped for the "last result".
+    // daily_slot_runs has one row per cron call and a slot is called up to three times: undelivered_drafts counts each draft
+    // (job_id) once and only if none of its calls delivered it; undelivered counts the calls themselves.
     daily_runs: params => readOnly(db, async sql => (await sql.query(`WITH runs AS (
-        SELECT invoked_at, outcome, whatsapp,
+        SELECT id, job_id, invoked_at, outcome, whatsapp,
           (whatsapp = ANY($5::text[]) AND outcome IN ($3, 'already_claimed')) AS delivered,
           ((outcome = $3 AND (whatsapp IS NULL OR NOT whatsapp = ANY($5::text[]))) OR (whatsapp IS NOT NULL AND NOT whatsapp = ANY($5::text[]))) AS undelivered,
           (outcome = ANY($4::text[]) AND whatsapp IS NULL) AS idle
         FROM daily_slot_runs WHERE invoked_at > $1::timestamptz)
       SELECT count(*)::int AS total, count(*) FILTER (WHERE outcome = ANY($2::text[]))::int AS errors,
         count(*) FILTER (WHERE delivered)::int AS drafts, count(*) FILTER (WHERE undelivered)::int AS undelivered,
+        count(DISTINCT coalesce(job_id::text, id::text)) FILTER (WHERE undelivered
+          AND (job_id IS NULL OR job_id NOT IN (SELECT job_id FROM runs WHERE delivered AND job_id IS NOT NULL)))::int AS undelivered_drafts,
         max(invoked_at) FILTER (WHERE delivered) AS last_draft_at, max(invoked_at) AS last_at,
         (array_agg(CASE WHEN undelivered THEN 'undelivered' ELSE outcome END ORDER BY invoked_at DESC) FILTER (WHERE NOT idle))[1] AS last_outcome
       FROM runs`,
@@ -63,7 +67,7 @@ export function affiliateContext(db: Database, now: () => Date = () => new Date(
   return { departmentId: "affiliate", now, read: createReadCapability("affiliate", affiliateReadViews(db)) };
 }
 
-type Figures = { totalRuns: number; errorRuns: number; drafts: number; undeliveredDrafts: number; lastDraftAt: string | null; lastRunAt: string | null;
+type Figures = { totalRuns: number; errorRuns: number; drafts: number; undeliveredDrafts: number; undeliveredRuns: number; lastDraftAt: string | null; lastRunAt: string | null;
   lastOutcome: string | null; contentApprovalsPending: number; publicationApprovalsPending: number; publishedFacebook: number; publishedInstagram: number;
   publishedInstagramReels: number };
 
@@ -73,7 +77,7 @@ async function readFigures(context: DepartmentContext): Promise<Figures> {
   const [open] = await context.read("open_approvals");
   const [published] = await context.read("published", { since });
   return {
-    totalRuns: count(runs?.total), errorRuns: count(runs?.errors), drafts: count(runs?.drafts), undeliveredDrafts: count(runs?.undelivered), lastDraftAt: iso(runs?.last_draft_at), lastRunAt: iso(runs?.last_at),
+    totalRuns: count(runs?.total), errorRuns: count(runs?.errors), drafts: count(runs?.drafts), undeliveredDrafts: count(runs?.undelivered_drafts), undeliveredRuns: count(runs?.undelivered), lastDraftAt: iso(runs?.last_draft_at), lastRunAt: iso(runs?.last_at),
     lastOutcome: runs?.last_outcome ? String(runs.last_outcome) : null,
     contentApprovalsPending: count(open?.content_pending), publicationApprovalsPending: count(open?.publication_pending),
     publishedFacebook: count(published?.facebook), publishedInstagram: count(published?.instagram), publishedInstagramReels: count(published?.instagram_reels),
@@ -103,6 +107,7 @@ export const affiliateDepartment: DepartmentModule = {
       { label: "davon Fehler", value: figures.errorRuns, source: "daily_slot_runs" },
       { label: "Freigabeanfragen zugestellt (7 Tage)", value: figures.drafts, source: "daily_slot_runs" },
       { label: "Entwürfe ohne Zustellung (7 Tage)", value: figures.undeliveredDrafts, source: "daily_slot_runs" },
+      { label: "Cron-Aufrufe ohne Zustellung (7 Tage)", value: figures.undeliveredRuns, source: "daily_slot_runs" },
       { label: "letzte zugestellte Freigabeanfrage", value: figures.lastDraftAt, source: "daily_slot_runs" },
       { label: "letztes Slot-Ergebnis", value: figures.lastOutcome, source: "daily_slot_runs" },
       { label: "offene Inhaltsfreigaben", value: figures.contentApprovalsPending, source: "content_approval_requests" },
